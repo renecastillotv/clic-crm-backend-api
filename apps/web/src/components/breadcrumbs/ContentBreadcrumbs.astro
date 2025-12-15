@@ -1,0 +1,127 @@
+---
+/**
+ * ContentBreadcrumbs.astro
+ * Componente de breadcrumbs reutilizable para secciones de contenido
+ * (videos, articulos, testimonios, etc.)
+ *
+ * Soporta dos variantes:
+ * - light: Texto blanco para fondos con gradiente/color
+ * - dark: Texto oscuro para fondos claros
+ */
+
+interface BreadcrumbItem {
+  label: string;
+  href?: string;
+}
+
+interface Props {
+  items: BreadcrumbItem[];
+  variant?: 'light' | 'dark';
+  separator?: string;
+  maxWidth?: string;
+}
+
+const {
+  items,
+  variant = 'light',
+  separator = '/',
+  maxWidth = '200px'
+} = Astro.props;
+
+const isLight = variant === 'light';
+---
+
+<nav class={`content-breadcrumbs ${variant}`} aria-label="Breadcrumb">
+  <ol class="breadcrumb-list">
+    {items.map((item, index) => {
+      const isLast = index === items.length - 1;
+      return (
+        <li class="breadcrumb-item">
+          {!isLast && item.href ? (
+            <a href={item.href} class="breadcrumb-link">{item.label}</a>
+          ) : (
+            <span class={`breadcrumb-current ${isLast ? 'truncate' : ''}`} style={isLast ? `max-width: ${maxWidth};` : ''}>
+              {item.label}
+            </span>
+          )}
+          {!isLast && <span class="breadcrumb-separator">{separator}</span>}
+        </li>
+      );
+    })}
+  </ol>
+</nav>
+
+<style>
+  .content-breadcrumbs {
+    font-size: 0.875rem;
+  }
+
+  .breadcrumb-list {
+    display: flex;
+    align-items: center;
+    flex-wrap: wrap;
+    gap: 0.5rem;
+    list-style: none;
+    margin: 0;
+    padding: 0;
+  }
+
+  .breadcrumb-item {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+  }
+
+  /* Variante Light (fondo oscuro/gradiente) */
+  .content-breadcrumbs.light .breadcrumb-link {
+    color: rgba(255, 255, 255, 0.85);
+    text-decoration: none;
+    transition: color 0.2s;
+  }
+
+  .content-breadcrumbs.light .breadcrumb-link:hover {
+    color: white;
+    text-decoration: underline;
+  }
+
+  .content-breadcrumbs.light .breadcrumb-separator {
+    color: rgba(255, 255, 255, 0.5);
+  }
+
+  .content-breadcrumbs.light .breadcrumb-current {
+    color: rgba(255, 255, 255, 0.7);
+  }
+
+  /* Variante Dark (fondo claro) */
+  .content-breadcrumbs.dark .breadcrumb-link {
+    color: #667eea;
+    text-decoration: none;
+    transition: color 0.2s;
+  }
+
+  .content-breadcrumbs.dark .breadcrumb-link:hover {
+    color: #5a67d8;
+    text-decoration: underline;
+  }
+
+  .content-breadcrumbs.dark .breadcrumb-separator {
+    color: #a0aec0;
+  }
+
+  .content-breadcrumbs.dark .breadcrumb-current {
+    color: #718096;
+  }
+
+  /* Truncate para items largos */
+  .truncate {
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+
+  @media (min-width: 768px) {
+    .truncate {
+      max-width: 400px !important;
+    }
+  }
+</style>

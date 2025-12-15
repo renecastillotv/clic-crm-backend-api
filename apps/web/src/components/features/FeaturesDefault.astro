@@ -1,0 +1,198 @@
+---
+/**
+ * FeaturesDefault - Sección de características o servicios
+ * Versión pulida con diseño consistente CLIC
+ */
+
+interface Props {
+  datos: {
+    static_data: {
+      titulo: string;
+      subtitulo?: string;
+      features?: Array<{
+        titulo: string;
+        descripcion: string;
+        icono: string;
+      }>;
+    };
+    dynamic_data?: {
+      resolved?: Array<any>;
+    };
+    styles?: {
+      columnas?: number;
+      gap?: string;
+    };
+  };
+  tema?: Record<string, string>;
+}
+
+const { datos, tema = {} } = Astro.props;
+const { static_data, dynamic_data, styles = {} } = datos;
+const { titulo, subtitulo, features: staticFeatures = [] } = static_data;
+
+// Datos resueltos o datos estáticos
+const features = dynamic_data?.resolved || staticFeatures;
+const { columnas = 3, gap = '2rem' } = styles;
+
+const primaryColor = tema.primary || '#f04e00';
+const secondaryColor = tema.secondary || '#1a1a1a';
+
+// Mapa de íconos (nombre -> SVG path)
+const iconMap: Record<string, string> = {
+  home: '<path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"></path><polyline points="9 22 9 12 15 12 15 22"></polyline>',
+  dollar: '<line x1="12" y1="1" x2="12" y2="23"></line><path d="M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6"></path>',
+  key: '<path d="M21 2l-2 2m-7.61 7.61a5.5 5.5 0 1 1-7.778 7.778 5.5 5.5 0 0 1 7.777-7.777zm0 0L15.5 7.5m0 0l3 3L22 7l-3-3m-3.5 3.5L19 4"></path>',
+  chart: '<line x1="18" y1="20" x2="18" y2="10"></line><line x1="12" y1="20" x2="12" y2="4"></line><line x1="6" y1="20" x2="6" y2="14"></line>',
+  building: '<rect x="4" y="2" width="16" height="20" rx="2" ry="2"></rect><path d="M9 22v-4h6v4"></path><path d="M8 6h.01"></path><path d="M16 6h.01"></path><path d="M12 6h.01"></path><path d="M12 10h.01"></path><path d="M12 14h.01"></path><path d="M16 10h.01"></path><path d="M16 14h.01"></path><path d="M8 10h.01"></path><path d="M8 14h.01"></path>',
+  shield: '<path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"></path>',
+  star: '<polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"></polygon>',
+  heart: '<path d="M20.84 4.61a5.5 5.5 0 0 0-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 0 0-7.78 7.78l1.06 1.06L12 21.23l7.78-7.78 1.06-1.06a5.5 5.5 0 0 0 0-7.78z"></path>',
+  users: '<path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"></path><circle cx="9" cy="7" r="4"></circle><path d="M23 21v-2a4 4 0 0 0-3-3.87"></path><path d="M16 3.13a4 4 0 0 1 0 7.75"></path>',
+  check: '<polyline points="20 6 9 17 4 12"></polyline>',
+  clock: '<circle cx="12" cy="12" r="10"></circle><polyline points="12 6 12 12 16 14"></polyline>',
+};
+
+// Función para obtener el SVG del ícono
+function getIconSvg(iconName: string): string {
+  const path = iconMap[iconName] || iconMap['star'];
+  return `<svg xmlns="http://www.w3.org/2000/svg" width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">${path}</svg>`;
+}
+---
+
+<section class="features-section">
+  <div class="container">
+    <div class="header">
+      <h2 class="title">{titulo}</h2>
+      {subtitulo && <p class="subtitle">{subtitulo}</p>}
+    </div>
+
+    <div class="features-grid" style={`grid-template-columns: repeat(${columnas}, 1fr); gap: ${gap};`}>
+      {features.map((feature: any) => (
+        <div class="feature-card">
+          <div class="feature-icon" set:html={getIconSvg(feature.icono)} />
+          <h3 class="feature-title">{feature.titulo}</h3>
+          <p class="feature-description">{feature.descripcion}</p>
+        </div>
+      ))}
+    </div>
+  </div>
+</section>
+
+<style define:vars={{ primaryColor, secondaryColor }}>
+  .features-section {
+    padding: 5rem 0;
+    background: white;
+  }
+
+  .container {
+    max-width: 1200px;
+    margin: 0 auto;
+    padding: 0 1.5rem;
+  }
+
+  .header {
+    text-align: center;
+    margin-bottom: 3.5rem;
+  }
+
+  .title {
+    font-size: 2.25rem;
+    font-weight: 700;
+    color: var(--secondaryColor);
+    margin: 0 0 0.75rem 0;
+    letter-spacing: -0.02em;
+  }
+
+  .subtitle {
+    font-size: 1.125rem;
+    color: #6b7280;
+    line-height: 1.6;
+    max-width: 640px;
+    margin: 0 auto;
+  }
+
+  .features-grid {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: 2rem;
+  }
+
+  .feature-card {
+    padding: 2rem;
+    background: #f9fafb;
+    border: 1px solid #e5e7eb;
+    border-radius: 12px;
+    text-align: center;
+    transition: all 0.3s;
+  }
+
+  .feature-card:hover {
+    transform: translateY(-4px);
+    box-shadow: 0 10px 25px rgba(0, 0, 0, 0.1);
+    border-color: var(--primaryColor);
+    background: white;
+  }
+
+  .feature-icon {
+    color: var(--primaryColor);
+    margin-bottom: 1.5rem;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+  }
+
+  .feature-icon svg {
+    width: 48px;
+    height: 48px;
+  }
+
+  .feature-title {
+    font-size: 1.25rem;
+    font-weight: 600;
+    color: var(--secondaryColor);
+    margin: 0 0 0.75rem 0;
+  }
+
+  .feature-description {
+    font-size: 0.95rem;
+    color: #6b7280;
+    line-height: 1.6;
+    margin: 0;
+  }
+
+  @media (max-width: 968px) {
+    .features-grid {
+      grid-template-columns: repeat(2, 1fr);
+      gap: 1.5rem;
+    }
+
+    .title {
+      font-size: 2rem;
+    }
+  }
+
+  @media (max-width: 640px) {
+    .features-section {
+      padding: 3rem 0;
+    }
+
+    .features-grid {
+      grid-template-columns: 1fr;
+      gap: 1rem;
+    }
+
+    .title {
+      font-size: 1.75rem;
+    }
+
+    .subtitle {
+      font-size: 1rem;
+    }
+
+    .feature-card {
+      padding: 1.5rem;
+    }
+  }
+</style>
+
+

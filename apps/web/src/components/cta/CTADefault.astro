@@ -1,0 +1,98 @@
+---
+/**
+ * CTADefault.astro
+ * Call to Action - Sección de llamada a la acción
+ */
+import type { ComponenteDataEstructurado } from '../../types/componentesEstructurado';
+
+interface Props {
+  datos: ComponenteDataEstructurado;
+  tema?: Record<string, string>;
+  baseUrl?: string;
+}
+
+const { datos, tema = {}, baseUrl = '' } = Astro.props;
+
+// Acceso a datos estructurados
+const staticData = datos.static_data || {};
+const styles = datos.styles || {};
+
+const titulo = staticData.titulo || '¿Listo para comenzar?';
+const textoBoton = staticData.textoBoton || 'Comenzar Ahora';
+const urlBotonOriginal = staticData.urlBoton || '#';
+// Si la URL es relativa (no empieza con http o #), agregar baseUrl
+const urlBoton = urlBotonOriginal.startsWith('http') || urlBotonOriginal.startsWith('#')
+  ? urlBotonOriginal
+  : `${baseUrl}${urlBotonOriginal.startsWith('/') ? urlBotonOriginal : '/' + urlBotonOriginal}`;
+
+// Prioridad: styles.colors > tema > variables CSS
+const padding = styles.spacing?.padding || '4rem 1rem';
+
+// Siempre usar colores del tema si están disponibles
+const primaryColor = styles.colors?.primary || tema?.primary;
+const secondaryColor = styles.colors?.secondary || tema?.secondary;
+const textColor = tema?.text || '#1a202c';
+
+// Si hay colores del tema o personalizados, usarlos inline con !important
+// Si no, dejar que el CSS use las variables CSS globales
+const backgroundGradient = (primaryColor && secondaryColor)
+  ? `background: linear-gradient(135deg, ${primaryColor} 0%, ${secondaryColor} 100%) !important;`
+  : '';
+---
+
+<section 
+  class="cta" 
+  style={`padding: ${padding}; ${backgroundGradient} text-align: center; color: #ffffff;`}
+>
+  <div class="container" style="max-width: 800px; margin: 0 auto;">
+    <h2 style={`
+      font-size: 2.5rem;
+      font-weight: 700;
+      margin-bottom: 1rem;
+      color: #ffffff;
+    `}>
+      {titulo}
+    </h2>
+    
+    <a
+      href={urlBoton}
+      class="cta-button"
+      style={`
+        display: inline-block;
+        padding: 1rem 2.5rem;
+        background: var(--background-color, #ffffff) !important;
+        color: ${primaryColor ? primaryColor : 'var(--primary-color, #667eea)'} !important;
+        text-decoration: none;
+        border-radius: 8px;
+        font-size: 1.1rem;
+        font-weight: 600;
+        margin-top: 1.5rem;
+        transition: transform 0.2s, box-shadow 0.2s;
+      `}
+    >
+      {textoBoton}
+    </a>
+  </div>
+</section>
+
+<style is:global>
+  .cta {
+    width: 100%;
+    display: block;
+    flex-shrink: 0;
+    background: linear-gradient(135deg, var(--primary-color, #667eea) 0%, var(--secondary-color, #764ba2) 100%) !important;
+  }
+  
+  /* Asegurar que el botón del CTA tenga buen contraste */
+  .cta-button {
+    background: var(--background-color, #ffffff) !important;
+    color: var(--primary-color, #00c732) !important;
+  }
+  
+  .cta-button:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 10px 25px rgba(0, 0, 0, 0.2);
+  }
+</style>
+
+

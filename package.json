@@ -1,0 +1,33 @@
+{
+  "name": "crm-monorepo",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Monorepo para proyecto CRM con React, APIs y página web en Astro",
+  "workspaces": [
+    "apps/*",
+    "packages/*"
+  ],
+  "scripts": {
+    "dev": "pnpm --filter \"./apps/*\" --filter \"./packages/*\" dev",
+    "dev:crm": "pnpm --filter crm-frontend dev",
+    "dev:web": "pnpm --filter web dev",
+    "dev:api": "pnpm --filter api dev",
+    "build": "pnpm --filter \"./apps/*\" --filter \"./packages/*\" build",
+    "build:crm": "pnpm --filter crm-frontend build",
+    "build:web": "pnpm --filter web build",
+    "build:api": "pnpm --filter api build",
+    "lint": "pnpm --filter \"./apps/*\" --filter \"./packages/*\" lint",
+    "clean": "pnpm --filter \"./apps/*\" --filter \"./packages/*\" clean"
+  },
+  "devDependencies": {
+    "typescript": "^5.3.3"
+  },
+  "engines": {
+    "node": ">=18.0.0",
+    "pnpm": ">=8.0.0"
+  },
+  "packageManager": "pnpm@8.15.0"
+}
+
+
+

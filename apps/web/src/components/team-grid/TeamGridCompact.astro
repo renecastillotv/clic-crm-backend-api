@@ -1,0 +1,279 @@
+---
+/**
+ * TeamGridCompact - Grid compacto de asesores
+ * Versión compacta con 4 columnas para homepage
+ */
+
+interface Props {
+  datos: {
+    static_data: {
+      titulo: string;
+      subtitulo?: string;
+    };
+    dynamic_data?: {
+      resolved?: Array<any>;
+    };
+    toggles?: {
+      mostrarContacto?: boolean;
+    };
+    styles?: {
+      columnas?: number;
+      gap?: string;
+    };
+  };
+  tema?: Record<string, string>;
+  baseUrl?: string;
+}
+
+const { datos, tema = {}, baseUrl = '' } = Astro.props;
+const { static_data, dynamic_data, toggles = {}, styles = {} } = datos;
+const { titulo, subtitulo } = static_data;
+const asesores = dynamic_data?.resolved || [];
+const { mostrarContacto = true } = toggles;
+const { columnas = 4, gap = '2rem' } = styles;
+
+const primaryColor = tema.primary || '#f04e00';
+const secondaryColor = tema.secondary || '#1a1a1a';
+
+// Agregar nombreCompleto para cada asesor
+const asesoresFormateados = asesores.map((asesor: any) => ({
+  ...asesor,
+  nombreCompleto: `${asesor.nombre || ''} ${asesor.apellido || ''}`.trim() || asesor.nombreCompleto || 'Sin nombre',
+}));
+---
+
+<section class="team-grid-compact">
+  <div class="container">
+    <div class="header">
+      <h2 class="title">{titulo}</h2>
+      {subtitulo && <p class="subtitle">{subtitulo}</p>}
+    </div>
+
+    {asesoresFormateados.length > 0 ? (
+      <div class="grid" style={`grid-template-columns: repeat(${columnas}, 1fr); gap: ${gap};`}>
+        {asesoresFormateados.map((asesor: any) => (
+          <div class="asesor-card">
+            <div class="avatar">
+              {asesor.avatar_url || asesor.foto_url ? (
+                <img src={asesor.avatar_url || asesor.foto_url} alt={asesor.nombreCompleto} />
+              ) : (
+                <div class="avatar-placeholder">
+                  {asesor.nombreCompleto.charAt(0).toUpperCase()}
+                </div>
+              )}
+            </div>
+
+            <h3 class="name">{asesor.nombreCompleto}</h3>
+
+            {asesor.cargo && (
+              <p class="role">{asesor.cargo}</p>
+            )}
+
+            {asesor.especialidad && (
+              <p class="specialty">{asesor.especialidad}</p>
+            )}
+
+            {mostrarContacto && asesor.email && (
+              <a href={`mailto:${asesor.email}`} class="contact-btn">
+                Contactar
+              </a>
+            )}
+          </div>
+        ))}
+      </div>
+    ) : (
+      <div class="empty-state">
+        <div class="empty-icon">👥</div>
+        <p>No hay asesores disponibles en este momento.</p>
+      </div>
+    )}
+
+    <div class="cta-section">
+      <a href={`${baseUrl}/asesores`} class="view-all-btn">Ver todos los asesores</a>
+    </div>
+  </div>
+</section>
+
+<style define:vars={{ primaryColor, secondaryColor }}>
+  .team-grid-compact {
+    padding: 5rem 0;
+    background: #f9fafb;
+  }
+
+  .container {
+    max-width: 1200px;
+    margin: 0 auto;
+    padding: 0 1.5rem;
+  }
+
+  .header {
+    text-align: center;
+    margin-bottom: 3.5rem;
+  }
+
+  .title {
+    font-size: 2.25rem;
+    font-weight: 700;
+    color: var(--secondaryColor);
+    margin: 0 0 0.75rem 0;
+    letter-spacing: -0.02em;
+  }
+
+  .subtitle {
+    font-size: 1.125rem;
+    color: #6b7280;
+    line-height: 1.6;
+  }
+
+  .grid {
+    display: grid;
+    grid-template-columns: repeat(4, 1fr);
+    gap: 2rem;
+    margin-bottom: 3rem;
+  }
+
+  .asesor-card {
+    text-align: center;
+    padding: 2rem 1.5rem;
+    background: #f9fafb;
+    border-radius: 12px;
+    transition: all 0.3s;
+  }
+
+  .asesor-card:hover {
+    transform: translateY(-8px);
+    box-shadow: 0 8px 24px rgba(0, 0, 0, 0.1);
+    background: white;
+  }
+
+  .avatar {
+    width: 100px;
+    height: 100px;
+    margin: 0 auto 1.5rem;
+    border-radius: 50%;
+    overflow: hidden;
+  }
+
+  .avatar img {
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+  }
+
+  .avatar-placeholder {
+    width: 100%;
+    height: 100%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    background: linear-gradient(135deg, var(--primaryColor) 0%, var(--secondaryColor) 100%);
+    color: white;
+    font-size: 2.5rem;
+    font-weight: 700;
+  }
+
+  .name {
+    font-size: 1.25rem;
+    font-weight: 600;
+    margin: 0 0 0.5rem 0;
+    color: var(--secondaryColor);
+  }
+
+  .role {
+    font-size: 0.95rem;
+    color: #6b7280;
+    margin: 0 0 0.5rem 0;
+  }
+
+  .specialty {
+    font-size: 0.875rem;
+    color: var(--primaryColor);
+    font-weight: 600;
+    margin: 0 0 1.5rem 0;
+  }
+
+  .contact-btn {
+    display: inline-block;
+    padding: 0.75rem 1.5rem;
+    background: var(--primaryColor);
+    color: white;
+    text-decoration: none;
+    border-radius: 8px;
+    font-weight: 600;
+    font-size: 0.95rem;
+    transition: all 0.3s;
+  }
+
+  .contact-btn:hover {
+    background: color-mix(in srgb, var(--primaryColor) 85%, black);
+    transform: translateY(-2px);
+  }
+
+  .empty-state {
+    text-align: center;
+    padding: 4rem 2rem;
+    color: #6b7280;
+  }
+
+  .empty-icon {
+    font-size: 4rem;
+    margin-bottom: 1rem;
+  }
+
+  .cta-section {
+    text-align: center;
+  }
+
+  .view-all-btn {
+    display: inline-block;
+    padding: 1rem 2.5rem;
+    background: white;
+    color: var(--primaryColor);
+    text-decoration: none;
+    border-radius: 8px;
+    font-weight: 600;
+    font-size: 1.125rem;
+    transition: all 0.3s;
+    border: 2px solid var(--primaryColor);
+  }
+
+  .view-all-btn:hover {
+    background: var(--primaryColor);
+    color: white;
+  }
+
+  @media (max-width: 968px) {
+    .grid {
+      grid-template-columns: repeat(2, 1fr);
+      gap: 1.5rem;
+    }
+
+    .title {
+      font-size: 2rem;
+    }
+  }
+
+  @media (max-width: 640px) {
+    .team-grid-compact {
+      padding: 3rem 0;
+    }
+
+    .grid {
+      grid-template-columns: 1fr;
+      gap: 1rem;
+    }
+
+    .title {
+      font-size: 1.75rem;
+    }
+
+    .avatar {
+      width: 80px;
+      height: 80px;
+    }
+
+    .view-all-btn {
+      width: 100%;
+    }
+  }
+</style>

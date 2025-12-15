@@ -1,0 +1,240 @@
+---
+/**
+ * VideoGalleryDefault.astro
+ * Grid de videos con soporte para filtro por categoría
+ */
+
+import type { ComponenteDataEstructurado } from '../../types/componentesEstructurado';
+
+interface Props {
+  datos: ComponenteDataEstructurado;
+  tema?: Record<string, string>;
+  baseUrl?: string;
+}
+
+const { datos, tema = {}, baseUrl = '' } = Astro.props;
+
+const staticData = datos?.static_data || {};
+const dynamicData = datos?.dynamic_data || {};
+const styles = datos?.styles || {};
+const toggles = datos?.toggles || {};
+
+// Configuración
+const titulo = staticData.titulo || '';
+const mostrarCategoria = toggles.mostrarCategoria !== false;
+const mostrarVistas = toggles.mostrarVistas !== false;
+
+// Videos
+const videos = dynamicData?.resolved || [];
+
+// Helper para extraer ID de YouTube
+function extractYouTubeId(url: string): string {
+  if (!url) return '';
+  const match = url.match(/^.*(youtu.be\/|v\/|u\/\w\/|embed\/|watch\?v=|&v=)([^#&?]*).*/);
+  return (match && match[2]?.length === 11) ? match[2] : '';
+}
+---
+
+<section class="video-gallery" style={`background: ${styles.colors?.background || '#f7fafc'};`}>
+  <div class="container">
+    {titulo && <h2 class="section-title" style={`color: ${tema.text || '#1a202c'};`}>{titulo}</h2>}
+
+    {videos.length > 0 ? (
+      <div class="video-grid">
+        {videos.map((video: any) => {
+          const youtubeId = extractYouTubeId(video.video_url || video.url || '');
+          let thumbnail = video.thumbnail_url || video.thumbnail || '';
+          if (!thumbnail && youtubeId) {
+            thumbnail = `https://img.youtube.com/vi/${youtubeId}/mqdefault.jpg`;
+          }
+
+          const title = video.titulo || video.title || 'Video';
+          const description = video.descripcion || video.description || '';
+          const views = video.vistas || video.views || 0;
+          const duration = video.duracion || video.duration || '';
+          const categoriaSlug = video.categoria_slug || 'general';
+          const categoriaNombre = video.categoria_nombre || 'General';
+          const videoSlug = video.slug || video.id;
+          const url = `${baseUrl}/videos/${categoriaSlug}/${videoSlug}`;
+
+          return (
+            <article class="video-card">
+              <a href={url} class="card-link">
+                <div class="thumbnail">
+                  <img src={thumbnail} alt={title} loading="lazy" />
+                  <div class="play-overlay">
+                    <svg fill="currentColor" viewBox="0 0 24 24">
+                      <path d="M8 5v14l11-7z"/>
+                    </svg>
+                  </div>
+                  {duration && <span class="duration">{duration}</span>}
+                  {mostrarCategoria && <span class="category-badge">{categoriaNombre}</span>}
+                </div>
+                <div class="info">
+                  <h3 class="title">{title}</h3>
+                  {description && <p class="description">{description}</p>}
+                  {mostrarVistas && views > 0 && (
+                    <span class="views">{views.toLocaleString()} vistas</span>
+                  )}
+                </div>
+              </a>
+            </article>
+          );
+        })}
+      </div>
+    ) : (
+      <div class="empty-state">
+        <svg fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 10l4.553-2.276A1 1 0 0121 8.618v6.764a1 1 0 01-1.447.894L15 14M5 18h8a2 2 0 002-2V8a2 2 0 00-2-2H5a2 2 0 00-2 2v8a2 2 0 002 2z" />
+        </svg>
+        <p>No hay videos disponibles</p>
+      </div>
+    )}
+  </div>
+</section>
+
+<style>
+  .video-gallery {
+    padding: 3rem 1rem;
+  }
+
+  .container {
+    max-width: 1200px;
+    margin: 0 auto;
+  }
+
+  .section-title {
+    font-size: 1.75rem;
+    font-weight: 700;
+    margin: 0 0 2rem;
+    text-align: center;
+  }
+
+  .video-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
+    gap: 1.5rem;
+  }
+
+  .video-card {
+    background: white;
+    border-radius: 8px;
+    overflow: hidden;
+    box-shadow: 0 2px 8px rgba(0,0,0,0.08);
+    transition: transform 0.2s, box-shadow 0.2s;
+  }
+
+  .video-card:hover {
+    transform: translateY(-4px);
+    box-shadow: 0 8px 20px rgba(0,0,0,0.12);
+  }
+
+  .card-link {
+    display: block;
+    text-decoration: none;
+    color: inherit;
+  }
+
+  .thumbnail {
+    position: relative;
+    padding-bottom: 56.25%;
+    background: #e2e8f0;
+  }
+
+  .thumbnail img {
+    position: absolute;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+  }
+
+  .play-overlay {
+    position: absolute;
+    inset: 0;
+    background: rgba(0,0,0,0.3);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    opacity: 0;
+    transition: opacity 0.2s;
+  }
+
+  .video-card:hover .play-overlay {
+    opacity: 1;
+  }
+
+  .play-overlay svg {
+    width: 48px;
+    height: 48px;
+    color: white;
+  }
+
+  .duration {
+    position: absolute;
+    bottom: 8px;
+    right: 8px;
+    background: rgba(0,0,0,0.8);
+    color: white;
+    padding: 2px 6px;
+    border-radius: 4px;
+    font-size: 0.75rem;
+    font-weight: 500;
+  }
+
+  .category-badge {
+    position: absolute;
+    top: 8px;
+    left: 8px;
+    background: rgba(102,126,234,0.9);
+    color: white;
+    padding: 4px 10px;
+    border-radius: 20px;
+    font-size: 0.7rem;
+    font-weight: 600;
+    text-transform: uppercase;
+  }
+
+  .info {
+    padding: 1rem;
+  }
+
+  .title {
+    font-size: 1rem;
+    font-weight: 600;
+    margin: 0 0 0.5rem;
+    color: #1a202c;
+    display: -webkit-box;
+    -webkit-line-clamp: 2;
+    -webkit-box-orient: vertical;
+    overflow: hidden;
+  }
+
+  .description {
+    font-size: 0.875rem;
+    color: #718096;
+    margin: 0 0 0.5rem;
+    display: -webkit-box;
+    -webkit-line-clamp: 2;
+    -webkit-box-orient: vertical;
+    overflow: hidden;
+  }
+
+  .views {
+    font-size: 0.75rem;
+    color: #a0aec0;
+  }
+
+  .empty-state {
+    text-align: center;
+    padding: 4rem 1rem;
+    color: #a0aec0;
+  }
+
+  .empty-state svg {
+    width: 48px;
+    height: 48px;
+    margin-bottom: 1rem;
+  }
+</style>

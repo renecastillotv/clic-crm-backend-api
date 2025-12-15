@@ -1,0 +1,200 @@
+---
+/**
+ * HomepageCTAClic.astro
+ *
+ * Sección CTA final de la homepage
+ * Diseño: Fondo gris gradiente, título centrado, botones lado a lado
+ */
+
+import type { TemaColores } from '../../types/componentes';
+
+interface Props {
+  datos?: {
+    static_data?: {
+      titulo?: string;
+      subtitulo?: string;
+      botonPrimario?: { texto: string; url: string; icono?: string };
+      botonSecundario?: { texto: string; url: string; icono?: string };
+      whatsappNumero?: string;
+      whatsappMensaje?: string;
+    };
+    styles?: {
+      primaryButtonBg?: string;
+      secondaryButtonBg?: string;
+    };
+    toggles?: {
+      mostrarSubtitulo?: boolean;
+      mostrarBotonSecundario?: boolean;
+    };
+  };
+  tema?: TemaColores;
+  baseUrl?: string;
+}
+
+const { datos = {}, tema, baseUrl = '' } = Astro.props;
+
+const staticData = datos.static_data || {};
+const styles = datos.styles || {};
+const toggles = datos.toggles || {};
+
+const titulo = staticData.titulo || 'Listos cuando tú lo estés';
+const subtitulo = staticData.subtitulo || 'Nuestro equipo de expertos está listo para ayudarte a encontrar tu próxima propiedad';
+
+const botonPrimario = staticData.botonPrimario || { texto: 'Contactar', url: '/contacto', icono: 'contact' };
+const botonSecundario = staticData.botonSecundario || { texto: 'Escribir', url: '#', icono: 'whatsapp' };
+
+const whatsappNumero = staticData.whatsappNumero || '+18095148080';
+const whatsappMensaje = staticData.whatsappMensaje || 'Hola, me interesa recibir información sobre propiedades';
+const whatsappUrl = `https://wa.me/${whatsappNumero.replace(/[^\d]/g, '')}?text=${encodeURIComponent(whatsappMensaje)}`;
+
+const mostrarSubtitulo = toggles.mostrarSubtitulo !== false;
+const mostrarBotonSecundario = toggles.mostrarBotonSecundario !== false;
+
+// === COLORES CONFIGURABLES ===
+const primaryButtonBg = styles.primaryButtonBg || tema?.primary || '#f04e00';
+const secondaryButtonBg = styles.secondaryButtonBg || tema?.backgroundDark || '#111827';
+const colorFondo = styles.colorFondo || tema?.backgroundSecondary || '#f3f4f6';
+const colorFondoGradiente = styles.colorFondoGradiente || '#e5e7eb';
+const colorTexto = styles.colorTexto || tema?.text || '#111827';
+const colorTextoSecondary = styles.colorTextoSecondary || tema?.textSecondary || '#4b5563';
+const colorTextoOnButton = styles.colorTextoOnButton || tema?.textOnPrimary || '#ffffff';
+const colorSombra = styles.colorSombra || 'rgba(0, 0, 0, 0.2)';
+---
+
+<section 
+  class="homepage-cta"
+  style={`
+    --cta-primary-bg: ${primaryButtonBg};
+    --cta-secondary-bg: ${secondaryButtonBg};
+    --cta-bg: ${colorFondo};
+    --cta-bg-gradient: ${colorFondoGradiente};
+    --cta-text: ${colorTexto};
+    --cta-text-secondary: ${colorTextoSecondary};
+    --cta-text-on-button: ${colorTextoOnButton};
+    --cta-sombra: ${colorSombra};
+    background: linear-gradient(to right, var(--cta-bg), var(--cta-bg-gradient));
+  `}
+>
+  <div class="cta-container">
+    <h2 class="cta-title">{titulo}</h2>
+
+    {mostrarSubtitulo && subtitulo && (
+      <p class="cta-subtitle">{subtitulo}</p>
+    )}
+
+    <div class="cta-buttons">
+      <!-- Botón Primario -->
+      <a
+        href={baseUrl + botonPrimario.url}
+        class="cta-btn cta-btn-primary"
+        style={`background-color: ${primaryButtonBg};`}
+      >
+        {botonPrimario.icono === 'contact' && (
+          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <path d="M3 8l7.89 5.26a2 2 0 002.22 0L21 8M5 19h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z"/>
+          </svg>
+        )}
+        <span>{botonPrimario.texto}</span>
+      </a>
+
+      <!-- Botón Secundario (WhatsApp) -->
+      {mostrarBotonSecundario && (
+        <a
+          href={botonSecundario.icono === 'whatsapp' ? whatsappUrl : (baseUrl + botonSecundario.url)}
+          target={botonSecundario.icono === 'whatsapp' ? '_blank' : '_self'}
+          rel={botonSecundario.icono === 'whatsapp' ? 'noopener noreferrer' : undefined}
+          class="cta-btn cta-btn-secondary"
+          style={`background-color: ${secondaryButtonBg};`}
+        >
+          {botonSecundario.icono === 'whatsapp' && (
+            <svg width="20" height="20" viewBox="0 0 24 24" fill="currentColor">
+              <path d="M17.472 14.382c-.297-.149-1.758-.867-2.03-.967-.273-.099-.471-.148-.67.15-.197.297-.767.966-.94 1.164-.173.199-.347.223-.644.075-.297-.15-1.255-.463-2.39-1.475-.883-.788-1.48-1.761-1.653-2.059-.173-.297-.018-.458.13-.606.134-.133.298-.347.446-.52.149-.174.198-.298.298-.497.099-.198.05-.371-.025-.52-.075-.149-.669-1.612-.916-2.207-.242-.579-.487-.5-.669-.51-.173-.008-.371-.01-.57-.01-.198 0-.52.074-.792.372-.272.297-1.04 1.016-1.04 2.479 0 1.462 1.065 2.875 1.213 3.074.149.198 2.096 3.2 5.077 4.487.709.306 1.262.489 1.694.625.712.227 1.36.195 1.871.118.571-.085 1.758-.719 2.006-1.413.248-.694.248-1.289.173-1.413-.074-.124-.272-.198-.57-.347m-5.421 7.403h-.004a9.87 9.87 0 01-5.031-1.378l-.361-.214-3.741.982.998-3.648-.235-.374a9.86 9.86 0 01-1.51-5.26c.001-5.45 4.436-9.884 9.888-9.884 2.64 0 5.122 1.03 6.988 2.898a9.825 9.825 0 012.893 6.994c-.003 5.45-4.437 9.884-9.885 9.884m8.413-18.297A11.815 11.815 0 0012.05 0C5.495 0 .16 5.335.157 11.892c0 2.096.547 4.142 1.588 5.945L.057 24l6.305-1.654a11.882 11.882 0 005.683 1.448h.005c6.554 0 11.89-5.335 11.893-11.893A11.821 11.821 0 0020.885 3.309"/>
+            </svg>
+          )}
+          <span>{botonSecundario.texto}</span>
+        </a>
+      )}
+    </div>
+  </div>
+</section>
+
+<style>
+  .homepage-cta {
+    padding: 5rem 0;
+    font-family: Inter, ui-sans-serif, system-ui, -apple-system, sans-serif;
+  }
+
+  .cta-container {
+    max-width: 800px;
+    margin: 0 auto;
+    padding: 0 1.5rem;
+    text-align: center;
+  }
+
+  .cta-title {
+    font-size: 2rem;
+    font-weight: 700;
+    color: var(--cta-text);
+    margin: 0 0 1rem 0;
+    line-height: 1.2;
+  }
+
+  @media (min-width: 768px) {
+    .cta-title {
+      font-size: 2.5rem;
+    }
+  }
+
+  .cta-subtitle {
+    font-size: 1rem;
+    color: var(--cta-text-secondary);
+    margin: 0 0 2rem 0;
+    line-height: 1.6;
+    max-width: 500px;
+    margin-left: auto;
+    margin-right: auto;
+  }
+
+  .cta-buttons {
+    display: flex;
+    flex-direction: column;
+    gap: 1rem;
+    justify-content: center;
+    align-items: center;
+  }
+
+  @media (min-width: 480px) {
+    .cta-buttons {
+      flex-direction: row;
+      gap: 1.25rem;
+    }
+  }
+
+  .cta-btn {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: 0.5rem;
+    padding: 0.875rem 1.75rem;
+    border-radius: 0.5rem;
+    font-size: 1rem;
+    font-weight: 600;
+    text-decoration: none;
+    color: var(--cta-text-on-button);
+    transition: transform 0.2s, box-shadow 0.2s, filter 0.2s;
+    min-width: 160px;
+  }
+
+  .cta-btn:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 8px 20px -4px var(--cta-sombra);
+  }
+
+  .cta-btn-primary:hover {
+    filter: brightness(0.9);
+  }
+
+  .cta-btn-secondary:hover {
+    filter: brightness(1.15);
+  }
+</style>

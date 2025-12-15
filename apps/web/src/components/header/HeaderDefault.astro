@@ -1,0 +1,316 @@
+---
+/**
+ * HeaderDefault.astro
+ * Header/Navegación configurable
+ *
+ * CONFIGURACION (static_data):
+ * - logo: URL del logo
+ * - logoAlt: Texto alternativo del logo
+ * - links: Array de {texto, url} para navegación
+ * - textoBotonCTA: Texto del botón CTA
+ * - urlBotonCTA: URL del botón CTA
+ * - placeholderBusqueda: Placeholder del campo de búsqueda
+ *
+ * OPCIONES DE DISEÑO (static_data):
+ * - posicionLogo: 'izquierda' | 'centro' (default: izquierda)
+ * - posicionNav: 'izquierda' | 'centro' | 'derecha' (default: centro)
+ * - estiloHeader: 'normal' | 'transparente' | 'oscuro' (default: normal)
+ * - headerFijo: boolean (default: true) - sticky header
+ *
+ * TOGGLES:
+ * - mostrarBusqueda: Mostrar barra de búsqueda
+ * - mostrarNav: Mostrar navegación
+ * - mostrarBotonCTA: Mostrar botón CTA
+ * - mostrarLogo: Mostrar logo
+ *
+ * COLORES (styles):
+ * - colorFondo: Color de fondo del header
+ * - colorTexto: Color del texto
+ * - colorPrimario: Color primario (botones, hover)
+ */
+
+import type { ComponenteDataEstructurado } from '../../types/componentesEstructurado';
+
+interface Props {
+  datos: ComponenteDataEstructurado;
+  tema?: Record<string, string>;
+  baseUrl?: string;
+}
+
+interface Enlace {
+  texto: string;
+  url: string;
+}
+
+const { datos, tema = {}, baseUrl = '' } = Astro.props;
+
+// Acceso a datos estructurados
+const staticData = datos?.static_data || {};
+const styles = datos?.styles || {};
+const toggles = datos?.toggles || {};
+
+// === DATOS BASICOS ===
+const logo = staticData.logo || '';
+const logoAlt = staticData.logoAlt || 'Logo';
+const links: Enlace[] = Array.isArray(staticData.links) ? staticData.links : [];
+const textoBotonCTA = staticData.textoBotonCTA || staticData.textoBotonContacto || 'Contactar';
+const urlBotonCTA = staticData.urlBotonCTA || staticData.urlBotonContacto || '/contacto';
+const placeholderBusqueda = staticData.placeholderBusqueda || 'Buscar...';
+
+// === OPCIONES DE DISEÑO ===
+const posicionLogo = staticData.posicionLogo || 'izquierda'; // izquierda | centro
+const posicionNav = staticData.posicionNav || 'centro'; // izquierda | centro | derecha
+const estiloHeader = staticData.estiloHeader || 'normal'; // normal | transparente | oscuro
+const headerFijo = staticData.headerFijo !== false; // default true
+
+// === TOGGLES ===
+const mostrarLogo = toggles.mostrarLogo !== false;
+const mostrarNav = toggles.mostrarNav !== false && toggles.mostrarMenu !== false;
+const mostrarBusqueda = toggles.mostrarBusqueda === true; // default false
+const mostrarBotonCTA = toggles.mostrarBotonCTA !== false && toggles.mostrarBotonContacto !== false;
+
+// === COLORES ===
+// Prioridad: styles del componente > tema del tenant > defaults
+const colorPrimario = styles.colorPrimario || tema.primary || '#667eea';
+const colorFondo = styles.colorFondo || (estiloHeader === 'oscuro' ? '#1a202c' : estiloHeader === 'transparente' ? 'transparent' : tema.background || '#ffffff');
+const colorTexto = styles.colorTexto || (estiloHeader === 'oscuro' ? '#ffffff' : tema.text || '#1a202c');
+const colorBorde = styles.colorBorde || tema.border || '#e2e8f0';
+
+// Clases CSS dinámicas
+const headerClasses = [
+  'header-default',
+  `logo-${posicionLogo}`,
+  `nav-${posicionNav}`,
+  `estilo-${estiloHeader}`,
+  headerFijo ? 'header-fijo' : '',
+].filter(Boolean).join(' ');
+---
+
+<header
+  class={headerClasses}
+  style={`
+    --hd-color-primario: ${colorPrimario};
+    --hd-color-fondo: ${colorFondo};
+    --hd-color-texto: ${colorTexto};
+    --hd-color-borde: ${colorBorde};
+  `}
+>
+  <div class="header-content">
+    {/* Logo */}
+    {mostrarLogo && (
+      <div class="header-logo">
+        {logo ? (
+          <a href={`${baseUrl}/`}>
+            <img src={logo} alt={logoAlt} />
+          </a>
+        ) : (
+          <a href={`${baseUrl}/`} class="logo-text">{logoAlt}</a>
+        )}
+      </div>
+    )}
+
+    {/* Navegación */}
+    {mostrarNav && links.length > 0 && (
+      <nav class="header-nav">
+        {links.map((enlace) => (
+          <a href={enlace.url.startsWith('/') ? `${baseUrl}${enlace.url}` : enlace.url}>
+            {enlace.texto}
+          </a>
+        ))}
+      </nav>
+    )}
+
+    {/* Acciones (búsqueda + CTA) */}
+    <div class="header-actions">
+      {mostrarBusqueda && (
+        <div class="header-search">
+          <input type="search" placeholder={placeholderBusqueda} />
+        </div>
+      )}
+
+      {mostrarBotonCTA && (
+        <a
+          href={urlBotonCTA.startsWith('/') ? `${baseUrl}${urlBotonCTA}` : urlBotonCTA}
+          class="header-cta"
+        >
+          {textoBotonCTA}
+        </a>
+      )}
+    </div>
+  </div>
+</header>
+
+<style>
+  .header-default {
+    background: var(--hd-color-fondo);
+    border-bottom: 1px solid var(--hd-color-borde);
+    padding: 1rem 2rem;
+    z-index: 100;
+    transition: background 0.3s, box-shadow 0.3s;
+  }
+
+  .header-default.header-fijo {
+    position: sticky;
+    top: 0;
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.08);
+  }
+
+  .header-default.estilo-transparente {
+    border-bottom: none;
+    box-shadow: none;
+  }
+
+  .header-default.estilo-oscuro {
+    border-bottom-color: rgba(255, 255, 255, 0.1);
+  }
+
+  .header-content {
+    max-width: 1200px;
+    margin: 0 auto;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 2rem;
+  }
+
+  /* === LOGO === */
+  .header-logo {
+    font-size: 1.5rem;
+    font-weight: 700;
+    flex-shrink: 0;
+  }
+
+  .header-logo a {
+    text-decoration: none;
+    display: flex;
+    align-items: center;
+  }
+
+  .header-logo img {
+    height: 40px;
+    width: auto;
+    max-width: 180px;
+    object-fit: contain;
+  }
+
+  .logo-text {
+    color: var(--hd-color-primario);
+    font-weight: 700;
+    font-size: 1.25rem;
+  }
+
+  /* Logo centrado */
+  .logo-centro .header-content {
+    flex-wrap: wrap;
+    justify-content: center;
+  }
+
+  .logo-centro .header-logo {
+    order: 0;
+    width: 100%;
+    text-align: center;
+    margin-bottom: 0.5rem;
+  }
+
+  /* === NAVEGACION === */
+  .header-nav {
+    display: flex;
+    gap: 2rem;
+    align-items: center;
+  }
+
+  .header-nav a {
+    color: var(--hd-color-texto);
+    text-decoration: none;
+    font-weight: 500;
+    font-size: 0.95rem;
+    transition: color 0.2s;
+    white-space: nowrap;
+  }
+
+  .header-nav a:hover {
+    color: var(--hd-color-primario);
+  }
+
+  /* Posición de navegación */
+  .nav-izquierda .header-nav {
+    margin-right: auto;
+  }
+
+  .nav-centro .header-nav {
+    flex: 1;
+    justify-content: center;
+  }
+
+  .nav-derecha .header-nav {
+    margin-left: auto;
+  }
+
+  /* === ACCIONES === */
+  .header-actions {
+    display: flex;
+    align-items: center;
+    gap: 1rem;
+    flex-shrink: 0;
+  }
+
+  .header-search input {
+    padding: 0.5rem 1rem;
+    border: 1px solid var(--hd-color-borde);
+    border-radius: 6px;
+    font-size: 0.9rem;
+    min-width: 180px;
+    background: transparent;
+    color: var(--hd-color-texto);
+  }
+
+  .header-search input::placeholder {
+    color: var(--hd-color-texto);
+    opacity: 0.6;
+  }
+
+  .header-search input:focus {
+    outline: none;
+    border-color: var(--hd-color-primario);
+  }
+
+  .header-cta {
+    padding: 0.6rem 1.5rem;
+    background: var(--hd-color-primario);
+    color: white;
+    border-radius: 6px;
+    text-decoration: none;
+    font-weight: 600;
+    font-size: 0.9rem;
+    transition: opacity 0.2s, transform 0.2s;
+    white-space: nowrap;
+  }
+
+  .header-cta:hover {
+    opacity: 0.9;
+    transform: translateY(-1px);
+  }
+
+  /* === RESPONSIVE === */
+  @media (max-width: 768px) {
+    .header-default {
+      padding: 0.75rem 1rem;
+    }
+
+    .header-content {
+      gap: 1rem;
+    }
+
+    .header-nav {
+      display: none; /* TODO: Implementar menú móvil */
+    }
+
+    .header-search {
+      display: none;
+    }
+
+    .header-logo img {
+      height: 32px;
+    }
+  }
+</style>

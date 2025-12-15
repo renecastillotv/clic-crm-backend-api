@@ -1,0 +1,117 @@
+---
+/**
+ * PaginationDefault.astro
+ * Componente de paginación para listados
+ */
+import type { ComponenteDataEstructurado } from '../../types/componentesEstructurado';
+
+interface Props {
+  datos: ComponenteDataEstructurado;
+  tema?: Record<string, string>;
+  paginaActual?: number;
+  totalPaginas?: number;
+}
+
+const { datos, tema = {}, paginaActual = 1, totalPaginas = 1 } = Astro.props;
+
+// Acceso a datos estructurados
+const staticData = datos.static_data || {};
+const styles = datos.styles || {};
+const toggles = datos.toggles || {};
+
+const itemsPorPagina = staticData.itemsPorPagina || 12;
+const mostrarTotal = toggles.mostrarTotal !== false;
+
+// Estilos personalizados
+const primaryColor = styles.colors?.primary || tema.primary || '#667eea';
+---
+
+<nav class="pagination" style="
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  gap: 0.5rem;
+  padding: 2rem 1rem;
+  flex-wrap: wrap;
+">
+  {mostrarTotal && (
+    <span style="color: var(--text-colorSecondary, #718096); margin-right: 1rem;">
+      Página {paginaActual} de {totalPaginas}
+    </span>
+  )}
+  
+  <button 
+    class="pagination-btn"
+    disabled={paginaActual === 1}
+    style="
+      padding: 0.5rem 1rem;
+      border: 1px solid var(--border-color, #e2e8f0);
+      background: var(--background-color, #ffffff);
+      color: var(--text-color, #1a202c);
+      border-radius: 6px;
+      cursor: pointer;
+      transition: all 0.2s;
+    "
+  >
+    ← Anterior
+  </button>
+  
+  {Array.from({ length: Math.min(totalPaginas, 5) }, (_, i) => {
+    const num = i + 1;
+    const isActive = num === paginaActual;
+    return (
+      <button
+        class="pagination-btn"
+        style={`
+          padding: 0.5rem 1rem;
+          border: 1px solid ${isActive ? 'var(--primary-color, #667eea)' : 'var(--border-color, #e2e8f0)'};
+          background: ${isActive ? 'var(--primary-color, #667eea)' : 'var(--background-color, #ffffff)'};
+          color: ${isActive ? '#ffffff' : 'var(--text-color, #1a202c)'};
+          border-radius: 6px;
+          cursor: pointer;
+          transition: all 0.2s;
+          font-weight: ${isActive ? '700' : '400'};
+        `}
+      >
+        {num}
+      </button>
+    );
+  })}
+  
+  <button
+    class="pagination-btn"
+    disabled={paginaActual === totalPaginas}
+    style="
+      padding: 0.5rem 1rem;
+      border: 1px solid var(--border-color, #e2e8f0);
+      background: var(--background-color, #ffffff);
+      color: var(--text-color, #1a202c);
+      border-radius: 6px;
+      cursor: pointer;
+      transition: all 0.2s;
+    "
+  >
+    Siguiente →
+  </button>
+</nav>
+
+<style is:global>
+  .pagination {
+    width: 100%;
+    display: flex;
+    flex-shrink: 0;
+  }
+  
+  .pagination-btn:hover:not(:disabled) {
+    background: var(--primary-color, #667eea) !important;
+    color: #ffffff !important;
+    border-color: var(--primary-color, #667eea) !important;
+  }
+  
+  .pagination-btn:disabled {
+    opacity: 0.5;
+    cursor: not-allowed;
+  }
+</style>
+
+

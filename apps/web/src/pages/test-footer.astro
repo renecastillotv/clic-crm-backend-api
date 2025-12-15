@@ -1,0 +1,53 @@
+---
+// Página de prueba solo para el Footer
+import FooterDefault from '../components/footer/FooterDefault.astro';
+
+const datos = {
+  textoCopyright: '© 2024 Inmobiliaria. Todos los derechos reservados.',
+  telefono: '+1 234 567 890',
+  email: 'contacto@inmobiliaria.com',
+  direccion: 'Calle Principal 123, Ciudad',
+};
+
+const tema = {
+  primary: '#667eea',
+  text: '#1a202c',
+};
+---
+
+<!doctype html>
+<html lang="es">
+  <head>
+    <meta charset="UTF-8" />
+    <title>Test Footer</title>
+    <style>
+      body {
+        margin: 0;
+        padding: 0;
+        background: #f0f0f0;
+      }
+      .test-wrapper {
+        min-height: 100vh;
+        display: flex;
+        flex-direction: column;
+      }
+      .spacer {
+        flex: 1;
+        background: white;
+        padding: 2rem;
+      }
+    </style>
+  </head>
+  <body>
+    <div class="test-wrapper">
+      <div class="spacer">
+        <h1>Contenido de prueba</h1>
+        <p>Si ves esto, el Footer debería estar abajo.</p>
+      </div>
+      <FooterDefault datos={datos} tema={tema} />
+    </div>
+  </body>
+</html>
+
+
+

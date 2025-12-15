@@ -1,0 +1,75 @@
+---
+/**
+ * CustomComponent.astro
+ * 
+ * Renderiza componentes personalizados creados a la medida
+ * Estos componentes se almacenan con código HTML/CSS/JS personalizado
+ */
+
+import type { ComponenteConfigurado } from '../../types/componentes';
+
+interface Props {
+  componente: ComponenteConfigurado;
+  tema?: Record<string, string>;
+  baseUrl?: string;
+}
+
+const { componente, tema = {}, baseUrl = '' } = Astro.props;
+
+// Los componentes custom pueden tener código HTML/CSS/JS almacenado
+const codigoHTML = componente.datos?.codigoHTML || '';
+const codigoCSS = componente.datos?.codigoCSS || '';
+const codigoJS = componente.datos?.codigoJS || '';
+const nombreCustom = componente.nombreCustom || 'Componente Personalizado';
+---
+
+<div 
+  class="custom-component" 
+  data-component-id={componente.id}
+  data-component-name={componente.nombreCustom}
+>
+  {codigoHTML ? (
+    <Fragment set:html={codigoHTML} />
+  ) : (
+    <div class="custom-component-placeholder">
+      <p>{nombreCustom}</p>
+      <small>Componente personalizado - Configura el contenido desde el CRM</small>
+    </div>
+  )}
+</div>
+
+{codigoCSS && (
+  <style set:html={codigoCSS} />
+)}
+
+{codigoJS && (
+  <script set:html={codigoJS} />
+)}
+
+<style>
+  .custom-component {
+    width: 100%;
+  }
+
+  .custom-component-placeholder {
+    padding: 3rem;
+    background: #f7fafc;
+    border: 2px dashed #cbd5e0;
+    border-radius: 12px;
+    text-align: center;
+    color: #718096;
+  }
+
+  .custom-component-placeholder p {
+    margin: 0 0 0.5rem 0;
+    font-weight: 600;
+    color: #4a5568;
+  }
+
+  .custom-component-placeholder small {
+    font-size: 0.85rem;
+  }
+</style>
+
+
+

@@ -1,0 +1,203 @@
+---
+/**
+ * LocationDiscoveryGrid - Grid de ubicaciones destacadas
+ * Muestra las zonas principales con imágenes y contador de propiedades
+ */
+
+interface Props {
+  datos: {
+    static_data: {
+      titulo: string;
+      subtitulo?: string;
+      ubicaciones: Array<{
+        nombre: string;
+        imagen: string;
+        propiedades: number;
+      }>;
+    };
+    toggles?: {
+      mostrarContador?: boolean;
+    };
+    styles?: {
+      columnas?: number;
+      gap?: string;
+    };
+  };
+  tema?: Record<string, string>;
+  baseUrl?: string;
+}
+
+const { datos, tema = {} } = Astro.props;
+const { static_data, toggles = {}, styles = {} } = datos;
+const { titulo, subtitulo, ubicaciones = [] } = static_data;
+const { mostrarContador = true } = toggles;
+const { columnas = 3, gap = '1.5rem' } = styles;
+
+const primaryColor = tema.primary || '#f04e00';
+const secondaryColor = tema.secondary || '#1a1a1a';
+---
+
+<section class="location-discovery">
+  <div class="container">
+    <div class="header">
+      <h2 class="title">{titulo}</h2>
+      {subtitulo && <p class="subtitle">{subtitulo}</p>}
+    </div>
+
+    <div class="locations-grid" style={`grid-template-columns: repeat(${columnas}, 1fr); gap: ${gap};`}>
+      {ubicaciones.map((ubicacion) => (
+        <a href={`/propiedades?ubicacion=${encodeURIComponent(ubicacion.nombre)}`} class="location-card">
+          <div class="location-image">
+            <img src={ubicacion.imagen} alt={ubicacion.nombre} />
+            <div class="overlay"></div>
+          </div>
+          <div class="location-info">
+            <h3 class="location-name">{ubicacion.nombre}</h3>
+            {mostrarContador && (
+              <p class="location-count">{ubicacion.propiedades} propiedades</p>
+            )}
+          </div>
+        </a>
+      ))}
+    </div>
+  </div>
+</section>
+
+<style define:vars={{ primaryColor, secondaryColor }}>
+  .location-discovery {
+    padding: 5rem 0;
+    background: white;
+  }
+
+  .container {
+    max-width: 1200px;
+    margin: 0 auto;
+    padding: 0 1.5rem;
+  }
+
+  .header {
+    text-align: center;
+    margin-bottom: 3.5rem;
+  }
+
+  .title {
+    font-size: 2.25rem;
+    font-weight: 700;
+    color: var(--secondaryColor);
+    margin-bottom: 0.75rem;
+    letter-spacing: -0.02em;
+  }
+
+  .subtitle {
+    font-size: 1.125rem;
+    color: #6b7280;
+    max-width: 640px;
+    margin: 0 auto;
+    line-height: 1.6;
+  }
+
+  .locations-grid {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: 1.5rem;
+  }
+
+  .location-card {
+    position: relative;
+    border-radius: 16px;
+    overflow: hidden;
+    text-decoration: none;
+    transition: transform 0.3s ease, box-shadow 0.3s ease;
+    cursor: pointer;
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
+  }
+
+  .location-card:hover {
+    transform: translateY(-8px);
+    box-shadow: 0 12px 24px rgba(0, 0, 0, 0.15);
+  }
+
+  .location-image {
+    position: relative;
+    aspect-ratio: 4 / 3;
+    overflow: hidden;
+  }
+
+  .location-image img {
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+    transition: transform 0.5s ease;
+  }
+
+  .location-card:hover .location-image img {
+    transform: scale(1.1);
+  }
+
+  .overlay {
+    position: absolute;
+    inset: 0;
+    background: linear-gradient(
+      to bottom,
+      rgba(0, 0, 0, 0.1) 0%,
+      rgba(0, 0, 0, 0.6) 100%
+    );
+  }
+
+  .location-info {
+    position: absolute;
+    bottom: 0;
+    left: 0;
+    right: 0;
+    padding: 1.5rem;
+    color: white;
+    z-index: 10;
+  }
+
+  .location-name {
+    font-size: 1.5rem;
+    font-weight: 700;
+    margin: 0 0 0.5rem 0;
+    text-shadow: 0 2px 4px rgba(0, 0, 0, 0.3);
+  }
+
+  .location-count {
+    font-size: 0.95rem;
+    margin: 0;
+    opacity: 0.95;
+    font-weight: 500;
+  }
+
+  @media (max-width: 968px) {
+    .locations-grid {
+      grid-template-columns: repeat(2, 1fr);
+    }
+
+    .title {
+      font-size: 2rem;
+    }
+  }
+
+  @media (max-width: 640px) {
+    .location-discovery {
+      padding: 3rem 0;
+    }
+
+    .locations-grid {
+      grid-template-columns: 1fr;
+      gap: 1rem;
+    }
+
+    .title {
+      font-size: 1.75rem;
+    }
+
+    .subtitle {
+      font-size: 1rem;
+    }
+
+    .location-name {
+      font-size: 1.25rem;
+    }
+  }
+</style>

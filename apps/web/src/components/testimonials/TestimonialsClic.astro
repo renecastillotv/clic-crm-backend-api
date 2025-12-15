@@ -1,0 +1,1191 @@
+---
+/**
+ * TestimonialsClic.astro - COPIA FIEL DEL ORIGINAL
+ * 100% fiel al diseño de pa.clicinmobiliaria.com
+ * 3 layouts: minimal, default, grid
+ * Adaptado al sistema de datos estructurados (frontend desacoplado)
+ * La API envía todo resuelto - solo dibujamos
+ */
+
+import type { ComponenteDataEstructurado } from '../../types/componentesEstructurado';
+
+interface Props {
+  datos: ComponenteDataEstructurado;
+  tema?: Record<string, string>;
+  baseUrl?: string;
+}
+
+const { datos, tema = {}, baseUrl = '' } = Astro.props;
+
+console.log(`💬 [TestimonialsClic] Props recibidos:`, {
+  hasDatos: !!datos,
+  hasStaticData: !!datos?.static_data,
+  hasDynamicData: !!datos?.dynamic_data,
+  baseUrl,
+  staticDataKeys: Object.keys(datos?.static_data || {}),
+  dynamicDataResolvedCount: datos?.dynamic_data?.resolved?.length || 0
+});
+
+const staticData = datos?.static_data || {};
+const dynamicData = datos?.dynamic_data || {};
+const styles = datos?.styles || {};
+
+// === COLORES CONFIGURABLES ===
+const colorPrimario = styles.colorPrimario || tema?.primary || '#f04e00';
+const colorPrimarioHover = styles.colorPrimarioHover || tema?.primaryHover || '#d94400';
+const colorTexto = styles.colorTexto || tema?.text || '#111827';
+const colorTextoSecondary = styles.colorTextoSecondary || tema?.textSecondary || '#4b5563';
+const colorTextoTertiary = styles.colorTextoTertiary || '#6b7280';
+const colorFondo = styles.colorFondo || tema?.background || '#ffffff';
+const colorFondoSecondary = styles.colorFondoSecondary || '#f9fafb';
+const colorBorde = styles.colorBorde || tema?.border || '#e5e7eb';
+const colorBordeHover = styles.colorBordeHover || `${colorPrimario}33`; // 20% opacity
+const colorEstrella = styles.colorEstrella || '#fbbf24'; // yellow-400
+const colorEstrellaInactiva = styles.colorEstrellaInactiva || '#d1d5db'; // gray-300
+const colorVerified = styles.colorVerified || '#3b82f6'; // blue-500 (siempre azul para verified)
+const colorTextoOnPrimary = styles.colorTextoOnPrimary || tema?.textOnPrimary || '#ffffff';
+
+// Detectar idioma desde la URL
+const pathname = Astro.url.pathname;
+let detectedLanguage = 'es'; // default
+
+// Detectar idioma desde la URL: /tenant/clic/en/ o /tenant/clic/fr/
+if (pathname.includes('/en/') || pathname.startsWith('/en/')) {
+  detectedLanguage = 'en';
+} else if (pathname.includes('/fr/') || pathname.startsWith('/fr/')) {
+  detectedLanguage = 'fr';
+}
+
+// Configuración
+const title = staticData.titulo;
+const subtitle = staticData.subtitulo;
+const showTitle = staticData.showTitle !== false;
+const layout = staticData.layout || 'minimal';
+const maxItems = staticData.maxItems || 4;
+// Prioridad: URL > staticData > default
+const language = detectedLanguage || staticData.language || 'es';
+
+// Datos dinámicos (testimonios) - Ya vienen procesados de la API
+const rawTestimonials = dynamicData?.resolved || [];
+const testimonials = Array.isArray(rawTestimonials) ? rawTestimonials : [];
+
+// No renderizar si no hay testimonios
+if (!testimonials || testimonials.length === 0) return null;
+
+// Traducciones - EXACTAS del original
+const translations = {
+  es: {
+    defaultTitle: "Lo que dicen nuestros clientes",
+    defaultSubtitle: "Experiencias reales de personas que han confiado en nosotros",
+    rating: "Calificación",
+    averageRating: "Calificación promedio",
+    testimonials: "Testimonios",
+    satisfied: "Clientes satisfechos",
+    recommend: "Recomiendan",
+    wouldRecommend: "Recomendarían CLIC",
+    readMore: "Leer más",
+    readings: "lecturas",
+    verified: "Verificado",
+    in: "en",
+    readyToFind: "¿Listo para encontrar tu próxima propiedad?",
+    talkToAdvisor: "Habla con un asesor",
+    viewAllTestimonials: "Ver todos los testimonios",
+    readFullTestimonial: "Leer testimonio completo de"
+  },
+  en: {
+    defaultTitle: "What our clients say",
+    defaultSubtitle: "Real experiences from people who have trusted us",
+    rating: "Rating",
+    averageRating: "Average rating",
+    testimonials: "Testimonials",
+    satisfied: "Satisfied clients",
+    recommend: "Recommend",
+    wouldRecommend: "Would recommend CLIC",
+    readMore: "Read more",
+    readings: "views",
+    verified: "Verified",
+    in: "in",
+    readyToFind: "Ready to find your next property?",
+    talkToAdvisor: "Talk to an advisor",
+    viewAllTestimonials: "View all testimonials",
+    readFullTestimonial: "Read full testimonial from"
+  },
+  fr: {
+    defaultTitle: "Découvrez ce que disent nos clients",
+    defaultSubtitle: "Expériences réelles de personnes qui nous ont fait confiance",
+    rating: "Évaluation",
+    averageRating: "Note moyenne",
+    testimonials: "Témoignages",
+    satisfied: "Clients satisfaits",
+    recommend: "Recommandent",
+    wouldRecommend: "Recommanderaient CLIC",
+    readMore: "Lire plus",
+    readings: "lectures",
+    verified: "Vérifié",
+    in: "à",
+    readyToFind: "Prêt à trouver votre prochaine propriété?",
+    talkToAdvisor: "Parler à un conseiller",
+    viewAllTestimonials: "Voir tous les témoignages",
+    readFullTestimonial: "Lire le témoignage complet de"
+  }
+};
+
+const t = translations[language] || translations.es;
+
+// Títulos (vienen de la API o usamos defaults)
+const finalTitle = title || t.defaultTitle;
+const finalSubtitle = subtitle || t.defaultSubtitle;
+
+// URLs según idioma
+const contactUrl = language === 'en' ? '/en/contact' : language === 'fr' ? '/fr/contact' : '/contacto';
+const testimonialsUrl = language === 'en' ? '/en/testimonials' : language === 'fr' ? '/fr/temoignages' : '/testimonios';
+
+// Los testimonios destacados y limitados YA vienen de la API
+const displayedTestimonials = testimonials.slice(0, maxItems);
+
+// Función para obtener la URL del testimonio individual
+// La API construye la URL relativa traducida, la completamos con baseUrl del tenant
+function getTestimonialUrl(testimonial: any): string | null {
+  // La API envía la URL relativa traducida (ej: /en/testimonios/... o /testimonios/...)
+  // El baseUrl es: /tenant/clic (sin idioma)
+  // Necesitamos combinar: /tenant/clic + /en/testimonios/... = /tenant/clic/en/testimonios/...
+  if (testimonial.url) {
+    // Asegurar que baseUrl no tenga trailing slash y que url empiece con /
+    const cleanBaseUrl = baseUrl.endsWith('/') ? baseUrl.slice(0, -1) : baseUrl;
+    const cleanUrl = testimonial.url.startsWith('/') ? testimonial.url : `/${testimonial.url}`;
+    const finalUrl = `${cleanBaseUrl}${cleanUrl}`;
+    
+    console.log(`🔗 [getTestimonialUrl] Construyendo URL:`, {
+      testimonialId: testimonial.id,
+      baseUrl,
+      urlFromAPI: testimonial.url,
+      finalUrl,
+      language: detectedLanguage
+    });
+    
+    return finalUrl;
+  }
+
+  // Fallback: si por alguna razón no viene URL desde la API, retornar null
+  // (no construimos URLs en el frontend - toda la lógica está en la API)
+  console.warn(`⚠️ [getTestimonialUrl] Testimonio ${testimonial.id} no tiene URL desde la API`);
+  return null;
+}
+
+console.log(`💬 [Testimonials] Mostrando ${displayedTestimonials.length} testimonios en layout "${layout}"`);
+---
+
+<!-- Layout Minimal - EXACTO del original -->
+{layout === 'minimal' && (
+  <section 
+    class="testimonials-clic-minimal"
+    style={`
+      --tc-primary: ${colorPrimario};
+      --tc-primary-hover: ${colorPrimarioHover};
+      --tc-text: ${colorTexto};
+      --tc-text-secondary: ${colorTextoSecondary};
+      --tc-text-tertiary: ${colorTextoTertiary};
+      --tc-bg: ${colorFondo};
+      --tc-bg-secondary: ${colorFondoSecondary};
+      --tc-border: ${colorBorde};
+      --tc-star: ${colorEstrella};
+      --tc-star-inactive: ${colorEstrellaInactiva};
+      --tc-verified: ${colorVerified};
+      width: 100%;
+      box-sizing: border-box;
+    `}
+  >
+    <div class="testimonials-container">
+      {showTitle && (
+        <div class="testimonials-header">
+          <h2 class="testimonials-title">{finalTitle}</h2>
+          <p class="testimonials-subtitle">{finalSubtitle}</p>
+        </div>
+      )}
+
+      {/* Testimonios en grid compacto - EXACTO del original */}
+      <div class="testimonials-grid-minimal">
+        {displayedTestimonials.map((testimonial: any) => {
+          const displayAvatar = testimonial.client_avatar || testimonial.avatar;
+          const displayName = testimonial.client_name || testimonial.author_name || 'Cliente';
+          const cleanText = testimonial.excerpt || testimonial.text || testimonial.full_testimonial || '';
+          const simpleLocation = testimonial.simple_location || testimonial.location || '';
+          const testimonialUrl = getTestimonialUrl(testimonial);
+
+          return (
+            <article class="testimonial-card-minimal">
+              {/* Rating compacto - EXACTO del original */}
+              <div class="testimonial-rating">
+                {[...Array(5)].map((_, i) => (
+                  <svg
+                    class={`star-icon star-icon-small ${i < testimonial.rating ? 'star-active' : 'star-inactive'}`}
+                    fill="currentColor"
+                    viewBox="0 0 24 24"
+                  >
+                    <path d="M12 2l3.09 6.26L22 9.27l-5 4.87 1.18 6.88L12 17.77l-6.18 3.25L7 14.14 2 9.27l6.91-1.01L12 2z"/>
+                  </svg>
+                ))}
+              </div>
+
+              {/* Testimonio corto - Limitado a 3 líneas */}
+              <blockquote class="testimonial-text testimonial-text-minimal">
+                "{cleanText}"
+              </blockquote>
+
+              {/* Autor compacto - EXACTO del original */}
+              <div class="testimonial-author-minimal">
+                {displayAvatar ? (
+                  <img
+                    src={displayAvatar}
+                    alt={displayName}
+                    class="testimonial-avatar testimonial-avatar-small"
+                    loading="lazy"
+                  />
+                ) : (
+                  <div class="testimonial-avatar-placeholder testimonial-avatar-small">
+                    <span class="testimonial-avatar-initial">
+                      {displayName.charAt(0)}
+                    </span>
+                  </div>
+                )}
+                <div class="testimonial-author-info">
+                  <cite class="testimonial-cite">
+                    <div class="author-name author-name-minimal">
+                      {displayName}
+                      {testimonial.client_verified && (
+                        <svg class="verified-icon verified-icon-small" fill="currentColor" viewBox="0 0 24 24" title={t.verified}>
+                          <path d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"/>
+                        </svg>
+                      )}
+                    </div>
+                    <div class="author-meta author-meta-minimal">
+                      {simpleLocation && <span>{simpleLocation}</span>}
+                      {simpleLocation && testimonial.client_profession && <span> • </span>}
+                      {testimonial.client_profession && <span>{testimonial.client_profession}</span>}
+                    </div>
+                  </cite>
+                </div>
+              </div>
+
+              {/* Link sutil si existe */}
+              {testimonialUrl && (
+                <a
+                  href={testimonialUrl}
+                  class="testimonial-link-overlay"
+                  aria-label={`${t.readFullTestimonial} ${displayName}`}
+                ></a>
+              )}
+            </article>
+          );
+        })}
+      </div>
+
+      {/* Stats mínimas - EXACTO del original */}
+      <div class="testimonials-stats-minimal">
+        <div>
+          <div class="stat-value">4.9/5</div>
+          <div class="stat-label">{t.rating}</div>
+        </div>
+        <div>
+          <div class="stat-value">{testimonials.length}+</div>
+          <div class="stat-label">{t.testimonials}</div>
+        </div>
+        <div>
+          <div class="stat-value">98%</div>
+          <div class="stat-label">{t.recommend}</div>
+        </div>
+      </div>
+    </div>
+  </section>
+)}
+
+<!-- Layout Default - EXACTO del original -->
+{layout === 'default' && (
+  <section 
+    class="testimonials-clic-default py-16"
+    style={`
+      --tc-primary: ${colorPrimario};
+      --tc-primary-hover: ${colorPrimarioHover};
+      --tc-text: ${colorTexto};
+      --tc-text-secondary: ${colorTextoSecondary};
+      --tc-text-tertiary: ${colorTextoTertiary};
+      --tc-bg: ${colorFondo};
+      --tc-bg-secondary: ${colorFondoSecondary};
+      --tc-border: ${colorBorde};
+      --tc-border-hover: ${colorBordeHover};
+      --tc-star: ${colorEstrella};
+      --tc-star-inactive: ${colorEstrellaInactiva};
+      --tc-verified: ${colorVerified};
+      --tc-text-on-primary: ${colorTextoOnPrimary};
+      background: linear-gradient(to bottom, var(--tc-bg-secondary), var(--tc-bg));
+    `}
+  >
+    <div class="testimonials-container">
+      {showTitle && (
+        <div class="testimonials-header-default">
+          <h2 class="testimonials-title-default">{finalTitle}</h2>
+          <p class="testimonials-subtitle-default">{finalSubtitle}</p>
+
+          {/* Stats - EXACTO del original */}
+          <div class="testimonials-stats-default">
+            <div class="testimonials-stat-item">
+              <div class="stat-value stat-value-large">4.9</div>
+              <div class="stat-label stat-label-default">{t.averageRating}</div>
+            </div>
+            <div class="testimonials-stat-item">
+              <div class="stat-value stat-value-large">{testimonials.length}+</div>
+              <div class="stat-label stat-label-default">{t.satisfied}</div>
+            </div>
+            <div class="testimonials-stat-item">
+              <div class="stat-value stat-value-large">98%</div>
+              <div class="stat-label stat-label-default">{t.wouldRecommend}</div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Testimonios en grid - EXACTO del original */}
+      <div class="testimonials-grid-default">
+        {displayedTestimonials.map((testimonial: any) => {
+          const displayAvatar = testimonial.client_avatar || testimonial.avatar;
+          const displayName = testimonial.client_name || testimonial.author_name || 'Cliente';
+          const cleanText = testimonial.excerpt || testimonial.text || testimonial.full_testimonial || '';
+          const simpleLocation = testimonial.simple_location || testimonial.location || '';
+          const testimonialUrl = getTestimonialUrl(testimonial);
+
+          return (
+            <article class="testimonial-card testimonial-card-default">
+              {/* Rating - EXACTO del original */}
+              <div class="testimonial-rating testimonial-rating-default">
+                {[...Array(5)].map((_, i) => (
+                  <svg
+                    class={`star-icon star-icon-default ${i < testimonial.rating ? 'star-active' : 'star-inactive'}`}
+                    fill="currentColor"
+                    viewBox="0 0 24 24"
+                  >
+                    <path d="M12 2l3.09 6.26L22 9.27l-5 4.87 1.18 6.88L12 17.77l-6.18 3.25L7 14.14 2 9.27l6.91-1.01L12 2z"/>
+                  </svg>
+                ))}
+              </div>
+
+              {/* Testimonio - EXACTO del original */}
+              <blockquote class="testimonial-text testimonial-text-default">
+                "{cleanText}"
+              </blockquote>
+
+              {/* Autor - EXACTO del original */}
+              <div class="testimonial-author testimonial-author-default">
+                {displayAvatar ? (
+                  <img
+                    src={displayAvatar}
+                    alt={displayName}
+                    class="testimonial-avatar testimonial-avatar-default"
+                    loading="lazy"
+                  />
+                ) : (
+                  <div class="testimonial-avatar-placeholder testimonial-avatar-default">
+                    <span class="testimonial-avatar-initial testimonial-avatar-initial-default">
+                      {displayName.charAt(0)}
+                    </span>
+                  </div>
+                )}
+                <div class="testimonial-author-info testimonial-author-info-default">
+                  <cite class="testimonial-cite">
+                    <div class="author-name author-name-default">
+                      {displayName}
+                      {testimonial.client_verified && (
+                        <svg class="verified-icon verified-icon-default" fill="currentColor" viewBox="0 0 24 24" title={t.verified}>
+                          <path d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"/>
+                        </svg>
+                      )}
+                    </div>
+                    <div class="author-meta author-meta-default">
+                      {simpleLocation && testimonial.client_profession && (
+                        <span>{testimonial.client_profession} {t.in} {simpleLocation} • </span>
+                      )}
+                      {!simpleLocation && testimonial.client_profession && (
+                        <span>{testimonial.client_profession} • </span>
+                      )}
+                      {simpleLocation && !testimonial.client_profession && (
+                        <span>{simpleLocation} • </span>
+                      )}
+                      {testimonial.formatted_date}
+                    </div>
+                  </cite>
+                </div>
+              </div>
+
+              {/* Metadata y CTA - EXACTO del original */}
+              <div class="testimonial-meta testimonial-meta-default">
+                <div class="testimonial-meta-left">
+                  {testimonial.views && testimonial.views !== '0' && (
+                    <span>{testimonial.views} {t.readings}</span>
+                  )}
+                  {testimonial.read_time && (
+                    <span>{testimonial.read_time}</span>
+                  )}
+                </div>
+                {testimonialUrl && (
+                  <a
+                    href={testimonialUrl}
+                    class="testimonial-read-more"
+                  >
+                    {t.readMore}
+                    <svg class="testimonial-read-more-icon" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7"></path>
+                    </svg>
+                  </a>
+                )}
+              </div>
+
+                     {/* Link invisible para toda la tarjeta */}
+                     {testimonialUrl && (
+                       <a
+                         href={testimonialUrl}
+                         class="testimonial-link-overlay"
+                         aria-label={`${t.readFullTestimonial} ${displayName}`}
+                       ></a>
+                     )}
+            </article>
+          );
+        })}
+      </div>
+
+      {/* CTA - EXACTO del original */}
+      <div class="testimonials-cta-container">
+        <p class="testimonials-cta-text">{t.readyToFind}</p>
+        <div class="testimonials-cta-buttons">
+          <a
+            href={contactUrl}
+            class="testimonial-cta-primary"
+          >
+            {t.talkToAdvisor}
+          </a>
+          <a
+            href={testimonialsUrl}
+            class="testimonial-cta-secondary"
+          >
+            {t.viewAllTestimonials}
+          </a>
+        </div>
+      </div>
+    </div>
+  </section>
+)}
+
+<!-- Layout Grid - EXACTO del original -->
+{layout === 'grid' && (
+  <section 
+    class="testimonials-clic-grid py-12"
+    style={`
+      --tc-primary: ${colorPrimario};
+      --tc-text: ${colorTexto};
+      --tc-text-secondary: ${colorTextoSecondary};
+      --tc-bg: ${colorFondo};
+      --tc-bg-secondary: ${colorFondoSecondary};
+      --tc-star: ${colorEstrella};
+      --tc-star-inactive: ${colorEstrellaInactiva};
+      background-color: var(--tc-bg);
+    `}
+  >
+    <div class="testimonials-container">
+      {showTitle && (
+        <div class="testimonials-header">
+          <h2 class="testimonials-title">{finalTitle}</h2>
+          <p class="testimonials-subtitle">{finalSubtitle}</p>
+        </div>
+      )}
+
+      <div class="testimonials-grid-grid">
+               {displayedTestimonials.map((testimonial: any) => {
+                 const displayAvatar = testimonial.client_avatar || testimonial.avatar;
+                 const displayName = testimonial.client_name || testimonial.author_name || 'Cliente';
+                 const cleanText = testimonial.excerpt || testimonial.text || testimonial.full_testimonial || '';
+                 const testimonialUrl = getTestimonialUrl(testimonial);
+
+                 return (
+                   <article class="testimonial-card-grid">
+              {/* Rating pequeño */}
+              <div class="testimonial-rating testimonial-rating-grid">
+                {[...Array(5)].map((_, i) => (
+                  <svg
+                    class={`star-icon star-icon-small ${i < testimonial.rating ? 'star-active' : 'star-inactive'}`}
+                    fill="currentColor"
+                    viewBox="0 0 24 24"
+                  >
+                    <path d="M12 2l3.09 6.26L22 9.27l-5 4.87 1.18 6.88L12 17.77l-6.18 3.25L7 14.14 2 9.27l6.91-1.01L12 2z"/>
+                  </svg>
+                ))}
+              </div>
+
+              {/* Texto ultra compacto */}
+              <blockquote class="testimonial-text testimonial-text-grid">
+                "{cleanText}"
+              </blockquote>
+
+              {/* Autor mini */}
+              <div class="testimonial-author testimonial-author-grid">
+                {displayAvatar ? (
+                  <img
+                    src={displayAvatar}
+                    alt={displayName}
+                    class="testimonial-avatar testimonial-avatar-grid"
+                    loading="lazy"
+                  />
+                ) : (
+                  <div class="testimonial-avatar-placeholder testimonial-avatar-grid">
+                    <span class="testimonial-avatar-initial testimonial-avatar-initial-grid">
+                      {displayName.charAt(0)}
+                    </span>
+                  </div>
+                )}
+                <cite class="author-name author-name-grid">
+                  {displayName}
+                </cite>
+              </div>
+
+                     {testimonialUrl && (
+                       <a
+                         href={testimonialUrl}
+                         class="testimonial-link-overlay"
+                         aria-label={`${t.readFullTestimonial} ${displayName}`}
+                       ></a>
+                     )}
+            </article>
+          );
+        })}
+      </div>
+    </div>
+  </section>
+)}
+
+<style>
+  /* Layout Minimal - EXACTO del original */
+  .testimonials-clic-minimal {
+    font-family: Inter, ui-sans-serif, system-ui, -apple-system, sans-serif;
+    padding: 3rem 0; /* py-12 */
+    background-color: rgba(249, 250, 251, 0.5); /* bg-gray-50/50 */
+    width: 100%;
+    box-sizing: border-box;
+    display: block;
+  }
+
+  .testimonials-container {
+    width: 100%;
+    margin-left: auto;
+    margin-right: auto;
+    padding-left: 1rem;
+    padding-right: 1rem;
+    /* Sin max-width - el grid interno controla el ancho máximo */
+  }
+
+  .testimonials-header {
+    text-align: center;
+    margin-bottom: 2rem; /* mb-8 */
+  }
+
+  .testimonials-title {
+    color: #111827; /* text-gray-900 */
+    font-size: 1.5rem; /* text-2xl */
+    font-weight: 700;
+    margin-bottom: 0.5rem; /* mb-2 */
+    line-height: 1.2;
+  }
+
+  @media (min-width: 768px) {
+    .testimonials-title {
+      font-size: 1.875rem; /* md:text-3xl */
+    }
+  }
+
+  .testimonials-subtitle {
+    color: #4b5563; /* text-gray-600 */
+    max-width: 36rem; /* max-w-xl */
+    margin: 0 auto;
+    font-size: 0.875rem; /* text-sm */
+    line-height: 1.5;
+  }
+
+  .testimonials-grid-minimal {
+    display: grid;
+    grid-template-columns: 1fr;
+    gap: 1.5rem; /* gap-6 - más espacio entre tarjetas */
+    width: 100%;
+    box-sizing: border-box;
+    /* Sin max-width - usar TODO el ancho disponible */
+  }
+
+  @media (min-width: 768px) {
+    .testimonials-grid-minimal {
+      grid-template-columns: repeat(2, 1fr); /* md:grid-cols-2 */
+    }
+  }
+
+  @media (min-width: 1024px) {
+    .testimonials-grid-minimal {
+      grid-template-columns: repeat(4, 1fr); /* lg:grid-cols-4 */
+    }
+  }
+
+  /* Asegurar que los artículos usen todo el ancho disponible */
+  .testimonials-grid-minimal > article {
+    width: 100%;
+    min-width: 0;
+    box-sizing: border-box;
+  }
+
+  .testimonial-card-minimal {
+    background: white;
+    border-radius: 0.5rem; /* rounded-lg */
+    box-shadow: 0 1px 2px 0 rgba(0, 0, 0, 0.05); /* shadow-sm */
+    transition: all 0.3s;
+    padding: 1.5rem; /* p-6 - más padding */
+    border: 1px solid #f3f4f6; /* border-gray-100 */
+    position: relative;
+    display: flex;
+    flex-direction: column;
+    width: 100%;
+    min-width: 0;
+    max-width: 100%;
+    box-sizing: border-box;
+    overflow: hidden; /* IMPORTANTE: Evitar que el contenido se salga */
+    word-wrap: break-word;
+    word-break: break-word;
+    overflow-wrap: anywhere; /* Forzar que las palabras se rompan si es necesario */
+    min-height: 200px; /* Altura mínima para que las tarjetas sean más altas */
+    height: auto; /* Permitir que crezca si es necesario */
+  }
+
+  .testimonial-card-minimal:hover {
+    box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1); /* hover:shadow-md */
+    border-color: #e5e7eb; /* hover:border-gray-200 */
+    cursor: pointer; /* Indicar que es clickeable */
+  }
+
+  .testimonial-rating {
+    display: flex;
+    align-items: center;
+    gap: 0.25rem; /* gap-1 */
+    margin-bottom: 1rem; /* mb-4 - más espacio */
+  }
+
+  .star-icon {
+    display: block;
+    flex-shrink: 0;
+  }
+
+  .star-icon-small {
+    width: 1rem; /* w-4 - más grande */
+    height: 1rem; /* h-4 - más grande */
+  }
+
+  .testimonial-text {
+    color: #374151; /* text-gray-700 */
+    overflow-wrap: break-word;
+    word-wrap: break-word;
+    word-break: break-word;
+  }
+
+  .testimonial-text-minimal {
+    font-size: 1.125rem; /* text-lg - más grande (18px) */
+    margin-bottom: 1.25rem; /* mb-5 */
+    line-height: 1.75; /* leading-relaxed - más espacio entre líneas */
+    color: #374151; /* text-gray-700 */
+    width: 100%;
+    max-width: 100%;
+    box-sizing: border-box;
+    overflow-wrap: break-word;
+    word-wrap: break-word;
+    word-break: break-word;
+    /* Limitar a 3 líneas con ellipsis */
+    display: -webkit-box;
+    -webkit-line-clamp: 3;
+    -webkit-box-orient: vertical;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    flex: 1; /* Ocupar el espacio disponible */
+    min-width: 0; /* Permitir que se encoja si es necesario */
+  }
+
+  .testimonial-author-minimal {
+    display: flex;
+    align-items: center;
+    gap: 0.75rem; /* gap-3 - más espacio */
+    margin-top: auto; /* Empujar hacia abajo */
+  }
+
+  .testimonial-avatar {
+    border-radius: 9999px;
+    object-fit: cover;
+    flex-shrink: 0;
+  }
+
+  .testimonial-avatar-small {
+    width: 2.5rem; /* w-10 - más grande */
+    height: 2.5rem; /* h-10 - más grande */
+  }
+
+  .testimonial-avatar-placeholder {
+    border-radius: 9999px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    flex-shrink: 0;
+    background: #e5e7eb;
+  }
+
+  .testimonial-avatar-placeholder.testimonial-avatar-small {
+    width: 2.5rem; /* w-10 - más grande */
+    height: 2.5rem; /* h-10 - más grande */
+  }
+
+  .testimonial-avatar-initial {
+    font-size: 1rem; /* text-base - más grande */
+    font-weight: 600; /* font-semibold - más bold */
+    color: #374151; /* text-gray-700 - más oscuro */
+  }
+
+  .testimonial-author-info {
+    flex: 1;
+    min-width: 0;
+  }
+
+  .testimonial-cite {
+    font-style: normal;
+  }
+
+  .author-name {
+    color: var(--tc-text);
+  }
+
+  .author-name-minimal {
+    font-weight: 600; /* font-semibold - más bold */
+    font-size: 0.875rem; /* text-sm - más grande */
+    color: #111827; /* text-gray-900 */
+    display: flex;
+    align-items: center;
+    gap: 0.25rem; /* gap-1 */
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+
+  .author-meta {
+    color: #6b7280; /* text-gray-500 */
+  }
+
+  .author-meta-minimal {
+    font-size: 0.75rem; /* text-xs */
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+
+  .verified-icon {
+    color: var(--tc-verified);
+  }
+
+  .verified-icon-small {
+    width: 1rem; /* w-4 - más grande */
+    height: 1rem; /* h-4 - más grande */
+    flex-shrink: 0;
+  }
+
+  .testimonial-link-overlay {
+    position: absolute;
+    inset: 0;
+    z-index: 10;
+  }
+
+  .testimonials-stats-minimal {
+    display: flex;
+    justify-content: center;
+    gap: 1.5rem; /* gap-6 */
+    margin-top: 2rem; /* mt-8 */
+    text-align: center;
+  }
+
+  .testimonials-stats-minimal > div {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+  }
+
+  .testimonials-stats-minimal .stat-value {
+    font-size: 1.125rem; /* text-lg */
+    font-weight: 700;
+    color: #f04e00; /* text-[#f04e00] */
+  }
+
+  .testimonials-stats-minimal .stat-label {
+    font-size: 0.75rem; /* text-xs */
+    color: #4b5563; /* text-gray-600 */
+  }
+
+  .star-icon.star-active {
+    color: #fbbf24; /* text-yellow-400 */
+  }
+
+  .star-icon.star-inactive {
+    color: #d1d5db; /* text-gray-300 */
+  }
+
+  .testimonial-text {
+    color: var(--tc-text-secondary);
+  }
+
+  .author-name {
+    color: var(--tc-text);
+  }
+
+  .author-meta {
+    color: var(--tc-text-tertiary);
+  }
+
+  .verified-icon {
+    color: var(--tc-verified);
+  }
+
+  .stat-value {
+    color: var(--tc-primary);
+  }
+
+  .stat-label {
+    color: var(--tc-text-secondary);
+  }
+
+  /* Layout Default */
+  .testimonials-clic-default {
+    font-family: Inter, ui-sans-serif, system-ui, -apple-system, sans-serif;
+    padding: 4rem 0;
+  }
+
+  .testimonials-header-default {
+    text-align: center;
+    margin-bottom: 3rem;
+  }
+
+  .testimonials-title-default {
+    font-size: 1.875rem;
+    font-weight: 700;
+    margin-bottom: 1rem;
+    color: var(--tc-text);
+  }
+
+  @media (min-width: 768px) {
+    .testimonials-title-default {
+      font-size: 2.25rem;
+    }
+  }
+
+  .testimonials-subtitle-default {
+    font-size: 1.125rem;
+    max-width: 42rem;
+    margin: 0 auto;
+    color: var(--tc-text-secondary);
+  }
+
+  .testimonials-stats-default {
+    display: flex;
+    justify-content: center;
+    gap: 2rem;
+    margin-top: 2rem;
+  }
+
+  .testimonials-stat-item {
+    text-align: center;
+  }
+
+  .stat-value-large {
+    font-size: 1.875rem;
+    font-weight: 700;
+    color: var(--tc-primary);
+  }
+
+  .stat-label-default {
+    font-size: 0.875rem;
+    color: var(--tc-text-secondary);
+  }
+
+  .testimonials-grid-default {
+    display: grid;
+    grid-template-columns: 1fr;
+    gap: 1.5rem;
+  }
+
+  @media (min-width: 768px) {
+    .testimonials-grid-default {
+      grid-template-columns: repeat(2, 1fr);
+    }
+  }
+
+  @media (min-width: 1024px) {
+    .testimonials-grid-default {
+      grid-template-columns: repeat(3, 1fr);
+    }
+  }
+
+  .testimonial-card-default {
+    background: white;
+    border-radius: 0.75rem;
+    box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1);
+    transition: all 0.3s;
+    padding: 1.5rem;
+    height: 100%;
+    position: relative;
+  }
+
+  .testimonial-card-default:hover {
+    box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.1);
+    border: 1px solid var(--tc-border-hover);
+  }
+
+  .testimonial-rating-default {
+    display: flex;
+    align-items: center;
+    gap: 0.25rem;
+    margin-bottom: 1rem;
+  }
+
+  .star-icon-default {
+    width: 1.25rem;
+    height: 1.25rem;
+  }
+
+  .testimonial-text-default {
+    margin-bottom: 1.5rem;
+    color: var(--tc-text-secondary);
+  }
+
+  .testimonial-author-default {
+    display: flex;
+    align-items: center;
+    gap: 0.75rem;
+    margin-bottom: 1rem;
+  }
+
+  .testimonial-avatar-default {
+    width: 2.5rem;
+    height: 2.5rem;
+  }
+
+  .testimonial-avatar-initial-default {
+    font-size: 0.875rem;
+    font-weight: 500;
+    color: #4b5563;
+  }
+
+  .testimonial-author-info-default {
+    flex: 1;
+  }
+
+  .author-name-default {
+    font-weight: 500;
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    color: var(--tc-text);
+  }
+
+  .verified-icon-default {
+    width: 1rem;
+    height: 1rem;
+  }
+
+  .author-meta-default {
+    font-size: 0.75rem;
+    color: var(--tc-text-tertiary);
+  }
+
+  .testimonial-meta-default {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    font-size: 0.75rem;
+    color: var(--tc-text-tertiary);
+  }
+
+  .testimonial-meta-left {
+    display: flex;
+    align-items: center;
+    gap: 0.75rem;
+  }
+
+  .testimonial-read-more {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.25rem;
+    transition: all 0.2s;
+    font-weight: 500;
+    z-index: 20;
+    position: relative;
+    color: var(--tc-primary);
+  }
+
+  .testimonial-read-more:hover {
+    gap: 0.5rem;
+  }
+
+  .testimonial-read-more-icon {
+    width: 0.75rem;
+    height: 0.75rem;
+  }
+
+  .testimonials-cta-container {
+    text-align: center;
+    margin-top: 3rem;
+  }
+
+  .testimonials-cta-text {
+    margin-bottom: 1rem;
+    color: var(--tc-text-secondary);
+  }
+
+  .testimonials-cta-buttons {
+    display: flex;
+    flex-direction: column;
+    gap: 1rem;
+    justify-content: center;
+  }
+
+  @media (min-width: 640px) {
+    .testimonials-cta-buttons {
+      flex-direction: row;
+    }
+  }
+
+  .testimonial-cta-primary {
+    display: inline-block;
+    padding: 0.75rem 2rem;
+    border-radius: 0.5rem;
+    transition: background-color 0.2s;
+    background-color: var(--tc-primary);
+    color: var(--tc-text-on-primary);
+    text-decoration: none;
+  }
+
+  .testimonial-cta-primary:hover {
+    background-color: var(--tc-primary-hover);
+  }
+
+  .testimonial-cta-secondary {
+    display: inline-block;
+    padding: 0.75rem 2rem;
+    border-radius: 0.5rem;
+    transition: all 0.2s;
+    background-color: var(--tc-bg);
+    color: var(--tc-primary);
+    border: 1px solid var(--tc-primary);
+    text-decoration: none;
+  }
+
+  .testimonial-cta-secondary:hover {
+    background-color: var(--tc-primary);
+    color: var(--tc-text-on-primary);
+  }
+
+  /* Layout Grid */
+  .testimonials-clic-grid {
+    font-family: Inter, ui-sans-serif, system-ui, -apple-system, sans-serif;
+    padding: 3rem 0;
+  }
+
+  .testimonials-grid-grid {
+    display: grid;
+    grid-template-columns: 1fr;
+    gap: 1rem;
+    max-width: 64rem;
+    margin: 0 auto;
+  }
+
+  @media (min-width: 768px) {
+    .testimonials-grid-grid {
+      grid-template-columns: repeat(2, 1fr);
+    }
+  }
+
+  @media (min-width: 1024px) {
+    .testimonials-grid-grid {
+      grid-template-columns: repeat(4, 1fr);
+    }
+  }
+
+  .testimonial-card-grid {
+    background: #f9fafb;
+    border-radius: 0.5rem;
+    padding: 1rem;
+    transition: box-shadow 0.2s;
+    position: relative;
+  }
+
+  .testimonial-card-grid:hover {
+    box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1);
+  }
+
+  .testimonial-rating-grid {
+    display: flex;
+    align-items: center;
+    gap: 0.125rem;
+    margin-bottom: 0.5rem;
+  }
+
+  .testimonial-text-grid {
+    font-size: 0.75rem;
+    margin-bottom: 0.75rem;
+    color: var(--tc-text-secondary);
+  }
+
+  .testimonial-author-grid {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+  }
+
+  .testimonial-avatar-grid {
+    width: 1.5rem;
+    height: 1.5rem;
+  }
+
+  .testimonial-avatar-placeholder.testimonial-avatar-grid {
+    background: #d1d5db;
+  }
+
+  .testimonial-avatar-initial-grid {
+    font-size: 0.75rem;
+    font-weight: 500;
+    color: #4b5563;
+  }
+
+  .author-name-grid {
+    font-style: normal;
+    font-size: 0.75rem;
+    font-weight: 500;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    color: var(--tc-text);
+  }
+
+  .line-clamp-2 {
+    display: -webkit-box;
+    -webkit-line-clamp: 2;
+    -webkit-box-orient: vertical;
+    overflow: hidden;
+  }
+
+  .line-clamp-3 {
+    display: -webkit-box;
+    -webkit-line-clamp: 3;
+    -webkit-box-orient: vertical;
+    overflow: hidden;
+    word-break: break-word;
+    hyphens: auto;
+  }
+
+  .line-clamp-4 {
+    display: -webkit-box;
+    -webkit-line-clamp: 4;
+    -webkit-box-orient: vertical;
+    overflow: hidden;
+  }
+</style>

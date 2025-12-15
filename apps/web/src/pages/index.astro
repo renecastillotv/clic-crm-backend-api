@@ -1,0 +1,80 @@
+---
+/**
+ * index.astro
+ * 
+ * En DESARROLLO: Redirige al primer tenant disponible
+ * En PRODUCCIÓN: Se detectará el tenant por dominio/subdominio
+ * 
+ * Para desarrollo, la estructura es: /tenant/[tenantId]/...
+ */
+
+// En desarrollo, redirigir al primer tenant usando su slug
+// En producción, esto vendrá del dominio/subdominio
+const isDevelopment = import.meta.env.DEV;
+
+if (isDevelopment) {
+  // Obtener el primer tenant disponible y redirigir usando su slug
+  let tenantSlug: string | null = null;
+  try {
+    const API_URL = import.meta.env.PUBLIC_API_URL || 'http://localhost:3001';
+    const tenantResponse = await fetch(`${API_URL}/api/tenants/first`);
+    if (tenantResponse.ok) {
+      const tenant = await tenantResponse.json();
+      tenantSlug = tenant.slug;
+    }
+  } catch (error) {
+    console.warn('No se pudo obtener tenant:', error);
+  }
+
+  if (tenantSlug) {
+    // Redirigir a /tenant/[tenantSlug]/
+    return Astro.redirect(`/tenant/${tenantSlug}/`);
+  } else {
+    // Si no hay tenants, mostrar página de error
+    return Astro.redirect('/404');
+  }
+} else {
+  // En producción, detectar tenant del dominio/subdominio
+  let tenantSlug: string | null = null;
+  try {
+    const API_URL = import.meta.env.PUBLIC_API_URL || process.env.PUBLIC_API_URL || 'https://api.dominiosaas.com';
+    const hostname = Astro.url.hostname;
+    const BASE_DOMAIN = import.meta.env.PUBLIC_BASE_DOMAIN || process.env.PUBLIC_BASE_DOMAIN || 'dominiosaas.com';
+    
+    console.log(`🌐 Producción - Detectando tenant desde hostname: ${hostname}`);
+    
+    // Llamar a la API para detectar el tenant por hostname
+    const tenantResponse = await fetch(
+      `${API_URL}/api/tenants/detect?hostname=${encodeURIComponent(hostname)}&baseDomain=${encodeURIComponent(BASE_DOMAIN)}`,
+      {
+        cache: 'no-store',
+        headers: {
+          'Cache-Control': 'no-cache',
+        },
+      }
+    );
+    
+    if (tenantResponse.ok) {
+      const tenant = await tenantResponse.json();
+      tenantSlug = tenant.slug;
+      console.log(`✅ Tenant detectado: ${tenant.nombre} (slug: ${tenantSlug})`);
+    } else {
+      console.warn(`⚠️ No se pudo detectar tenant para hostname: ${hostname}`);
+    }
+  } catch (error) {
+    console.error('❌ Error al detectar tenant:', error);
+  }
+
+  if (tenantSlug) {
+    // En producción, NO redirigir a /tenant/[slug]/, renderizar directamente
+    // porque el dominio/subdominio ya identifica al tenant
+    // Pero por ahora mantenemos la estructura para compatibilidad
+    return Astro.redirect(`/tenant/${tenantSlug}/`);
+  } else {
+    return Astro.redirect('/404');
+  }
+}
+---
+
+<!-- Este contenido no debería ejecutarse, ya que siempre redirige -->
+<div>Redirigiendo...</div>

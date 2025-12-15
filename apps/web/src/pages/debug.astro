@@ -1,0 +1,120 @@
+---
+// Página de debug para ver qué componentes se están renderizando
+import ComponentRenderer from '../components/ComponentRenderer.astro';
+
+const componentes = [
+  {
+    id: '0',
+    tipo: 'header',
+    variante: 'default',
+    datos: {},
+    activo: true,
+    orden: -1,
+  },
+  {
+    id: '1',
+    tipo: 'hero',
+    variante: 'default',
+    datos: {
+      titulo: 'Test Hero',
+      subtitulo: 'Subtítulo de prueba',
+      textoBoton: 'Botón',
+      urlBoton: '#',
+    },
+    activo: true,
+    orden: 0,
+  },
+  {
+    id: '2',
+    tipo: 'footer',
+    variante: 'default',
+    datos: {
+      textoCopyright: '© 2024 Test',
+      telefono: '+1234567890',
+      email: 'test@test.com',
+      direccion: 'Test Address',
+    },
+    activo: true,
+    orden: 100,
+  },
+];
+
+const tema = {
+  primary: '#667eea',
+  secondary: '#764ba2',
+  accent: '#f56565',
+  background: '#ffffff',
+  text: '#1a202c',
+  textSecondary: '#718096',
+  border: '#e2e8f0',
+  success: '#48bb78',
+  warning: '#ed8936',
+  error: '#f56565',
+};
+---
+
+<!doctype html>
+<html lang="es">
+  <head>
+    <meta charset="UTF-8" />
+    <title>Debug - Componentes</title>
+    <style>
+      body {
+        margin: 0;
+        padding: 2rem;
+        font-family: system-ui, sans-serif;
+        background: #f0f0f0;
+      }
+      .debug-info {
+        background: white;
+        padding: 1rem;
+        margin-bottom: 1rem;
+        border-radius: 8px;
+        border-left: 4px solid #667eea;
+      }
+      .component-wrapper {
+        margin: 2rem 0;
+        border: 2px dashed #cbd5e0;
+        padding: 1rem;
+        border-radius: 8px;
+      }
+      .component-label {
+        background: #667eea;
+        color: white;
+        padding: 0.5rem 1rem;
+        border-radius: 4px;
+        display: inline-block;
+        margin-bottom: 1rem;
+        font-weight: 600;
+      }
+    </style>
+  </head>
+  <body>
+    <div class="debug-info">
+      <h2>Debug - Renderizado de Componentes</h2>
+      <p>Total de componentes: {componentes.length}</p>
+      <ul>
+        {componentes.map(c => (
+          <li>
+            {c.tipo} ({c.variante}) - Activo: {c.activo ? 'Sí' : 'No'} - Orden: {c.orden}
+          </li>
+        ))}
+      </ul>
+    </div>
+
+    {componentes.map((componente) => (
+      <div class="component-wrapper">
+        <div class="component-label">
+          {componente.tipo} - {componente.variante}
+        </div>
+        <ComponentRenderer 
+          componente={componente} 
+          tema={tema}
+        />
+      </div>
+    ))}
+  </body>
+</html>
+
+
+

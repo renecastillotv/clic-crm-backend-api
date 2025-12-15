@@ -1,0 +1,62 @@
+---
+/**
+ * Placeholder.astro
+ * 
+ * Componente placeholder para componentes que aún no están implementados
+ */
+
+interface Props {
+  tipo: string;
+  variante: string;
+}
+
+const { tipo, variante } = Astro.props;
+---
+
+<div class="component-placeholder">
+  <div class="placeholder-icon">🚧</div>
+  <h3>Componente en Desarrollo</h3>
+  <p>Tipo: <strong>{tipo}</strong></p>
+  <p>Variante: <strong>{variante}</strong></p>
+  <small>Este componente será implementado próximamente</small>
+</div>
+
+<style>
+  .component-placeholder {
+    padding: 4rem 2rem;
+    text-align: center;
+    background: #f7fafc;
+    border: 2px dashed #cbd5e0;
+    border-radius: 12px;
+    margin: 2rem 0;
+  }
+
+  .placeholder-icon {
+    font-size: 4rem;
+    margin-bottom: 1rem;
+  }
+
+  .component-placeholder h3 {
+    margin: 0 0 1rem 0;
+    color: #2d3748;
+  }
+
+  .component-placeholder p {
+    margin: 0.5rem 0;
+    color: #718096;
+  }
+
+  .component-placeholder strong {
+    color: #4a5568;
+  }
+
+  .component-placeholder small {
+    display: block;
+    margin-top: 1rem;
+    color: #a0aec0;
+    font-style: italic;
+  }
+</style>
+
+
+

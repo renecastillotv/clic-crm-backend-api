@@ -1,0 +1,187 @@
+---
+/**
+ * PropertyCardDefault.astro
+ * Tarjeta individual para mostrar una propiedad
+ */
+import type { ComponenteDataEstructurado } from '../../types/componentesEstructurado';
+
+interface Props {
+  datos: ComponenteDataEstructurado;
+  tema?: Record<string, string>;
+  propiedad?: Record<string, any>; // Datos de la propiedad (opcional)
+}
+
+const { datos, tema = {}, propiedad } = Astro.props;
+
+// Acceso a datos estructurados
+const staticData = datos.static_data || {};
+const styles = datos.styles || {};
+const toggles = datos.toggles || {};
+
+const mostrarPrecio = toggles.mostrarPrecio !== false;
+const mostrarUbicacion = toggles.mostrarUbicacion !== false;
+const mostrarCaracteristicas = toggles.mostrarCaracteristicas !== false;
+
+// Estilos personalizados
+const primaryColor = styles.colors?.primary || tema.primary || '#667eea';
+const backgroundColor = styles.colors?.background || tema.background || '#ffffff';
+const textColor = styles.colors?.text || tema.text || '#1a202c';
+const borderColor = styles.colors?.border || tema.border || '#e2e8f0';
+---
+
+{propiedad?.id ? (
+  <a href={`/propiedades/${propiedad.id}`} class="property-card-link" style="text-decoration: none; color: inherit; display: block;">
+    <article class="property-card" style="
+      background: var(--background-color, #ffffff);
+      border: 1px solid var(--border-color, #e2e8f0);
+      border-radius: 8px;
+      overflow: hidden;
+      transition: transform 0.2s, box-shadow 0.2s;
+      cursor: pointer;
+    ">
+      <div class="property-image" style="
+        width: 100%;
+        height: 200px;
+        background: linear-gradient(135deg, var(--primary-color, #667eea) 0%, var(--secondary-color, #764ba2) 100%);
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        color: var(--background-color, #ffffff);
+        font-size: 3rem;
+      ">
+        🏠
+      </div>
+      
+      <div class="property-content" style="padding: 1.5rem;">
+        {propiedad?.titulo ? (
+          <h3 style="color: var(--text-color, #1a202c); margin-bottom: 0.5rem; font-size: 1.25rem;">
+            {propiedad.titulo}
+          </h3>
+        ) : (
+          <h3 style="color: var(--text-color, #1a202c); margin-bottom: 0.5rem; font-size: 1.25rem;">
+            Propiedad de Ejemplo
+          </h3>
+        )}
+        
+        {mostrarUbicacion && (
+          <p style="color: var(--text-colorSecondary, #718096); margin-bottom: 1rem; font-size: 0.9rem;">
+            📍 {propiedad?.ubicacion || 'Ciudad, País'}
+          </p>
+        )}
+        
+        {mostrarPrecio && (
+          <p style="
+            color: var(--primary-color, #667eea);
+            font-size: 1.5rem;
+            font-weight: 700;
+            margin-bottom: 1rem;
+          ">
+            ${propiedad?.precio?.toLocaleString() || '250,000'}
+          </p>
+        )}
+        
+        {mostrarCaracteristicas && (
+          <div class="property-features" style="
+            display: flex;
+            gap: 1rem;
+            color: var(--text-colorSecondary, #718096);
+            font-size: 0.9rem;
+            margin-top: 1rem;
+            padding-top: 1rem;
+            border-top: 1px solid var(--border-color, #e2e8f0);
+          ">
+            <span>🛏️ {propiedad?.habitaciones || 3} hab</span>
+            <span>🚿 {propiedad?.banos || 2} baños</span>
+            <span>📐 {propiedad?.metros || 120} m²</span>
+          </div>
+        )}
+      </div>
+    </article>
+  </a>
+) : (
+  <article class="property-card" style="
+    background: var(--background-color, #ffffff);
+    border: 1px solid var(--border-color, #e2e8f0);
+    border-radius: 8px;
+    overflow: hidden;
+    transition: transform 0.2s, box-shadow 0.2s;
+  ">
+    <div class="property-image" style="
+      width: 100%;
+      height: 200px;
+      background: linear-gradient(135deg, var(--primary-color, #667eea) 0%, var(--secondary-color, #764ba2) 100%);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      color: var(--background-color, #ffffff);
+      font-size: 3rem;
+    ">
+      🏠
+    </div>
+    
+    <div class="property-content" style="padding: 1.5rem;">
+      {propiedad?.titulo ? (
+        <h3 style="color: var(--text-color, #1a202c); margin-bottom: 0.5rem; font-size: 1.25rem;">
+          {propiedad.titulo}
+        </h3>
+      ) : (
+        <h3 style="color: var(--text-color, #1a202c); margin-bottom: 0.5rem; font-size: 1.25rem;">
+          Propiedad de Ejemplo
+        </h3>
+      )}
+      
+      {mostrarUbicacion && (
+        <p style="color: var(--text-colorSecondary, #718096); margin-bottom: 1rem; font-size: 0.9rem;">
+          📍 {propiedad?.ubicacion || 'Ciudad, País'}
+        </p>
+      )}
+      
+      {mostrarPrecio && (
+        <p style="
+          color: var(--primary-color, #667eea);
+          font-size: 1.5rem;
+          font-weight: 700;
+          margin-bottom: 1rem;
+        ">
+          ${propiedad?.precio?.toLocaleString() || '250,000'}
+        </p>
+      )}
+      
+      {mostrarCaracteristicas && (
+        <div class="property-features" style="
+          display: flex;
+          gap: 1rem;
+          color: var(--text-colorSecondary, #718096);
+          font-size: 0.9rem;
+          margin-top: 1rem;
+          padding-top: 1rem;
+          border-top: 1px solid var(--border-color, #e2e8f0);
+        ">
+          <span>🛏️ {propiedad?.habitaciones || 3} hab</span>
+          <span>🚿 {propiedad?.banos || 2} baños</span>
+          <span>📐 {propiedad?.metros || 120} m²</span>
+        </div>
+      )}
+    </div>
+  </article>
+)}
+
+<style is:global>
+  .property-card-link {
+    text-decoration: none;
+    color: inherit;
+    display: block;
+  }
+
+  .property-card {
+    width: 100%;
+    display: block;
+    flex-shrink: 0;
+  }
+  
+  .property-card-link:hover .property-card,
+  .property-card:hover {
+    transform: translateY(-4px);
+    box-shadow: 0 10px 25px rgba(0, 0, 0, 0.1);
+  }
+</style>

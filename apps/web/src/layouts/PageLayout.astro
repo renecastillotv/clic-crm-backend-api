@@ -1,0 +1,177 @@
+---
+/**
+ * PageLayout.astro
+ * 
+ * Layout base para páginas con soporte de temas y componentes dinámicos
+ */
+
+import ComponentRenderer from '../components/ComponentRenderer.astro';
+import { fetchTema, fetchComponentes } from '../utils/fetchComponents';
+import type { ComponenteConfigurado, TemaColores } from '../types/componentes';
+
+interface Props {
+  title: string;
+  description?: string;
+  tenantId?: string;
+  tenantSlug?: string;
+  componentes?: ComponenteConfigurado[];
+  tema?: TemaColores;
+  resolvedData?: any; // Datos resueltos para páginas single (ej: propiedad individual)
+}
+
+const {
+  title,
+  description = '',
+  tenantId = '1', // Por defecto, luego vendrá de la URL o contexto
+  tenantSlug = '',
+  componentes: componentesProps,
+  tema: temaProps,
+  resolvedData
+} = Astro.props;
+
+// Base URL para el tenant (sin prefijo de idioma - las URLs de la API ya lo incluyen)
+// Formato: /tenant/{tenantSlug}
+const baseUrl = tenantSlug ? `/tenant/${tenantSlug}` : '';
+
+// Los datos ya vienen desde el resolver de la API
+// No hacer fetch adicionales si ya tenemos los datos
+const tema = temaProps;
+const componentes = componentesProps;
+
+// NOTA: No hacer fetch aquí porque los datos ya vienen desde [...slug].astro
+// Si no vienen los datos, significa que hay un error en el flujo superior
+
+// Valores por defecto del tema
+const defaultTema: TemaColores = {
+  primary: '#667eea',
+  secondary: '#764ba2',
+  accent: '#f56565',
+  background: '#ffffff',
+  text: '#1a202c',
+  textSecondary: '#718096',
+  border: '#e2e8f0',
+  success: '#48bb78',
+  warning: '#ed8936',
+  error: '#f56565',
+};
+
+// Tema final: merge de colores del API con defaults
+// El tema puede venir como { primary, secondary, ... } o como { colores: { primary, ... } }
+const temaApi = tema as any;
+const coloresApi = temaApi?.colores || temaApi || {};
+const temaFinal: TemaColores = {
+  primary: coloresApi.primary || defaultTema.primary,
+  secondary: coloresApi.secondary || defaultTema.secondary,
+  accent: coloresApi.accent || defaultTema.accent,
+  background: coloresApi.background || defaultTema.background,
+  text: coloresApi.text || defaultTema.text,
+  textSecondary: coloresApi.textSecondary || defaultTema.textSecondary,
+  border: coloresApi.border || defaultTema.border,
+  success: coloresApi.success || defaultTema.success,
+  warning: coloresApi.warning || defaultTema.warning,
+  error: coloresApi.error || defaultTema.error,
+};
+
+// Los componentes ya vienen filtrados y ordenados desde el backend
+// No es necesario filtrar ni ordenar aquí
+const componentesBase = componentes || [];
+
+// Calcular totalItems desde componentes con datos dinámicos (team_grid, property_grid, etc.)
+// para poder pasarlo al hero
+const componenteConDatos = componentesBase.find(c =>
+  c.datos?.dynamic_data?.resolved &&
+  Array.isArray(c.datos.dynamic_data.resolved) &&
+  c.datos.dynamic_data.resolved.length > 0
+);
+const totalItems = componenteConDatos?.datos?.dynamic_data?.resolved?.length || 0;
+
+// Inyectar totalItems en los componentes de tipo hero para que muestren el contador
+const componentesActivos = componentesBase.map(c => {
+  if (c.tipo === 'hero' && totalItems > 0) {
+    return {
+      ...c,
+      datos: {
+        ...c.datos,
+        dynamic_data: {
+          ...(c.datos?.dynamic_data || {}),
+          resolved: componenteConDatos?.datos?.dynamic_data?.resolved || [],
+          totalItems
+        }
+      }
+    };
+  }
+  return c;
+});
+---
+
+<!doctype html>
+<html lang="es">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="description" content={description} />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
+    <meta name="generator" content={Astro.generator} />
+    <title>{title}</title>
+    
+    <!-- Variables CSS del tema usando inline style en :root -->
+    <style is:global>
+      * {
+        box-sizing: border-box;
+      }
+
+      body {
+        margin: 0;
+        padding: 0;
+        font-family: system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+        background: var(--background-color);
+        color: var(--text-color);
+        line-height: 1.6;
+        width: 100%;
+        box-sizing: border-box;
+      }
+
+      main {
+        min-height: 100vh;
+        display: flex;
+        flex-direction: column;
+        width: 100%;
+        max-width: 100%;
+        box-sizing: border-box;
+      }
+
+      /* Asegurar que las secciones usen todo el ancho */
+      section {
+        width: 100%;
+        box-sizing: border-box;
+      }
+    </style>
+    <style set:html={`
+      :root {
+        --primary-color: ${temaFinal.primary};
+        --secondary-color: ${temaFinal.secondary};
+        --accent-color: ${temaFinal.accent};
+        --background-color: ${temaFinal.background};
+        --text-color: ${temaFinal.text};
+        --text-secondary: ${temaFinal.textSecondary};
+        --border-color: ${temaFinal.border};
+        --success-color: ${temaFinal.success};
+        --warning-color: ${temaFinal.warning};
+        --error-color: ${temaFinal.error};
+      }
+    `}></style>
+  </head>
+  <body>
+    <main>
+      {componentesActivos.map((componente) => (
+        <ComponentRenderer
+          componente={componente}
+          tema={temaFinal}
+          baseUrl={baseUrl}
+          resolvedData={resolvedData}
+        />
+      ))}
+    </main>
+  </body>
+</html>
+

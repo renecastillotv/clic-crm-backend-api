@@ -1,0 +1,118 @@
+---
+/**
+ * DynamicFAQsClic.astro - COPIA FIEL DEL ORIGINAL
+ * 100% fiel al diseño de pa.clicinmobiliaria.com
+ * Incluye Schema.org FAQ markup para SEO
+ * Adaptado al sistema de datos estructurados (frontend desacoplado)
+ * La API envía todo resuelto - solo dibujamos
+ */
+
+import type { ComponenteDataEstructurado } from '../../types/componentesEstructurado';
+
+interface Props {
+  datos: ComponenteDataEstructurado;
+  tema?: Record<string, string>;
+  baseUrl?: string;
+}
+
+const { datos, tema = {}, baseUrl = '' } = Astro.props;
+
+const staticData = datos?.static_data || {};
+const dynamicData = datos?.dynamic_data || {};
+const styles = datos?.styles || {};
+
+// Configuración
+const title = staticData.titulo;
+const context = staticData.context;
+const language = staticData.language || 'es';
+
+// Datos dinámicos (FAQs) - Ya vienen de la API
+const rawFaqs = dynamicData?.resolved || [];
+const faqs = Array.isArray(rawFaqs) ? rawFaqs : [];
+
+// No renderizar si no hay FAQs
+if (!faqs || faqs.length === 0) return null;
+
+// Traducciones - EXACTAS del original
+const translations = {
+  es: {
+    frequentQuestions: 'Preguntas Frecuentes',
+    questionsAbout: 'Preguntas sobre',
+    questionsAboutInvesting: 'Preguntas sobre invertir en',
+    forAirbnb: 'para Airbnb'
+  },
+  en: {
+    frequentQuestions: 'Frequently Asked Questions',
+    questionsAbout: 'Questions about',
+    questionsAboutInvesting: 'Questions about investing in',
+    forAirbnb: 'for Airbnb'
+  },
+  fr: {
+    frequentQuestions: 'Questions Fréquemment Posées',
+    questionsAbout: 'Questions sur',
+    questionsAboutInvesting: 'Questions sur investir à',
+    forAirbnb: 'pour Airbnb'
+  }
+};
+
+const t = translations[language] || translations.es;
+
+// El título viene ya resuelto de la API, o usamos el default traducido
+const contextualTitle = title || t.frequentQuestions;
+
+console.log(`❓ [FAQs] Mostrando ${faqs.length} preguntas frecuentes`);
+---
+
+<section class="py-12 bg-white">
+  <div class="container mx-auto px-4">
+    <div class="max-w-3xl mx-auto">
+      {/* Título - EXACTO del original */}
+      <h2 class="text-2xl md:text-3xl font-bold text-gray-900 mb-8 text-center">{contextualTitle}</h2>
+
+      {/* Accordion de FAQs - EXACTO del original */}
+      <div class="space-y-4">
+        {faqs.map((faq: any, index: number) => (
+          <details class="group bg-gray-50 rounded-lg">
+            <summary class="flex items-center justify-between cursor-pointer p-6 hover:bg-gray-100 transition-colors">
+              <h3 class="text-lg font-medium text-gray-900 pr-4">{faq.question}</h3>
+              <svg
+                class="w-5 h-5 text-gray-500 group-open:rotate-180 transition-transform flex-shrink-0"
+                fill="none"
+                stroke="currentColor"
+                viewBox="0 0 24 24"
+              >
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"></path>
+              </svg>
+            </summary>
+            <div class="px-6 pb-6">
+              <p class="text-gray-700 leading-relaxed">{faq.answer}</p>
+              {faq.tags && faq.tags.length > 0 && (
+                <div class="flex flex-wrap gap-2 mt-4">
+                  {faq.tags.map((tag: string) => (
+                    <span class="text-xs bg-gray-200 text-gray-700 px-2 py-1 rounded">
+                      {tag}
+                    </span>
+                  ))}
+                </div>
+              )}
+            </div>
+          </details>
+        ))}
+      </div>
+
+      {/* Schema.org FAQ Markup - EXACTO del original (para SEO) */}
+      <script type="application/ld+json" set:html={JSON.stringify({
+        "@context": "https://schema.org",
+        "@type": "FAQPage",
+        "mainEntity": faqs.map((faq: any) => ({
+          "@type": "Question",
+          "name": faq.question,
+          "acceptedAnswer": {
+            "@type": "Answer",
+            "text": faq.answer
+          }
+        }))
+      })} />
+    </div>
+  </div>
+</section>

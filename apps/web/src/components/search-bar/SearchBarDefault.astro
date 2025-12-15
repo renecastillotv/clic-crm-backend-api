@@ -1,0 +1,113 @@
+---
+/**
+ * SearchBarDefault.astro
+ * Barra de búsqueda para propiedades
+ */
+import type { ComponenteDataEstructurado } from '../../types/componentesEstructurado';
+
+interface Props {
+  datos: ComponenteDataEstructurado;
+  tema?: Record<string, string>;
+}
+
+const { datos, tema = {} } = Astro.props;
+
+// Acceso a datos estructurados
+const staticData = datos.static_data || {};
+const styles = datos.styles || {};
+const toggles = datos.toggles || {};
+
+const placeholder = staticData.placeholder || 'Buscar propiedades...';
+const mostrarFiltros = toggles.mostrarFiltros === true;
+
+// Estilos personalizados
+const primaryColor = styles.colors?.primary || tema.primary || '#667eea';
+const padding = styles.spacing?.padding || '2rem 1rem';
+---
+
+<section class="search-bar" style="
+  padding: 2rem 1rem;
+  background: var(--background-color, #ffffff);
+  border-bottom: 1px solid var(--border-color, #e2e8f0);
+">
+  <div class="container" style="max-width: 1200px; margin: 0 auto;">
+    <div class="search-wrapper" style="
+      display: flex;
+      gap: 1rem;
+      align-items: center;
+    ">
+      <input
+        type="search"
+        placeholder={placeholder}
+        class="search-input"
+        style="
+          flex: 1;
+          padding: 0.75rem 1rem;
+          border: 2px solid var(--border-color, #e2e8f0);
+          border-radius: 8px;
+          font-size: 1rem;
+          background: var(--background-color, #ffffff);
+          color: var(--text-color, #1a202c);
+        "
+      />
+      <button
+        type="button"
+        class="search-button"
+        style="
+          padding: 0.75rem 2rem;
+          background: var(--primary-color, #667eea);
+          color: var(--background-color, #ffffff);
+          border: none;
+          border-radius: 8px;
+          font-size: 1rem;
+          font-weight: 600;
+          cursor: pointer;
+          transition: background 0.2s;
+        "
+      >
+        🔍 Buscar
+      </button>
+    </div>
+    
+    {mostrarFiltros && (
+      <div class="filters-toggle" style="
+        margin-top: 1rem;
+        text-align: center;
+      ">
+        <button
+          type="button"
+          style="
+            color: var(--primary-color, #667eea);
+            background: none;
+            border: none;
+            cursor: pointer;
+            font-size: 0.9rem;
+            text-decoration: underline;
+          "
+        >
+          🔧 Mostrar filtros avanzados
+        </button>
+      </div>
+    )}
+  </div>
+</section>
+
+<style is:global>
+  .search-bar {
+    width: 100%;
+    display: block;
+    flex-shrink: 0;
+  }
+  
+  .search-input:focus {
+    outline: none;
+    border-color: var(--primary-color, #667eea) !important;
+    box-shadow: 0 0 0 3px rgba(102, 126, 234, 0.1);
+  }
+  
+  .search-button:hover {
+    background: var(--secondary-color, #764ba2) !important;
+  }
+</style>
+
+

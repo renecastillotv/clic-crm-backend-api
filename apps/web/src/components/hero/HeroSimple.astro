@@ -1,0 +1,116 @@
+---
+/**
+ * HeroSimple.astro
+ * Hero simple para páginas de directorio (asesores, propiedades, etc.)
+ */
+
+interface Props {
+  datos?: any;
+  tema?: Record<string, string>;
+  baseUrl?: string;
+  tipoPagina?: string;
+}
+
+const { datos, tema = {} } = Astro.props;
+
+const staticData = datos?.static_data || {};
+const dynamicData = datos?.dynamic_data || {};
+
+// Obtener datos dinámicos resueltos (lista de items)
+const resolvedItems = dynamicData?.resolved || [];
+const totalItems = Array.isArray(resolvedItems) ? resolvedItems.length : 0;
+
+// Textos del hero
+const titulo = staticData?.titulo || 'Nuestro Equipo';
+const subtitulo = staticData?.subtitulo || 'Profesionales comprometidos con tu éxito';
+const badge = staticData?.badge || null;
+
+// Colores del tema
+const primaryColor = tema?.primary || '#667eea';
+const secondaryColor = tema?.secondary || '#764ba2';
+---
+
+<section class="hero-simple" style={`--primary: ${primaryColor}; --secondary: ${secondaryColor};`}>
+  <div class="hero-content">
+    {badge && <span class="hero-badge">{badge}</span>}
+    <h1 class="hero-title">{titulo}</h1>
+    <p class="hero-subtitle">{subtitulo}</p>
+
+    {totalItems > 0 && (
+      <div class="hero-stats">
+        <span class="stat-pill">{totalItems} profesionales disponibles</span>
+      </div>
+    )}
+  </div>
+</section>
+
+<style>
+  .hero-simple {
+    min-height: 280px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    background: linear-gradient(135deg, var(--primary) 0%, var(--secondary) 100%);
+    padding: 3rem 2rem;
+  }
+
+  .hero-content {
+    text-align: center;
+    color: white;
+    max-width: 800px;
+  }
+
+  .hero-badge {
+    display: inline-block;
+    background: rgba(255,255,255,0.2);
+    color: white;
+    padding: 0.5rem 1rem;
+    border-radius: 50px;
+    font-size: 0.85rem;
+    font-weight: 600;
+    margin-bottom: 1rem;
+    text-transform: uppercase;
+  }
+
+  .hero-title {
+    font-size: 2.5rem;
+    font-weight: 700;
+    margin: 0 0 0.75rem 0;
+    line-height: 1.2;
+  }
+
+  .hero-subtitle {
+    font-size: 1.15rem;
+    margin: 0;
+    opacity: 0.9;
+    line-height: 1.5;
+  }
+
+  .hero-stats {
+    margin-top: 1.5rem;
+  }
+
+  .stat-pill {
+    display: inline-block;
+    background: rgba(255,255,255,0.2);
+    padding: 0.5rem 1.25rem;
+    border-radius: 50px;
+    font-size: 0.95rem;
+    font-weight: 500;
+  }
+
+  @media (max-width: 768px) {
+    .hero-simple {
+      min-height: 220px;
+      padding: 2rem 1rem;
+    }
+
+    .hero-title {
+      font-size: 1.75rem;
+    }
+
+    .hero-subtitle {
+      font-size: 1rem;
+    }
+  }
+</style>

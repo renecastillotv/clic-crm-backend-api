@@ -1,0 +1,185 @@
+---
+/**
+ * ContactFormDefault.astro
+ * Formulario de contacto
+ */
+import type { ComponenteDataEstructurado } from '../../types/componentesEstructurado';
+
+interface Props {
+  datos: ComponenteDataEstructurado;
+  tema?: Record<string, string>;
+}
+
+const { datos, tema = {} } = Astro.props;
+
+// Acceso a datos estructurados
+const staticData = datos.static_data || {};
+const styles = datos.styles || {};
+const toggles = datos.toggles || {};
+
+const titulo = staticData.titulo || 'Contáctanos';
+const mostrarTelefono = toggles.mostrarTelefono !== false;
+const mostrarMensaje = toggles.mostrarMensaje !== false;
+
+// Estilos personalizados
+const primaryColor = styles.colors?.primary || tema.primary || '#667eea';
+const backgroundColor = styles.colors?.background || tema.background || '#ffffff';
+const padding = styles.spacing?.padding || '3rem 1rem';
+---
+
+<section class="contact-form" style="
+  padding: 3rem 1rem;
+  background: var(--background-color, #ffffff);
+">
+  <div class="container" style="max-width: 600px; margin: 0 auto;">
+    <h2 style="
+      color: var(--text-color, #1a202c);
+      margin-bottom: 2rem;
+      font-size: 2rem;
+      font-weight: 700;
+      text-align: center;
+    ">
+      {titulo}
+    </h2>
+    
+    <form class="form" style="display: flex; flex-direction: column; gap: 1.5rem;">
+      <div>
+        <label style="
+          display: block;
+          color: var(--text-color, #1a202c);
+          margin-bottom: 0.5rem;
+          font-weight: 600;
+        ">
+          Nombre *
+        </label>
+        <input
+          type="text"
+          required
+          style="
+            width: 100%;
+            padding: 0.75rem;
+            border: 1px solid var(--border-color, #e2e8f0);
+            border-radius: 6px;
+            font-size: 1rem;
+            background: var(--background-color, #ffffff);
+            color: var(--text-color, #1a202c);
+          "
+        />
+      </div>
+      
+      <div>
+        <label style="
+          display: block;
+          color: var(--text-color, #1a202c);
+          margin-bottom: 0.5rem;
+          font-weight: 600;
+        ">
+          Email *
+        </label>
+        <input
+          type="email"
+          required
+          style="
+            width: 100%;
+            padding: 0.75rem;
+            border: 1px solid var(--border-color, #e2e8f0);
+            border-radius: 6px;
+            font-size: 1rem;
+            background: var(--background-color, #ffffff);
+            color: var(--text-color, #1a202c);
+          "
+        />
+      </div>
+      
+      {mostrarTelefono && (
+        <div>
+          <label style="
+            display: block;
+            color: var(--text-color, #1a202c);
+            margin-bottom: 0.5rem;
+            font-weight: 600;
+          ">
+            Teléfono
+          </label>
+          <input
+            type="tel"
+            style="
+              width: 100%;
+              padding: 0.75rem;
+              border: 1px solid var(--border-color, #e2e8f0);
+              border-radius: 6px;
+              font-size: 1rem;
+              background: var(--background-color, #ffffff);
+              color: var(--text-color, #1a202c);
+            "
+          />
+        </div>
+      )}
+      
+      {mostrarMensaje && (
+        <div>
+          <label style="
+            display: block;
+            color: var(--text-color, #1a202c);
+            margin-bottom: 0.5rem;
+            font-weight: 600;
+          ">
+            Mensaje *
+          </label>
+          <textarea
+            required
+            rows="5"
+            style="
+              width: 100%;
+              padding: 0.75rem;
+              border: 1px solid var(--border-color, #e2e8f0);
+              border-radius: 6px;
+              font-size: 1rem;
+              background: var(--background-color, #ffffff);
+              color: var(--text-color, #1a202c);
+              resize: vertical;
+            "
+          ></textarea>
+        </div>
+      )}
+      
+      <button
+        type="submit"
+        style="
+          padding: 0.75rem 2rem;
+          background: var(--primary-color, #667eea);
+          color: var(--background-color, #ffffff);
+          border: none;
+          border-radius: 6px;
+          font-size: 1rem;
+          font-weight: 600;
+          cursor: pointer;
+          transition: background 0.2s;
+        "
+      >
+        Enviar Mensaje
+      </button>
+    </form>
+  </div>
+</section>
+
+<style is:global>
+  .contact-form {
+    width: 100%;
+    display: block;
+    flex-shrink: 0;
+  }
+  
+  .contact-form input:focus,
+  .contact-form textarea:focus {
+    outline: none;
+    border-color: var(--primary-color, #667eea) !important;
+    box-shadow: 0 0 0 3px rgba(102, 126, 234, 0.1);
+  }
+  
+  .contact-form button:hover {
+    background: var(--secondary-color, #764ba2) !important;
+  }
+</style>
+
+

@@ -1,0 +1,457 @@
+---
+/**
+ * TestimonialDetailDefault.astro
+ * Pagina de detalle de un testimonio individual
+ */
+
+import type { ComponenteDataEstructurado } from '../../types/componentesEstructurado';
+import ContentBreadcrumbs from '../breadcrumbs/ContentBreadcrumbs.astro';
+
+interface Props {
+  datos: ComponenteDataEstructurado;
+  tema?: Record<string, string>;
+  baseUrl?: string;
+}
+
+const { datos, tema = {}, baseUrl = '' } = Astro.props;
+
+const staticData = datos?.static_data || {};
+const dynamicData = datos?.dynamic_data || {};
+const styles = datos?.styles || {};
+
+// El testimonio puede venir como array o como objeto single
+let testimonio = dynamicData?.resolved || null;
+if (Array.isArray(testimonio)) {
+  testimonio = testimonio[0] || null;
+}
+
+// Si no hay testimonio resuelto, usar datos estaticos
+if (!testimonio) {
+  testimonio = staticData.testimonio || {
+    cliente_nombre: 'Cliente',
+    contenido: 'Excelente servicio, muy recomendado.',
+    rating: 5,
+  };
+}
+
+const nombre = testimonio.cliente_nombre || testimonio.nombre_cliente || testimonio.client_name || 'Cliente';
+const contenido = testimonio.contenido || testimonio.testimonio || testimonio.full_testimonial || '';
+const rating = testimonio.rating || testimonio.calificacion || 5;
+const foto = testimonio.foto_url || testimonio.client_avatar || testimonio.cliente_foto || '';
+const cargo = testimonio.cargo || testimonio.cliente_cargo || '';
+const empresa = testimonio.empresa || testimonio.cliente_empresa || '';
+const ubicacion = testimonio.ubicacion || testimonio.cliente_ubicacion || testimonio.client_location || '';
+const categoriaSlug = testimonio.categoria_slug || 'general';
+const categoriaNombre = testimonio.categoria_nombre || '';
+const fecha = testimonio.fecha || '';
+const verificado = testimonio.verificado || testimonio.client_verified || false;
+const fuente = testimonio.fuente || '';
+
+// Colores del tema
+const primaryColor = tema?.primary || '#667eea';
+const secondaryColor = tema?.secondary || '#764ba2';
+
+// Formatear fecha
+function formatDate(dateString: string): string {
+  if (!dateString) return '';
+  try {
+    const date = new Date(dateString);
+    return date.toLocaleDateString('es-ES', {
+      year: 'numeric',
+      month: 'long',
+      day: 'numeric'
+    });
+  } catch {
+    return dateString;
+  }
+}
+
+// Generar estrellas
+function getStars(rating: number): string {
+  return '★'.repeat(Math.min(5, Math.max(0, rating || 5)));
+}
+
+// Breadcrumbs
+const breadcrumbItems = [
+  { label: 'Testimonios', href: `${baseUrl}/testimonios` },
+  ...(categoriaNombre ? [{ label: categoriaNombre, href: `${baseUrl}/testimonios/${categoriaSlug}` }] : []),
+  { label: nombre }
+];
+---
+
+<!-- Hero con gradiente -->
+<section class="testimonial-hero" style={`--primary: ${primaryColor}; --secondary: ${secondaryColor};`}>
+  <div class="hero-container">
+    <ContentBreadcrumbs items={breadcrumbItems} variant="light" />
+
+    <div class="hero-content">
+      <div class="hero-rating">
+        <span class="hero-stars">{getStars(rating)}</span>
+        <span class="hero-rating-text">{rating}/5</span>
+      </div>
+      <h1 class="hero-title">{nombre}</h1>
+      {(cargo || empresa) && (
+        <p class="hero-subtitle">{cargo}{cargo && empresa ? ' en ' : ''}{empresa}</p>
+      )}
+    </div>
+  </div>
+</section>
+
+<section class="testimonial-detail" style={`--primary: ${primaryColor}; --secondary: ${secondaryColor};`}>
+  <div class="container">
+    <!-- Contenido principal -->
+    <article class="testimonial-content-wrapper">
+      <!-- Rating -->
+      <div class="rating-section">
+        <div class="stars">{getStars(rating)}</div>
+        <span class="rating-text">{rating}/5</span>
+      </div>
+
+      <!-- Contenido del testimonio -->
+      <blockquote class="testimonial-quote">
+        "{contenido}"
+      </blockquote>
+
+      <!-- Autor -->
+      <div class="testimonial-author">
+        <div class="author-photo-wrapper">
+          {foto ? (
+            <img src={foto} alt={nombre} class="author-photo" />
+          ) : (
+            <div class="author-photo placeholder">
+              <span>{nombre.charAt(0)}</span>
+            </div>
+          )}
+          {verificado && (
+            <div class="verified-badge" title="Cliente verificado">
+              ✓
+            </div>
+          )}
+        </div>
+
+        <div class="author-details">
+          <h2 class="author-name">{nombre}</h2>
+          {(cargo || empresa) && (
+            <p class="author-role">{cargo}{cargo && empresa ? ' en ' : ''}{empresa}</p>
+          )}
+          {ubicacion && (
+            <p class="author-location">{ubicacion}</p>
+          )}
+        </div>
+      </div>
+
+      <!-- Metadatos -->
+      <div class="testimonial-meta">
+        {fecha && (
+          <div class="meta-item">
+            <span class="meta-label">Fecha</span>
+            <span class="meta-value">{formatDate(fecha)}</span>
+          </div>
+        )}
+        {categoriaNombre && (
+          <div class="meta-item">
+            <span class="meta-label">Categoria</span>
+            <a href={`${baseUrl}/testimonios/${categoriaSlug}`} class="meta-value meta-link">{categoriaNombre}</a>
+          </div>
+        )}
+        {fuente && (
+          <div class="meta-item">
+            <span class="meta-label">Fuente</span>
+            <span class="meta-value">{fuente}</span>
+          </div>
+        )}
+      </div>
+
+      <!-- Acciones -->
+      <div class="testimonial-actions">
+        <a href={`${baseUrl}/testimonios`} class="btn btn-secondary">Ver todos los testimonios</a>
+        <a href={`${baseUrl}/contacto`} class="btn btn-primary">Contactanos</a>
+      </div>
+    </article>
+  </div>
+</section>
+
+<style>
+  /* Hero styles */
+  .testimonial-hero {
+    background: linear-gradient(135deg, var(--primary) 0%, var(--secondary) 100%);
+    padding: 2rem 1rem 2.5rem;
+    color: white;
+  }
+
+  .hero-container {
+    max-width: 800px;
+    margin: 0 auto;
+  }
+
+  .hero-content {
+    text-align: center;
+    margin-top: 1rem;
+  }
+
+  .hero-rating {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 0.75rem;
+    margin-bottom: 0.75rem;
+  }
+
+  .hero-stars {
+    color: #fbbf24;
+    font-size: 1.5rem;
+    letter-spacing: 3px;
+  }
+
+  .hero-rating-text {
+    font-size: 1.25rem;
+    font-weight: 600;
+    opacity: 0.9;
+  }
+
+  .hero-title {
+    font-size: 2rem;
+    font-weight: 700;
+    margin: 0 0 0.5rem;
+  }
+
+  .hero-subtitle {
+    font-size: 1rem;
+    opacity: 0.9;
+    margin: 0;
+  }
+
+  /* Detail section */
+  .testimonial-detail {
+    padding: 2rem 1rem 4rem;
+    background: #f7fafc;
+    min-height: 40vh;
+  }
+
+  .container {
+    max-width: 800px;
+    margin: 0 auto;
+  }
+
+  .testimonial-content-wrapper {
+    background: white;
+    border-radius: 16px;
+    padding: 2.5rem;
+    box-shadow: 0 4px 20px rgba(0,0,0,0.08);
+  }
+
+  .rating-section {
+    display: flex;
+    align-items: center;
+    gap: 1rem;
+    margin-bottom: 2rem;
+    padding-bottom: 1.5rem;
+    border-bottom: 1px solid #e2e8f0;
+  }
+
+  .stars {
+    color: #fbbf24;
+    font-size: 2rem;
+    letter-spacing: 4px;
+  }
+
+  .rating-text {
+    font-size: 1.5rem;
+    font-weight: 600;
+    color: #1a202c;
+  }
+
+  .testimonial-quote {
+    font-size: 1.5rem;
+    line-height: 1.8;
+    color: #2d3748;
+    margin: 0 0 2.5rem 0;
+    font-style: italic;
+    position: relative;
+  }
+
+  .testimonial-author {
+    display: flex;
+    align-items: center;
+    gap: 1.5rem;
+    padding: 1.5rem;
+    background: #f7fafc;
+    border-radius: 12px;
+    margin-bottom: 2rem;
+  }
+
+  .author-photo-wrapper {
+    position: relative;
+    flex-shrink: 0;
+  }
+
+  .author-photo {
+    width: 80px;
+    height: 80px;
+    border-radius: 50%;
+    object-fit: cover;
+  }
+
+  .author-photo.placeholder {
+    width: 80px;
+    height: 80px;
+    border-radius: 50%;
+    background: linear-gradient(135deg, var(--primary) 0%, var(--secondary) 100%);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    color: white;
+    font-size: 2rem;
+    font-weight: 600;
+  }
+
+  .verified-badge {
+    position: absolute;
+    bottom: 0;
+    right: 0;
+    background: #48bb78;
+    color: white;
+    width: 24px;
+    height: 24px;
+    border-radius: 50%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 0.8rem;
+    border: 2px solid white;
+  }
+
+  .author-details {
+    flex: 1;
+  }
+
+  .author-name {
+    font-size: 1.5rem;
+    font-weight: 700;
+    color: #1a202c;
+    margin: 0 0 0.5rem 0;
+  }
+
+  .author-role {
+    font-size: 1rem;
+    color: #4a5568;
+    margin: 0 0 0.25rem 0;
+  }
+
+  .author-location {
+    font-size: 0.9rem;
+    color: #718096;
+    margin: 0;
+  }
+
+  .testimonial-meta {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 2rem;
+    padding: 1.5rem 0;
+    border-top: 1px solid #e2e8f0;
+    border-bottom: 1px solid #e2e8f0;
+    margin-bottom: 2rem;
+  }
+
+  .meta-item {
+    display: flex;
+    flex-direction: column;
+    gap: 0.25rem;
+  }
+
+  .meta-label {
+    font-size: 0.75rem;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+    color: #a0aec0;
+    font-weight: 600;
+  }
+
+  .meta-value {
+    font-size: 0.95rem;
+    color: #1a202c;
+  }
+
+  .meta-link {
+    color: var(--primary);
+    text-decoration: none;
+  }
+
+  .meta-link:hover {
+    text-decoration: underline;
+  }
+
+  .testimonial-actions {
+    display: flex;
+    gap: 1rem;
+    flex-wrap: wrap;
+  }
+
+  .btn {
+    display: inline-block;
+    padding: 0.875rem 1.5rem;
+    border-radius: 8px;
+    font-weight: 600;
+    text-decoration: none;
+    transition: transform 0.2s, box-shadow 0.2s;
+  }
+
+  .btn:hover {
+    transform: translateY(-2px);
+  }
+
+  .btn-primary {
+    background: linear-gradient(135deg, var(--primary) 0%, var(--secondary) 100%);
+    color: white;
+    box-shadow: 0 4px 12px rgba(102, 126, 234, 0.3);
+  }
+
+  .btn-secondary {
+    background: white;
+    color: var(--primary);
+    border: 2px solid var(--primary);
+  }
+
+  @media (max-width: 768px) {
+    .testimonial-hero {
+      padding: 1.5rem 1rem 2rem;
+    }
+
+    .hero-title {
+      font-size: 1.5rem;
+    }
+
+    .hero-stars {
+      font-size: 1.25rem;
+    }
+
+    .testimonial-content-wrapper {
+      padding: 1.5rem;
+    }
+
+    .testimonial-quote {
+      font-size: 1.2rem;
+    }
+
+    .testimonial-author {
+      flex-direction: column;
+      text-align: center;
+    }
+
+    .author-photo, .author-photo.placeholder {
+      width: 64px;
+      height: 64px;
+      font-size: 1.5rem;
+    }
+
+    .testimonial-actions {
+      flex-direction: column;
+    }
+
+    .btn {
+      width: 100%;
+      text-align: center;
+    }
+  }
+</style>

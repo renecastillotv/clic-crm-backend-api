@@ -1,0 +1,434 @@
+---
+/**
+ * TestimonialCategoryDefault.astro
+ * Muestra info de categoria + testimonios filtrados por esa categoria
+ * Con hero que muestra nombre y descripcion de la categoria
+ */
+
+import type { ComponenteDataEstructurado } from '../../types/componentesEstructurado';
+import ContentBreadcrumbs from '../breadcrumbs/ContentBreadcrumbs.astro';
+
+interface Props {
+  datos: ComponenteDataEstructurado;
+  tema?: Record<string, string>;
+  baseUrl?: string;
+}
+
+const { datos, tema = {}, baseUrl = '' } = Astro.props;
+
+const staticData = datos?.static_data || {};
+const dynamicData = datos?.dynamic_data || {};
+const styles = datos?.styles || {};
+
+// El formato de resolved puede ser:
+// 1. {categoria, items} - objeto directo
+// 2. [{categoria, items}] - array con un solo elemento (cuando viene de la API)
+// 3. array de testimonios directo (formato antiguo)
+let resolvedData: any = dynamicData?.resolved || {};
+
+// Si es un array, extraer el primer elemento si tiene la estructura {categoria, items}
+if (Array.isArray(resolvedData) && resolvedData.length > 0) {
+  const firstItem = resolvedData[0];
+  if (firstItem && typeof firstItem === 'object' && ('categoria' in firstItem || 'items' in firstItem)) {
+    resolvedData = firstItem;
+  }
+}
+
+const isNewFormat = resolvedData && typeof resolvedData === 'object' && !Array.isArray(resolvedData) && ('items' in resolvedData || 'categoria' in resolvedData);
+
+// Categoria actual
+const categoria = isNewFormat
+  ? resolvedData.categoria
+  : (datos?.categoria || dynamicData?.categoria || null);
+
+// Testimonios
+const testimonios = isNewFormat
+  ? (resolvedData.items || [])
+  : (Array.isArray(dynamicData?.resolved) ? dynamicData.resolved : (dynamicData?.testimonios || []));
+
+const hasCategoria = !!categoria;
+const categoriaNombre = hasCategoria ? (categoria.nombre || 'Categoria') : 'Categoria';
+const categoriaDescripcion = hasCategoria ? (categoria.descripcion || '') : '';
+const categoriaSlug = hasCategoria
+  ? categoria.slug
+  : (testimonios[0]?.categoria_slug || 'general');
+
+// Mapeo de iconos
+const iconoMap: Record<string, string> = {
+  'star': '⭐',
+  'heart': '❤️',
+  'home': '🏠',
+  'building': '🏢',
+  'key': '🔑',
+  'thumbs-up': '👍',
+  'smile': '😊',
+  'award': '🏆',
+  'users': '👥',
+  'check': '✅',
+  'message': '💬',
+  'default': '💬'
+};
+
+function getIcono(icono: string | undefined): string {
+  if (!icono) return iconoMap['default'];
+  if (/[\u{1F300}-\u{1F9FF}]/u.test(icono)) return icono;
+  return iconoMap[icono] || iconoMap['default'];
+}
+
+const categoriaIcono = getIcono(hasCategoria ? categoria.icono : undefined);
+
+// Colores del tema
+const primaryColor = tema?.primary || '#667eea';
+const secondaryColor = tema?.secondary || '#764ba2';
+
+// Breadcrumbs
+const breadcrumbItems = [
+  { label: 'Testimonios', href: `${baseUrl}/testimonios` },
+  { label: categoriaNombre }
+];
+
+// Generar estrellas
+function getStars(rating: number): string {
+  return '★'.repeat(Math.min(5, Math.max(0, rating || 5)));
+}
+---
+
+<section class="testimonial-category-page" style={`--primary: ${primaryColor}; --secondary: ${secondaryColor};`}>
+  <!-- Hero de Categoria -->
+  <div class="category-hero">
+    <div class="hero-container">
+      <ContentBreadcrumbs items={breadcrumbItems} variant="light" />
+
+      <div class="hero-content">
+        <span class="category-icon">{categoriaIcono}</span>
+        <h1 class="category-title">{categoriaNombre}</h1>
+        {categoriaDescripcion && (
+          <p class="category-description">{categoriaDescripcion}</p>
+        )}
+        <div class="category-stats">
+          <span class="testimonial-count">{testimonios.length} testimonio{testimonios.length !== 1 ? 's' : ''}</span>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Grid de testimonios -->
+  <div class="testimonials-section">
+    <div class="container">
+      {testimonios.length > 0 ? (
+        <div class="testimonial-grid">
+          {testimonios.map((testimonio: any, index: number) => {
+            const nombre = testimonio.cliente_nombre || testimonio.nombre_cliente || testimonio.client_name || 'Cliente';
+            const contenido = testimonio.contenido || testimonio.testimonio || testimonio.full_testimonial || '';
+            const rating = testimonio.rating || testimonio.calificacion || 5;
+            const foto = testimonio.foto_url || testimonio.client_avatar || testimonio.cliente_foto || '';
+            const cargo = testimonio.cargo || testimonio.cliente_cargo || '';
+            const empresa = testimonio.empresa || testimonio.cliente_empresa || '';
+            const ubicacion = testimonio.ubicacion || testimonio.cliente_ubicacion || testimonio.client_location || '';
+            const testimonioSlug = testimonio.slug || testimonio.id;
+            const testimonioCategoria = categoriaSlug || testimonio.categoria_slug || 'general';
+            const url = `${baseUrl}/testimonios/${testimonioCategoria}/${testimonioSlug}`;
+            const verificado = testimonio.verificado || testimonio.client_verified || false;
+            const isFeatured = index === 0;
+
+            return (
+              <article class={`testimonial-card ${isFeatured ? 'featured' : ''}`}>
+                <a href={url} class="card-link">
+                  <div class="rating">
+                    <span class="stars">{getStars(rating)}</span>
+                  </div>
+
+                  <blockquote class="testimonial-content">
+                    "{contenido}"
+                  </blockquote>
+
+                  <div class="testimonial-author">
+                    {foto ? (
+                      <div class="author-photo">
+                        <img src={foto} alt={nombre} loading="lazy" />
+                      </div>
+                    ) : (
+                      <div class="author-photo placeholder">
+                        <span>{nombre.charAt(0)}</span>
+                      </div>
+                    )}
+                    <div class="author-info">
+                      <div class="author-name">
+                        {nombre}
+                        {verificado && <span class="verified" title="Verificado">✓</span>}
+                      </div>
+                      {(cargo || empresa) && (
+                        <div class="author-role">{cargo}{cargo && empresa ? ' - ' : ''}{empresa}</div>
+                      )}
+                      {ubicacion && (
+                        <div class="author-location">{ubicacion}</div>
+                      )}
+                    </div>
+                  </div>
+                </a>
+              </article>
+            );
+          })}
+        </div>
+      ) : (
+        <div class="empty-state">
+          <div class="empty-icon">💬</div>
+          <h3>No hay testimonios en esta categoria</h3>
+          <p>Actualmente no tenemos testimonios publicados en esta categoria.</p>
+          <a href={`${baseUrl}/testimonios`} class="back-btn">Ver todos los testimonios</a>
+        </div>
+      )}
+    </div>
+  </div>
+</section>
+
+<style>
+  .testimonial-category-page {
+    min-height: 60vh;
+  }
+
+  .category-hero {
+    background: linear-gradient(135deg, var(--primary) 0%, var(--secondary) 100%);
+    padding: 2rem 1rem 2.5rem;
+    color: white;
+  }
+
+  .hero-container {
+    max-width: 800px;
+    margin: 0 auto;
+    text-align: center;
+  }
+
+  .hero-content {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 0.75rem;
+    margin-top: 1rem;
+  }
+
+  .category-icon {
+    font-size: 3rem;
+    line-height: 1;
+  }
+
+  .category-title {
+    font-size: 2rem;
+    font-weight: 700;
+    margin: 0;
+    text-shadow: 0 2px 4px rgba(0,0,0,0.1);
+  }
+
+  .category-description {
+    font-size: 1rem;
+    max-width: 600px;
+    margin: 0;
+    opacity: 0.9;
+    line-height: 1.5;
+  }
+
+  .category-stats {
+    margin-top: 0.5rem;
+  }
+
+  .testimonial-count {
+    background: rgba(255,255,255,0.2);
+    padding: 0.5rem 1.25rem;
+    border-radius: 20px;
+    font-size: 0.9rem;
+    font-weight: 500;
+  }
+
+  .testimonials-section {
+    padding: 3rem 1rem 4rem;
+    background: #f7fafc;
+  }
+
+  .container {
+    max-width: 1200px;
+    margin: 0 auto;
+  }
+
+  .testimonial-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(350px, 1fr));
+    gap: 1.5rem;
+  }
+
+  .testimonial-card {
+    background: white;
+    border-radius: 16px;
+    overflow: hidden;
+    box-shadow: 0 4px 12px rgba(0,0,0,0.08);
+    transition: transform 0.2s, box-shadow 0.2s;
+  }
+
+  .testimonial-card:hover {
+    transform: translateY(-4px);
+    box-shadow: 0 8px 24px rgba(0,0,0,0.12);
+  }
+
+  .testimonial-card.featured {
+    grid-column: span 2;
+  }
+
+  .card-link {
+    display: block;
+    padding: 1.5rem;
+    text-decoration: none;
+    color: inherit;
+  }
+
+  .rating {
+    margin-bottom: 1rem;
+  }
+
+  .stars {
+    color: #fbbf24;
+    font-size: 1.25rem;
+    letter-spacing: 2px;
+  }
+
+  .testimonial-content {
+    font-size: 1rem;
+    color: #4a5568;
+    line-height: 1.7;
+    margin: 0 0 1.5rem 0;
+    font-style: italic;
+    display: -webkit-box;
+    -webkit-line-clamp: 4;
+    -webkit-box-orient: vertical;
+    overflow: hidden;
+  }
+
+  .testimonial-card.featured .testimonial-content {
+    -webkit-line-clamp: 6;
+  }
+
+  .testimonial-author {
+    display: flex;
+    align-items: center;
+    gap: 1rem;
+  }
+
+  .author-photo {
+    width: 48px;
+    height: 48px;
+    border-radius: 50%;
+    overflow: hidden;
+    flex-shrink: 0;
+  }
+
+  .author-photo img {
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+  }
+
+  .author-photo.placeholder {
+    background: linear-gradient(135deg, var(--primary) 0%, var(--secondary) 100%);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    color: white;
+    font-weight: 600;
+    font-size: 1.25rem;
+  }
+
+  .author-info {
+    flex: 1;
+  }
+
+  .author-name {
+    font-weight: 600;
+    color: #1a202c;
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+  }
+
+  .verified {
+    background: #48bb78;
+    color: white;
+    width: 18px;
+    height: 18px;
+    border-radius: 50%;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 0.7rem;
+  }
+
+  .author-role {
+    font-size: 0.85rem;
+    color: #718096;
+    margin-top: 0.25rem;
+  }
+
+  .author-location {
+    font-size: 0.8rem;
+    color: #a0aec0;
+    margin-top: 0.25rem;
+  }
+
+  .empty-state {
+    text-align: center;
+    padding: 4rem 2rem;
+    background: white;
+    border-radius: 16px;
+    box-shadow: 0 2px 8px rgba(0,0,0,0.05);
+  }
+
+  .empty-icon {
+    font-size: 4rem;
+    margin-bottom: 1rem;
+  }
+
+  .empty-state h3 {
+    font-size: 1.5rem;
+    color: #1a202c;
+    margin: 0 0 0.5rem;
+  }
+
+  .empty-state p {
+    color: #718096;
+    margin: 0 0 1.5rem;
+  }
+
+  .back-btn {
+    display: inline-block;
+    padding: 0.75rem 1.5rem;
+    background: var(--primary);
+    color: white;
+    text-decoration: none;
+    border-radius: 8px;
+    font-weight: 500;
+    transition: transform 0.2s;
+  }
+
+  .back-btn:hover {
+    transform: translateY(-2px);
+  }
+
+  @media (max-width: 768px) {
+    .category-hero {
+      padding: 1.5rem 1rem 2rem;
+    }
+
+    .category-icon {
+      font-size: 2.5rem;
+    }
+
+    .category-title {
+      font-size: 1.5rem;
+    }
+
+    .testimonial-grid {
+      grid-template-columns: 1fr;
+    }
+
+    .testimonial-card.featured {
+      grid-column: span 1;
+    }
+  }
+</style>

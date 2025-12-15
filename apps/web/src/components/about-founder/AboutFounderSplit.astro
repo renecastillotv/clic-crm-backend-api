@@ -1,0 +1,238 @@
+---
+/**
+ * AboutFounderSplit - Sección sobre el fundador con layout split
+ * Muestra información del fundador con imagen y estadísticas
+ */
+
+interface Props {
+  datos: {
+    static_data: {
+      titulo: string;
+      subtitulo?: string;
+      descripcion: string;
+      imagen: string;
+      estadisticas?: Array<{
+        valor: string;
+        label: string;
+      }>;
+      cta?: {
+        texto: string;
+        url: string;
+      };
+    };
+    toggles?: {
+      mostrarEstadisticas?: boolean;
+      mostrarCTA?: boolean;
+    };
+  };
+  tema?: Record<string, string>;
+  baseUrl?: string;
+}
+
+const { datos, tema = {} } = Astro.props;
+const { static_data, toggles = {} } = datos;
+const { titulo, subtitulo, descripcion, imagen, estadisticas = [], cta } = static_data;
+const { mostrarEstadisticas = true, mostrarCTA = true } = toggles;
+
+const primaryColor = tema.primary || '#f04e00';
+const secondaryColor = tema.secondary || '#1a1a1a';
+---
+
+<section class="about-founder">
+  <div class="container">
+    <div class="split-layout">
+      <div class="image-side">
+        <img src={imagen} alt={titulo} class="founder-image" />
+      </div>
+
+      <div class="content-side">
+        <h2 class="title">{titulo}</h2>
+        {subtitulo && <p class="subtitle">{subtitulo}</p>}
+
+        <p class="description">{descripcion}</p>
+
+        {mostrarEstadisticas && estadisticas.length > 0 && (
+          <div class="statistics">
+            {estadisticas.map((stat) => (
+              <div class="stat-item">
+                <div class="stat-value">{stat.valor}</div>
+                <div class="stat-label">{stat.label}</div>
+              </div>
+            ))}
+          </div>
+        )}
+
+        {mostrarCTA && cta && (
+          <a href={cta.url} class="cta-button">
+            {cta.texto}
+          </a>
+        )}
+      </div>
+    </div>
+  </div>
+</section>
+
+<style define:vars={{ primaryColor, secondaryColor }}>
+  .about-founder {
+    padding: 5rem 0;
+    background: white;
+  }
+
+  .container {
+    max-width: 1200px;
+    margin: 0 auto;
+    padding: 0 1.5rem;
+  }
+
+  .split-layout {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 4rem;
+    align-items: center;
+  }
+
+  .image-side {
+    position: relative;
+  }
+
+  .founder-image {
+    width: 100%;
+    height: auto;
+    border-radius: 16px;
+    box-shadow: 0 12px 32px rgba(0, 0, 0, 0.15);
+  }
+
+  .content-side {
+    padding: 2rem 0;
+  }
+
+  .title {
+    font-size: 3rem;
+    font-weight: 700;
+    color: var(--secondaryColor);
+    margin: 0 0 0.5rem 0;
+    line-height: 1.2;
+  }
+
+  .subtitle {
+    font-size: 1.25rem;
+    color: var(--primaryColor);
+    font-weight: 600;
+    margin: 0 0 2rem 0;
+  }
+
+  .description {
+    font-size: 1.125rem;
+    line-height: 1.8;
+    color: #4b5563;
+    margin: 0 0 2.5rem 0;
+  }
+
+  .statistics {
+    display: grid;
+    grid-template-columns: repeat(2, 1fr);
+    gap: 2rem;
+    margin-bottom: 2.5rem;
+  }
+
+  .stat-item {
+    text-align: center;
+    padding: 1.5rem;
+    background: #f9fafb;
+    border-radius: 12px;
+    transition: all 0.3s;
+  }
+
+  .stat-item:hover {
+    background: #f3f4f6;
+    transform: translateY(-4px);
+  }
+
+  .stat-value {
+    font-size: 2.5rem;
+    font-weight: 700;
+    color: var(--primaryColor);
+    margin-bottom: 0.5rem;
+  }
+
+  .stat-label {
+    font-size: 0.95rem;
+    color: #6b7280;
+    font-weight: 500;
+  }
+
+  .cta-button {
+    display: inline-block;
+    padding: 1rem 2.5rem;
+    background: var(--primaryColor);
+    color: white;
+    text-decoration: none;
+    border-radius: 8px;
+    font-weight: 600;
+    font-size: 1.125rem;
+    transition: all 0.3s;
+    box-shadow: 0 4px 12px rgba(240, 78, 0, 0.3);
+  }
+
+  .cta-button:hover {
+    background: color-mix(in srgb, var(--primaryColor) 85%, black);
+    transform: translateY(-2px);
+    box-shadow: 0 6px 16px rgba(240, 78, 0, 0.4);
+  }
+
+  @media (max-width: 968px) {
+    .split-layout {
+      grid-template-columns: 1fr;
+      gap: 3rem;
+    }
+
+    .image-side {
+      order: -1;
+    }
+
+    .title {
+      font-size: 2.5rem;
+    }
+
+    .statistics {
+      grid-template-columns: repeat(2, 1fr);
+      gap: 1.5rem;
+    }
+
+    .stat-value {
+      font-size: 2rem;
+    }
+  }
+
+  @media (max-width: 640px) {
+    .about-founder {
+      padding: 3rem 0;
+    }
+
+    .title {
+      font-size: 2rem;
+    }
+
+    .subtitle {
+      font-size: 1.125rem;
+    }
+
+    .description {
+      font-size: 1rem;
+    }
+
+    .statistics {
+      grid-template-columns: 1fr;
+      gap: 1rem;
+    }
+
+    .stat-value {
+      font-size: 1.75rem;
+    }
+
+    .cta-button {
+      width: 100%;
+      text-align: center;
+    }
+  }
+</style>

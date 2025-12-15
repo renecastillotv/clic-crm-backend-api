@@ -1,0 +1,32 @@
+He modificado el backend en [tenants.ts:2477](d:\2026 CLIC\packages\api\src\routes\tenants.ts#L2477) para incluir `campos_config` en la respuesta.
+
+Ahora el modal necesita ser reescrito completamente para mostrar formularios user-friendly basados en `campos_config`.
+
+El modal actual muestra JSON crudo. Necesita:
+
+1. Leer `componente.campos_config` que es un array de configuraciones de campos
+2. Para cada campo en `campos_config`, renderizar el input apropiado (text, textarea, number, boolean, select, color, url)
+3. Prellenar los valores desde `componente.datos`
+4. Al guardar, construir el objeto de datos automáticamente desde el formulario
+
+El formato esperado de `campos_config` es:
+```json
+[
+  {
+    "clave": "titulo",
+    "label": "Título",
+    "tipo": "texto",
+    "valor_default": "",
+    "requerido": true
+  },
+  {
+    "clave": "descripcion",
+    "tipo": "textarea",
+    "label": "Descripción"
+  }
+]
+```
+
+Tipos soportados: texto/text, textarea, numero/number, boolean/checkbox, select, color, url
+
+El modal debe reemplazar la función `ComponenteEditorModal` completa (línea 890 en adelante) con una versión que renderice formularios dinámicos.

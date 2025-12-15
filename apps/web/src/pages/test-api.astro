@@ -1,0 +1,167 @@
+---
+/**
+ * Página de prueba para verificar que la API funciona
+ */
+import { fetchTema, fetchComponentes } from '../utils/fetchComponents';
+
+const API_URL = import.meta.env.PUBLIC_API_URL || 'http://localhost:3001';
+
+// Obtener tenant
+let tenantId: string | null = null;
+let tenantInfo: any = null;
+
+try {
+  const tenantResponse = await fetch(`${API_URL}/api/tenants/first`);
+  if (tenantResponse.ok) {
+    tenantInfo = await tenantResponse.json();
+    tenantId = tenantInfo.id;
+  }
+} catch (error) {
+  console.error('Error obteniendo tenant:', error);
+}
+
+// Obtener datos desde la API
+let tema = null;
+let componentes = null;
+let errorMessage = null;
+
+if (tenantId) {
+  try {
+    tema = await fetchTema(tenantId);
+    componentes = await fetchComponentes(tenantId);
+  } catch (error: any) {
+    errorMessage = error.message;
+  }
+}
+---
+
+<!doctype html>
+<html lang="es">
+  <head>
+    <meta charset="UTF-8" />
+    <title>Test API - Verificación</title>
+    <style>
+      body {
+        font-family: system-ui, sans-serif;
+        max-width: 1200px;
+        margin: 0 auto;
+        padding: 2rem;
+        background: #f5f5f5;
+      }
+      .card {
+        background: white;
+        padding: 1.5rem;
+        margin: 1rem 0;
+        border-radius: 8px;
+        box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+      }
+      .success { color: #48bb78; }
+      .error { color: #f56565; }
+      .info { color: #667eea; }
+      pre {
+        background: #f7f7f7;
+        padding: 1rem;
+        border-radius: 4px;
+        overflow-x: auto;
+      }
+      .badge {
+        display: inline-block;
+        padding: 0.25rem 0.75rem;
+        border-radius: 12px;
+        font-size: 0.875rem;
+        font-weight: 600;
+      }
+      .badge-success { background: #c6f6d5; color: #22543d; }
+      .badge-error { background: #fed7d7; color: #742a2a; }
+    </style>
+  </head>
+  <body>
+    <h1>🔍 Test de Conexión con la API</h1>
+    
+    <div class="card">
+      <h2>1. Información del Tenant</h2>
+      {tenantInfo ? (
+        <>
+          <p><strong>ID:</strong> <code>{tenantInfo.id}</code></p>
+          <p><strong>Nombre:</strong> {tenantInfo.nombre}</p>
+          <p><strong>Slug:</strong> {tenantInfo.slug}</p>
+          <span class="badge badge-success">✅ Tenant obtenido</span>
+        </>
+      ) : (
+        <span class="badge badge-error">❌ No se pudo obtener tenant</span>
+      )}
+    </div>
+
+    <div class="card">
+      <h2>2. Tema desde API</h2>
+      {tema ? (
+        <>
+          <p><strong>Primary:</strong> <span style="color: {tema.primary}">{tema.primary}</span></p>
+          <p><strong>Secondary:</strong> <span style="color: {tema.secondary}">{tema.secondary}</span></p>
+          <span class="badge badge-success">✅ Tema obtenido</span>
+          <pre>{JSON.stringify(tema, null, 2)}</pre>
+        </>
+      ) : (
+        <span class="badge badge-error">❌ No se pudo obtener tema</span>
+      )}
+    </div>
+
+    <div class="card">
+      <h2>3. Componentes desde API</h2>
+      {componentes && componentes.length > 0 ? (
+        <>
+          <p><strong>Total:</strong> {componentes.length} componentes</p>
+          <span class="badge badge-success">✅ Componentes obtenidos</span>
+          <ul>
+            {componentes.map((c: any) => (
+              <li>
+                <strong>{c.tipo}</strong> ({c.variante}) - Orden: {c.orden}
+                <pre style="font-size: 0.8rem; margin-top: 0.5rem;">{JSON.stringify(c.datos, null, 2)}</pre>
+              </li>
+            ))}
+          </ul>
+        </>
+      ) : (
+        <span class="badge badge-error">❌ No se obtuvieron componentes</span>
+      )}
+      {errorMessage && (
+        <p class="error">Error: {errorMessage}</p>
+      )}
+    </div>
+
+    <div class="card">
+      <h2>4. URLs de la API</h2>
+      <ul>
+        <li><code>{API_URL}/api/tenants/first</code></li>
+        {tenantId && (
+          <>
+            <li><code>{API_URL}/api/tenants/{tenantId}/componentes</code></li>
+            <li><code>{API_URL}/api/tenants/{tenantId}/tema</code></li>
+          </>
+        )}
+      </ul>
+    </div>
+
+    <div class="card">
+      <h2>✅ Conclusión</h2>
+      {tenantInfo && tema && componentes && componentes.length > 0 ? (
+        <p class="success">
+          <strong>✅ TODO FUNCIONANDO:</strong> El frontend está obteniendo datos desde la API correctamente.
+          Los componentes que ves en la página principal vienen directamente de la base de datos.
+        </p>
+      ) : (
+        <p class="error">
+          <strong>❌ HAY PROBLEMAS:</strong> No se pudieron obtener todos los datos de la API.
+          Verifica que el servidor de la API esté corriendo en {API_URL}
+        </p>
+      )}
+    </div>
+
+    <div class="card">
+      <p><a href="/">← Volver a la página principal</a></p>
+    </div>
+  </body>
+</html>
+
+
+

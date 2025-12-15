@@ -1,0 +1,357 @@
+---
+/**
+ * TeamGridDefault.astro
+ * Grid de asesores/equipo con datos dinámicos desde la API
+ * Muestra los asesores disponibles o un mensaje si no hay
+ */
+
+interface Props {
+  datos?: any;
+  tema?: Record<string, string>;
+  baseUrl?: string;
+  tipoPagina?: string;
+}
+
+const { datos, tema = {}, baseUrl = '', tipoPagina = '' } = Astro.props;
+
+const staticData = datos?.static_data || {};
+const toggles = datos?.toggles || {};
+const dynamicData = datos?.dynamic_data || {};
+
+// Datos estáticos del componente
+const titulo = staticData?.titulo || 'Nuestro Equipo';
+const subtitulo = staticData?.subtitulo || 'Conoce a nuestros asesores profesionales';
+
+// Toggles
+const mostrarRating = toggles?.mostrarRating ?? true;
+const mostrarContacto = toggles?.mostrarContacto ?? true;
+const mostrarEspecialidad = toggles?.mostrarEspecialidad ?? true;
+
+// Asesores dinámicos (vendrán desde la API)
+const asesoresRaw = dynamicData?.resolved || datos?.asesores || [];
+
+// Normalizar datos de asesores para compatibilidad
+const asesores = asesoresRaw.map((a: any) => ({
+  ...a,
+  nombreCompleto: `${a.nombre || ''} ${a.apellido || ''}`.trim() || 'Asesor',
+  foto: a.foto_url || a.foto || a.avatar_url || a.avatar || null,
+  especialidad: Array.isArray(a.especialidades) && a.especialidades.length > 0
+    ? a.especialidades[0]
+    : (a.cargo || a.especialidad || null),
+  rating: a.calificacion_promedio || a.rating || null,
+  num_reviews: a.total_resenas || a.num_reviews || null,
+}));
+
+// Colores del tema
+const primaryColor = tema?.primary || '#667eea';
+const secondaryColor = tema?.secondary || '#764ba2';
+---
+
+<section class="team-grid-section" style={`--primary: ${primaryColor}; --secondary: ${secondaryColor};`}>
+  <div class="team-grid-container">
+    {/* Header de la sección */}
+    <div class="section-header">
+      <h2 class="section-title">{titulo}</h2>
+      {subtitulo && <p class="section-subtitle">{subtitulo}</p>}
+    </div>
+
+    {/* Grid de asesores - VERSIÓN SIMPLIFICADA */}
+    {asesores.length > 0 ? (
+      <div style="display: grid; grid-template-columns: repeat(auto-fill, minmax(300px, 1fr)); gap: 2rem; padding: 2rem 0;">
+        {asesores.map((asesor: any) => (
+          <div style="background: white; border-radius: 12px; padding: 1.5rem; box-shadow: 0 2px 8px rgba(0,0,0,0.1);">
+            {/* Avatar */}
+            <div style="width: 80px; height: 80px; border-radius: 50%; background: linear-gradient(135deg, #e63946, #1d3557); display: flex; align-items: center; justify-content: center; color: white; font-size: 2rem; font-weight: bold; margin-bottom: 1rem;">
+              {asesor.nombreCompleto.charAt(0).toUpperCase()}
+            </div>
+
+            {/* Info */}
+            <h3 style="margin: 0 0 0.5rem 0; font-size: 1.25rem; font-weight: 600;">{asesor.nombreCompleto}</h3>
+            <p style="margin: 0 0 0.25rem 0; color: #4a5568; font-size: 0.9rem;">{asesor.cargo}</p>
+            {asesor.especialidad && (
+              <p style="margin: 0 0 0.5rem 0; color: #e63946; font-size: 0.9rem; font-weight: 500;">{asesor.especialidad}</p>
+            )}
+
+            {/* Rating */}
+            {asesor.rating !== undefined && (
+              <div style="display: flex; align-items: center; gap: 0.5rem; margin: 0.5rem 0;">
+                <span style="color: #f6ad55;">★★★★★</span>
+                <span style="font-weight: 600;">{asesor.rating.toFixed(1)}</span>
+                {asesor.num_reviews && (
+                  <span style="font-size: 0.85rem; color: #718096;">({asesor.num_reviews} reseñas)</span>
+                )}
+              </div>
+            )}
+
+            {/* Email */}
+            {asesor.email && (
+              <a href={`mailto:${asesor.email}`} style="display: inline-block; margin-top: 0.5rem; padding: 0.5rem 1rem; background: #f7fafc; border-radius: 8px; color: #e63946; text-decoration: none; font-size: 0.85rem; font-weight: 500;">
+                📧 Email
+              </a>
+            )}
+
+            {/* Stats */}
+            {asesor.propiedades_activas !== undefined && (
+              <p style="margin: 0.5rem 0 0 0; font-size: 0.85rem; color: #718096;">
+                {asesor.propiedades_activas} propiedades activas
+              </p>
+            )}
+          </div>
+        ))}
+      </div>
+    ) : (
+      <div class="empty-state">
+        <div class="empty-icon">👥</div>
+        <h3>No hay asesores disponibles</h3>
+        <p>Actualmente no tenemos asesores registrados en el sistema.</p>
+        <p class="empty-hint">Los asesores aparecerán aquí cuando estén disponibles.</p>
+      </div>
+    )}
+
+    {/* Contador */}
+    {asesores.length > 0 && (
+      <div class="team-count">
+        <span>Mostrando {asesores.length} asesor{asesores.length !== 1 ? 'es' : ''}</span>
+      </div>
+    )}
+  </div>
+</section>
+
+<style>
+  .team-grid-section {
+    padding: 4rem 2rem;
+    background: var(--background-color, #f8f9fa);
+  }
+
+  .team-grid-container {
+    max-width: 1200px;
+    margin: 0 auto;
+  }
+
+  .section-header {
+    text-align: center;
+    margin-bottom: 3rem;
+  }
+
+  .section-title {
+    font-size: 2rem;
+    font-weight: 700;
+    color: var(--text-color, #1a202c);
+    margin: 0 0 0.5rem 0;
+  }
+
+  .section-subtitle {
+    font-size: 1.1rem;
+    color: var(--text-secondary, #718096);
+    margin: 0;
+  }
+
+  .team-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(320px, 1fr));
+    gap: 1.5rem;
+  }
+
+  .team-card {
+    display: flex !important;
+    flex-direction: row !important;
+    align-items: flex-start !important;
+    gap: 1.25rem !important;
+    background: white;
+    border-radius: 16px;
+    padding: 1.5rem;
+    text-decoration: none;
+    color: inherit;
+    box-shadow: 0 4px 12px rgba(0,0,0,0.08);
+    transition: transform 0.2s, box-shadow 0.2s;
+  }
+
+  .team-card:hover {
+    transform: translateY(-4px);
+    box-shadow: 0 8px 24px rgba(0,0,0,0.12);
+  }
+
+  .team-avatar {
+    flex-shrink: 0;
+    width: 80px;
+    height: 80px;
+    border-radius: 50%;
+    overflow: hidden;
+    border: 3px solid var(--primary);
+  }
+
+  .team-avatar img {
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+  }
+
+  .avatar-placeholder {
+    width: 100%;
+    height: 100%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    background: linear-gradient(135deg, var(--primary), var(--secondary));
+    color: white;
+    font-size: 2rem;
+    font-weight: 700;
+  }
+
+  .team-info {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    gap: 0.25rem;
+    text-align: left;
+  }
+
+  .team-name {
+    font-size: 1.25rem;
+    font-weight: 600;
+    color: var(--text-color, #1a202c);
+    margin: 0;
+  }
+
+  .team-role {
+    font-size: 0.9rem;
+    color: var(--text-secondary, #4a5568);
+    margin: 0;
+    font-weight: 500;
+  }
+
+  .team-specialty {
+    font-size: 0.9rem;
+    color: var(--primary);
+    margin: 0;
+    font-weight: 500;
+  }
+
+  .team-rating {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+  }
+
+  .stars {
+    display: flex;
+  }
+
+  .star {
+    color: #e2e8f0;
+    font-size: 1rem;
+  }
+
+  .star.filled {
+    color: #f6ad55;
+  }
+
+  .rating-value {
+    font-weight: 600;
+    color: var(--text-color, #1a202c);
+  }
+
+  .reviews-count {
+    font-size: 0.85rem;
+    color: #718096;
+  }
+
+  .team-contact {
+    display: flex;
+    gap: 0.5rem;
+    margin-top: 0.5rem;
+  }
+
+  .contact-link {
+    display: flex;
+    align-items: center;
+    gap: 0.35rem;
+    padding: 0.5rem 1rem;
+    background: #f7fafc;
+    border-radius: 8px;
+    color: var(--primary);
+    text-decoration: none;
+    font-size: 0.85rem;
+    font-weight: 500;
+    transition: background 0.2s;
+  }
+
+  .contact-link:hover {
+    background: #edf2f7;
+  }
+
+  .team-stats {
+    font-size: 0.85rem;
+    color: #718096;
+    margin: 0.5rem 0 0 0;
+  }
+
+  .empty-state {
+    text-align: center;
+    padding: 4rem 2rem;
+    background: white;
+    border-radius: 16px;
+    box-shadow: 0 2px 8px rgba(0,0,0,0.05);
+  }
+
+  .empty-icon {
+    font-size: 4rem;
+    margin-bottom: 1rem;
+  }
+
+  .empty-state h3 {
+    font-size: 1.5rem;
+    color: var(--text-color, #1a202c);
+    margin: 0 0 0.5rem 0;
+  }
+
+  .empty-state p {
+    color: var(--text-secondary, #718096);
+    margin: 0 0 0.5rem 0;
+  }
+
+  .empty-hint {
+    font-size: 0.9rem;
+    color: #a0aec0;
+    font-style: italic;
+  }
+
+  .team-count {
+    margin-top: 2rem;
+    text-align: center;
+    font-size: 0.9rem;
+    color: #718096;
+  }
+
+  @media (max-width: 768px) {
+    .team-grid-section {
+      padding: 2rem 1rem;
+    }
+
+    .section-title {
+      font-size: 1.5rem;
+    }
+
+    .team-grid {
+      grid-template-columns: 1fr;
+    }
+
+    .team-card {
+      gap: 1rem;
+      padding: 1rem;
+    }
+
+    .team-avatar {
+      width: 60px;
+      height: 60px;
+    }
+
+    .avatar-placeholder {
+      font-size: 1.5rem;
+    }
+
+    .team-name {
+      font-size: 1.1rem;
+    }
+  }
+</style>

@@ -1,0 +1,207 @@
+.dashboard-container {
+  display: flex;
+  min-height: 100vh;
+  background-color: var(--premium-surface, #FAFBFC);
+}
+
+.sidebar {
+  width: 280px;
+  background: var(--premium-sidebar-bg, #E8EBEF);
+  border-right: 1px solid var(--premium-sidebar-border, #D1D5DB);
+  display: flex;
+  flex-direction: column;
+  position: fixed;
+  height: 100vh;
+  overflow-y: auto;
+}
+
+.sidebar-header {
+  padding: 1.5rem;
+  border-bottom: 1px solid #e2e8f0;
+}
+
+.sidebar-header h2 {
+  margin: 0;
+  color: #1a202c;
+  font-size: 1.5rem;
+  font-weight: 700;
+}
+
+.sidebar-nav {
+  flex: 1;
+  padding: 1rem 0;
+  overflow-y: auto;
+}
+
+.nav-section {
+  margin-bottom: 2rem;
+}
+
+.nav-section-title {
+  padding: 0.5rem 1.5rem;
+  font-size: 12px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  color: var(--premium-text-muted, #6B7280);
+  margin-top: var(--premium-spacing-xl, 24px);
+  margin-bottom: var(--premium-spacing-xs, 8px);
+}
+
+.nav-link {
+  display: block;
+  padding: 0.75rem 1.5rem;
+  color: var(--premium-text-main, #111827);
+  text-decoration: none;
+  transition: all 0.2s ease;
+  border-left: 3px solid transparent;
+}
+
+.nav-link:hover {
+  background-color: rgba(0, 0, 0, 0.04);
+  color: var(--premium-text-main, #111827);
+}
+
+.nav-link.active {
+  background-color: var(--premium-primary-light, rgba(0, 87, 255, 0.08));
+  color: var(--premium-primary, #0057FF);
+  border-left-color: var(--premium-primary, #0057FF);
+  font-weight: 600;
+}
+
+.sidebar-footer {
+  padding: 1.5rem;
+  border-top: 1px solid var(--premium-card-border, #E4E7EC);
+  background-color: var(--premium-surface, #FAFBFC);
+}
+
+.user-info {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  margin-bottom: 1rem;
+}
+
+.user-avatar {
+  width: 40px;
+  height: 40px;
+  border-radius: 50%;
+  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: white;
+  font-weight: 600;
+  font-size: 1.1rem;
+}
+
+.user-details {
+  flex: 1;
+  min-width: 0;
+}
+
+.user-name {
+  font-weight: 600;
+  color: #1a202c;
+  font-size: 0.9rem;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.user-email {
+  font-size: 0.75rem;
+  color: #718096;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.logout-button {
+  width: 100%;
+  padding: 0.75rem;
+  background-color: #e53e3e;
+  color: white;
+  border: none;
+  border-radius: 8px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: background-color 0.2s;
+}
+
+.logout-button:hover {
+  background-color: #c53030;
+}
+
+.dashboard-main {
+  flex: 1;
+  margin-left: 280px;
+  display: flex;
+  flex-direction: column;
+}
+
+.dashboard-header {
+  background: var(--premium-card-bg, #FFFFFF);
+  border-bottom: 1px solid var(--premium-card-border, #E4E7EC);
+  box-shadow: var(--premium-elevation-header, 0 1px 3px rgba(0, 0, 0, 0.06));
+  padding: 1.5rem 2rem;
+  position: sticky;
+  top: 0;
+  z-index: 10;
+}
+
+.dashboard-header h1 {
+  margin: 0;
+  color: #1a202c;
+  font-size: 1.75rem;
+  font-weight: 700;
+}
+
+.dashboard-content {
+  flex: 1;
+  padding: 2rem;
+  overflow-y: auto;
+}
+
+/* ================================
+   PREMIUM DEPTH - Stat Cards / Content Cards
+   ================================ */
+
+/* Estilos premium para cards de estadísticas y contenido */
+.stat-card,
+.content-card,
+.dashboard-card,
+.info-card {
+  background: var(--premium-card-bg, #FFFFFF);
+  border: 1px solid var(--premium-card-border, #E2E8F0);
+  border-radius: var(--premium-radius-large, 18px);
+  box-shadow: var(--premium-elevation-card, 0 4px 14px rgba(0, 0, 0, 0.08));
+  transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+.stat-card:hover,
+.content-card:hover,
+.dashboard-card:hover,
+.info-card:hover {
+  box-shadow: 0 6px 20px rgba(0, 0, 0, 0.12);
+  transform: translateY(-2px);
+}
+
+/* Stats grid con spacing premium */
+.stats-grid,
+.dashboard-stats {
+  display: grid;
+  gap: var(--premium-spacing-lg, 24px);
+}
+
+/* Secciones del dashboard con spacing premium */
+.dashboard-section {
+  margin-top: var(--premium-spacing-xl, 32px);
+}
+
+.dashboard-section:first-child {
+  margin-top: 0;
+}
+
+
+

@@ -1,0 +1,94 @@
+---
+import type { ComponenteDataEstructurado } from '../../types/componentesEstructurado';
+
+interface Props {
+  datos: ComponenteDataEstructurado;
+  tema?: Record<string, string>;
+}
+
+const { datos = {}, tema = {} } = Astro.props;
+
+// Acceso directo a datos estructurados (formato estricto)
+// Asegurar que datos y static_data existan para evitar errores
+const staticData = datos?.static_data || {};
+const toggles = datos?.toggles || {};
+
+const textoCopyright = staticData.textoCopyright || '© 2024 Todos los derechos reservados';
+const telefono = staticData.telefono || '';
+const email = staticData.email || '';
+const direccion = staticData.direccion || '';
+
+// Usar toggles para mostrar/ocultar elementos
+const mostrarTelefono = toggles.mostrarTelefono !== false; // Por defecto true si no está definido
+const mostrarEmail = toggles.mostrarEmail !== false;
+
+// Obtener colores del tema para el footer (footer usa colores oscuros)
+// Footer usa text-color como background y background-color como texto
+const footerBackground = tema?.text || null; // Color de texto del tema como background
+const footerText = tema?.background || null; // Background del tema como color de texto
+
+// Aplicar colores inline si están disponibles
+const footerStyle = (footerBackground && footerText)
+  ? `background: ${footerBackground} !important; color: ${footerText} !important;`
+  : '';
+---
+
+<!-- Footer Component -->
+<footer 
+  class="footer-default" 
+  data-component="footer-default"
+  style={footerStyle}
+>
+  <div class="footer-content">
+    {direccion ? <p class="footer-address">{direccion}</p> : null}
+    <div class="footer-contact">
+      {mostrarTelefono && telefono ? <span>Tel: {telefono}</span> : null}
+      {mostrarEmail && email ? <span>Email: {email}</span> : null}
+    </div>
+    <p class="footer-copyright">{textoCopyright}</p>
+  </div>
+</footer>
+
+<style is:global>
+  .footer-default {
+    /* Si no hay estilo inline, usar variables CSS globales del tema */
+    background: var(--text-color, #1a202c) !important;
+    color: var(--background-color, #ffffff) !important;
+    padding: 3rem 2rem !important;
+    text-align: center;
+    width: 100% !important;
+    display: block !important;
+    margin-top: auto;
+    flex-shrink: 0;
+    box-sizing: border-box;
+  }
+
+  .footer-content {
+    max-width: 1200px;
+    margin: 0 auto;
+  }
+
+  .footer-address {
+    margin: 0 0 1rem 0;
+    color: rgba(255, 255, 255, 0.8);
+  }
+
+  .footer-contact {
+    display: flex;
+    justify-content: center;
+    gap: 2rem;
+    margin-bottom: 1rem;
+    flex-wrap: wrap;
+  }
+
+  .footer-copyright {
+    margin: 1rem 0 0 0;
+    color: rgba(255, 255, 255, 0.6) !important;
+    font-size: 0.9rem;
+  }
+
+  .footer-contact span {
+    color: rgba(255, 255, 255, 0.9) !important;
+  }
+</style>
+

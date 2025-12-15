@@ -1,0 +1,415 @@
+---
+/**
+ * PropertyCarouselFeatured - Carrusel de propiedades destacadas
+ * Muestra propiedades en un carrusel con navegación
+ */
+
+interface Props {
+  datos: {
+    static_data: {
+      titulo: string;
+      subtitulo?: string;
+    };
+    dynamic_data?: {
+      resolved?: Array<any>;
+    };
+    toggles?: {
+      mostrarFlechas?: boolean;
+      autoplay?: boolean;
+      loop?: boolean;
+    };
+    styles?: {
+      itemsPerView?: number;
+      gap?: string;
+    };
+  };
+  tema?: Record<string, string>;
+  baseUrl?: string;
+}
+
+const { datos, tema = {}, baseUrl = '' } = Astro.props;
+const { static_data, dynamic_data, toggles = {}, styles = {} } = datos;
+const { titulo, subtitulo } = static_data;
+const propiedades = dynamic_data?.resolved || [];
+const { mostrarFlechas = true } = toggles;
+const { itemsPerView = 3, gap = '2rem' } = styles;
+
+const primaryColor = tema.primary || '#f04e00';
+const secondaryColor = tema.secondary || '#1a1a1a';
+---
+
+<section class="property-carousel">
+  <div class="container">
+    <div class="header">
+      <h2 class="title">{titulo}</h2>
+      {subtitulo && <p class="subtitle">{subtitulo}</p>}
+    </div>
+
+    {propiedades.length > 0 ? (
+      <div class="carousel-wrapper">
+        {mostrarFlechas && (
+          <>
+            <button class="carousel-btn prev" aria-label="Anterior">
+              ‹
+            </button>
+            <button class="carousel-btn next" aria-label="Siguiente">
+              ›
+            </button>
+          </>
+        )}
+
+        <div class="carousel-container">
+          <div class="carousel-track" data-items-per-view={itemsPerView}>
+            {propiedades.map((propiedad: any) => (
+              <div class="carousel-item">
+                <a href={`${baseUrl}${propiedad.url || `/propiedades/${propiedad.slug}`}`} class="property-card">
+                  <div class="property-image">
+                    <img
+                      src={propiedad.imagen || propiedad.imagenes?.[0] || '/placeholder-property.jpg'}
+                      alt={propiedad.titulo || propiedad.title}
+                    />
+                    {propiedad.destacada && (
+                      <span class="badge badge-featured">Destacada</span>
+                    )}
+                    {propiedad.exclusiva && (
+                      <span class="badge badge-exclusive">Exclusiva</span>
+                    )}
+                  </div>
+                  <div class="property-info">
+                    <h3 class="property-title">{propiedad.titulo || propiedad.title}</h3>
+                    {propiedad.ubicacion && (
+                      <p class="property-location">📍 {propiedad.ubicacion}</p>
+                    )}
+                    <div class="property-features">
+                      {propiedad.habitaciones && (
+                        <span class="feature">🛏️ {propiedad.habitaciones}</span>
+                      )}
+                      {propiedad.banos && (
+                        <span class="feature">🚿 {propiedad.banos}</span>
+                      )}
+                      {propiedad.metros && (
+                        <span class="feature">📐 {propiedad.metros}m²</span>
+                      )}
+                    </div>
+                    {propiedad.precio && (
+                      <p class="property-price">${propiedad.precio.toLocaleString()}</p>
+                    )}
+                  </div>
+                </a>
+              </div>
+            ))}
+          </div>
+        </div>
+
+        <div class="carousel-dots"></div>
+      </div>
+    ) : (
+      <div class="empty-state">
+        <p>No hay propiedades destacadas disponibles en este momento.</p>
+      </div>
+    )}
+  </div>
+</section>
+
+<script>
+  // Carousel functionality
+  const carousels = document.querySelectorAll('.carousel-wrapper');
+
+  carousels.forEach((wrapper) => {
+    const track = wrapper.querySelector('.carousel-track') as HTMLElement;
+    const prevBtn = wrapper.querySelector('.prev') as HTMLButtonElement;
+    const nextBtn = wrapper.querySelector('.next') as HTMLButtonElement;
+    const dotsContainer = wrapper.querySelector('.carousel-dots') as HTMLElement;
+
+    if (!track) return;
+
+    const items = Array.from(track.children) as HTMLElement[];
+    const itemsPerView = parseInt(track.dataset.itemsPerView || '3');
+    const totalSlides = Math.ceil(items.length / itemsPerView);
+    let currentSlide = 0;
+
+    // Create dots
+    for (let i = 0; i < totalSlides; i++) {
+      const dot = document.createElement('button');
+      dot.classList.add('dot');
+      if (i === 0) dot.classList.add('active');
+      dot.addEventListener('click', () => goToSlide(i));
+      dotsContainer?.appendChild(dot);
+    }
+
+    function goToSlide(index: number) {
+      currentSlide = index;
+      const offset = currentSlide * 100;
+      track.style.transform = `translateX(-${offset}%)`;
+
+      // Update dots
+      dotsContainer?.querySelectorAll('.dot').forEach((dot, i) => {
+        dot.classList.toggle('active', i === currentSlide);
+      });
+    }
+
+    prevBtn?.addEventListener('click', () => {
+      currentSlide = Math.max(0, currentSlide - 1);
+      goToSlide(currentSlide);
+    });
+
+    nextBtn?.addEventListener('click', () => {
+      currentSlide = Math.min(totalSlides - 1, currentSlide + 1);
+      goToSlide(currentSlide);
+    });
+  });
+</script>
+
+<style define:vars={{ primaryColor, secondaryColor }}>
+  .property-carousel {
+    padding: 5rem 0;
+    background: #f9fafb;
+  }
+
+  .container {
+    max-width: 1200px;
+    margin: 0 auto;
+    padding: 0 1.5rem;
+  }
+
+  .header {
+    text-align: center;
+    margin-bottom: 3.5rem;
+  }
+
+  .title {
+    font-size: 2.25rem;
+    font-weight: 700;
+    color: var(--secondaryColor);
+    margin: 0 0 0.75rem 0;
+    letter-spacing: -0.02em;
+  }
+
+  .subtitle {
+    font-size: 1.125rem;
+    color: #6b7280;
+    line-height: 1.6;
+  }
+
+  .carousel-wrapper {
+    position: relative;
+  }
+
+  .carousel-btn {
+    position: absolute;
+    top: 50%;
+    transform: translateY(-50%);
+    width: 52px;
+    height: 52px;
+    border-radius: 50%;
+    background: white;
+    border: 2px solid #e5e7eb;
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
+    cursor: pointer;
+    font-size: 2rem;
+    color: var(--primaryColor);
+    z-index: 10;
+    transition: all 0.3s;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+  }
+
+  .carousel-btn:hover {
+    background: var(--primaryColor);
+    color: white;
+    border-color: var(--primaryColor);
+    box-shadow: 0 6px 16px rgba(240, 78, 0, 0.3);
+  }
+
+  .carousel-btn.prev {
+    left: -26px;
+  }
+
+  .carousel-btn.next {
+    right: -26px;
+  }
+
+  .carousel-container {
+    overflow: hidden;
+    padding: 1rem 0;
+  }
+
+  .carousel-track {
+    display: flex;
+    gap: 2rem;
+    transition: transform 0.5s ease;
+  }
+
+  .carousel-item {
+    flex: 0 0 calc((100% - 4rem) / 3);
+    min-width: 0;
+  }
+
+  .carousel-track[data-items-per-view="2"] .carousel-item {
+    flex: 0 0 calc((100% - 2rem) / 2);
+  }
+
+  .carousel-track[data-items-per-view="4"] .carousel-item {
+    flex: 0 0 calc((100% - 6rem) / 4);
+  }
+
+  .property-card {
+    display: block;
+    text-decoration: none;
+    color: inherit;
+    background: white;
+    border-radius: 12px;
+    overflow: hidden;
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+    transition: all 0.3s;
+  }
+
+  .property-card:hover {
+    transform: translateY(-8px);
+    box-shadow: 0 8px 24px rgba(0, 0, 0, 0.15);
+  }
+
+  .property-image {
+    position: relative;
+    aspect-ratio: 4 / 3;
+    overflow: hidden;
+  }
+
+  .property-image img {
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+  }
+
+  .badge {
+    position: absolute;
+    top: 1rem;
+    right: 1rem;
+    padding: 0.5rem 1rem;
+    border-radius: 20px;
+    font-size: 0.875rem;
+    font-weight: 600;
+    color: white;
+  }
+
+  .badge-featured {
+    background: var(--primaryColor);
+  }
+
+  .badge-exclusive {
+    background: #8b5cf6;
+  }
+
+  .property-info {
+    padding: 1.5rem;
+  }
+
+  .property-title {
+    font-size: 1.25rem;
+    font-weight: 600;
+    margin: 0 0 0.5rem 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+
+  .property-location {
+    font-size: 0.875rem;
+    color: #6b7280;
+    margin: 0 0 1rem 0;
+  }
+
+  .property-features {
+    display: flex;
+    gap: 1rem;
+    margin-bottom: 1rem;
+    font-size: 0.875rem;
+    color: #6b7280;
+  }
+
+  .property-price {
+    font-size: 1.5rem;
+    font-weight: 700;
+    color: var(--primaryColor);
+    margin: 0;
+  }
+
+  .carousel-dots {
+    display: flex;
+    justify-content: center;
+    gap: 0.5rem;
+    margin-top: 2rem;
+  }
+
+  .dot {
+    width: 12px;
+    height: 12px;
+    border-radius: 50%;
+    background: #d1d5db;
+    border: none;
+    cursor: pointer;
+    transition: all 0.3s;
+  }
+
+  .dot.active,
+  .dot:hover {
+    background: var(--primaryColor);
+  }
+
+  .empty-state {
+    text-align: center;
+    padding: 3rem;
+    color: #6b7280;
+  }
+
+  @media (max-width: 968px) {
+    .carousel-item {
+      flex: 0 0 calc((100% - 2rem) / 2) !important;
+    }
+
+    .carousel-btn {
+      width: 40px;
+      height: 40px;
+      font-size: 1.5rem;
+    }
+  }
+
+  @media (max-width: 968px) {
+    .title {
+      font-size: 2rem;
+    }
+  }
+
+  @media (max-width: 640px) {
+    .property-carousel {
+      padding: 3rem 0;
+    }
+
+    .carousel-item {
+      flex: 0 0 100% !important;
+    }
+
+    .carousel-btn {
+      width: 44px;
+      height: 44px;
+      font-size: 1.75rem;
+    }
+
+    .carousel-btn.prev {
+      left: -12px;
+    }
+
+    .carousel-btn.next {
+      right: -12px;
+    }
+
+    .title {
+      font-size: 1.75rem;
+    }
+
+    .subtitle {
+      font-size: 1rem;
+    }
+  }
+</style>

@@ -1,0 +1,133 @@
+---
+/**
+ * TestimonialsDefault.astro
+ * Sección de testimonios de clientes
+ */
+import type { ComponenteDataEstructurado } from '../../types/componentesEstructurado';
+
+interface Props {
+  datos: ComponenteDataEstructurado;
+  tema?: Record<string, string>;
+}
+
+const { datos, tema = {} } = Astro.props;
+
+// Acceso a datos estructurados
+const staticData = datos.static_data || {};
+const dynamicData = datos.dynamic_data;
+const styles = datos.styles || {};
+const toggles = datos.toggles || {};
+
+const titulo = staticData.titulo || 'Lo que dicen nuestros clientes';
+const subtitulo = staticData.subtitulo || 'Testimonios reales de personas que confiaron en nosotros';
+
+// Datos resueltos: primero dynamic_data, luego static_data, luego fallback
+const testimonios = dynamicData?.resolved || staticData.testimonios || [
+  {
+    nombre: 'María González',
+    cargo: 'Compradora',
+    texto: 'Excelente servicio, encontré mi hogar ideal en tiempo récord.',
+    calificacion: 5,
+  },
+  {
+    nombre: 'Juan Pérez',
+    cargo: 'Vendedor',
+    texto: 'Profesionales de confianza, vendí mi propiedad al mejor precio.',
+    calificacion: 5,
+  },
+  {
+    nombre: 'Ana Martínez',
+    cargo: 'Inversora',
+    texto: 'Asesoramiento impecable, la mejor experiencia inmobiliaria.',
+    calificacion: 5,
+  },
+];
+---
+
+<section 
+  class="testimonials" 
+  style={`
+    padding: ${styles.spacing?.padding || '4rem 1rem'};
+    background: ${styles.colors?.background || tema.background || '#f7fafc'};
+  `}
+>
+  <div class="container" style="max-width: 1200px; margin: 0 auto;">
+    <div class="header" style="text-align: center; margin-bottom: 3rem;">
+      <h2 style="
+        color: var(--text-color, #1a202c);
+        font-size: 2.5rem;
+        font-weight: 700;
+        margin-bottom: 1rem;
+      ">
+        {titulo}
+      </h2>
+      {subtitulo && (
+        <p style="
+          color: var(--text-colorSecondary, #718096);
+          font-size: 1.2rem;
+        ">
+          {subtitulo}
+        </p>
+      )}
+    </div>
+    
+    <div class="testimonials-grid" style="
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+      gap: 2rem;
+    ">
+      {testimonios.map((testimonio: any) => (
+        <div class="testimonial-card" style="
+          padding: 2rem;
+          background: var(--background-color, #ffffff);
+          border-radius: 12px;
+          box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+        ">
+          <div class="rating" style="
+            color: var(--warning-color, #ed8936);
+            font-size: 1.2rem;
+            margin-bottom: 1rem;
+          ">
+            {'⭐'.repeat(testimonio.calificacion || 5)}
+          </div>
+
+          <p style="
+            color: var(--text-color, #1a202c);
+            font-size: 1.1rem;
+            line-height: 1.6;
+            margin-bottom: 1.5rem;
+            font-style: italic;
+          ">
+            "{testimonio.testimonio || testimonio.texto || testimonio.full_testimonial}"
+          </p>
+
+          <div class="author">
+            <p style="
+              color: var(--text-color, #1a202c);
+              font-weight: 700;
+              margin-bottom: 0.25rem;
+            ">
+              {testimonio.nombre_cliente || testimonio.nombre || testimonio.client_name}
+            </p>
+            <p style="
+              color: var(--text-colorSecondary, #718096);
+              font-size: 0.9rem;
+            ">
+              {testimonio.ubicacion || testimonio.cargo || testimonio.client_location || testimonio.tipo_propiedad}
+            </p>
+          </div>
+        </div>
+      ))}
+    </div>
+  </div>
+</section>
+
+<style is:global>
+  .testimonials {
+    width: 100%;
+    display: block;
+    flex-shrink: 0;
+  }
+</style>
+
+

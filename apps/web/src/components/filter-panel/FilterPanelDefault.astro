@@ -1,0 +1,168 @@
+---
+/**
+ * FilterPanelDefault.astro
+ * Panel lateral con filtros para propiedades
+ */
+import type { ComponenteDataEstructurado } from '../../types/componentesEstructurado';
+
+interface Props {
+  datos: ComponenteDataEstructurado;
+  tema?: Record<string, string>;
+}
+
+const { datos, tema = {} } = Astro.props;
+
+// Acceso a datos estructurados
+const staticData = datos.static_data || {};
+const styles = datos.styles || {};
+const toggles = datos.toggles || {};
+
+const mostrarPrecio = toggles.mostrarPrecio !== false;
+const mostrarTipo = toggles.mostrarTipo !== false;
+const mostrarUbicacion = toggles.mostrarUbicacion !== false;
+
+// Estilos personalizados
+const backgroundColor = styles.colors?.background || tema.background || '#ffffff';
+const textColor = styles.colors?.text || tema.text || '#1a202c';
+const borderColor = styles.colors?.border || tema.border || '#e2e8f0';
+const primaryColor = styles.colors?.primary || tema.primary || '#667eea';
+const padding = styles.spacing?.padding || '2rem';
+---
+
+<aside 
+  class="filter-panel" 
+  style={`
+    padding: ${padding};
+    background: ${backgroundColor};
+    border: 1px solid ${borderColor};
+    border-radius: 8px;
+  `}
+>
+  <h3 style="
+    color: var(--text-color, #1a202c);
+    margin-bottom: 1.5rem;
+    font-size: 1.5rem;
+    font-weight: 700;
+  ">
+    🔧 Filtros
+  </h3>
+  
+  <div class="filters" style="display: flex; flex-direction: column; gap: 1.5rem;">
+    {mostrarPrecio && (
+      <div>
+        <label style="
+          display: block;
+          color: var(--text-color, #1a202c);
+          margin-bottom: 0.5rem;
+          font-weight: 600;
+        ">
+          Rango de Precio
+        </label>
+        <div style="display: flex; gap: 0.5rem;">
+          <input
+            type="number"
+            placeholder="Mín"
+            style="
+              flex: 1;
+              padding: 0.5rem;
+              border: 1px solid var(--border-color, #e2e8f0);
+              border-radius: 6px;
+              font-size: 0.9rem;
+            "
+          />
+          <input
+            type="number"
+            placeholder="Máx"
+            style="
+              flex: 1;
+              padding: 0.5rem;
+              border: 1px solid var(--border-color, #e2e8f0);
+              border-radius: 6px;
+              font-size: 0.9rem;
+            "
+          />
+        </div>
+      </div>
+    )}
+    
+    {mostrarTipo && (
+      <div>
+        <label style="
+          display: block;
+          color: var(--text-color, #1a202c);
+          margin-bottom: 0.5rem;
+          font-weight: 600;
+        ">
+          Tipo de Propiedad
+        </label>
+        <select style="
+          width: 100%;
+          padding: 0.5rem;
+          border: 1px solid var(--border-color, #e2e8f0);
+          border-radius: 6px;
+          font-size: 0.9rem;
+          background: var(--background-color, #ffffff);
+          color: var(--text-color, #1a202c);
+        ">
+          <option value="">Todos</option>
+          <option value="casa">Casa</option>
+          <option value="apartamento">Apartamento</option>
+          <option value="terreno">Terreno</option>
+          <option value="local">Local Comercial</option>
+        </select>
+      </div>
+    )}
+    
+    {mostrarUbicacion && (
+      <div>
+        <label style="
+          display: block;
+          color: var(--text-color, #1a202c);
+          margin-bottom: 0.5rem;
+          font-weight: 600;
+        ">
+          Ubicación
+        </label>
+        <input
+          type="text"
+          placeholder="Ciudad, Zona..."
+          style="
+            width: 100%;
+            padding: 0.5rem;
+            border: 1px solid var(--border-color, #e2e8f0);
+            border-radius: 6px;
+            font-size: 0.9rem;
+          "
+        />
+      </div>
+    )}
+    
+    <button
+      type="button"
+      style="
+        width: 100%;
+        padding: 0.75rem;
+        background: var(--primary-color, #667eea);
+        color: var(--background-color, #ffffff);
+        border: none;
+        border-radius: 6px;
+        font-size: 1rem;
+        font-weight: 600;
+        cursor: pointer;
+        margin-top: 1rem;
+      "
+    >
+      Aplicar Filtros
+    </button>
+  </div>
+</aside>
+
+<style is:global>
+  .filter-panel {
+    width: 100%;
+    display: block;
+    flex-shrink: 0;
+  }
+</style>
+
+

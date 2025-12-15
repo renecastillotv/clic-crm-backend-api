@@ -1,0 +1,107 @@
+---
+/**
+ * HeroVariant2.astro
+ * Variante 2 del componente Hero - Minimalista
+ */
+
+import type { ComponenteDataEstructurado } from '../../types/componentesEstructurado';
+
+interface Props {
+  datos: ComponenteDataEstructurado;
+  tema?: Record<string, string>;
+}
+
+const { datos, tema = {} } = Astro.props;
+
+// Acceso directo a datos estructurados
+const staticData = datos.static_data || {};
+const styles = datos.styles || {};
+
+const titulo = staticData.titulo || 'Bienvenido';
+const subtitulo = staticData.subtitulo || '';
+const textoBoton = staticData.textoBoton || 'Comenzar';
+const urlBoton = staticData.urlBoton || '#';
+
+// Aplicar estilos personalizados si existen
+const primaryColor = styles.colors?.primary || tema.primary || '#667eea';
+const textColor = styles.colors?.text || tema.text || '#1a202c';
+const textSecondary = tema.textSecondary || '#718096';
+const backgroundColor = styles.colors?.background || tema.background || '#ffffff';
+const padding = styles.spacing?.padding || '4rem 2rem';
+---
+
+<section 
+  class="hero-variant2"
+  style={`
+    --primary-color: ${primaryColor};
+    --text-color: ${textColor};
+    --text-secondary: ${textSecondary};
+    background: ${backgroundColor};
+    padding: ${padding};
+  `}
+>
+  <div class="hero-content">
+    <h1 class="hero-title">{titulo}</h1>
+    {subtitulo && <p class="hero-subtitle">{subtitulo}</p>}
+    {textoBoton && (
+      <a href={urlBoton} class="hero-button">
+        {textoBoton}
+      </a>
+    )}
+  </div>
+</section>
+
+<style>
+  .hero-variant2 {
+    min-height: 400px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+  }
+
+  .hero-content {
+    text-align: center;
+    max-width: 700px;
+  }
+
+  .hero-title {
+    font-size: 3rem;
+    font-weight: 700;
+    margin: 0 0 1rem 0;
+    color: var(--text-color, #1a202c);
+    line-height: 1.2;
+  }
+
+  .hero-subtitle {
+    font-size: 1.25rem;
+    margin: 0 0 2rem 0;
+    color: var(--text-secondary, #718096);
+    line-height: 1.6;
+  }
+
+  .hero-button {
+    display: inline-block;
+    padding: 0.875rem 2rem;
+    background: transparent;
+    color: var(--primary-color, #667eea);
+    text-decoration: none;
+    border: 2px solid var(--primary-color, #667eea);
+    border-radius: 8px;
+    font-weight: 600;
+    font-size: 1rem;
+    transition: all 0.2s;
+  }
+
+  .hero-button:hover {
+    background: var(--primary-color, #667eea);
+    color: white;
+  }
+
+  @media (max-width: 768px) {
+    .hero-title {
+      font-size: 2rem;
+    }
+  }
+</style>
+
+

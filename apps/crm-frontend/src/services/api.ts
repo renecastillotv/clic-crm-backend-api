@@ -1,0 +1,5180 @@
+/**
+ * Servicio para comunicarse con la API
+ */
+
+const API_BASE_URL = import.meta.env.VITE_API_URL || 'http://localhost:3001/api';
+
+// Log para debugging (solo en desarrollo)
+if (import.meta.env.DEV) {
+  console.log('🔧 API_BASE_URL configurado:', API_BASE_URL);
+}
+
+/**
+ * Helper para hacer fetch con mejor manejo de errores
+ * @param url - URL relativa o absoluta
+ * @param options - Opciones de fetch
+ * @param token - Token de autenticación de Clerk (opcional)
+ */
+async function apiFetch(url: string, options: RequestInit = {}, token?: string | null) {
+  const fullUrl = url.startsWith('http') ? url : `${API_BASE_URL}${url.startsWith('/') ? url : `/${url}`}`;
+  
+  if (import.meta.env.DEV) {
+    console.log(`🌐 Fetching: ${options.method || 'GET'} ${fullUrl}`);
+  }
+
+  const headers: HeadersInit = {
+    'Content-Type': 'application/json',
+    ...options.headers,
+  };
+
+  // Agregar token de autenticación si se proporciona
+  // IMPORTANTE: Solo agregar si token es una cadena no vacía
+  if (token && typeof token === 'string' && token.trim().length > 0) {
+    headers['Authorization'] = `Bearer ${token}`;
+    if (import.meta.env.DEV) {
+      console.log('🔑 Token incluido en la petición');
+    }
+  } else {
+    if (import.meta.env.DEV) {
+      console.warn('⚠️ No se proporcionó token de autenticación para la petición a:', fullUrl);
+      console.warn('⚠️ Token recibido:', token);
+    }
+  }
+
+  try {
+    const response = await fetch(fullUrl, {
+      ...options,
+      headers,
+    });
+
+    if (!response.ok) {
+      const errorData = await response.json().catch(() => ({ message: 'Error desconocido' }));
+      
+      if (import.meta.env.DEV) {
+        console.error(`❌ Error en ${fullUrl}:`, {
+          status: response.status,
+          statusText: response.statusText,
+          error: errorData,
+        });
+      }
+      
+      throw new Error(errorData.message || `Error ${response.status}: ${response.statusText}`);
+    }
+
+    return response;
+  } catch (error: any) {
+    if (import.meta.env.DEV) {
+      console.error(`❌ Error de red en ${fullUrl}:`, error);
+    }
+    
+    if (error.name === 'TypeError' && error.message.includes('fetch')) {
+      throw new Error(`No se pudo conectar con el servidor API. Verifica que esté corriendo en ${API_BASE_URL}`);
+    }
+    
+    throw error;
+  }
+}
+
+export interface ComponenteWeb {
+  id?: string;
+  tipo: string;
+  variante: string;
+  datos: Record<string, any>;
+  activo?: boolean;
+  orden?: number;
+  paginaId?: string | null;
+  predeterminado?: boolean;
+  scope?: 'tenant' | 'page_type' | 'page';
+  nombre?: string | null;
+}
+
+export interface TemaColores {
+  primary: string;
+  secondary: string;
+  accent: string;
+  background: string;
+  text: string;
+  textSecondary: string;
+  border: string;
+  success: string;
+  warning: string;
+  error: string;
+}
+
+/**
+ * Obtiene el primer tenant (para desarrollo)
+ */
+export async function getFirstTenant() {
+  const response = await fetch(`${API_BASE_URL}/tenants/first`);
+  if (!response.ok) {
+    throw new Error('Error al obtener tenant');
+  }
+  return response.json();
+}
+
+/**
+ * Obtiene todos los componentes de un tenant
+ * @param todos - Si es true, obtiene todos los componentes (para CRM). Si es false, solo los predeterminados (para frontend)
+ */
+export async function getComponentes(tenantId: string, paginaId?: string, todos: boolean = true): Promise<ComponenteWeb[]> {
+  const url = new URL(`${API_BASE_URL}/tenants/${tenantId}/componentes`, window.location.origin);
+  if (paginaId) {
+    url.searchParams.append('paginaId', paginaId);
+  }
+  if (todos) {
+    url.searchParams.append('todos', 'true');
+  }
+  
+  const response = await fetch(url.toString());
+  if (!response.ok) {
+    throw new Error('Error al obtener componentes');
+  }
+  return response.json();
+}
+
+/**
+ * Guarda o actualiza un componente
+ */
+export async function saveComponente(tenantId: string, componente: ComponenteWeb): Promise<ComponenteWeb> {
+  const url = componente.id
+    ? `${API_BASE_URL}/tenants/${tenantId}/componentes/${componente.id}`
+    : `${API_BASE_URL}/tenants/${tenantId}/componentes`;
+  
+  const method = componente.id ? 'PUT' : 'POST';
+  
+  const response = await fetch(url, {
+    method,
+    headers: {
+      'Content-Type': 'application/json',
+    },
+    body: JSON.stringify(componente),
+  });
+  
+  if (!response.ok) {
+    const error = await response.json();
+    throw new Error(error.message || 'Error al guardar componente');
+  }
+  
+  return response.json();
+}
+
+/**
+ * Elimina un componente
+ */
+export async function deleteComponente(tenantId: string, componenteId: string): Promise<void> {
+  const response = await fetch(
+    `${API_BASE_URL}/tenants/${tenantId}/componentes/${componenteId}`,
+    {
+      method: 'DELETE',
+    }
+  );
+  
+  if (!response.ok) {
+    const error = await response.json();
+    throw new Error(error.message || 'Error al eliminar componente');
+  }
+}
+
+/**
+ * Obtiene el tema de un tenant
+ */
+export async function getTema(tenantId: string): Promise<TemaColores> {
+  const response = await fetch(`${API_BASE_URL}/tenants/${tenantId}/tema`);
+  if (!response.ok) {
+    throw new Error('Error al obtener tema');
+  }
+  return response.json();
+}
+
+/**
+ * Actualiza el tema de un tenant
+ */
+export async function updateTema(tenantId: string, colores: TemaColores): Promise<TemaColores> {
+  const response = await fetch(`${API_BASE_URL}/tenants/${tenantId}/tema`, {
+    method: 'PUT',
+    headers: {
+      'Content-Type': 'application/json',
+    },
+    body: JSON.stringify({ colores }),
+  });
+  
+  if (!response.ok) {
+    const error = await response.json();
+    throw new Error(error.message || 'Error al actualizar tema');
+  }
+  
+  return response.json();
+}
+
+/**
+ * Obtiene todas las páginas de un tenant
+ */
+export async function getPaginas(tenantId: string) {
+  const response = await fetch(`${API_BASE_URL}/tenants/${tenantId}/paginas`);
+  if (!response.ok) {
+    throw new Error('Error al obtener páginas');
+  }
+  return response.json();
+}
+
+/**
+ * Obtiene una página específica por ID
+ */
+export async function getPagina(tenantId: string, paginaId: string) {
+  const response = await fetch(`${API_BASE_URL}/tenants/${tenantId}/paginas/${paginaId}`);
+  if (!response.ok) {
+    throw new Error('Error al obtener página');
+  }
+  return response.json();
+}
+
+/**
+ * Guarda o actualiza una página
+ */
+export async function savePagina(tenantId: string, pagina: any) {
+  // Solo incluir ID si es un UUID válido (evitar IDs inválidos como "custom-123456")
+  const tieneIdValido = pagina.id && /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(pagina.id);
+  const paginaData = { ...pagina };
+
+  // Si el ID no es válido, no enviarlo (la base de datos lo generará)
+  if (!tieneIdValido) {
+    delete paginaData.id;
+  }
+
+  const url = tieneIdValido
+    ? `${API_BASE_URL}/tenants/${tenantId}/paginas/${pagina.id}`
+    : `${API_BASE_URL}/tenants/${tenantId}/paginas`;
+
+  const method = tieneIdValido ? 'PUT' : 'POST';
+
+  const response = await fetch(url, {
+    method,
+    headers: {
+      'Content-Type': 'application/json',
+    },
+    body: JSON.stringify(paginaData),
+  });
+
+  if (!response.ok) {
+    const error = await response.json();
+    throw new Error(error.message || 'Error al guardar página');
+  }
+
+  return response.json();
+}
+
+// ==========================================
+// SECCIONES - Sistema de configuración v2
+// ==========================================
+
+// Información de cada variante con nombre y descripción
+export interface VarianteInfo {
+  id: string;
+  nombre: string;
+  descripcion: string;
+}
+
+// Configuración de campo del catálogo
+export interface CampoConfig {
+  key: string;
+  label: string;
+  type: string;
+  required?: boolean;
+  default?: any;
+}
+
+export interface CatalogoComponente {
+  tipo: string;
+  nombre: string;
+  descripcion: string | null;
+  icono: string | null;
+  categoria: string;
+  variantes: VarianteInfo[];  // Ahora es array de objetos con id, nombre, descripcion
+  camposConfig: CampoConfig[];
+  esGlobal: boolean;
+  disponible: boolean;
+  orden: number;
+}
+
+export interface SeccionConfig {
+  id?: string;
+  tenantId?: string;
+  tipo: string;
+  variante: string;
+  datos: Record<string, any>;
+  activo: boolean;
+  orden: number;
+  scope: 'tenant' | 'page_type' | 'page';
+  tipoPagina?: string | null;
+  paginaId?: string | null;
+  esActivo?: boolean;         // Si esta variante es la activa para renderizar
+  configCompleta?: boolean;   // Si tiene todos los campos requeridos llenos
+}
+
+/**
+ * Obtiene el catálogo global de componentes disponibles
+ * @param tenantId - ID del tenant (opcional) para filtrar variantes por features
+ */
+export async function getCatalogoComponentes(tenantId?: string): Promise<CatalogoComponente[]> {
+  const url = new URL(`${API_BASE_URL}/secciones/catalogo`, window.location.origin);
+  if (tenantId) {
+    url.searchParams.set('tenantId', tenantId);
+  }
+  const response = await fetch(url.toString());
+  if (!response.ok) {
+    throw new Error('Error al obtener catálogo de componentes');
+  }
+  return response.json();
+}
+
+/**
+ * Obtiene las secciones configuradas de un tenant (scope='tenant')
+ */
+export async function getSeccionesTenant(tenantId: string): Promise<SeccionConfig[]> {
+  const response = await fetch(`${API_BASE_URL}/tenants/${tenantId}/secciones`);
+  if (!response.ok) {
+    throw new Error('Error al obtener secciones');
+  }
+  return response.json();
+}
+
+/**
+ * Guarda o actualiza una sección del tenant
+ */
+export async function saveSeccion(tenantId: string, seccion: SeccionConfig): Promise<SeccionConfig> {
+  const url = seccion.id
+    ? `${API_BASE_URL}/tenants/${tenantId}/secciones/${seccion.id}`
+    : `${API_BASE_URL}/tenants/${tenantId}/secciones`;
+
+  const method = seccion.id ? 'PUT' : 'POST';
+
+  const response = await fetch(url, {
+    method,
+    headers: {
+      'Content-Type': 'application/json',
+    },
+    body: JSON.stringify(seccion),
+  });
+
+  if (!response.ok) {
+    const error = await response.json();
+    throw new Error(error.message || 'Error al guardar sección');
+  }
+
+  return response.json();
+}
+
+/**
+ * Elimina una sección
+ */
+export async function deleteSeccion(tenantId: string, seccionId: string): Promise<void> {
+  const response = await fetch(
+    `${API_BASE_URL}/tenants/${tenantId}/secciones/${seccionId}`,
+    {
+      method: 'DELETE',
+    }
+  );
+
+  if (!response.ok) {
+    const error = await response.json();
+    throw new Error(error.message || 'Error al eliminar sección');
+  }
+}
+
+// ==========================================
+// SECCIONES v2 - Configuración por variante
+// ==========================================
+
+/**
+ * Obtiene TODAS las configuraciones de variantes para un tipo de componente
+ */
+export async function getSeccionesPorTipo(tenantId: string, tipo: string): Promise<SeccionConfig[]> {
+  const response = await fetch(`${API_BASE_URL}/tenants/${tenantId}/secciones/componente/${tipo}`);
+  if (!response.ok) {
+    throw new Error('Error al obtener configuraciones de variantes');
+  }
+  return response.json();
+}
+
+/**
+ * Obtiene solo las secciones ACTIVAS (una por tipo)
+ */
+export async function getSeccionesActivas(tenantId: string): Promise<SeccionConfig[]> {
+  const response = await fetch(`${API_BASE_URL}/tenants/${tenantId}/secciones/activas`);
+  if (!response.ok) {
+    throw new Error('Error al obtener secciones activas');
+  }
+  return response.json();
+}
+
+/**
+ * Activa una variante específica para un tipo de componente
+ */
+export async function activarVariante(
+  tenantId: string,
+  tipo: string,
+  variante: string
+): Promise<{ success: boolean; tipo: string; variante: string }> {
+  const response = await fetch(`${API_BASE_URL}/tenants/${tenantId}/secciones/activar`, {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+    },
+    body: JSON.stringify({ tipo, variante }),
+  });
+
+  if (!response.ok) {
+    const error = await response.json();
+    throw new Error(error.message || 'Error al activar variante');
+  }
+
+  return response.json();
+}
+
+// ==========================================
+// COMPONENTES GLOBALES REUTILIZABLES v3
+// ==========================================
+
+export interface ComponenteGlobal extends SeccionConfig {
+  nombre: string | null;
+}
+
+export interface ComponentePagina extends ComponenteGlobal {
+  esReferencia: boolean;  // true si es referencia a componente global
+}
+
+/**
+ * Obtiene todos los componentes globales del tenant
+ * @param tipo - Opcional: filtrar por tipo de componente (hero, cta, etc)
+ */
+export async function getComponentesGlobales(
+  tenantId: string,
+  tipo?: string
+): Promise<ComponenteGlobal[]> {
+  const url = new URL(`${API_BASE_URL}/tenants/${tenantId}/componentes-globales`, window.location.origin);
+  if (tipo) {
+    url.searchParams.append('tipo', tipo);
+  }
+
+  const response = await fetch(url.toString());
+  if (!response.ok) {
+    throw new Error('Error al obtener componentes globales');
+  }
+  return response.json();
+}
+
+/**
+ * Crea un nuevo componente global reutilizable
+ */
+export async function crearComponenteGlobal(
+  tenantId: string,
+  data: { tipo: string; variante: string; nombre: string; datos?: Record<string, any> }
+): Promise<ComponenteGlobal> {
+  const response = await fetch(`${API_BASE_URL}/tenants/${tenantId}/componentes-globales`, {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+    },
+    body: JSON.stringify(data),
+  });
+
+  if (!response.ok) {
+    const error = await response.json();
+    throw new Error(error.message || 'Error al crear componente global');
+  }
+
+  return response.json();
+}
+
+/**
+ * Actualiza el nombre de un componente global
+ */
+export async function actualizarNombreComponente(
+  tenantId: string,
+  componenteId: string,
+  nombre: string
+): Promise<void> {
+  const response = await fetch(
+    `${API_BASE_URL}/tenants/${tenantId}/componentes-globales/${componenteId}/nombre`,
+    {
+      method: 'PUT',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({ nombre }),
+    }
+  );
+
+  if (!response.ok) {
+    const error = await response.json();
+    throw new Error(error.message || 'Error al actualizar nombre');
+  }
+}
+
+/**
+ * Duplica un componente global con un nuevo nombre
+ */
+export async function duplicarComponenteGlobal(
+  tenantId: string,
+  componenteId: string,
+  nombre: string
+): Promise<ComponenteGlobal> {
+  const response = await fetch(
+    `${API_BASE_URL}/tenants/${tenantId}/componentes-globales/${componenteId}/duplicar`,
+    {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({ nombre }),
+    }
+  );
+
+  if (!response.ok) {
+    const error = await response.json();
+    throw new Error(error.message || 'Error al duplicar componente');
+  }
+
+  return response.json();
+}
+
+/**
+ * Obtiene los componentes asignados a una página específica
+ */
+export async function getComponentesPagina(
+  tenantId: string,
+  paginaId: string
+): Promise<ComponentePagina[]> {
+  const response = await fetch(
+    `${API_BASE_URL}/tenants/${tenantId}/paginas/${paginaId}/componentes`
+  );
+  if (!response.ok) {
+    throw new Error('Error al obtener componentes de página');
+  }
+  return response.json();
+}
+
+/**
+ * Agrega un componente global a una página (crea referencia)
+ */
+export async function agregarComponenteAPagina(
+  tenantId: string,
+  paginaId: string,
+  componenteId: string,
+  orden?: number
+): Promise<{ id: string }> {
+  const response = await fetch(
+    `${API_BASE_URL}/tenants/${tenantId}/paginas/${paginaId}/componentes`,
+    {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({ componenteId, orden }),
+    }
+  );
+
+  if (!response.ok) {
+    const error = await response.json();
+    throw new Error(error.message || 'Error al agregar componente a página');
+  }
+
+  return response.json();
+}
+
+/**
+ * Remueve un componente de una página (solo la referencia, no el componente global)
+ */
+export async function removerComponenteDePagina(
+  tenantId: string,
+  paginaId: string,
+  componenteId: string
+): Promise<void> {
+  const response = await fetch(
+    `${API_BASE_URL}/tenants/${tenantId}/paginas/${paginaId}/componentes/${componenteId}`,
+    {
+      method: 'DELETE',
+    }
+  );
+
+  if (!response.ok) {
+    const error = await response.json();
+    throw new Error(error.message || 'Error al remover componente de página');
+  }
+}
+
+/**
+ * Reordena los componentes de una página
+ */
+export async function reordenarComponentesPagina(
+  tenantId: string,
+  paginaId: string,
+  ordenComponentes: Array<{ componenteId: string; orden: number }>
+): Promise<void> {
+  const response = await fetch(
+    `${API_BASE_URL}/tenants/${tenantId}/paginas/${paginaId}/componentes/orden`,
+    {
+      method: 'PUT',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify(ordenComponentes),
+    }
+  );
+
+  if (!response.ok) {
+    const error = await response.json();
+    throw new Error(error.message || 'Error al reordenar componentes');
+  }
+}
+
+// ==================== ADMIN API ====================
+
+export interface AdminStats {
+  totalTenants: number;
+  activeTenants: number;
+  inactiveTenants: number;
+  totalUsers: number;
+  totalProperties: number;
+  recentTenants: Array<{
+    id: string;
+    nombre: string;
+    slug: string;
+    activo: boolean;
+    createdAt: string;
+  }>;
+  platformUsers?: number;
+  tenantUsers?: number;
+  plansDistribution?: {
+    basic: number;
+    pro: number;
+    premium: number;
+  };
+}
+
+export interface TenantAdmin {
+  id: string;
+  nombre: string;
+  slug: string;
+  codigoPais?: string;
+  idiomaDefault?: string;
+  activo: boolean;
+  plan?: string;
+  dominioPersonalizado?: string | null;
+  createdAt: string;
+  updatedAt: string;
+  totalUsuarios?: number;
+  totalPropiedades?: number;
+  totalPaginas?: number;
+}
+
+/**
+ * Obtiene las estadísticas de la plataforma para el admin
+ */
+export async function getAdminStats(token?: string | null): Promise<AdminStats> {
+  const response = await apiFetch('/admin/stats', {}, token);
+  return response.json();
+}
+
+/**
+ * Obtiene todos los tenants para el panel de administración
+ */
+export async function getAllTenants(token?: string | null): Promise<TenantAdmin[]> {
+  const response = await apiFetch('/admin/tenants', {}, token);
+  return response.json();
+}
+
+// ==================== ADMIN USERS API ====================
+
+export interface AdminUser {
+  id: string;
+  email: string;
+  nombre: string | null;
+  apellido: string | null;
+  avatarUrl: string | null;
+  codigoPais?: string;
+  idiomaPreferido?: string;
+  esPlatformAdmin: boolean;
+  activo: boolean;
+  ultimoAcceso: string | null;
+  createdAt: string;
+  updatedAt: string;
+  tenants: Array<{
+    tenantId: string;
+    tenantNombre: string;
+    tenantSlug: string;
+    rolNombre: string;
+    esOwner: boolean;
+  }>;
+  roles: Array<{
+    rolId: string;
+    rolNombre: string;
+    rolTipo: string;
+    tenantId: string | null;
+  }>;
+}
+
+/**
+ * Obtiene todos los usuarios para el panel de administración
+ */
+export async function getAllUsers(token?: string | null): Promise<AdminUser[]> {
+  const response = await apiFetch('/admin/users', {}, token);
+  return response.json();
+}
+
+export interface Role {
+  id: string;
+  nombre: string;
+  codigo: string;
+  tipo: 'platform' | 'tenant';
+  descripcion: string | null;
+  activo?: boolean;
+  visible?: boolean;
+  featureRequerido?: string | null;
+}
+
+export interface CreateUserData {
+  email: string;
+  password: string;
+  nombre: string;
+  apellido: string;
+  codigoPais?: string;
+  idiomaPreferido?: string;
+  esPlatformAdmin?: boolean;
+  activo?: boolean;
+  tenantIds?: string[];
+  roleIds?: { tenantId: string; roleId: string }[];
+}
+
+export interface UpdateUserData {
+  email?: string;
+  nombre?: string;
+  apellido?: string;
+  codigoPais?: string;
+  idiomaPreferido?: string;
+  esPlatformAdmin?: boolean;
+  activo?: boolean;
+  password?: string;
+  tenantIds?: string[];
+  roleIds?: { tenantId: string | null; roleId: string }[];
+}
+
+export async function getUserById(userId: string, token?: string | null): Promise<AdminUser> {
+  const response = await apiFetch(`/admin/users/${userId}`, {}, token);
+  return response.json();
+}
+
+export async function createUser(data: CreateUserData, token?: string | null): Promise<AdminUser> {
+  const response = await apiFetch('/admin/users', {
+    method: 'POST',
+    body: JSON.stringify(data),
+  }, token);
+  return response.json();
+}
+
+export async function updateUser(userId: string, data: UpdateUserData, token?: string | null): Promise<AdminUser> {
+  const response = await apiFetch(`/admin/users/${userId}`, {
+    method: 'PUT',
+    body: JSON.stringify(data),
+  }, token);
+  return response.json();
+}
+
+export async function getAllRoles(token?: string | null): Promise<Role[]> {
+  const response = await apiFetch('/admin/roles', {}, token);
+  return response.json();
+}
+
+// ==================== ADMIN ROLES MANAGEMENT API ====================
+
+export interface CreateRoleData {
+  nombre: string;
+  codigo: string;
+  tipo: 'platform' | 'tenant';
+  descripcion?: string;
+  activo?: boolean;
+  visible?: boolean;
+  featureRequerido?: string | null;
+}
+
+export interface UpdateRoleData {
+  nombre?: string;
+  codigo?: string;
+  tipo?: 'platform' | 'tenant';
+  descripcion?: string;
+  activo?: boolean;
+  visible?: boolean;
+  featureRequerido?: string | null;
+}
+
+export interface RoleWithDates extends Role {
+  createdAt: string;
+  updatedAt: string;
+}
+
+/**
+ * Obtiene todos los roles (incluyendo inactivos) para gestión
+ */
+export async function getAllRolesForManagement(token?: string | null): Promise<RoleWithDates[]> {
+  const response = await apiFetch('/admin/roles/all', {}, token);
+  return response.json();
+}
+
+/**
+ * Obtiene un rol por ID
+ */
+export async function getRoleById(roleId: string, token?: string | null): Promise<RoleWithDates> {
+  const response = await apiFetch(`/admin/roles/${roleId}`, {}, token);
+  return response.json();
+}
+
+/**
+ * Crea un nuevo rol
+ */
+export async function createRole(data: CreateRoleData, token?: string | null): Promise<RoleWithDates> {
+  const response = await apiFetch('/admin/roles', {
+    method: 'POST',
+    body: JSON.stringify(data),
+  }, token);
+  return response.json();
+}
+
+/**
+ * Actualiza un rol existente
+ */
+export async function updateRole(roleId: string, data: UpdateRoleData, token?: string | null): Promise<RoleWithDates> {
+  const response = await apiFetch(`/admin/roles/${roleId}`, {
+    method: 'PUT',
+    body: JSON.stringify(data),
+  }, token);
+  return response.json();
+}
+
+/**
+ * Elimina un rol (soft delete)
+ */
+export async function deleteRole(roleId: string, token?: string | null): Promise<void> {
+  const response = await apiFetch(`/admin/roles/${roleId}`, {
+    method: 'DELETE',
+  }, token);
+  
+  if (response.status === 204) {
+    return;
+  }
+  
+  const text = await response.text();
+  if (text) {
+    try {
+      return JSON.parse(text);
+    } catch {
+      return;
+    }
+  }
+}
+
+/**
+ * Activa o desactiva un usuario
+ */
+export async function toggleUserStatus(userId: string, activo: boolean, token?: string | null): Promise<void> {
+  const response = await apiFetch(`/admin/users/${userId}/toggle-status`, {
+    method: 'PATCH',
+    body: JSON.stringify({ activo }),
+  }, token);
+  
+  // Si la respuesta tiene contenido, parsearlo, si no solo retornar
+  if (response.status === 204) {
+    return;
+  }
+  
+  const text = await response.text();
+  if (text) {
+    try {
+      return JSON.parse(text);
+    } catch {
+      return;
+    }
+  }
+}
+
+/**
+ * Elimina un usuario (soft delete)
+ */
+export async function deleteUser(userId: string, token?: string | null): Promise<void> {
+  const response = await apiFetch(`/admin/users/${userId}`, {
+    method: 'DELETE',
+  }, token);
+  
+  // Si la respuesta es 204 (sin contenido), retornar sin procesar
+  if (response.status === 204) {
+    return;
+  }
+  
+  // Si hay contenido, intentar parsearlo
+  const text = await response.text();
+  if (text) {
+    try {
+      return JSON.parse(text);
+    } catch {
+      return;
+    }
+  }
+}
+
+/**
+ * Asigna un rol a un usuario
+ */
+export async function assignRoleToUser(
+  userId: string,
+  roleId: string,
+  tenantId?: string | null,
+  token?: string | null
+): Promise<void> {
+  await apiFetch(`/admin/users/${userId}/roles`, {
+    method: 'POST',
+    body: JSON.stringify({ roleId, tenantId }),
+  }, token);
+}
+
+/**
+ * Desasigna un rol de un usuario
+ */
+export async function unassignRoleFromUser(
+  userId: string,
+  roleId: string,
+  tenantId?: string | null,
+  token?: string | null
+): Promise<void> {
+  const url = new URL(`${API_BASE_URL}/admin/users/${userId}/roles/${roleId}`, window.location.origin);
+  if (tenantId) url.searchParams.append('tenantId', tenantId);
+  
+  await apiFetch(url.pathname + url.search, {
+    method: 'DELETE',
+  }, token);
+}
+
+// ==================== ADMIN TENANTS API ====================
+
+export interface CreateTenantData {
+  nombre: string;
+  slug: string;
+  codigoPais?: string;
+  idiomaDefault?: string;
+  idiomasDisponibles?: string[];
+  activo?: boolean;
+  configuracion?: Record<string, any>;
+  plan?: string;
+  dominioPersonalizado?: string | null;
+}
+
+export interface CreateTenantWithAdminData extends CreateTenantData {
+  adminUser: {
+    email: string;
+    password: string;
+    nombre: string;
+    apellido: string;
+  };
+}
+
+export interface CreateTenantWithAdminResponse {
+  tenant: {
+    id: string;
+    nombre: string;
+    slug: string;
+    plan: string;
+    dominioPersonalizado: string | null;
+  };
+  adminUser: {
+    id: string;
+    email: string;
+    nombre: string;
+    apellido: string;
+  };
+}
+
+export interface UpdateTenantData {
+  nombre?: string;
+  slug?: string;
+  codigoPais?: string;
+  idiomaDefault?: string;
+  idiomasDisponibles?: string[];
+  activo?: boolean;
+  configuracion?: Record<string, any>;
+  plan?: string;
+  dominioPersonalizado?: string | null;
+}
+
+/**
+ * Crea un nuevo tenant
+ */
+export async function createTenant(data: CreateTenantData, token?: string | null): Promise<TenantAdmin> {
+  const response = await apiFetch('/admin/tenants', {
+    method: 'POST',
+    body: JSON.stringify(data),
+  }, token);
+  
+  return response.json();
+}
+
+/**
+ * Crea un nuevo tenant con su usuario administrador (onboarding completo)
+ */
+export async function createTenantWithAdmin(
+  data: CreateTenantWithAdminData,
+  token?: string | null
+): Promise<CreateTenantWithAdminResponse> {
+  const response = await apiFetch('/admin/tenants/with-admin', {
+    method: 'POST',
+    body: JSON.stringify(data),
+  }, token);
+
+  return response.json();
+}
+
+/**
+ * Actualiza un tenant existente
+ */
+export async function updateTenant(tenantId: string, data: UpdateTenantData, token?: string | null): Promise<TenantAdmin> {
+  const response = await apiFetch(`/admin/tenants/${tenantId}`, {
+    method: 'PUT',
+    body: JSON.stringify(data),
+  }, token);
+  
+  return response.json();
+}
+
+/**
+ * Obtiene un tenant por ID
+ */
+export async function getTenantById(tenantId: string, token?: string | null): Promise<TenantAdmin> {
+  const response = await apiFetch(`/admin/tenants/${tenantId}`, {}, token);
+  return response.json();
+}
+
+/**
+ * Activa o desactiva un tenant
+ */
+export async function toggleTenantStatus(tenantId: string, activo: boolean, token?: string | null): Promise<void> {
+  const response = await apiFetch(`/admin/tenants/${tenantId}/toggle-status`, {
+    method: 'PATCH',
+    body: JSON.stringify({ activo }),
+  }, token);
+  
+  // Si la respuesta tiene contenido, parsearlo, si no solo retornar
+  if (response.status === 204) {
+    return;
+  }
+  
+  const text = await response.text();
+  if (text) {
+    try {
+      return JSON.parse(text);
+    } catch {
+      return;
+    }
+  }
+}
+
+/**
+ * Elimina un tenant (soft delete)
+ */
+export async function deleteTenant(tenantId: string, token?: string | null): Promise<void> {
+  const response = await apiFetch(`/admin/tenants/${tenantId}`, {
+    method: 'DELETE',
+  }, token);
+  
+  // Si la respuesta es 204 (sin contenido), retornar sin procesar
+  if (response.status === 204) {
+    return;
+  }
+  
+  // Si hay contenido, intentar parsearlo
+  const text = await response.text();
+  if (text) {
+    try {
+      return JSON.parse(text);
+    } catch {
+      return;
+    }
+  }
+}
+
+// ==================== PAISES API ====================
+
+export interface Pais {
+  codigo: string;
+  nombre: string;
+  nombreEn: string | null;
+  moneda: string | null;
+  zonaHoraria: string | null;
+}
+
+/**
+ * Obtiene todos los países disponibles
+ */
+export async function getAllPaises(token?: string | null): Promise<Pais[]> {
+  const response = await apiFetch('/admin/paises', {}, token);
+  return response.json();
+}
+
+// ==================== CRM CONTACTOS API ====================
+
+export interface Contacto {
+  id: string;
+  tenant_id: string;
+  nombre: string;
+  apellido: string | null;
+  email: string | null;
+  telefono: string | null;
+  telefono_secundario: string | null;
+  whatsapp: string | null;
+  tipo: 'lead' | 'cliente' | 'asesor' | 'desarrollador' | 'referidor' | 'propietario' | 'vendedor';
+  tipos_contacto: string[];
+  empresa: string | null;
+  cargo: string | null;
+  origen: string | null;
+  favorito: boolean;
+  notas: string | null;
+  etiquetas: string[];
+  datos_extra: Record<string, any>;
+  usuario_asignado_id: string | null;
+  activo: boolean;
+  foto_url: string | null;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface ContactosResponse {
+  data: Contacto[];
+  total: number;
+  page: number;
+  limit: number;
+  totalPages: number;
+}
+
+export interface ContactoFiltros {
+  busqueda?: string;
+  tipo?: string;
+  favoritos?: boolean;
+  todos?: boolean;
+  page?: number;
+  limit?: number;
+}
+
+/**
+ * Obtiene los contactos de un tenant con filtros y paginación
+ */
+export async function getContactos(tenantId: string, filtros?: ContactoFiltros): Promise<ContactosResponse> {
+  const url = new URL(`${API_BASE_URL}/tenants/${tenantId}/contactos`, window.location.origin);
+
+  if (filtros?.busqueda) url.searchParams.append('busqueda', filtros.busqueda);
+  if (filtros?.tipo) url.searchParams.append('tipo', filtros.tipo);
+  if (filtros?.favoritos) url.searchParams.append('favoritos', 'true');
+  if (filtros?.todos) url.searchParams.append('todos', 'true');
+  if (filtros?.page) url.searchParams.append('page', String(filtros.page));
+  if (filtros?.limit) url.searchParams.append('limit', String(filtros.limit));
+
+  const response = await fetch(url.toString());
+  if (!response.ok) {
+    throw new Error('Error al obtener contactos');
+  }
+  return response.json();
+}
+
+/**
+ * Obtiene un contacto por ID
+ */
+export async function getContacto(tenantId: string, contactoId: string): Promise<Contacto> {
+  const response = await fetch(`${API_BASE_URL}/tenants/${tenantId}/contactos/${contactoId}`);
+  if (!response.ok) {
+    throw new Error('Error al obtener contacto');
+  }
+  return response.json();
+}
+
+/**
+ * Crea un nuevo contacto
+ */
+export async function createContacto(tenantId: string, data: Partial<Contacto>): Promise<Contacto> {
+  const response = await fetch(`${API_BASE_URL}/tenants/${tenantId}/contactos`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(data),
+  });
+
+  if (!response.ok) {
+    const error = await response.json();
+    throw new Error(error.message || 'Error al crear contacto');
+  }
+
+  return response.json();
+}
+
+/**
+ * Actualiza un contacto
+ */
+export async function updateContacto(tenantId: string, contactoId: string, data: Partial<Contacto>): Promise<Contacto> {
+  const response = await fetch(`${API_BASE_URL}/tenants/${tenantId}/contactos/${contactoId}`, {
+    method: 'PUT',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(data),
+  });
+
+  if (!response.ok) {
+    const error = await response.json();
+    throw new Error(error.message || 'Error al actualizar contacto');
+  }
+
+  return response.json();
+}
+
+/**
+ * Elimina un contacto
+ */
+export async function deleteContacto(tenantId: string, contactoId: string): Promise<void> {
+  const response = await fetch(`${API_BASE_URL}/tenants/${tenantId}/contactos/${contactoId}`, {
+    method: 'DELETE',
+  });
+
+  if (!response.ok) {
+    const error = await response.json();
+    throw new Error(error.message || 'Error al eliminar contacto');
+  }
+}
+
+/**
+ * Toggle favorito de un contacto
+ */
+export async function toggleContactoFavorito(tenantId: string, contactoId: string): Promise<Contacto> {
+  const response = await fetch(`${API_BASE_URL}/tenants/${tenantId}/contactos/${contactoId}/favorito`, {
+    method: 'POST',
+  });
+
+  if (!response.ok) {
+    const error = await response.json();
+    throw new Error(error.message || 'Error al cambiar favorito');
+  }
+
+  return response.json();
+}
+
+// ==================== CRM RELACIONES DE CONTACTOS API ====================
+
+export interface ContactoRelacion {
+  id: string;
+  tenant_id: string;
+  contacto_origen_id: string;
+  contacto_destino_id: string;
+  tipo_relacion: string;
+  notas?: string;
+  created_at: string;
+  updated_at: string;
+  contacto_relacionado?: Partial<Contacto>;
+}
+
+/**
+ * Obtiene las relaciones de un contacto
+ */
+export async function getRelacionesContacto(tenantId: string, contactoId: string): Promise<ContactoRelacion[]> {
+  const response = await fetch(`${API_BASE_URL}/tenants/${tenantId}/contactos/${contactoId}/relaciones`);
+  if (!response.ok) {
+    throw new Error('Error al obtener relaciones');
+  }
+  return response.json();
+}
+
+/**
+ * Crea una relación entre contactos
+ */
+export async function createRelacionContacto(
+  tenantId: string,
+  contactoOrigenId: string,
+  data: {
+    contacto_destino_id: string;
+    tipo_relacion: string;
+    notas?: string;
+  }
+): Promise<ContactoRelacion> {
+  const response = await fetch(`${API_BASE_URL}/tenants/${tenantId}/contactos/${contactoOrigenId}/relaciones`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(data),
+  });
+
+  if (!response.ok) {
+    const error = await response.json();
+    throw new Error(error.message || 'Error al crear relación');
+  }
+
+  return response.json();
+}
+
+/**
+ * Elimina una relación entre contactos
+ */
+export async function deleteRelacionContacto(
+  tenantId: string,
+  contactoId: string,
+  relacionId: string
+): Promise<void> {
+  const response = await fetch(`${API_BASE_URL}/tenants/${tenantId}/contactos/${contactoId}/relaciones/${relacionId}`, {
+    method: 'DELETE',
+  });
+
+  if (!response.ok) {
+    const error = await response.json();
+    throw new Error(error.message || 'Error al eliminar relación');
+  }
+}
+
+// ==================== CRM SOLICITUDES/PIPELINE API ====================
+
+export interface Solicitud {
+  id: string;
+  tenant_id: string;
+  titulo: string;
+  descripcion: string | null;
+  etapa: string;
+  tipo_solicitud: string;
+  prioridad: string;
+  purge_score: number;
+  purge_power: number;
+  purge_urgency: number;
+  purge_resources: number;
+  purge_genuine: number;
+  purge_expectations: number;
+  presupuesto_min: number | null;
+  presupuesto_max: number | null;
+  // Información de búsqueda
+  tipo_propiedad: string | null;
+  tipo_operacion: string | null;
+  zona_interes: string | null;
+  motivo: string | null;
+  // Contacto
+  contacto_id: string | null;
+  contacto_nombre: string | null;
+  contacto_apellido: string | null;
+  contacto_email: string | null;
+  contacto_telefono: string | null;
+  contacto_foto: string | null;
+  // Asignado
+  asignado_id: string | null;
+  asignado_nombre: string | null;
+  asignado_apellido: string | null;
+  asignado_avatar: string | null;
+  // Propiedades
+  propiedades_count: number;
+  propiedades_preview: any[];
+  valor_estimado: number | null;
+  fecha_cierre_esperada: string | null;
+  ultima_actividad: string | null;
+  fuente: string | null;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface SolicitudesResponse {
+  data: Solicitud[];
+  total: number;
+  byEtapa: Record<string, number>;
+}
+
+export interface SolicitudFiltros {
+  busqueda?: string;
+  etapa?: string;
+  tipo?: string;
+  prioridad?: string;
+  todos?: boolean;
+  contacto_id?: string;
+}
+
+/**
+ * Obtiene las solicitudes de un tenant
+ */
+export async function getSolicitudes(tenantId: string, filtros?: SolicitudFiltros): Promise<SolicitudesResponse> {
+  let url = `${API_BASE_URL}/tenants/${tenantId}/solicitudes`;
+  const params = new URLSearchParams();
+
+  if (filtros?.busqueda) params.append('busqueda', filtros.busqueda);
+  if (filtros?.etapa) params.append('etapa', filtros.etapa);
+  if (filtros?.tipo) params.append('tipo', filtros.tipo);
+  if (filtros?.prioridad) params.append('prioridad', filtros.prioridad);
+  if (filtros?.todos) params.append('todos', 'true');
+  if (filtros?.contacto_id) params.append('contacto_id', filtros.contacto_id);
+
+  const queryString = params.toString();
+  if (queryString) {
+    url += `?${queryString}`;
+  }
+
+  const response = await fetch(url);
+  if (!response.ok) {
+    throw new Error('Error al obtener solicitudes');
+  }
+  return response.json();
+}
+
+/**
+ * Obtiene una solicitud por ID
+ */
+export async function getSolicitud(tenantId: string, solicitudId: string): Promise<Solicitud> {
+  const response = await fetch(`${API_BASE_URL}/tenants/${tenantId}/solicitudes/${solicitudId}`);
+  if (!response.ok) {
+    throw new Error('Error al obtener solicitud');
+  }
+  return response.json();
+}
+
+/**
+ * Crea una nueva solicitud
+ */
+export async function createSolicitud(tenantId: string, data: Partial<Solicitud>): Promise<Solicitud> {
+  const response = await fetch(`${API_BASE_URL}/tenants/${tenantId}/solicitudes`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(data),
+  });
+
+  if (!response.ok) {
+    const error = await response.json();
+    throw new Error(error.message || 'Error al crear solicitud');
+  }
+
+  return response.json();
+}
+
+/**
+ * Actualiza una solicitud
+ */
+export async function updateSolicitud(tenantId: string, solicitudId: string, data: Partial<Solicitud>): Promise<Solicitud> {
+  const response = await fetch(`${API_BASE_URL}/tenants/${tenantId}/solicitudes/${solicitudId}`, {
+    method: 'PUT',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(data),
+  });
+
+  if (!response.ok) {
+    const error = await response.json();
+    throw new Error(error.message || 'Error al actualizar solicitud');
+  }
+
+  return response.json();
+}
+
+/**
+ * Cambia la etapa de una solicitud (drag & drop)
+ * @param razonPerdida - Nota/razón cuando se marca como perdida o descartada
+ */
+export async function cambiarEtapaSolicitud(
+  tenantId: string,
+  solicitudId: string,
+  nuevaEtapa: string,
+  razonPerdida?: string
+): Promise<Solicitud> {
+  const response = await fetch(`${API_BASE_URL}/tenants/${tenantId}/solicitudes/${solicitudId}/etapa`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({
+      etapa: nuevaEtapa,
+      razonPerdida: razonPerdida || undefined,
+    }),
+  });
+
+  if (!response.ok) {
+    const error = await response.json();
+    throw new Error(error.message || 'Error al cambiar etapa');
+  }
+
+  return response.json();
+}
+
+/**
+ * Elimina una solicitud
+ */
+export async function deleteSolicitud(tenantId: string, solicitudId: string): Promise<void> {
+  const response = await fetch(`${API_BASE_URL}/tenants/${tenantId}/solicitudes/${solicitudId}`, {
+    method: 'DELETE',
+  });
+
+  if (!response.ok) {
+    const error = await response.json();
+    throw new Error(error.message || 'Error al eliminar solicitud');
+  }
+}
+
+// ==================== CRM PROPUESTAS API ====================
+
+export interface Propuesta {
+  id: string;
+  tenant_id: string;
+  titulo: string;
+  descripcion: string | null;
+  estado: string;
+  solicitud_id: string | null;
+  solicitud_titulo: string | null;
+  contacto_id: string | null;
+  contacto_nombre: string | null;
+  contacto_apellido: string | null;
+  contacto_email: string | null;
+  monto_total: number | null;
+  moneda: string;
+  fecha_validez: string | null;
+  url_publica: string | null;
+  propiedades: Array<{
+    id: string;
+    titulo: string;
+    precio: number;
+    imagen: string | null;
+  }>;
+  notas_internas: string | null;
+  created_by: string | null;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface PropuestasResponse {
+  data: Propuesta[];
+  total: number;
+}
+
+export interface PropuestaFiltros {
+  busqueda?: string;
+  estado?: string;
+  solicitud_id?: string;
+  contacto_id?: string;
+}
+
+/**
+ * Obtiene las propuestas de un tenant
+ */
+export async function getPropuestas(tenantId: string, filtros?: PropuestaFiltros): Promise<PropuestasResponse> {
+  const url = new URL(`${API_BASE_URL}/tenants/${tenantId}/propuestas`, window.location.origin);
+
+  if (filtros?.busqueda) url.searchParams.append('busqueda', filtros.busqueda);
+  if (filtros?.estado) url.searchParams.append('estado', filtros.estado);
+  if (filtros?.solicitud_id) url.searchParams.append('solicitud_id', filtros.solicitud_id);
+  if (filtros?.contacto_id) url.searchParams.append('contacto_id', filtros.contacto_id);
+
+  const response = await fetch(url.toString());
+  if (!response.ok) {
+    throw new Error('Error al obtener propuestas');
+  }
+  return response.json();
+}
+
+/**
+ * Obtiene una propuesta por ID
+ */
+export async function getPropuesta(tenantId: string, propuestaId: string): Promise<Propuesta> {
+  const response = await fetch(`${API_BASE_URL}/tenants/${tenantId}/propuestas/${propuestaId}`);
+  if (!response.ok) {
+    throw new Error('Error al obtener propuesta');
+  }
+  return response.json();
+}
+
+/**
+ * Crea una nueva propuesta
+ */
+export async function createPropuesta(tenantId: string, data: Partial<Propuesta>): Promise<Propuesta> {
+  const response = await fetch(`${API_BASE_URL}/tenants/${tenantId}/propuestas`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(data),
+  });
+
+  if (!response.ok) {
+    const error = await response.json();
+    throw new Error(error.message || 'Error al crear propuesta');
+  }
+
+  return response.json();
+}
+
+/**
+ * Actualiza una propuesta
+ */
+export async function updatePropuesta(tenantId: string, propuestaId: string, data: Partial<Propuesta>): Promise<Propuesta> {
+  const response = await fetch(`${API_BASE_URL}/tenants/${tenantId}/propuestas/${propuestaId}`, {
+    method: 'PUT',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(data),
+  });
+
+  if (!response.ok) {
+    const error = await response.json();
+    throw new Error(error.message || 'Error al actualizar propuesta');
+  }
+
+  return response.json();
+}
+
+/**
+ * Cambia el estado de una propuesta
+ */
+export async function cambiarEstadoPropuesta(tenantId: string, propuestaId: string, nuevoEstado: string): Promise<Propuesta> {
+  const response = await fetch(`${API_BASE_URL}/tenants/${tenantId}/propuestas/${propuestaId}/estado`, {
+    method: 'PUT',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ estado: nuevoEstado }),
+  });
+
+  if (!response.ok) {
+    const error = await response.json();
+    throw new Error(error.message || 'Error al cambiar estado');
+  }
+
+  return response.json();
+}
+
+/**
+ * Elimina una propuesta
+ */
+export async function deletePropuesta(tenantId: string, propuestaId: string): Promise<void> {
+  const response = await fetch(`${API_BASE_URL}/tenants/${tenantId}/propuestas/${propuestaId}`, {
+    method: 'DELETE',
+  });
+
+  if (!response.ok) {
+    const error = await response.json();
+    throw new Error(error.message || 'Error al eliminar propuesta');
+  }
+}
+
+// ==================== CRM ACTIVIDADES/SEGUIMIENTO API ====================
+
+export type TipoActividad = 'llamada' | 'email' | 'reunion' | 'visita' | 'tarea' | 'whatsapp' | 'seguimiento';
+export type EstadoActividad = 'pendiente' | 'en_progreso' | 'completada' | 'cancelada';
+export type Prioridad = 'baja' | 'normal' | 'alta' | 'urgente';
+
+export interface Actividad {
+  id: string;
+  tenant_id: string;
+  tipo: TipoActividad;
+  titulo: string;
+  descripcion?: string;
+  contacto_id?: string;
+  solicitud_id?: string;
+  propuesta_id?: string;
+  usuario_id?: string;
+  // Campos de fecha
+  fecha_actividad?: string;
+  fecha_programada?: string;
+  fecha_recordatorio?: string;
+  fecha_completada?: string;
+  // Estado y prioridad
+  estado: EstadoActividad;
+  prioridad: Prioridad;
+  completada: boolean; // Compatibilidad
+  nota_completacion?: string;
+  // Metadata
+  metadata?: Record<string, any>;
+  datos_extra?: Record<string, any>;
+  // Timestamps
+  created_at: string;
+  updated_at: string;
+  // JOINs
+  contacto_nombre?: string;
+  contacto_apellido?: string;
+  contacto_email?: string;
+  solicitud_titulo?: string;
+  usuario_nombre?: string;
+  usuario_apellido?: string;
+}
+
+export interface ActividadesStats {
+  porTipo: Record<TipoActividad, number>;
+  porEstado: Record<EstadoActividad, number>;
+  esteMes: number;
+  esteAno: number;
+  completadas: number;
+}
+
+export interface ActividadesResponse {
+  data: Actividad[];
+  total: number;
+  page: number;
+  limit: number;
+  totalPages: number;
+  stats?: ActividadesStats;
+}
+
+export interface ActividadFiltros {
+  tipo?: string;
+  estado?: EstadoActividad;
+  prioridad?: Prioridad;
+  contacto_id?: string;
+  solicitud_id?: string;
+  propuesta_id?: string;
+  completada?: boolean;
+  busqueda?: string;
+  fecha_desde?: string;
+  fecha_hasta?: string;
+  page?: number;
+  limit?: number;
+}
+
+/**
+ * Obtiene las actividades de un tenant
+ */
+export async function getActividades(tenantId: string, filtros?: ActividadFiltros): Promise<ActividadesResponse> {
+  const url = new URL(`${API_BASE_URL}/tenants/${tenantId}/actividades`, window.location.origin);
+
+  if (filtros?.tipo) url.searchParams.append('tipo', filtros.tipo);
+  if (filtros?.estado) url.searchParams.append('estado', filtros.estado);
+  if (filtros?.prioridad) url.searchParams.append('prioridad', filtros.prioridad);
+  if (filtros?.contacto_id) url.searchParams.append('contacto_id', filtros.contacto_id);
+  if (filtros?.solicitud_id) url.searchParams.append('solicitud_id', filtros.solicitud_id);
+  if (filtros?.propuesta_id) url.searchParams.append('propuesta_id', filtros.propuesta_id);
+  if (filtros?.completada !== undefined) url.searchParams.append('completada', String(filtros.completada));
+  if (filtros?.busqueda) url.searchParams.append('busqueda', filtros.busqueda);
+  if (filtros?.fecha_desde) url.searchParams.append('fecha_desde', filtros.fecha_desde);
+  if (filtros?.fecha_hasta) url.searchParams.append('fecha_hasta', filtros.fecha_hasta);
+  if (filtros?.page) url.searchParams.append('page', String(filtros.page));
+  if (filtros?.limit) url.searchParams.append('limit', String(filtros.limit));
+
+  const response = await fetch(url.toString());
+  if (!response.ok) {
+    throw new Error('Error al obtener actividades');
+  }
+  return response.json();
+}
+
+/**
+ * Obtiene una actividad por ID
+ */
+export async function getActividad(tenantId: string, actividadId: string): Promise<Actividad> {
+  const response = await fetch(`${API_BASE_URL}/tenants/${tenantId}/actividades/${actividadId}`);
+  if (!response.ok) {
+    throw new Error('Error al obtener actividad');
+  }
+  return response.json();
+}
+
+/**
+ * Obtiene las actividades de un contacto
+ */
+export async function getActividadesByContacto(tenantId: string, contactoId: string, limit?: number): Promise<Actividad[]> {
+  const url = new URL(`${API_BASE_URL}/tenants/${tenantId}/contactos/${contactoId}/actividades`, window.location.origin);
+  if (limit) url.searchParams.append('limit', String(limit));
+
+  const response = await fetch(url.toString());
+  if (!response.ok) {
+    throw new Error('Error al obtener actividades del contacto');
+  }
+  return response.json();
+}
+
+/**
+ * Obtiene las actividades de una solicitud
+ */
+export async function getActividadesBySolicitud(tenantId: string, solicitudId: string, limit?: number): Promise<Actividad[]> {
+  const url = new URL(`${API_BASE_URL}/tenants/${tenantId}/solicitudes/${solicitudId}/actividades`, window.location.origin);
+  if (limit) url.searchParams.append('limit', String(limit));
+
+  const response = await fetch(url.toString());
+  if (!response.ok) {
+    throw new Error('Error al obtener actividades de la solicitud');
+  }
+  return response.json();
+}
+
+/**
+ * Obtiene actividades pendientes
+ */
+export async function getActividadesPendientes(tenantId: string, usuarioId?: string, limit?: number): Promise<Actividad[]> {
+  const url = new URL(`${API_BASE_URL}/tenants/${tenantId}/actividades/pendientes`, window.location.origin);
+  if (usuarioId) url.searchParams.append('usuario_id', usuarioId);
+  if (limit) url.searchParams.append('limit', String(limit));
+
+  const response = await fetch(url.toString());
+  if (!response.ok) {
+    throw new Error('Error al obtener actividades pendientes');
+  }
+  return response.json();
+}
+
+/**
+ * Crea una nueva actividad
+ */
+export async function createActividad(tenantId: string, data: Partial<Actividad>): Promise<Actividad> {
+  const response = await fetch(`${API_BASE_URL}/tenants/${tenantId}/actividades`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(data),
+  });
+
+  if (!response.ok) {
+    const error = await response.json();
+    throw new Error(error.message || 'Error al crear actividad');
+  }
+
+  return response.json();
+}
+
+/**
+ * Actualiza una actividad
+ */
+export async function updateActividad(tenantId: string, actividadId: string, data: Partial<Actividad>): Promise<Actividad> {
+  const response = await fetch(`${API_BASE_URL}/tenants/${tenantId}/actividades/${actividadId}`, {
+    method: 'PUT',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(data),
+  });
+
+  if (!response.ok) {
+    const error = await response.json();
+    throw new Error(error.message || 'Error al actualizar actividad');
+  }
+
+  return response.json();
+}
+
+/**
+ * Marca una actividad como completada/no completada
+ */
+export async function completarActividad(
+  tenantId: string,
+  actividadId: string,
+  completada: boolean = true,
+  nota?: string
+): Promise<Actividad> {
+  const response = await fetch(`${API_BASE_URL}/tenants/${tenantId}/actividades/${actividadId}/completar`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ completada, nota }),
+  });
+
+  if (!response.ok) {
+    const error = await response.json();
+    throw new Error(error.message || 'Error al completar actividad');
+  }
+
+  return response.json();
+}
+
+/**
+ * Cambia el estado de una actividad
+ */
+export async function cambiarEstadoActividad(
+  tenantId: string,
+  actividadId: string,
+  estado: EstadoActividad,
+  nota?: string
+): Promise<Actividad> {
+  const response = await fetch(`${API_BASE_URL}/tenants/${tenantId}/actividades/${actividadId}/estado`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ estado, nota }),
+  });
+
+  if (!response.ok) {
+    const error = await response.json();
+    throw new Error(error.message || 'Error al cambiar estado');
+  }
+
+  return response.json();
+}
+
+/**
+ * Obtiene estadísticas de actividades
+ */
+export async function getActividadesStats(tenantId: string): Promise<{
+  total: number;
+  pendientes: number;
+  enProgreso: number;
+  completadas: number;
+  canceladas: number;
+  esteMes: number;
+  esteAno: number;
+  porTipo: Record<TipoActividad, number>;
+}> {
+  const response = await fetch(`${API_BASE_URL}/tenants/${tenantId}/actividades/stats`);
+  if (!response.ok) {
+    throw new Error('Error al obtener estadísticas');
+  }
+  return response.json();
+}
+
+/**
+ * Elimina una actividad
+ */
+export async function deleteActividad(tenantId: string, actividadId: string): Promise<void> {
+  const response = await fetch(`${API_BASE_URL}/tenants/${tenantId}/actividades/${actividadId}`, {
+    method: 'DELETE',
+  });
+
+  if (!response.ok) {
+    const error = await response.json();
+    throw new Error(error.message || 'Error al eliminar actividad');
+  }
+}
+
+// ==================== CRM PROPIEDADES API ====================
+
+export type TipoPropiedad = 'casa' | 'departamento' | 'terreno' | 'oficina' | 'local' | 'bodega';
+export type OperacionPropiedad = 'venta' | 'renta' | 'traspaso';
+export type EstadoPropiedad = 'disponible' | 'reservada' | 'vendida' | 'rentada' | 'inactiva';
+
+export interface Propiedad {
+  id: string;
+  tenant_id: string;
+  titulo: string;
+  codigo?: string;
+  descripcion?: string;
+  tipo: TipoPropiedad;
+  operacion: OperacionPropiedad;
+  precio?: number;
+  precio_anterior?: number;
+  moneda: string;
+  pais?: string;
+  estado?: string;
+  ciudad?: string;
+  colonia?: string;
+  direccion?: string;
+  codigo_postal?: string;
+  latitud?: number;
+  longitud?: number;
+  recamaras?: number;
+  banos?: number;
+  medios_banos?: number;
+  estacionamientos?: number;
+  m2_construccion?: number;
+  m2_terreno?: number;
+  antiguedad?: number;
+  pisos?: number;
+  amenidades: string[];
+  caracteristicas: Record<string, any>;
+  imagen_principal?: string;
+  imagenes: string[];
+  video_url?: string;
+  tour_virtual_url?: string;
+  estado_propiedad: EstadoPropiedad;
+  destacada: boolean;
+  exclusiva: boolean;
+  agente_id?: string;
+  propietario_id?: string;
+  slug?: string;
+  notas?: string;
+  activo: boolean;
+  created_at: string;
+  updated_at: string;
+  agente_nombre?: string;
+  agente_apellido?: string;
+  propietario_nombre?: string;
+  propietario_apellido?: string;
+}
+
+export interface PropiedadesResponse {
+  data: Propiedad[];
+  total: number;
+  page: number;
+  limit: number;
+  totalPages: number;
+}
+
+export interface PropiedadFiltros {
+  tipo?: string;
+  operacion?: string;
+  estado_propiedad?: string;
+  ciudad?: string;
+  precio_min?: number;
+  precio_max?: number;
+  recamaras_min?: number;
+  banos_min?: number;
+  m2_min?: number;
+  m2_max?: number;
+  destacada?: boolean;
+  busqueda?: string;
+  agente_id?: string;
+  page?: number;
+  limit?: number;
+}
+
+export interface PropiedadesStats {
+  total: number;
+  disponibles: number;
+  reservadas: number;
+  vendidas: number;
+  porTipo: Record<string, number>;
+  porOperacion: Record<string, number>;
+}
+
+/**
+ * Obtiene las propiedades de un tenant
+ */
+export async function getPropiedadesCrm(tenantId: string, filtros?: PropiedadFiltros): Promise<PropiedadesResponse> {
+  const url = new URL(`${API_BASE_URL}/tenants/${tenantId}/propiedades`, window.location.origin);
+
+  if (filtros?.tipo) url.searchParams.append('tipo', filtros.tipo);
+  if (filtros?.operacion) url.searchParams.append('operacion', filtros.operacion);
+  if (filtros?.estado_propiedad) url.searchParams.append('estado_propiedad', filtros.estado_propiedad);
+  if (filtros?.ciudad) url.searchParams.append('ciudad', filtros.ciudad);
+  if (filtros?.precio_min !== undefined) url.searchParams.append('precio_min', String(filtros.precio_min));
+  if (filtros?.precio_max !== undefined) url.searchParams.append('precio_max', String(filtros.precio_max));
+  if (filtros?.recamaras_min !== undefined) url.searchParams.append('recamaras_min', String(filtros.recamaras_min));
+  if (filtros?.banos_min !== undefined) url.searchParams.append('banos_min', String(filtros.banos_min));
+  if (filtros?.m2_min !== undefined) url.searchParams.append('m2_min', String(filtros.m2_min));
+  if (filtros?.m2_max !== undefined) url.searchParams.append('m2_max', String(filtros.m2_max));
+  if (filtros?.destacada !== undefined) url.searchParams.append('destacada', String(filtros.destacada));
+  if (filtros?.busqueda) url.searchParams.append('busqueda', filtros.busqueda);
+  if (filtros?.agente_id) url.searchParams.append('agente_id', filtros.agente_id);
+  if (filtros?.page) url.searchParams.append('page', String(filtros.page));
+  if (filtros?.limit) url.searchParams.append('limit', String(filtros.limit));
+
+  const response = await fetch(url.toString());
+  if (!response.ok) {
+    throw new Error('Error al obtener propiedades');
+  }
+  return response.json();
+}
+
+/**
+ * Obtiene una propiedad por ID
+ */
+export async function getPropiedadCrm(tenantId: string, propiedadId: string): Promise<Propiedad> {
+  const response = await fetch(`${API_BASE_URL}/tenants/${tenantId}/propiedades/${propiedadId}`);
+  if (!response.ok) {
+    throw new Error('Error al obtener propiedad');
+  }
+  return response.json();
+}
+
+/**
+ * Obtiene estadísticas de propiedades
+ */
+export async function getPropiedadesStats(tenantId: string): Promise<PropiedadesStats> {
+  const response = await fetch(`${API_BASE_URL}/tenants/${tenantId}/propiedades/stats`);
+  if (!response.ok) {
+    throw new Error('Error al obtener estadísticas');
+  }
+  return response.json();
+}
+
+/**
+ * Crea una nueva propiedad
+ */
+export async function createPropiedadCrm(tenantId: string, data: Partial<Propiedad>): Promise<Propiedad> {
+  const response = await fetch(`${API_BASE_URL}/tenants/${tenantId}/propiedades`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(data),
+  });
+
+  if (!response.ok) {
+    const error = await response.json();
+    throw new Error(error.message || 'Error al crear propiedad');
+  }
+
+  return response.json();
+}
+
+/**
+ * Actualiza una propiedad
+ */
+export async function updatePropiedadCrm(tenantId: string, propiedadId: string, data: Partial<Propiedad>): Promise<Propiedad> {
+  const response = await fetch(`${API_BASE_URL}/tenants/${tenantId}/propiedades/${propiedadId}`, {
+    method: 'PUT',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(data),
+  });
+
+  if (!response.ok) {
+    const error = await response.json();
+    throw new Error(error.message || 'Error al actualizar propiedad');
+  }
+
+  return response.json();
+}
+
+/**
+ * Elimina una propiedad
+ */
+export async function deletePropiedadCrm(tenantId: string, propiedadId: string): Promise<void> {
+  const response = await fetch(`${API_BASE_URL}/tenants/${tenantId}/propiedades/${propiedadId}`, {
+    method: 'DELETE',
+  });
+
+  if (!response.ok) {
+    const error = await response.json();
+    throw new Error(error.message || 'Error al eliminar propiedad');
+  }
+}
+
+// ==================== CRM METAS API (GAMIFICACIÓN) ====================
+
+export type TipoMeta = 'ventas' | 'contactos' | 'actividades' | 'cierres' | 'propuestas' | 'propiedades';
+export type EstadoMeta = 'activa' | 'completada' | 'fallida' | 'cancelada';
+export type PeriodoMeta = 'diario' | 'semanal' | 'mensual' | 'trimestral' | 'anual' | 'personalizado';
+
+export interface Meta {
+  id: string;
+  tenant_id: string;
+  usuario_id?: string;
+  creado_por_id?: string;
+  titulo: string;
+  descripcion?: string;
+  tipo_meta: TipoMeta;
+  metrica: 'cantidad' | 'monto' | 'porcentaje';
+  valor_objetivo: number;
+  valor_actual: number;
+  periodo: PeriodoMeta;
+  fecha_inicio: string;
+  fecha_fin: string;
+  estado: EstadoMeta;
+  origen: 'personal' | 'asignada';
+  tipo_recompensa?: string;
+  descripcion_recompensa?: string;
+  monto_recompensa?: number;
+  fecha_completada?: string;
+  historial_progreso: any[];
+  activo: boolean;
+  created_at: string;
+  updated_at: string;
+  usuario_nombre?: string;
+  usuario_apellido?: string;
+  creador_nombre?: string;
+  creador_apellido?: string;
+  porcentaje_avance?: number;
+}
+
+export interface MetasResponse {
+  data: Meta[];
+  total: number;
+  page: number;
+  limit: number;
+  totalPages: number;
+}
+
+export interface MetaFiltros {
+  tipo_meta?: string;
+  estado?: string;
+  origen?: string;
+  usuario_id?: string;
+  periodo?: string;
+  page?: number;
+  limit?: number;
+}
+
+export interface MetasResumen {
+  activas: number;
+  completadas: number;
+  fallidas: number;
+  porcentajeExito: number;
+  progresoPromedio: number;
+}
+
+/**
+ * Obtiene las metas de un tenant
+ */
+export async function getMetas(tenantId: string, filtros?: MetaFiltros): Promise<MetasResponse> {
+  const url = new URL(`${API_BASE_URL}/tenants/${tenantId}/metas`, window.location.origin);
+
+  if (filtros?.tipo_meta) url.searchParams.append('tipo_meta', filtros.tipo_meta);
+  if (filtros?.estado) url.searchParams.append('estado', filtros.estado);
+  if (filtros?.origen) url.searchParams.append('origen', filtros.origen);
+  if (filtros?.usuario_id) url.searchParams.append('usuario_id', filtros.usuario_id);
+  if (filtros?.periodo) url.searchParams.append('periodo', filtros.periodo);
+  if (filtros?.page) url.searchParams.append('page', String(filtros.page));
+  if (filtros?.limit) url.searchParams.append('limit', String(filtros.limit));
+
+  const response = await fetch(url.toString());
+  if (!response.ok) {
+    throw new Error('Error al obtener metas');
+  }
+  return response.json();
+}
+
+/**
+ * Obtiene una meta por ID
+ */
+export async function getMetaCrm(tenantId: string, metaId: string): Promise<Meta> {
+  const response = await fetch(`${API_BASE_URL}/tenants/${tenantId}/metas/${metaId}`);
+  if (!response.ok) {
+    throw new Error('Error al obtener meta');
+  }
+  return response.json();
+}
+
+/**
+ * Obtiene el resumen de metas
+ */
+export async function getMetasResumen(tenantId: string, usuarioId?: string): Promise<MetasResumen> {
+  const url = new URL(`${API_BASE_URL}/tenants/${tenantId}/metas/resumen`, window.location.origin);
+  if (usuarioId) url.searchParams.append('usuario_id', usuarioId);
+
+  const response = await fetch(url.toString());
+  if (!response.ok) {
+    throw new Error('Error al obtener resumen');
+  }
+  return response.json();
+}
+
+/**
+ * Crea una nueva meta
+ */
+export async function createMeta(tenantId: string, data: Partial<Meta>): Promise<Meta> {
+  const response = await fetch(`${API_BASE_URL}/tenants/${tenantId}/metas`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(data),
+  });
+
+  if (!response.ok) {
+    const error = await response.json();
+    throw new Error(error.message || 'Error al crear meta');
+  }
+
+  return response.json();
+}
+
+/**
+ * Actualiza una meta
+ */
+export async function updateMeta(tenantId: string, metaId: string, data: Partial<Meta>): Promise<Meta> {
+  const response = await fetch(`${API_BASE_URL}/tenants/${tenantId}/metas/${metaId}`, {
+    method: 'PUT',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(data),
+  });
+
+  if (!response.ok) {
+    const error = await response.json();
+    throw new Error(error.message || 'Error al actualizar meta');
+  }
+
+  return response.json();
+}
+
+/**
+ * Actualiza el progreso de una meta
+ */
+export async function actualizarProgresoMeta(tenantId: string, metaId: string, valor: number, nota?: string): Promise<Meta> {
+  const response = await fetch(`${API_BASE_URL}/tenants/${tenantId}/metas/${metaId}/progreso`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ valor, nota }),
+  });
+
+  if (!response.ok) {
+    const error = await response.json();
+    throw new Error(error.message || 'Error al actualizar progreso');
+  }
+
+  return response.json();
+}
+
+/**
+ * Elimina una meta
+ */
+export async function deleteMeta(tenantId: string, metaId: string): Promise<void> {
+  const response = await fetch(`${API_BASE_URL}/tenants/${tenantId}/metas/${metaId}`, {
+    method: 'DELETE',
+  });
+
+  if (!response.ok) {
+    const error = await response.json();
+    throw new Error(error.message || 'Error al eliminar meta');
+  }
+}
+
+// ==================== FEATURES API ====================
+
+export interface Feature {
+  id: string;
+  codigo?: string; // Código único del feature
+  name: string;
+  nombre?: string; // Alias para nombre (usado en algunos lugares)
+  description: string;
+  icon: string;
+  category: string;
+  isPublic: boolean;
+  isPremium: boolean;
+  availableInPlans: string[];
+  enabledCount: number;
+  createdAt?: string;
+  updatedAt?: string;
+}
+
+export interface CreateFeatureData {
+  name: string;
+  description?: string;
+  icon?: string;
+  category?: string;
+  isPublic?: boolean;
+  isPremium?: boolean;
+  availableInPlans?: string[];
+}
+
+export interface UpdateFeatureData {
+  name?: string;
+  description?: string;
+  icon?: string;
+  category?: string;
+  isPublic?: boolean;
+  isPremium?: boolean;
+  availableInPlans?: string[];
+}
+
+/**
+ * Obtiene todos los features
+ */
+export async function getAllFeatures(token?: string | null): Promise<Feature[]> {
+  const response = await apiFetch('/admin/features', {}, token);
+  const data = await response.json();
+  return data.features || data;
+}
+
+/**
+ * Crea un nuevo feature
+ */
+export async function createFeature(data: CreateFeatureData, token?: string | null): Promise<Feature> {
+  const response = await apiFetch('/admin/features', {
+    method: 'POST',
+    body: JSON.stringify(data),
+  }, token);
+  return response.json();
+}
+
+/**
+ * Actualiza un feature existente
+ */
+export async function updateFeature(featureId: string, data: UpdateFeatureData, token?: string | null): Promise<Feature> {
+  const response = await apiFetch(`/admin/features/${featureId}`, {
+    method: 'PUT',
+    body: JSON.stringify(data),
+  }, token);
+  return response.json();
+}
+
+/**
+ * Elimina un feature
+ */
+export async function deleteFeature(featureId: string, token?: string | null): Promise<void> {
+  await apiFetch(`/admin/features/${featureId}`, {
+    method: 'DELETE',
+  }, token);
+}
+
+export interface FeatureWithTenantStatus extends Feature {
+  enabled: boolean;
+}
+
+/**
+ * Obtiene todos los features disponibles con información de si están habilitados para un tenant
+ */
+export async function getTenantFeatures(tenantId: string, token?: string | null): Promise<FeatureWithTenantStatus[]> {
+  const response = await apiFetch(`/admin/tenants/${tenantId}/features`, {}, token);
+  const data = await response.json();
+  return data.features || data;
+}
+
+/**
+ * Habilita un feature para un tenant
+ */
+export async function enableFeatureForTenant(tenantId: string, featureId: string, token?: string | null): Promise<void> {
+  await apiFetch(`/admin/tenants/${tenantId}/features/${featureId}`, {
+    method: 'POST',
+  }, token);
+}
+
+/**
+ * Deshabilita un feature para un tenant
+ */
+export async function disableFeatureForTenant(tenantId: string, featureId: string, token?: string | null): Promise<void> {
+  await apiFetch(`/admin/tenants/${tenantId}/features/${featureId}`, {
+    method: 'DELETE',
+  }, token);
+}
+
+// ==================== BILLING API ====================
+
+export interface BillingStats {
+  totalFacturas: number;
+  facturasPendientes: number;
+  facturasPagadas: number;
+  facturasVencidas: number;
+  totalRecaudado: number;
+  totalPendiente: number;
+  suscripcionesActivas: number;
+  suscripcionesSuspendidas: number;
+  proximosVencimientos: number;
+}
+
+export interface Factura {
+  id: string;
+  tenantId: string;
+  tenantNombre?: string;
+  numeroFactura: string;
+  plan: string;
+  monto: number;
+  moneda: string;
+  estado: 'pendiente' | 'pagada' | 'vencida' | 'cancelada';
+  fechaEmision: string;
+  fechaVencimiento: string;
+  fechaPago: string | null;
+  metodoPago: string | null;
+  referenciaPago: string | null;
+  detalles: Record<string, any>;
+  notas: string | null;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface Suscripcion {
+  id: string;
+  tenantId: string;
+  tenantNombre?: string;
+  plan: string;
+  estado: 'activa' | 'suspendida' | 'cancelada';
+  fechaInicio: string;
+  fechaFin: string | null;
+  proximoCobro: string | null;
+  montoMensual: number;
+  metodoPagoGuardado: string | null;
+  configuracion: Record<string, any>;
+  createdAt: string;
+  updatedAt: string;
+}
+
+/**
+ * Obtiene estadísticas de facturación
+ */
+export async function getBillingStats(token?: string | null): Promise<BillingStats> {
+  const response = await apiFetch('/admin/billing/stats', {}, token);
+  return response.json();
+}
+
+/**
+ * Obtiene todas las facturas
+ */
+export async function getAllFacturas(token?: string | null, filters?: {
+  tenantId?: string;
+  estado?: string;
+  fechaDesde?: string;
+  fechaHasta?: string;
+}): Promise<Factura[]> {
+  const params = new URLSearchParams();
+  if (filters?.tenantId) params.append('tenantId', filters.tenantId);
+  if (filters?.estado) params.append('estado', filters.estado);
+  if (filters?.fechaDesde) params.append('fechaDesde', filters.fechaDesde);
+  if (filters?.fechaHasta) params.append('fechaHasta', filters.fechaHasta);
+  
+  const queryString = params.toString();
+  const url = `/admin/billing/facturas${queryString ? `?${queryString}` : ''}`;
+  const response = await apiFetch(url, {}, token);
+  const data = await response.json();
+  return data.facturas || data;
+}
+
+/**
+ * Obtiene todas las suscripciones
+ */
+export async function getAllSuscripciones(token?: string | null): Promise<Suscripcion[]> {
+  const response = await apiFetch('/admin/billing/suscripciones', {}, token);
+  const data = await response.json();
+  return data.suscripciones || data;
+}
+
+// ==================== CONFIGURACIÓN API ====================
+
+export interface PlatformConfig {
+  clave: string;
+  categoria: string;
+  valor: string;
+  tipo: 'string' | 'number' | 'boolean' | 'json';
+  descripcion: string | null;
+  esSensible: boolean;
+  createdAt: string;
+  updatedAt: string;
+}
+
+/**
+ * Obtiene todas las configuraciones agrupadas por categoría
+ */
+export async function getAllConfig(token?: string | null): Promise<Record<string, PlatformConfig[]>> {
+  const response = await apiFetch('/admin/config', {}, token);
+  const data = await response.json();
+  return data.config || data;
+}
+
+/**
+ * Obtiene una configuración por su clave
+ */
+export async function getConfigByKey(clave: string, token?: string | null): Promise<PlatformConfig> {
+  const response = await apiFetch(`/admin/config/${clave}`, {}, token);
+  return response.json();
+}
+
+/**
+ * Actualiza una configuración específica
+ */
+export async function updateConfig(clave: string, valor: string, token?: string | null): Promise<PlatformConfig> {
+  const response = await apiFetch(`/admin/config/${clave}`, {
+    method: 'PUT',
+    body: JSON.stringify({ valor }),
+  }, token);
+  return response.json();
+}
+
+/**
+ * Actualiza múltiples configuraciones a la vez
+ */
+export async function updateMultipleConfig(configs: Record<string, string>, token?: string | null): Promise<PlatformConfig[]> {
+  const response = await apiFetch('/admin/config', {
+    method: 'PUT',
+    body: JSON.stringify({ configs }),
+  }, token);
+  const data = await response.json();
+  return data.configs || [];
+}
+
+// ==================== CATÁLOGOS API ====================
+
+export interface Operacion {
+  id: string;
+  codigo: string;
+  nombre: string;
+  descripcion?: string;
+  icono?: string;
+  color?: string;
+  activo: boolean;
+}
+
+export interface CategoriaPropiedad {
+  id: string;
+  codigo: string;
+  nombre: string;
+  descripcion?: string;
+  icono?: string;
+  color?: string;
+  activo: boolean;
+}
+
+/**
+ * Obtiene el catálogo de operaciones (venta, renta, etc.)
+ * @param soloActivas - Si es true, solo devuelve operaciones activas (default: true)
+ * @param token - Token de autenticación opcional
+ */
+export async function getOperacionesCatalogo(soloActivas: boolean = true, token?: string | null): Promise<Operacion[]> {
+  const url = soloActivas ? '/catalogos/operaciones' : '/catalogos/operaciones?soloActivas=false';
+  const response = await apiFetch(url, {}, token);
+  const data = await response.json();
+  return data || [];
+}
+
+/**
+ * Obtiene el catálogo de categorías de propiedades (casa, apartamento, etc.)
+ * @param soloActivas - Si es true, solo devuelve categorías activas (default: true)
+ * @param token - Token de autenticación opcional
+ */
+export async function getCategoriasPropiedadesCatalogo(soloActivas: boolean = true, token?: string | null): Promise<CategoriaPropiedad[]> {
+  const url = soloActivas ? '/catalogos/categorias' : '/catalogos/categorias?soloActivas=false';
+  const response = await apiFetch(url, {}, token);
+  const data = await response.json();
+  return data || [];
+}
+
+// ==================== MONEDAS API ====================
+
+export interface Moneda {
+  codigo: string;
+  nombre: string;
+  nombreEn?: string;
+  simbolo: string;
+  tasaUsd: number;
+  decimales: number;
+  formato: string;
+  orden: number;
+  activo: boolean;
+}
+
+export interface TenantMoneda {
+  codigo: string;
+  esDefault: boolean;
+}
+
+/**
+ * Obtiene el catálogo de monedas
+ * @param soloActivas - Si es true, solo devuelve monedas activas (default: true)
+ * @param token - Token de autenticación opcional
+ */
+export async function getMonedasCatalogo(soloActivas: boolean = true, token?: string | null): Promise<Moneda[]> {
+  const url = soloActivas ? '/catalogos/monedas' : '/catalogos/monedas?soloActivas=false';
+  const response = await apiFetch(url, {}, token);
+  const data = await response.json();
+  return data || [];
+}
+
+/**
+ * Obtiene las monedas habilitadas para un tenant
+ * @param tenantId - ID del tenant
+ * @param token - Token de autenticación opcional
+ */
+export async function getTenantMonedas(tenantId: string, token?: string | null): Promise<Moneda[]> {
+  const response = await apiFetch(`/catalogos/monedas/tenant/${tenantId}`, {}, token);
+  const data = await response.json();
+  return data || [];
+}
+
+/**
+ * Configura las monedas habilitadas para un tenant
+ * @param tenantId - ID del tenant
+ * @param monedas - Array de monedas con su configuración
+ * @param token - Token de autenticación opcional
+ */
+export async function setTenantMonedasHabilitadas(
+  tenantId: string,
+  monedas: TenantMoneda[],
+  token?: string | null
+): Promise<{ success: boolean; message: string }> {
+  const response = await apiFetch(`/catalogos/monedas/tenant/${tenantId}`, {
+    method: 'PUT',
+    body: JSON.stringify({ monedas }),
+  }, token);
+  return response.json();
+}
+
+// ==================== TIPOS DE PÁGINA Y PLANTILLAS API ====================
+
+export interface ComponentePlantilla {
+  codigo: string;
+  orden: number;
+  configuracion?: Record<string, any>;
+}
+
+export interface PlantillaPagina {
+  id: string;
+  codigo: string;
+  tipoPagina: string;
+  tipoPaginaNombre?: string;
+  nombre: string;
+  descripcion: string | null;
+  previewImage: string | null;
+  categoria: string | null;
+  componentes: ComponentePlantilla[];
+  configuracionDefault: Record<string, any>;
+  estilos: Record<string, any>;
+  featureRequerido: string | null;
+  visible: boolean;
+  featured: boolean;
+  esPremium: boolean;
+  orden: number;
+  createdAt: string;
+  updatedAt: string;
+  paginasUsando?: number;
+}
+
+export interface TipoPaginaDB {
+  codigo: string;
+  nombre: string;
+  descripcion: string;
+  esEstandar: boolean;
+  requiereSlug: boolean;
+  configuracion: Record<string, any>;
+  rutaPatron: string | null;
+  rutaPadre: string | null;
+  nivel: number;
+  fuenteDatos: string | null;
+  featureRequerido: string | null;
+  esPlantilla: boolean;
+  protegida: boolean;
+  parametros: any[];
+  aliasRutas: Record<string, string>;
+  componentesRequeridos: string[];
+  visible: boolean;
+  featured: boolean;
+  publico: boolean;
+  ordenCatalogo: number;
+  createdAt: string;
+  updatedAt: string;
+  tenantsUsando?: number;
+}
+
+export interface TipoPaginaConPlantillas extends TipoPaginaDB {
+  plantillas?: PlantillaPagina[];
+}
+
+/**
+ * Obtiene todos los tipos de página del sistema
+ * @param token - Token de autenticación opcional
+ */
+export async function getAllTiposPagina(token?: string | null): Promise<TipoPaginaDB[]> {
+  const response = await apiFetch('/admin/tipos-pagina', {}, token);
+  const data = await response.json();
+  return data.tipos || [];
+}
+
+/**
+ * Obtiene los tipos de página disponibles para un tenant con sus plantillas
+ * @param tenantId - ID del tenant
+ * @param token - Token de autenticación opcional
+ */
+export async function getTiposPaginaParaTenant(tenantId: string, token?: string | null): Promise<TipoPaginaConPlantillas[]> {
+  // Por ahora usa el mismo endpoint admin
+  const response = await apiFetch('/admin/tipos-pagina', {}, token);
+  const data = await response.json();
+  return data.tipos || [];
+}
+
+/**
+ * Obtiene las plantillas disponibles para un tenant y tipo de página específico
+ * @param tenantId - ID del tenant
+ * @param tipoPagina - Código del tipo de página
+ * @param token - Token de autenticación opcional
+ */
+export async function getPlantillasParaTenant(tenantId: string, tipoPagina: string, token?: string | null): Promise<PlantillaPagina[]> {
+  const response = await apiFetch(`/admin/plantillas/tipo/${tipoPagina}`, {}, token);
+  const data = await response.json();
+  return data.plantillas || [];
+}
+
+// ==================== UPLOAD DE IMÁGENES ====================
+
+export interface UploadImageResult {
+  url: string;
+  key?: string;
+  width?: number;
+  height?: number;
+  size?: number;
+  format?: string;
+}
+
+/**
+ * Sube una imagen para un componente
+ * @param tenantId - ID del tenant
+ * @param file - Archivo de imagen a subir
+ * @param token - Token de autenticación opcional
+ */
+export async function uploadComponentImage(
+  tenantId: string,
+  file: File,
+  token?: string | null
+): Promise<UploadImageResult> {
+  const formData = new FormData();
+  formData.append('image', file);
+  formData.append('folder', 'componentes');
+
+  const headers: Record<string, string> = {};
+  if (token) {
+    headers['Authorization'] = `Bearer ${token}`;
+  }
+
+  const response = await fetch(`${API_URL}/tenants/${tenantId}/upload/image`, {
+    method: 'POST',
+    headers,
+    body: formData,
+  });
+
+  if (!response.ok) {
+    const errorData = await response.json().catch(() => ({}));
+    throw new Error(errorData.error || `Error al subir imagen: ${response.status}`);
+  }
+
+  const data = await response.json();
+  return data;
+}
+
+// ==================== COMPONENTES - SCHEMA ====================
+
+export interface ComponenteSchemaField {
+  label: string;
+  type: 'text' | 'textarea' | 'number' | 'boolean' | 'color' | 'image' | 'array' | 'select' | 'richtext';
+  required?: boolean;
+  default?: any;
+  options?: { value: string; label: string }[];
+  schema?: Record<string, ComponenteSchemaField>;
+}
+
+export interface ComponenteSchema {
+  campos: {
+    nombre: string;
+    label: string;
+    tipo: string;
+    requerido?: boolean;
+    default?: any;
+    opciones?: { value: string; label: string }[];
+    schema?: Record<string, any>;
+  }[];
+  toggles?: {
+    nombre: string;
+    label: string;
+    default?: boolean;
+  }[];
+}
+
+export interface CatalogoComponenteConSchema {
+  id: string;
+  tipo: string;
+  nombre: string;
+  descripcion?: string;
+  icono?: string;
+  categoria?: string;
+  schema_config?: ComponenteSchema;
+}
+
+/**
+ * Obtiene el schema de configuración de un componente por su tipo
+ * @param tipo - Tipo del componente
+ * @param token - Token de autenticación
+ */
+export async function getComponenteSchema(tipo: string, token?: string | null): Promise<CatalogoComponenteConSchema | null> {
+  try {
+    const response = await apiFetch(`/secciones/catalogo/${tipo}`, {}, token);
+    const data = await response.json();
+    return data;
+  } catch (error) {
+    console.error('Error obteniendo schema del componente:', error);
+    return null;
+  }
+}
+
+// ==================== TIPOS DE PÁGINA - ADMIN ====================
+
+// Alias para compatibilidad
+export type TipoPagina = TipoPaginaDB;
+
+export interface CreateTipoPaginaData {
+  codigo: string;
+  nombre: string;
+  descripcion?: string;
+  rutaPatron?: string | null;
+  rutaPadre?: string | null;
+  nivel?: number;
+  esPlantilla?: boolean;
+  visible?: boolean;
+  featured?: boolean;
+  featureRequerido?: string | null;
+  ordenCatalogo?: number;
+}
+
+export interface UpdateTipoPaginaData {
+  nombre?: string;
+  descripcion?: string;
+  rutaPatron?: string | null;
+  rutaPadre?: string | null;
+  nivel?: number;
+  esPlantilla?: boolean;
+  visible?: boolean;
+  featured?: boolean;
+  featureRequerido?: string | null;
+  ordenCatalogo?: number;
+}
+
+/**
+ * Crea un nuevo tipo de página
+ * @param data - Datos del tipo de página
+ * @param token - Token de autenticación
+ */
+export async function createTipoPagina(data: CreateTipoPaginaData, token?: string | null): Promise<TipoPagina> {
+  const response = await apiFetch('/admin/tipos-pagina', {
+    method: 'POST',
+    body: JSON.stringify(data),
+  }, token);
+  const result = await response.json();
+  return result.tipo || result;
+}
+
+/**
+ * Actualiza un tipo de página existente
+ * @param codigo - Código del tipo de página
+ * @param data - Datos a actualizar
+ * @param token - Token de autenticación
+ */
+export async function updateTipoPagina(codigo: string, data: UpdateTipoPaginaData, token?: string | null): Promise<TipoPagina> {
+  const response = await apiFetch(`/admin/tipos-pagina/${codigo}`, {
+    method: 'PUT',
+    body: JSON.stringify(data),
+  }, token);
+  const result = await response.json();
+  return result.tipo || result;
+}
+
+// ==================== AMENIDADES ====================
+
+export interface CategoriaAmenidad {
+  id: string;
+  codigo: string;
+  nombre: string;
+  descripcion?: string;
+  orden: number;
+}
+
+/**
+ * Obtiene las categorías de amenidades disponibles (solo los códigos/nombres)
+ * @param tenantId - ID del tenant (opcional)
+ * @param token - Token de autenticación
+ */
+export async function getCategoriasAmenidades(tenantId?: string, token?: string | null): Promise<string[]> {
+  const url = tenantId
+    ? `/tenants/${tenantId}/amenidades/categorias`
+    : '/catalogo/amenidades/categorias';
+  const response = await apiFetch(url, {}, token);
+  const data = await response.json();
+  // Si el API devuelve objetos, extraer solo los códigos/nombres
+  const categorias = data.categorias || data || [];
+  if (categorias.length > 0 && typeof categorias[0] === 'object') {
+    return categorias.map((c: CategoriaAmenidad) => c.codigo || c.nombre);
+  }
+  return categorias;
+}
+
+// ==================== PLANTILLAS DE PÁGINA ====================
+
+export interface PlantillaPaginaCreate {
+  codigo: string;
+  tipoPagina: string;
+  nombre: string;
+  descripcion?: string | null;
+  previewImage?: string | null;
+  categoria?: string | null;
+  componentes?: ComponentePlantilla[];
+  configuracionDefault?: Record<string, any>;
+  estilos?: Record<string, any>;
+  featureRequerido?: string | null;
+  visible?: boolean;
+  featured?: boolean;
+  esPremium?: boolean;
+  orden?: number;
+}
+
+export interface PlantillaPaginaUpdate {
+  nombre?: string;
+  descripcion?: string | null;
+  previewImage?: string | null;
+  categoria?: string | null;
+  componentes?: ComponentePlantilla[];
+  configuracionDefault?: Record<string, any>;
+  estilos?: Record<string, any>;
+  featureRequerido?: string | null;
+  visible?: boolean;
+  featured?: boolean;
+  esPremium?: boolean;
+  orden?: number;
+}
+
+/**
+ * Obtiene todas las plantillas de página
+ * @param token - Token de autenticación
+ */
+export async function getAllPlantillas(token?: string | null): Promise<PlantillaPagina[]> {
+  const response = await apiFetch('/admin/plantillas', {}, token);
+  const data = await response.json();
+  return data.plantillas || [];
+}
+
+/**
+ * Crea una nueva plantilla de página
+ * @param data - Datos de la plantilla
+ * @param token - Token de autenticación
+ */
+export async function createPlantilla(data: PlantillaPaginaCreate, token?: string | null): Promise<PlantillaPagina> {
+  const response = await apiFetch('/admin/plantillas', {
+    method: 'POST',
+    body: JSON.stringify(data),
+  }, token);
+  const result = await response.json();
+  return result.plantilla || result;
+}
+
+/**
+ * Actualiza una plantilla de página
+ * @param id - ID de la plantilla
+ * @param data - Datos a actualizar
+ * @param token - Token de autenticación
+ */
+export async function updatePlantilla(id: string, data: PlantillaPaginaUpdate, token?: string | null): Promise<PlantillaPagina> {
+  const response = await apiFetch(`/admin/plantillas/${id}`, {
+    method: 'PUT',
+    body: JSON.stringify(data),
+  }, token);
+  const result = await response.json();
+  return result.plantilla || result;
+}
+
+/**
+ * Elimina una plantilla de página
+ * @param id - ID de la plantilla
+ * @param token - Token de autenticación
+ */
+export async function deletePlantilla(id: string, token?: string | null): Promise<void> {
+  await apiFetch(`/admin/plantillas/${id}`, {
+    method: 'DELETE',
+  }, token);
+}
+
+// ==================== TASAS DE CAMBIO ====================
+
+/**
+ * Tipo para las tasas de cambio
+ * Mapea código de moneda a su tasa contra USD
+ */
+export type TasasCambio = Record<string, number>;
+
+/**
+ * Obtiene las tasas de cambio actuales para un tenant
+ * @param tenantId - ID del tenant
+ * @param token - Token de autenticación opcional
+ * @returns Objeto con tasas de cambio (ej: { DOP: 58.5, EUR: 0.92, MXN: 17.2 })
+ */
+export async function getTasasCambio(tenantId: string, token?: string | null): Promise<TasasCambio> {
+  try {
+    const response = await apiFetch(`/tenants/${tenantId}/tasas-cambio`, {}, token);
+    const data = await response.json();
+    return data.tasas || data || {};
+  } catch (error) {
+    // Devolver tasas por defecto si hay error
+    console.warn('Error obteniendo tasas de cambio, usando valores por defecto:', error);
+    return {
+      DOP: 58.5,
+      EUR: 0.92,
+      MXN: 17.2,
+    };
+  }
+}
+
+/**
+ * Convierte un valor a USD usando las tasas de cambio proporcionadas
+ * @param valor - Valor a convertir
+ * @param moneda - Código de la moneda origen (ej: 'DOP', 'EUR', 'MXN')
+ * @param tasas - Objeto con las tasas de cambio
+ * @returns Valor convertido a USD
+ */
+export function convertirAUSD(valor: number, moneda: string, tasas: TasasCambio): number {
+  if (!valor || isNaN(valor)) return 0;
+
+  // Si ya es USD, devolver el valor directamente
+  if (moneda === 'USD') return valor;
+
+  // Obtener la tasa de cambio para esta moneda
+  const tasa = tasas[moneda];
+
+  // Si no hay tasa, devolver el valor sin convertir
+  if (!tasa || tasa === 0) {
+    console.warn(`No hay tasa de cambio para ${moneda}, devolviendo valor sin convertir`);
+    return valor;
+  }
+
+  // Convertir dividiendo por la tasa (ya que las tasas son: 1 USD = X moneda)
+  return valor / tasa;
+}
+
+// ==================== USUARIOS TENANT ====================
+
+/**
+ * Representa un usuario del tenant
+ */
+export interface UsuarioTenant {
+  id: string;
+  email: string;
+  nombre: string | null;
+  apellido: string | null;
+  avatarUrl: string | null;
+  roles: {
+    id: string;
+    codigo: string;
+    nombre: string;
+    color: string | null;
+  }[];
+  esOwner: boolean;
+  activo: boolean;
+}
+
+/**
+ * Obtiene los usuarios de un tenant
+ * @param tenantId - ID del tenant
+ * @param token - Token de autenticación opcional
+ */
+export async function getUsuariosTenant(tenantId: string, token?: string | null): Promise<UsuarioTenant[]> {
+  const response = await apiFetch(`/tenants/${tenantId}/usuarios`, {}, token);
+  const data = await response.json();
+  return data.usuarios || data || [];
+}
+
+// ==================== ESTADOS DE VENTA ====================
+
+/**
+ * Representa un estado de venta
+ */
+export interface EstadoVenta {
+  id: string;
+  nombre: string;
+  codigo: string;
+  color: string | null;
+  orden: number;
+  esCompletado: boolean;
+  esCancelado: boolean;
+  activo: boolean;
+}
+
+/**
+ * Obtiene los estados de venta de un tenant
+ * @param tenantId - ID del tenant
+ * @param token - Token de autenticación opcional
+ */
+export async function getEstadosVenta(tenantId: string, token?: string | null): Promise<EstadoVenta[]> {
+  const response = await apiFetch(`/tenants/${tenantId}/estados-venta`, {}, token);
+  const data = await response.json();
+  return data.estados || data || [];
+}
+
+// ==================== VENTAS ====================
+
+/**
+ * Representa una venta (deal)
+ */
+export interface Venta {
+  id: string;
+  nombre_negocio: string | null;
+  descripcion: string | null;
+  propiedad_id: string | null;
+  contacto_id: string | null;
+  usuario_cerrador_id: string | null;
+  estado_venta_id: string | null;
+  valor_cierre: number | string | null;
+  moneda: string;
+  porcentaje_comision: number | string | null;
+  monto_comision: number | string | null;
+  fecha_cierre: string | null;
+  vendedor_externo_tipo: string | null;
+  vendedor_externo_nombre: string | null;
+  vendedor_externo_contacto: string | null;
+  referidor_nombre: string | null;
+  referidor_id: string | null;
+  notas: string | null;
+  completada: boolean;
+  cancelada: boolean;
+  tenant_id: string;
+  created_at: string;
+  updated_at: string;
+  // Relaciones expandidas
+  propiedad?: Propiedad | null;
+  contacto?: Contacto | null;
+  usuario_cerrador?: UsuarioTenant | null;
+  estado_venta?: EstadoVenta | null;
+}
+
+/**
+ * Filtros para buscar ventas
+ */
+export interface VentaFiltros {
+  estadoVentaId?: string;
+  usuarioId?: string;
+  usuarioIds?: string[];
+  soloMisVentas?: boolean;
+  soloParticipadas?: boolean;
+  tipoOperacion?: string;
+  ciudad?: string;
+  sector?: string;
+  categoria?: string;
+  esPropiedadExterna?: boolean;
+  fechaDesde?: string;
+  fechaHasta?: string;
+  busqueda?: string;
+  limit?: number;
+  offset?: number;
+}
+
+/**
+ * Obtiene las ventas de un tenant
+ * @param tenantId - ID del tenant
+ * @param filtros - Filtros opcionales
+ * @param token - Token de autenticación opcional
+ */
+export async function getVentas(tenantId: string, filtros?: VentaFiltros, token?: string | null): Promise<Venta[]> {
+  const params = new URLSearchParams();
+
+  if (filtros) {
+    if (filtros.estadoVentaId) params.append('estadoVentaId', filtros.estadoVentaId);
+    if (filtros.usuarioId) params.append('usuarioId', filtros.usuarioId);
+    if (filtros.usuarioIds?.length) params.append('usuarioIds', filtros.usuarioIds.join(','));
+    if (filtros.soloMisVentas) params.append('soloMisVentas', 'true');
+    if (filtros.soloParticipadas) params.append('soloParticipadas', 'true');
+    if (filtros.tipoOperacion) params.append('tipoOperacion', filtros.tipoOperacion);
+    if (filtros.ciudad) params.append('ciudad', filtros.ciudad);
+    if (filtros.sector) params.append('sector', filtros.sector);
+    if (filtros.categoria) params.append('categoria', filtros.categoria);
+    if (filtros.esPropiedadExterna !== undefined) params.append('esPropiedadExterna', String(filtros.esPropiedadExterna));
+    if (filtros.fechaDesde) params.append('fechaDesde', filtros.fechaDesde);
+    if (filtros.fechaHasta) params.append('fechaHasta', filtros.fechaHasta);
+    if (filtros.busqueda) params.append('busqueda', filtros.busqueda);
+    if (filtros.limit) params.append('limit', String(filtros.limit));
+    if (filtros.offset) params.append('offset', String(filtros.offset));
+  }
+
+  const queryString = params.toString();
+  const url = `/tenants/${tenantId}/ventas${queryString ? `?${queryString}` : ''}`;
+  const response = await apiFetch(url, {}, token);
+  const data = await response.json();
+  return data.ventas || data || [];
+}
+
+/**
+ * Crea una nueva venta
+ * @param tenantId - ID del tenant
+ * @param venta - Datos de la venta
+ * @param token - Token de autenticación opcional
+ */
+export async function createVenta(tenantId: string, venta: Partial<Venta>, token?: string | null): Promise<Venta> {
+  const response = await apiFetch(`/tenants/${tenantId}/ventas`, {
+    method: 'POST',
+    body: JSON.stringify(venta),
+  }, token);
+  const data = await response.json();
+  return data.venta || data;
+}
+
+/**
+ * Actualiza una venta existente
+ * @param tenantId - ID del tenant
+ * @param ventaId - ID de la venta
+ * @param venta - Datos a actualizar
+ * @param token - Token de autenticación opcional
+ */
+export async function updateVenta(tenantId: string, ventaId: string, venta: Partial<Venta>, token?: string | null): Promise<Venta> {
+  const response = await apiFetch(`/tenants/${tenantId}/ventas/${ventaId}`, {
+    method: 'PUT',
+    body: JSON.stringify(venta),
+  }, token);
+  const data = await response.json();
+  return data.venta || data;
+}
+
+/**
+ * Elimina una venta
+ * @param tenantId - ID del tenant
+ * @param ventaId - ID de la venta
+ * @param token - Token de autenticación opcional
+ */
+export async function deleteVenta(tenantId: string, ventaId: string, token?: string | null): Promise<void> {
+  await apiFetch(`/tenants/${tenantId}/ventas/${ventaId}`, {
+    method: 'DELETE',
+  }, token);
+}
+
+// ==================== COMISIONES ====================
+
+/**
+ * Representa una comisión
+ */
+export interface Comision {
+  id: string;
+  venta_id: string;
+  usuario_id: string;
+  tipo: string;
+  porcentaje: number | null;
+  monto: number | null;
+  moneda: string;
+  estado: string;
+  fecha_pago: string | null;
+  notas: string | null;
+  created_at: string;
+  updated_at: string;
+  // Relaciones
+  usuario?: UsuarioTenant | null;
+  venta?: Venta | null;
+}
+
+/**
+ * Obtiene las comisiones de una venta
+ * @param tenantId - ID del tenant
+ * @param ventaId - ID de la venta
+ * @param token - Token de autenticación opcional
+ */
+export async function getComisiones(tenantId: string, ventaId: string, token?: string | null): Promise<Comision[]> {
+  const response = await apiFetch(`/tenants/${tenantId}/ventas/${ventaId}/comisiones`, {}, token);
+  const data = await response.json();
+  return data.comisiones || data || [];
+}
+
+/**
+ * Crea una nueva comisión
+ * @param tenantId - ID del tenant
+ * @param ventaId - ID de la venta
+ * @param comision - Datos de la comisión
+ * @param token - Token de autenticación opcional
+ */
+export async function createComision(tenantId: string, ventaId: string, comision: Partial<Comision>, token?: string | null): Promise<Comision> {
+  const response = await apiFetch(`/tenants/${tenantId}/ventas/${ventaId}/comisiones`, {
+    method: 'POST',
+    body: JSON.stringify(comision),
+  }, token);
+  const data = await response.json();
+  return data.comision || data;
+}
+
+/**
+ * Actualiza una comisión existente
+ * @param tenantId - ID del tenant
+ * @param ventaId - ID de la venta
+ * @param comisionId - ID de la comisión
+ * @param comision - Datos a actualizar
+ * @param token - Token de autenticación opcional
+ */
+export async function updateComision(
+  tenantId: string,
+  ventaId: string,
+  comisionId: string,
+  comision: Partial<Comision>,
+  token?: string | null
+): Promise<Comision> {
+  const response = await apiFetch(`/tenants/${tenantId}/ventas/${ventaId}/comisiones/${comisionId}`, {
+    method: 'PUT',
+    body: JSON.stringify(comision),
+  }, token);
+  const data = await response.json();
+  return data.comision || data;
+}
+
+/**
+ * Obtiene una venta específica por ID
+ * @param tenantId - ID del tenant
+ * @param ventaId - ID de la venta
+ * @param token - Token de autenticación opcional
+ */
+export async function getVenta(tenantId: string, ventaId: string, token?: string | null): Promise<Venta> {
+  const response = await apiFetch(`/tenants/${tenantId}/ventas/${ventaId}`, {}, token);
+  const data = await response.json();
+  return data.venta || data;
+}
+
+// ==================== PAGOS DE COMISIONES ====================
+
+/**
+ * Representa un pago de comisión
+ */
+export interface PagoComision {
+  id: string;
+  comision_id: string;
+  venta_id: string;
+  monto: number;
+  moneda: string;
+  fecha_pago: string | null;
+  metodo_pago: string | null;
+  referencia: string | null;
+  notas: string | null;
+  created_at: string;
+  updated_at: string;
+}
+
+/**
+ * Obtiene los pagos de una venta
+ * @param tenantId - ID del tenant
+ * @param ventaId - ID de la venta
+ * @param token - Token de autenticación opcional
+ */
+export async function getPagosByVenta(tenantId: string, ventaId: string, token?: string | null): Promise<PagoComision[]> {
+  const response = await apiFetch(`/tenants/${tenantId}/ventas/${ventaId}/pagos`, {}, token);
+  const data = await response.json();
+  return data.pagos || data || [];
+}
+
+/**
+ * Crea un nuevo pago de comisión
+ * @param tenantId - ID del tenant
+ * @param ventaId - ID de la venta
+ * @param pago - Datos del pago
+ * @param token - Token de autenticación opcional
+ */
+export async function createPagoComision(
+  tenantId: string,
+  ventaId: string,
+  pago: Partial<PagoComision>,
+  token?: string | null
+): Promise<PagoComision> {
+  const response = await apiFetch(`/tenants/${tenantId}/ventas/${ventaId}/pagos`, {
+    method: 'POST',
+    body: JSON.stringify(pago),
+  }, token);
+  const data = await response.json();
+  return data.pago || data;
+}
+
+// ==================== EXPEDIENTE DE VENTAS ====================
+
+/**
+ * Representa un requerimiento de expediente
+ */
+export interface RequerimientoExpediente {
+  id: string;
+  codigo: string;
+  nombre: string;
+  descripcion: string | null;
+  tipo_archivo: string;
+  obligatorio: boolean;
+  orden: number;
+  tipo_operacion: string | null;
+  activo: boolean;
+}
+
+/**
+ * Representa un item de expediente subido
+ */
+export interface ItemExpediente {
+  id: string;
+  venta_id: string;
+  requerimiento_id: string;
+  archivo_url: string | null;
+  archivo_nombre: string | null;
+  archivo_tipo: string | null;
+  archivo_size: number | null;
+  estado: string;
+  notas: string | null;
+  fecha_subida: string | null;
+  subido_por_id: string | null;
+  created_at: string;
+  updated_at: string;
+}
+
+/**
+ * Obtiene los requerimientos de expediente para una venta
+ * @param tenantId - ID del tenant
+ * @param ventaId - ID de la venta
+ * @param token - Token de autenticación opcional
+ */
+export async function getRequerimientosExpediente(
+  tenantId: string,
+  ventaId: string,
+  token?: string | null
+): Promise<RequerimientoExpediente[]> {
+  const response = await apiFetch(`/tenants/${tenantId}/ventas/${ventaId}/expediente/requerimientos`, {}, token);
+  const data = await response.json();
+  return data.requerimientos || data || [];
+}
+
+/**
+ * Obtiene los items de expediente subidos para una venta
+ * @param tenantId - ID del tenant
+ * @param ventaId - ID de la venta
+ * @param token - Token de autenticación opcional
+ */
+export async function getItemsExpediente(
+  tenantId: string,
+  ventaId: string,
+  token?: string | null
+): Promise<ItemExpediente[]> {
+  const response = await apiFetch(`/tenants/${tenantId}/ventas/${ventaId}/expediente/items`, {}, token);
+  const data = await response.json();
+  return data.items || data || [];
+}
+
+/**
+ * Crea o actualiza un item de expediente
+ * @param tenantId - ID del tenant
+ * @param ventaId - ID de la venta
+ * @param item - Datos del item
+ * @param token - Token de autenticación opcional
+ */
+export async function upsertItemExpediente(
+  tenantId: string,
+  ventaId: string,
+  item: Partial<ItemExpediente>,
+  token?: string | null
+): Promise<ItemExpediente> {
+  const response = await apiFetch(`/tenants/${tenantId}/ventas/${ventaId}/expediente/items`, {
+    method: 'POST',
+    body: JSON.stringify(item),
+  }, token);
+  const data = await response.json();
+  return data.item || data;
+}
+
+// ==================== CONTENIDO - CATEGORÍAS ====================
+
+/**
+ * Representa una categoría de contenido
+ */
+export interface CategoriaContenido {
+  id: string;
+  nombre: string;
+  slug: string;
+  descripcion: string | null;
+  tipo: string;
+  color: string | null;
+  icono: string | null;
+  orden: number;
+  activo: boolean;
+}
+
+/**
+ * Obtiene las categorías de contenido de un tenant
+ * @param tenantId - ID del tenant
+ * @param tipo - Tipo de contenido (articulo, testimonio, faq, video)
+ * @param token - Token de autenticación opcional
+ */
+export async function getCategoriasContenido(
+  tenantId: string,
+  tipo?: string,
+  token?: string | null
+): Promise<CategoriaContenido[]> {
+  const params = tipo ? `?tipo=${tipo}` : '';
+  const response = await apiFetch(`/tenants/${tenantId}/contenido/categorias${params}`, {}, token);
+  const data = await response.json();
+  return data.categorias || data || [];
+}
+
+// ==================== CONTENIDO - TAGS GLOBALES ====================
+
+/**
+ * Representa un tag global
+ */
+export interface TagGlobal {
+  id: string;
+  nombre: string;
+  slug: string;
+  color: string | null;
+  activo: boolean;
+}
+
+/**
+ * Obtiene los tags globales de un tenant
+ * @param tenantId - ID del tenant
+ * @param filtros - Filtros opcionales (activo, etc.)
+ * @param token - Token de autenticación opcional
+ */
+export async function getTagsGlobales(
+  tenantId: string,
+  filtros?: { activo?: boolean } | null,
+  token?: string | null
+): Promise<TagGlobal[]> {
+  let url = `/tenants/${tenantId}/contenido/tags`;
+  if (filtros) {
+    const params = new URLSearchParams();
+    if (filtros.activo !== undefined) params.append('activo', String(filtros.activo));
+    if (params.toString()) url += `?${params.toString()}`;
+  }
+  const response = await apiFetch(url, {}, token);
+  const data = await response.json();
+  return data.tags || data || [];
+}
+
+/**
+ * Obtiene los tags asociados a un contenido
+ * @param tenantId - ID del tenant
+ * @param tipoContenido - Tipo de contenido (articulo, video, etc.)
+ * @param contenidoId - ID del contenido
+ * @param token - Token de autenticación opcional
+ */
+export async function getTagsDeContenido(
+  tenantId: string,
+  tipoContenido: string,
+  contenidoId: string,
+  token?: string | null
+): Promise<TagGlobal[]> {
+  const response = await apiFetch(`/tenants/${tenantId}/contenido/${tipoContenido}/${contenidoId}/tags`, {}, token);
+  const data = await response.json();
+  return data.tags || data || [];
+}
+
+// ==================== CONTENIDO - TESTIMONIOS ====================
+
+/**
+ * Representa un testimonio
+ */
+export interface Testimonio {
+  id: string;
+  tenant_id: string;
+  nombre_cliente: string;
+  cargo: string | null;
+  empresa: string | null;
+  contenido: string;
+  foto_url: string | null;
+  calificacion: number | null;
+  contacto_id: string | null;
+  propiedad_id: string | null;
+  usuario_id: string | null;
+  destacado: boolean;
+  activo: boolean;
+  slug: string;
+  idioma: string;
+  traducciones: Record<string, any>;
+  created_at: string;
+  updated_at: string;
+}
+
+/**
+ * Obtiene un testimonio por ID
+ * @param tenantId - ID del tenant
+ * @param testimonioId - ID del testimonio
+ * @param token - Token de autenticación opcional
+ */
+export async function getTestimonio(
+  tenantId: string,
+  testimonioId: string,
+  token?: string | null
+): Promise<Testimonio> {
+  const response = await apiFetch(`/tenants/${tenantId}/contenido/testimonios/${testimonioId}`, {}, token);
+  const data = await response.json();
+  return data.testimonio || data;
+}
+
+/**
+ * Crea un nuevo testimonio
+ * @param tenantId - ID del tenant
+ * @param testimonio - Datos del testimonio
+ * @param token - Token de autenticación opcional
+ */
+export async function createTestimonio(
+  tenantId: string,
+  testimonio: Partial<Testimonio>,
+  token?: string | null
+): Promise<Testimonio> {
+  const response = await apiFetch(`/tenants/${tenantId}/contenido/testimonios`, {
+    method: 'POST',
+    body: JSON.stringify(testimonio),
+  }, token);
+  const data = await response.json();
+  return data.testimonio || data;
+}
+
+/**
+ * Actualiza un testimonio existente
+ * @param tenantId - ID del tenant
+ * @param testimonioId - ID del testimonio
+ * @param testimonio - Datos a actualizar
+ * @param token - Token de autenticación opcional
+ */
+export async function updateTestimonio(
+  tenantId: string,
+  testimonioId: string,
+  testimonio: Partial<Testimonio>,
+  token?: string | null
+): Promise<Testimonio> {
+  const response = await apiFetch(`/tenants/${tenantId}/contenido/testimonios/${testimonioId}`, {
+    method: 'PUT',
+    body: JSON.stringify(testimonio),
+  }, token);
+  const data = await response.json();
+  return data.testimonio || data;
+}
+
+// ==================== CONTENIDO - ARTÍCULOS ====================
+
+/**
+ * Representa un artículo
+ */
+export interface Articulo {
+  id: string;
+  tenant_id: string;
+  titulo: string;
+  slug: string;
+  extracto: string | null;
+  contenido: string | null;
+  imagen_portada: string | null;
+  categoria_id: string | null;
+  autor_id: string | null;
+  fecha_publicacion: string | null;
+  publicado: boolean;
+  destacado: boolean;
+  idioma: string;
+  traducciones: Record<string, any>;
+  seo_title: string | null;
+  seo_description: string | null;
+  seo_keywords: string | null;
+  created_at: string;
+  updated_at: string;
+  // Relaciones
+  categoria?: CategoriaContenido | null;
+  autor?: UsuarioTenant | null;
+  tags?: TagGlobal[];
+  // Campos camelCase adicionales usados por el componente
+  categoriaId?: string | null;
+  imagenPrincipal?: string | null;
+  imagenes?: string[];
+  metaTitulo?: string | null;
+  metaDescripcion?: string | null;
+  fechaPublicacion?: string | null;
+}
+
+/**
+ * Obtiene un artículo por ID
+ * @param tenantId - ID del tenant
+ * @param articuloId - ID del artículo
+ * @param token - Token de autenticación opcional
+ */
+export async function getArticulo(
+  tenantId: string,
+  articuloId: string,
+  token?: string | null
+): Promise<Articulo> {
+  const response = await apiFetch(`/tenants/${tenantId}/contenido/articulos/${articuloId}`, {}, token);
+  const data = await response.json();
+  return data.articulo || data;
+}
+
+/**
+ * Crea un nuevo artículo
+ * @param tenantId - ID del tenant
+ * @param articulo - Datos del artículo
+ * @param token - Token de autenticación opcional
+ */
+export async function createArticulo(
+  tenantId: string,
+  articulo: Partial<Articulo>,
+  token?: string | null
+): Promise<Articulo> {
+  const response = await apiFetch(`/tenants/${tenantId}/contenido/articulos`, {
+    method: 'POST',
+    body: JSON.stringify(articulo),
+  }, token);
+  const data = await response.json();
+  return data.articulo || data;
+}
+
+/**
+ * Actualiza un artículo existente
+ * @param tenantId - ID del tenant
+ * @param articuloId - ID del artículo
+ * @param articulo - Datos a actualizar
+ * @param token - Token de autenticación opcional
+ */
+export async function updateArticulo(
+  tenantId: string,
+  articuloId: string,
+  articulo: Partial<Articulo>,
+  token?: string | null
+): Promise<Articulo> {
+  const response = await apiFetch(`/tenants/${tenantId}/contenido/articulos/${articuloId}`, {
+    method: 'PUT',
+    body: JSON.stringify(articulo),
+  }, token);
+  const data = await response.json();
+  return data.articulo || data;
+}
+
+// ==================== CONTENIDO - UPLOAD DE IMÁGENES ====================
+
+/**
+ * Sube una imagen para contenido
+ * @param tenantId - ID del tenant
+ * @param file - Archivo de imagen
+ * @param folder - Carpeta de destino
+ * @param token - Token de autenticación opcional
+ */
+export async function uploadContenidoImage(
+  tenantId: string,
+  file: File,
+  folder: string = 'contenido',
+  token?: string | null
+): Promise<{ url: string; key?: string }> {
+  const formData = new FormData();
+  formData.append('image', file);
+  formData.append('folder', folder);
+
+  const headers: Record<string, string> = {};
+  if (token) {
+    headers['Authorization'] = `Bearer ${token}`;
+  }
+
+  const response = await fetch(`${API_BASE_URL}/tenants/${tenantId}/upload/image`, {
+    method: 'POST',
+    headers,
+    body: formData,
+  });
+
+  if (!response.ok) {
+    const errorData = await response.json().catch(() => ({}));
+    throw new Error(errorData.error || `Error al subir imagen: ${response.status}`);
+  }
+
+  return response.json();
+}
+
+/**
+ * Crea una nueva categoría de contenido
+ * @param tenantId - ID del tenant
+ * @param categoria - Datos de la categoría
+ * @param token - Token de autenticación opcional
+ */
+export async function createCategoriaContenido(
+  tenantId: string,
+  categoria: Partial<CategoriaContenido>,
+  token?: string | null
+): Promise<CategoriaContenido> {
+  const response = await apiFetch(`/tenants/${tenantId}/contenido/categorias`, {
+    method: 'POST',
+    body: JSON.stringify(categoria),
+  }, token);
+  const data = await response.json();
+  return data.categoria || data;
+}
+
+/**
+ * Actualiza una categoría de contenido
+ * @param tenantId - ID del tenant
+ * @param categoriaId - ID de la categoría
+ * @param categoria - Datos a actualizar
+ * @param token - Token de autenticación opcional
+ */
+export async function updateCategoriaContenido(
+  tenantId: string,
+  categoriaId: string,
+  categoria: Partial<CategoriaContenido>,
+  token?: string | null
+): Promise<CategoriaContenido> {
+  const response = await apiFetch(`/tenants/${tenantId}/contenido/categorias/${categoriaId}`, {
+    method: 'PUT',
+    body: JSON.stringify(categoria),
+  }, token);
+  const data = await response.json();
+  return data.categoria || data;
+}
+
+/**
+ * Elimina una categoría de contenido
+ * @param tenantId - ID del tenant
+ * @param categoriaId - ID de la categoría
+ * @param token - Token de autenticación opcional
+ */
+export async function deleteCategoriaContenido(
+  tenantId: string,
+  categoriaId: string,
+  token?: string | null
+): Promise<void> {
+  await apiFetch(`/tenants/${tenantId}/contenido/categorias/${categoriaId}`, {
+    method: 'DELETE',
+  }, token);
+}
+
+// ==================== CONTENIDO - LISTAS ====================
+
+/**
+ * Obtiene la lista de artículos
+ * @param tenantId - ID del tenant
+ * @param token - Token de autenticación opcional
+ */
+export async function getArticulos(tenantId: string, token?: string | null): Promise<Articulo[]> {
+  const response = await apiFetch(`/tenants/${tenantId}/contenido/articulos`, {}, token);
+  const data = await response.json();
+  return data.articulos || data || [];
+}
+
+/**
+ * Elimina un artículo
+ * @param tenantId - ID del tenant
+ * @param articuloId - ID del artículo
+ * @param token - Token de autenticación opcional
+ */
+export async function deleteArticulo(tenantId: string, articuloId: string, token?: string | null): Promise<void> {
+  await apiFetch(`/tenants/${tenantId}/contenido/articulos/${articuloId}`, {
+    method: 'DELETE',
+  }, token);
+}
+
+/**
+ * Obtiene la lista de testimonios
+ * @param tenantId - ID del tenant
+ * @param token - Token de autenticación opcional
+ */
+export async function getTestimonios(tenantId: string, token?: string | null): Promise<Testimonio[]> {
+  const response = await apiFetch(`/tenants/${tenantId}/contenido/testimonios`, {}, token);
+  const data = await response.json();
+  return data.testimonios || data || [];
+}
+
+/**
+ * Elimina un testimonio
+ * @param tenantId - ID del tenant
+ * @param testimonioId - ID del testimonio
+ * @param token - Token de autenticación opcional
+ */
+export async function deleteTestimonio(tenantId: string, testimonioId: string, token?: string | null): Promise<void> {
+  await apiFetch(`/tenants/${tenantId}/contenido/testimonios/${testimonioId}`, {
+    method: 'DELETE',
+  }, token);
+}
+
+// ==================== CONTENIDO - VIDEOS ====================
+
+/**
+ * Representa un video
+ */
+export interface Video {
+  id: string;
+  tenant_id: string;
+  titulo: string;
+  slug: string;
+  descripcion: string | null;
+  url_video: string | null;
+  plataforma: string | null;
+  video_id: string | null;
+  thumbnail_url: string | null;
+  duracion: number | null;
+  categoria_id: string | null;
+  publicado: boolean;
+  destacado: boolean;
+  idioma: string;
+  traducciones: Record<string, any>;
+  created_at: string;
+  updated_at: string;
+}
+
+/**
+ * Obtiene la lista de videos
+ * @param tenantId - ID del tenant
+ * @param token - Token de autenticación opcional
+ */
+export async function getVideos(tenantId: string, token?: string | null): Promise<Video[]> {
+  const response = await apiFetch(`/tenants/${tenantId}/contenido/videos`, {}, token);
+  const data = await response.json();
+  return data.videos || data || [];
+}
+
+/**
+ * Obtiene un video por ID
+ * @param tenantId - ID del tenant
+ * @param videoId - ID del video
+ * @param token - Token de autenticación opcional
+ */
+export async function getVideo(tenantId: string, videoId: string, token?: string | null): Promise<Video> {
+  const response = await apiFetch(`/tenants/${tenantId}/contenido/videos/${videoId}`, {}, token);
+  const data = await response.json();
+  return data.video || data;
+}
+
+/**
+ * Crea un nuevo video
+ * @param tenantId - ID del tenant
+ * @param video - Datos del video
+ * @param token - Token de autenticación opcional
+ */
+export async function createVideo(tenantId: string, video: Partial<Video>, token?: string | null): Promise<Video> {
+  const response = await apiFetch(`/tenants/${tenantId}/contenido/videos`, {
+    method: 'POST',
+    body: JSON.stringify(video),
+  }, token);
+  const data = await response.json();
+  return data.video || data;
+}
+
+/**
+ * Actualiza un video
+ * @param tenantId - ID del tenant
+ * @param videoId - ID del video
+ * @param video - Datos a actualizar
+ * @param token - Token de autenticación opcional
+ */
+export async function updateVideo(tenantId: string, videoId: string, video: Partial<Video>, token?: string | null): Promise<Video> {
+  const response = await apiFetch(`/tenants/${tenantId}/contenido/videos/${videoId}`, {
+    method: 'PUT',
+    body: JSON.stringify(video),
+  }, token);
+  const data = await response.json();
+  return data.video || data;
+}
+
+/**
+ * Elimina un video
+ * @param tenantId - ID del tenant
+ * @param videoId - ID del video
+ * @param token - Token de autenticación opcional
+ */
+export async function deleteVideo(tenantId: string, videoId: string, token?: string | null): Promise<void> {
+  await apiFetch(`/tenants/${tenantId}/contenido/videos/${videoId}`, {
+    method: 'DELETE',
+  }, token);
+}
+
+// ==================== CONTENIDO - FAQs ====================
+
+/**
+ * Representa un FAQ
+ */
+export interface FAQ {
+  id: string;
+  tenant_id: string;
+  pregunta: string;
+  respuesta: string;
+  slug: string;
+  categoria_id: string | null;
+  orden: number;
+  publicado: boolean;
+  destacado: boolean;
+  idioma: string;
+  traducciones: Record<string, any>;
+  created_at: string;
+  updated_at: string;
+}
+
+/**
+ * Obtiene la lista de FAQs
+ * @param tenantId - ID del tenant
+ * @param token - Token de autenticación opcional
+ */
+export async function getFaqs(tenantId: string, token?: string | null): Promise<FAQ[]> {
+  const response = await apiFetch(`/tenants/${tenantId}/contenido/faqs`, {}, token);
+  const data = await response.json();
+  return data.faqs || data || [];
+}
+
+/**
+ * Obtiene un FAQ por ID
+ * @param tenantId - ID del tenant
+ * @param faqId - ID del FAQ
+ * @param token - Token de autenticación opcional
+ */
+export async function getFaq(tenantId: string, faqId: string, token?: string | null): Promise<FAQ> {
+  const response = await apiFetch(`/tenants/${tenantId}/contenido/faqs/${faqId}`, {}, token);
+  const data = await response.json();
+  return data.faq || data;
+}
+
+/**
+ * Crea un nuevo FAQ
+ * @param tenantId - ID del tenant
+ * @param faq - Datos del FAQ
+ * @param token - Token de autenticación opcional
+ */
+export async function createFaq(tenantId: string, faq: Partial<FAQ>, token?: string | null): Promise<FAQ> {
+  const response = await apiFetch(`/tenants/${tenantId}/contenido/faqs`, {
+    method: 'POST',
+    body: JSON.stringify(faq),
+  }, token);
+  const data = await response.json();
+  return data.faq || data;
+}
+
+/**
+ * Actualiza un FAQ
+ * @param tenantId - ID del tenant
+ * @param faqId - ID del FAQ
+ * @param faq - Datos a actualizar
+ * @param token - Token de autenticación opcional
+ */
+export async function updateFaq(tenantId: string, faqId: string, faq: Partial<FAQ>, token?: string | null): Promise<FAQ> {
+  const response = await apiFetch(`/tenants/${tenantId}/contenido/faqs/${faqId}`, {
+    method: 'PUT',
+    body: JSON.stringify(faq),
+  }, token);
+  const data = await response.json();
+  return data.faq || data;
+}
+
+/**
+ * Elimina un FAQ
+ * @param tenantId - ID del tenant
+ * @param faqId - ID del FAQ
+ * @param token - Token de autenticación opcional
+ */
+export async function deleteFaq(tenantId: string, faqId: string, token?: string | null): Promise<void> {
+  await apiFetch(`/tenants/${tenantId}/contenido/faqs/${faqId}`, {
+    method: 'DELETE',
+  }, token);
+}
+
+// ==================== CONTENIDO - SEO STATS ====================
+
+/**
+ * Representa un SEO Stat
+ */
+export interface SeoStat {
+  id: string;
+  tenant_id: string;
+  titulo: string;
+  valor: string;
+  descripcion: string | null;
+  icono: string | null;
+  orden: number;
+  publicado: boolean;
+  idioma: string;
+  traducciones: Record<string, any>;
+  created_at: string;
+  updated_at: string;
+}
+
+/**
+ * Obtiene la lista de SEO Stats
+ * @param tenantId - ID del tenant
+ * @param token - Token de autenticación opcional
+ */
+export async function getSeoStats(tenantId: string, token?: string | null): Promise<SeoStat[]> {
+  const response = await apiFetch(`/tenants/${tenantId}/contenido/seo-stats`, {}, token);
+  const data = await response.json();
+  return data.stats || data || [];
+}
+
+/**
+ * Obtiene un SEO Stat por ID
+ * @param tenantId - ID del tenant
+ * @param statId - ID del stat
+ * @param token - Token de autenticación opcional
+ */
+export async function getSeoStat(tenantId: string, statId: string, token?: string | null): Promise<SeoStat> {
+  const response = await apiFetch(`/tenants/${tenantId}/contenido/seo-stats/${statId}`, {}, token);
+  const data = await response.json();
+  return data.stat || data;
+}
+
+/**
+ * Crea un nuevo SEO Stat
+ * @param tenantId - ID del tenant
+ * @param stat - Datos del stat
+ * @param token - Token de autenticación opcional
+ */
+export async function createSeoStat(tenantId: string, stat: Partial<SeoStat>, token?: string | null): Promise<SeoStat> {
+  const response = await apiFetch(`/tenants/${tenantId}/contenido/seo-stats`, {
+    method: 'POST',
+    body: JSON.stringify(stat),
+  }, token);
+  const data = await response.json();
+  return data.stat || data;
+}
+
+/**
+ * Actualiza un SEO Stat
+ * @param tenantId - ID del tenant
+ * @param statId - ID del stat
+ * @param stat - Datos a actualizar
+ * @param token - Token de autenticación opcional
+ */
+export async function updateSeoStat(tenantId: string, statId: string, stat: Partial<SeoStat>, token?: string | null): Promise<SeoStat> {
+  const response = await apiFetch(`/tenants/${tenantId}/contenido/seo-stats/${statId}`, {
+    method: 'PUT',
+    body: JSON.stringify(stat),
+  }, token);
+  const data = await response.json();
+  return data.stat || data;
+}
+
+/**
+ * Elimina un SEO Stat
+ * @param tenantId - ID del tenant
+ * @param statId - ID del stat
+ * @param token - Token de autenticación opcional
+ */
+export async function deleteSeoStat(tenantId: string, statId: string, token?: string | null): Promise<void> {
+  await apiFetch(`/tenants/${tenantId}/contenido/seo-stats/${statId}`, {
+    method: 'DELETE',
+  }, token);
+}
+
+// ==================== CONTENIDO - RELACIONES ====================
+
+/**
+ * Representa una relación entre contenidos
+ */
+export interface ContenidoRelacion {
+  id: string;
+  tenant_id: string;
+  contenido_tipo: string;
+  contenido_id: string;
+  relacionado_tipo: string;
+  relacionado_id: string;
+  orden: number;
+  created_at: string;
+}
+
+/**
+ * Obtiene las relaciones de contenido
+ * @param tenantId - ID del tenant
+ * @param contenidoTipo - Tipo de contenido
+ * @param contenidoId - ID del contenido
+ * @param token - Token de autenticación opcional
+ */
+export async function getRelacionesContenido(
+  tenantId: string,
+  contenidoTipo?: string,
+  contenidoId?: string,
+  token?: string | null
+): Promise<ContenidoRelacion[]> {
+  let url = `/tenants/${tenantId}/contenido/relaciones`;
+  const params: string[] = [];
+  if (contenidoTipo) params.push(`tipo=${contenidoTipo}`);
+  if (contenidoId) params.push(`id=${contenidoId}`);
+  if (params.length > 0) url += `?${params.join('&')}`;
+
+  const response = await apiFetch(url, {}, token);
+  const data = await response.json();
+  return data.relaciones || data || [];
+}
+
+/**
+ * Crea una relación de contenido
+ * @param tenantId - ID del tenant
+ * @param relacion - Datos de la relación
+ * @param token - Token de autenticación opcional
+ */
+export async function createRelacionContenido(
+  tenantId: string,
+  relacion: Partial<ContenidoRelacion>,
+  token?: string | null
+): Promise<ContenidoRelacion> {
+  const response = await apiFetch(`/tenants/${tenantId}/contenido/relaciones`, {
+    method: 'POST',
+    body: JSON.stringify(relacion),
+  }, token);
+  const data = await response.json();
+  return data.relacion || data;
+}
+
+/**
+ * Elimina una relación de contenido
+ * @param tenantId - ID del tenant
+ * @param relacionId - ID de la relación
+ * @param token - Token de autenticación opcional
+ */
+export async function deleteRelacionContenido(
+  tenantId: string,
+  relacionId: string,
+  token?: string | null
+): Promise<void> {
+  await apiFetch(`/tenants/${tenantId}/contenido/relaciones/${relacionId}`, {
+    method: 'DELETE',
+  }, token);
+}
+
+// ==========================================
+// Roles de Tenant
+// ==========================================
+
+/**
+ * Interfaz de Rol de Tenant
+ */
+export interface RolTenant {
+  id: string;
+  codigo: string;
+  nombre: string;
+  descripcion: string | null;
+  color: string | null;
+  permisos: string[];
+  activo: boolean;
+  tenant_id: string;
+  created_at: string;
+  updated_at: string;
+}
+
+/**
+ * Obtiene los roles del tenant
+ * @param tenantId - ID del tenant
+ * @param token - Token de autenticación opcional
+ */
+export async function getRolesTenant(
+  tenantId: string,
+  token?: string | null
+): Promise<RolTenant[]> {
+  const response = await apiFetch(`/tenants/${tenantId}/roles`, {}, token);
+  const data = await response.json();
+  return data.roles || data || [];
+}
+
+// ==========================================
+// CRUD de Roles del Tenant
+// ==========================================
+
+/**
+ * Obtiene un rol específico del tenant
+ * @param tenantId - ID del tenant
+ * @param rolId - ID del rol
+ * @param token - Token de autenticación opcional
+ */
+export async function getRolTenant(
+  tenantId: string,
+  rolId: string,
+  token?: string | null
+): Promise<RolTenant> {
+  const response = await apiFetch(`/tenants/${tenantId}/roles/${rolId}`, {}, token);
+  const data = await response.json();
+  return data.rol || data;
+}
+
+/**
+ * Crea un nuevo rol en el tenant
+ * @param tenantId - ID del tenant
+ * @param rol - Datos del rol
+ * @param token - Token de autenticación opcional
+ */
+export async function createRolTenant(
+  tenantId: string,
+  rol: Partial<RolTenant>,
+  token?: string | null
+): Promise<RolTenant> {
+  const response = await apiFetch(`/tenants/${tenantId}/roles`, {
+    method: 'POST',
+    body: JSON.stringify(rol),
+  }, token);
+  const data = await response.json();
+  return data.rol || data;
+}
+
+/**
+ * Actualiza un rol del tenant
+ * @param tenantId - ID del tenant
+ * @param rolId - ID del rol
+ * @param rol - Datos a actualizar
+ * @param token - Token de autenticación opcional
+ */
+export async function updateRolTenant(
+  tenantId: string,
+  rolId: string,
+  rol: Partial<RolTenant>,
+  token?: string | null
+): Promise<RolTenant> {
+  const response = await apiFetch(`/tenants/${tenantId}/roles/${rolId}`, {
+    method: 'PUT',
+    body: JSON.stringify(rol),
+  }, token);
+  const data = await response.json();
+  return data.rol || data;
+}
+
+/**
+ * Elimina un rol del tenant
+ * @param tenantId - ID del tenant
+ * @param rolId - ID del rol
+ * @param token - Token de autenticación opcional
+ */
+export async function deleteRolTenant(
+  tenantId: string,
+  rolId: string,
+  token?: string | null
+): Promise<void> {
+  await apiFetch(`/tenants/${tenantId}/roles/${rolId}`, {
+    method: 'DELETE',
+  }, token);
+}
+
+/**
+ * Obtiene el conteo de usuarios por rol
+ * @param tenantId - ID del tenant
+ * @param token - Token de autenticación opcional
+ */
+export async function getUsuariosCountByRol(
+  tenantId: string,
+  token?: string | null
+): Promise<Record<string, number>> {
+  const response = await apiFetch(`/tenants/${tenantId}/roles/usuarios-count`, {}, token);
+  const data = await response.json();
+  return data.counts || data || {};
+}
+
+// ==========================================
+// CRUD de Usuarios del Tenant
+// ==========================================
+
+/**
+ * Obtiene un usuario específico del tenant
+ * @param tenantId - ID del tenant
+ * @param userId - ID del usuario
+ * @param token - Token de autenticación opcional
+ */
+export async function getUsuarioTenant(
+  tenantId: string,
+  userId: string,
+  token?: string | null
+): Promise<UsuarioTenant> {
+  const response = await apiFetch(`/tenants/${tenantId}/usuarios/${userId}`, {}, token);
+  const data = await response.json();
+  return data.usuario || data;
+}
+
+/**
+ * Crea un nuevo usuario en el tenant
+ * @param tenantId - ID del tenant
+ * @param usuario - Datos del usuario
+ * @param token - Token de autenticación opcional
+ */
+export async function createUsuarioTenant(
+  tenantId: string,
+  usuario: Partial<UsuarioTenant> & { roleIds?: string[] },
+  token?: string | null
+): Promise<UsuarioTenant> {
+  const response = await apiFetch(`/tenants/${tenantId}/usuarios`, {
+    method: 'POST',
+    body: JSON.stringify(usuario),
+  }, token);
+  const data = await response.json();
+  return data.usuario || data;
+}
+
+/**
+ * Actualiza un usuario del tenant
+ * @param tenantId - ID del tenant
+ * @param userId - ID del usuario
+ * @param usuario - Datos a actualizar
+ * @param token - Token de autenticación opcional
+ */
+export async function updateUsuarioTenant(
+  tenantId: string,
+  userId: string,
+  usuario: Partial<UsuarioTenant> & { roleIds?: string[] },
+  token?: string | null
+): Promise<UsuarioTenant> {
+  const response = await apiFetch(`/tenants/${tenantId}/usuarios/${userId}`, {
+    method: 'PUT',
+    body: JSON.stringify(usuario),
+  }, token);
+  const data = await response.json();
+  return data.usuario || data;
+}
+
+/**
+ * Elimina un usuario del tenant
+ * @param tenantId - ID del tenant
+ * @param userId - ID del usuario
+ * @param token - Token de autenticación opcional
+ */
+export async function deleteUsuarioTenant(
+  tenantId: string,
+  userId: string,
+  token?: string | null
+): Promise<void> {
+  await apiFetch(`/tenants/${tenantId}/usuarios/${userId}`, {
+    method: 'DELETE',
+  }, token);
+}
+
+// ==========================================
+// Documentos de Usuario
+// ==========================================
+
+/**
+ * Interfaz para documentos de usuario
+ */
+export interface UsuarioDocumento {
+  id: string;
+  usuario_id: string;
+  tipo: string;
+  nombre: string;
+  archivo_url: string;
+  archivo_nombre: string;
+  archivo_tipo: string;
+  archivo_size: number;
+  fecha_vencimiento: string | null;
+  notas: string | null;
+  verificado: boolean;
+  verificado_por: string | null;
+  fecha_verificacion: string | null;
+  tenant_id: string;
+  created_at: string;
+  updated_at: string;
+}
+
+/**
+ * Obtiene los documentos de un usuario
+ * @param tenantId - ID del tenant
+ * @param userId - ID del usuario
+ * @param token - Token de autenticación opcional
+ */
+export async function getDocumentosUsuario(
+  tenantId: string,
+  userId: string,
+  token?: string | null
+): Promise<UsuarioDocumento[]> {
+  const response = await apiFetch(`/tenants/${tenantId}/usuarios/${userId}/documentos`, {}, token);
+  const data = await response.json();
+  return data.documentos || data || [];
+}
+
+/**
+ * Crea un documento de usuario
+ * @param tenantId - ID del tenant
+ * @param userId - ID del usuario
+ * @param documento - Datos del documento
+ * @param token - Token de autenticación opcional
+ */
+export async function crearDocumentoUsuario(
+  tenantId: string,
+  userId: string,
+  documento: Partial<UsuarioDocumento>,
+  token?: string | null
+): Promise<UsuarioDocumento> {
+  const response = await apiFetch(`/tenants/${tenantId}/usuarios/${userId}/documentos`, {
+    method: 'POST',
+    body: JSON.stringify(documento),
+  }, token);
+  const data = await response.json();
+  return data.documento || data;
+}
+
+/**
+ * Elimina un documento de usuario
+ * @param tenantId - ID del tenant
+ * @param userId - ID del usuario
+ * @param documentoId - ID del documento
+ * @param token - Token de autenticación opcional
+ */
+export async function eliminarDocumentoUsuario(
+  tenantId: string,
+  userId: string,
+  documentoId: string,
+  token?: string | null
+): Promise<void> {
+  await apiFetch(`/tenants/${tenantId}/usuarios/${userId}/documentos/${documentoId}`, {
+    method: 'DELETE',
+  }, token);
+}
+
+// ==========================================
+// Join Requests (Solicitudes de CLIC Connect)
+// ==========================================
+
+/**
+ * Interfaz para usuario que revisó la solicitud
+ */
+export interface JoinRequestRevisor {
+  id: string;
+  email: string;
+  nombre: string | null;
+  apellido: string | null;
+}
+
+/**
+ * Interfaz para usuario que refirió la solicitud
+ */
+export interface JoinRequestReferidor {
+  id: string;
+  email: string;
+  nombre: string | null;
+  apellido: string | null;
+}
+
+/**
+ * Interfaz para solicitudes de unirse a CLIC Connect
+ */
+export interface JoinRequest {
+  id: string;
+  tenant_id: string;
+  nombre: string;
+  apellido: string;
+  email: string;
+  telefono: string | null;
+  empresa: string | null;
+  mensaje: string | null;
+  estado: 'pendiente' | 'aprobado' | 'rechazado' | 'pending' | 'approved' | 'rejected';
+  notas_revision: string | null;
+  revisado_por: string | null;
+  fecha_revision: string | null;
+  created_at: string;
+  updated_at: string;
+  // Campos adicionales (camelCase desde el API)
+  createdAt: string;
+  anosExperiencia: number | null;
+  especializacion: string | null;
+  agenciaActual: string | null;
+  motivacion: string | null;
+  referidor: JoinRequestReferidor | null;
+  notasRevision: string | null;
+  revisor: JoinRequestRevisor | null;
+  revisadoAt: string | null;
+}
+
+/**
+ * Obtiene las solicitudes de unirse a CLIC Connect
+ * @param tenantId - ID del tenant
+ * @param estado - Filtro por estado (opcional)
+ * @param token - Token de autenticación opcional
+ */
+export async function getJoinRequests(
+  tenantId: string,
+  estado?: string,
+  token?: string | null
+): Promise<JoinRequest[]> {
+  let url = `/tenants/${tenantId}/join-requests`;
+  if (estado) url += `?estado=${estado}`;
+  const response = await apiFetch(url, {}, token);
+  const data = await response.json();
+  return data.solicitudes || data || [];
+}
+
+/**
+ * Aprueba una solicitud de unirse a CLIC Connect
+ * @param tenantId - ID del tenant
+ * @param requestId - ID de la solicitud
+ * @param notas - Notas de aprobación (opcional)
+ * @param token - Token de autenticación opcional
+ */
+export async function approveJoinRequest(
+  tenantId: string,
+  requestId: string,
+  notas?: string,
+  token?: string | null
+): Promise<void> {
+  await apiFetch(`/tenants/${tenantId}/join-requests/${requestId}/approve`, {
+    method: 'POST',
+    body: JSON.stringify({ notas }),
+  }, token);
+}
+
+/**
+ * Rechaza una solicitud de unirse a CLIC Connect
+ * @param tenantId - ID del tenant
+ * @param requestId - ID de la solicitud
+ * @param notas - Notas de rechazo (opcional)
+ * @param token - Token de autenticación opcional
+ */
+export async function rejectJoinRequest(
+  tenantId: string,
+  requestId: string,
+  notas?: string,
+  token?: string | null
+): Promise<void> {
+  await apiFetch(`/tenants/${tenantId}/join-requests/${requestId}/reject`, {
+    method: 'POST',
+    body: JSON.stringify({ notas }),
+  }, token);
+}
+
+// ==========================================
+// Info Negocio
+// ==========================================
+
+/**
+ * Interfaz de Info Negocio
+ */
+export interface InfoNegocio {
+  id: string;
+  tenant_id: string;
+  nombre: string;
+  nombre_traducciones: Record<string, string> | null;
+  slogan: string | null;
+  slogan_traducciones: Record<string, string> | null;
+  descripcion: string | null;
+  descripcion_traducciones: Record<string, string> | null;
+  logo_url: string | null;
+  isotipo_url: string | null;
+  favicon_url: string | null;
+  telefono_principal: string | null;
+  telefono_secundario: string | null;
+  whatsapp: string | null;
+  email_principal: string | null;
+  email_ventas: string | null;
+  email_soporte: string | null;
+  direccion: string | null;
+  ciudad: string | null;
+  estado_provincia: string | null;
+  pais: string | null;
+  codigo_postal: string | null;
+  latitud: number | null;
+  longitud: number | null;
+  horario_lunes_viernes: string | null;
+  horario_sabado: string | null;
+  horario_domingo: string | null;
+  zona_horaria: string | null;
+  facebook_url: string | null;
+  instagram_url: string | null;
+  twitter_url: string | null;
+  linkedin_url: string | null;
+  youtube_url: string | null;
+  tiktok_url: string | null;
+  rnc: string | null;
+  razon_social: string | null;
+  tipo_empresa: string | null;
+  ceo_nombre: string | null;
+  ceo_cargo: string | null;
+  ceo_foto_url: string | null;
+  ceo_bio: string | null;
+  ceo_bio_traducciones: Record<string, string> | null;
+  created_at: string;
+  updated_at: string;
+}
+
+/**
+ * Obtiene la información del negocio
+ * @param tenantId - ID del tenant
+ * @param token - Token de autenticación opcional
+ */
+export async function getInfoNegocio(
+  tenantId: string,
+  token?: string | null
+): Promise<InfoNegocio> {
+  const response = await apiFetch(`/tenants/${tenantId}/info-negocio`, {}, token);
+  const data = await response.json();
+  return data.infoNegocio || data;
+}
+
+/**
+ * Actualiza parcialmente la información del negocio
+ * @param tenantId - ID del tenant
+ * @param updates - Campos a actualizar
+ * @param token - Token de autenticación opcional
+ */
+export async function patchInfoNegocio(
+  tenantId: string,
+  updates: Partial<InfoNegocio>,
+  token?: string | null
+): Promise<InfoNegocio> {
+  const response = await apiFetch(`/tenants/${tenantId}/info-negocio`, {
+    method: 'PATCH',
+    body: JSON.stringify(updates),
+  }, token);
+  const data = await response.json();
+  return data.infoNegocio || data;
+}
+
+// ==========================================
+// Sistema de Fases
+// ==========================================
+
+/**
+ * Interfaz de Proyecto del Sistema de Fases
+ */
+export interface SistemaFasesProyecto {
+  id: string;
+  tenant_id: string;
+  nombre: string;
+  descripcion: string | null;
+  activo: boolean;
+  created_at: string;
+  updated_at: string;
+}
+
+/**
+ * Interfaz de Asesor del Sistema de Fases
+ */
+export interface SistemaFasesAsesor {
+  id: string;
+  tenant_id: string;
+  usuario_id: string;
+  proyecto_id: string;
+  fase_actual: number;
+  leads_asignados: number;
+  leads_convertidos: number;
+  puntos_prestige: number;
+  puntos_ultra: number;
+  activo: boolean;
+  created_at: string;
+  updated_at: string;
+  usuario?: UsuarioTenant;
+}
+
+/**
+ * Interfaz de Lead del Sistema de Fases
+ */
+export interface SistemaFasesLead {
+  id: string;
+  tenant_id: string;
+  proyecto_id: string;
+  asesor_id: string;
+  contacto_id: string;
+  estado: string;
+  fecha_asignacion: string;
+  fecha_conversion: string | null;
+  notas: string | null;
+  created_at: string;
+  updated_at: string;
+  contacto?: Contacto;
+}
+
+/**
+ * Obtiene los proyectos del sistema de fases
+ * @param tenantId - ID del tenant
+ * @param token - Token de autenticación opcional
+ */
+export async function getSistemaFasesProyectos(
+  tenantId: string,
+  token?: string | null
+): Promise<SistemaFasesProyecto[]> {
+  const response = await apiFetch(`/tenants/${tenantId}/sistema-fases/proyectos`, {}, token);
+  const data = await response.json();
+  return data.proyectos || data || [];
+}
+
+/**
+ * Obtiene los asesores del sistema de fases
+ * @param tenantId - ID del tenant
+ * @param proyectoId - ID del proyecto (opcional)
+ * @param token - Token de autenticación opcional
+ */
+export async function getSistemaFasesAsesores(
+  tenantId: string,
+  proyectoId?: string,
+  token?: string | null
+): Promise<SistemaFasesAsesor[]> {
+  let url = `/tenants/${tenantId}/sistema-fases/asesores`;
+  if (proyectoId) url += `?proyectoId=${proyectoId}`;
+  const response = await apiFetch(url, {}, token);
+  const data = await response.json();
+  return data.asesores || data || [];
+}
+
+/**
+ * Obtiene los leads del sistema de fases
+ * @param tenantId - ID del tenant
+ * @param asesorId - ID del asesor (opcional)
+ * @param proyectoId - ID del proyecto (opcional)
+ * @param token - Token de autenticación opcional
+ */
+export async function getSistemaFasesLeads(
+  tenantId: string,
+  asesorId?: string,
+  proyectoId?: string,
+  token?: string | null
+): Promise<SistemaFasesLead[]> {
+  let url = `/tenants/${tenantId}/sistema-fases/leads`;
+  const params: string[] = [];
+  if (asesorId) params.push(`asesorId=${asesorId}`);
+  if (proyectoId) params.push(`proyectoId=${proyectoId}`);
+  if (params.length > 0) url += `?${params.join('&')}`;
+  const response = await apiFetch(url, {}, token);
+  const data = await response.json();
+  return data.leads || data || [];
+}
+
+/**
+ * Crea un proyecto del sistema de fases
+ * @param tenantId - ID del tenant
+ * @param proyecto - Datos del proyecto
+ * @param token - Token de autenticación opcional
+ */
+export async function createSistemaFasesProyecto(
+  tenantId: string,
+  proyecto: Partial<SistemaFasesProyecto>,
+  token?: string | null
+): Promise<SistemaFasesProyecto> {
+  const response = await apiFetch(`/tenants/${tenantId}/sistema-fases/proyectos`, {
+    method: 'POST',
+    body: JSON.stringify(proyecto),
+  }, token);
+  const data = await response.json();
+  return data.proyecto || data;
+}
+
+/**
+ * Actualiza un proyecto del sistema de fases
+ * @param tenantId - ID del tenant
+ * @param proyectoId - ID del proyecto
+ * @param proyecto - Datos a actualizar
+ * @param token - Token de autenticación opcional
+ */
+export async function updateSistemaFasesProyecto(
+  tenantId: string,
+  proyectoId: string,
+  proyecto: Partial<SistemaFasesProyecto>,
+  token?: string | null
+): Promise<SistemaFasesProyecto> {
+  const response = await apiFetch(`/tenants/${tenantId}/sistema-fases/proyectos/${proyectoId}`, {
+    method: 'PUT',
+    body: JSON.stringify(proyecto),
+  }, token);
+  const data = await response.json();
+  return data.proyecto || data;
+}
+
+/**
+ * Elimina un proyecto del sistema de fases
+ * @param tenantId - ID del tenant
+ * @param proyectoId - ID del proyecto
+ * @param token - Token de autenticación opcional
+ */
+export async function deleteSistemaFasesProyecto(
+  tenantId: string,
+  proyectoId: string,
+  token?: string | null
+): Promise<void> {
+  await apiFetch(`/tenants/${tenantId}/sistema-fases/proyectos/${proyectoId}`, {
+    method: 'DELETE',
+  }, token);
+}
+
+/**
+ * Agrega un asesor al sistema de fases
+ * @param tenantId - ID del tenant
+ * @param proyectoId - ID del proyecto
+ * @param usuarioId - ID del usuario
+ * @param token - Token de autenticación opcional
+ */
+export async function agregarAsesorSistemaFases(
+  tenantId: string,
+  proyectoId: string,
+  usuarioId: string,
+  token?: string | null
+): Promise<SistemaFasesAsesor> {
+  const response = await apiFetch(`/tenants/${tenantId}/sistema-fases/asesores`, {
+    method: 'POST',
+    body: JSON.stringify({ proyectoId, usuarioId }),
+  }, token);
+  const data = await response.json();
+  return data.asesor || data;
+}
+
+/**
+ * Obtiene estadísticas del sistema de fases
+ * @param tenantId - ID del tenant
+ * @param proyectoId - ID del proyecto (opcional)
+ * @param token - Token de autenticación opcional
+ */
+export async function getSistemaFasesEstadisticas(
+  tenantId: string,
+  proyectoId?: string,
+  token?: string | null
+): Promise<any> {
+  let url = `/tenants/${tenantId}/sistema-fases/estadisticas`;
+  if (proyectoId) url += `?proyectoId=${proyectoId}`;
+  const response = await apiFetch(url, {}, token);
+  const data = await response.json();
+  return data;
+}
+
+// ==========================================
+// Oficinas
+// ==========================================
+
+/**
+ * Interfaz de Oficina
+ */
+export interface Oficina {
+  id: string;
+  tenant_id: string;
+  nombre: string;
+  codigo: string;
+  direccion: string | null;
+  ciudad: string | null;
+  provincia: string | null;
+  pais: string | null;
+  codigo_postal: string | null;
+  telefono: string | null;
+  email: string | null;
+  zona_trabajo: string | null;
+  administrador_id: string | null;
+  activo: boolean;
+  created_at: string;
+  updated_at: string;
+  administrador?: UsuarioTenant;
+}
+
+/**
+ * Obtiene las oficinas del tenant
+ * @param tenantId - ID del tenant
+ * @param token - Token de autenticación opcional
+ */
+export async function getOficinas(
+  tenantId: string,
+  token?: string | null
+): Promise<Oficina[]> {
+  const response = await apiFetch(`/tenants/${tenantId}/oficinas`, {}, token);
+  const data = await response.json();
+  return data.oficinas || data || [];
+}
+
+/**
+ * Crea una nueva oficina
+ * @param tenantId - ID del tenant
+ * @param oficina - Datos de la oficina
+ * @param token - Token de autenticación opcional
+ */
+export async function createOficina(
+  tenantId: string,
+  oficina: Partial<Oficina>,
+  token?: string | null
+): Promise<Oficina> {
+  const response = await apiFetch(`/tenants/${tenantId}/oficinas`, {
+    method: 'POST',
+    body: JSON.stringify(oficina),
+  }, token);
+  const data = await response.json();
+  return data.oficina || data;
+}
+
+/**
+ * Actualiza una oficina
+ * @param tenantId - ID del tenant
+ * @param oficinaId - ID de la oficina
+ * @param oficina - Datos a actualizar
+ * @param token - Token de autenticación opcional
+ */
+export async function updateOficina(
+  tenantId: string,
+  oficinaId: string,
+  oficina: Partial<Oficina>,
+  token?: string | null
+): Promise<Oficina> {
+  const response = await apiFetch(`/tenants/${tenantId}/oficinas/${oficinaId}`, {
+    method: 'PUT',
+    body: JSON.stringify(oficina),
+  }, token);
+  const data = await response.json();
+  return data.oficina || data;
+}
+
+/**
+ * Elimina una oficina
+ * @param tenantId - ID del tenant
+ * @param oficinaId - ID de la oficina
+ * @param token - Token de autenticación opcional
+ */
+export async function deleteOficina(
+  tenantId: string,
+  oficinaId: string,
+  token?: string | null
+): Promise<void> {
+  await apiFetch(`/tenants/${tenantId}/oficinas/${oficinaId}`, {
+    method: 'DELETE',
+  }, token);
+}
+
+// ==========================================
+// Equipos
+// ==========================================
+
+/**
+ * Interfaz de Equipo
+ */
+export interface Equipo {
+  id: string;
+  tenant_id: string;
+  nombre: string;
+  descripcion: string | null;
+  color: string | null;
+  lider_id: string | null;
+  asistente_id: string | null;
+  oficina_id: string | null;
+  activo: boolean;
+  created_at: string;
+  updated_at: string;
+  lider?: UsuarioTenant;
+  asistente?: UsuarioTenant;
+  oficina?: Oficina;
+}
+
+/**
+ * Obtiene los equipos del tenant
+ * @param tenantId - ID del tenant
+ * @param token - Token de autenticación opcional
+ */
+export async function getEquipos(
+  tenantId: string,
+  token?: string | null
+): Promise<Equipo[]> {
+  const response = await apiFetch(`/tenants/${tenantId}/equipos`, {}, token);
+  const data = await response.json();
+  return data.equipos || data || [];
+}
+
+/**
+ * Crea un nuevo equipo
+ * @param tenantId - ID del tenant
+ * @param equipo - Datos del equipo
+ * @param token - Token de autenticación opcional
+ */
+export async function createEquipo(
+  tenantId: string,
+  equipo: Partial<Equipo>,
+  token?: string | null
+): Promise<Equipo> {
+  const response = await apiFetch(`/tenants/${tenantId}/equipos`, {
+    method: 'POST',
+    body: JSON.stringify(equipo),
+  }, token);
+  const data = await response.json();
+  return data.equipo || data;
+}
+
+/**
+ * Actualiza un equipo
+ * @param tenantId - ID del tenant
+ * @param equipoId - ID del equipo
+ * @param equipo - Datos a actualizar
+ * @param token - Token de autenticación opcional
+ */
+export async function updateEquipo(
+  tenantId: string,
+  equipoId: string,
+  equipo: Partial<Equipo>,
+  token?: string | null
+): Promise<Equipo> {
+  const response = await apiFetch(`/tenants/${tenantId}/equipos/${equipoId}`, {
+    method: 'PUT',
+    body: JSON.stringify(equipo),
+  }, token);
+  const data = await response.json();
+  return data.equipo || data;
+}
+
+/**
+ * Elimina un equipo
+ * @param tenantId - ID del tenant
+ * @param equipoId - ID del equipo
+ * @param token - Token de autenticación opcional
+ */
+export async function deleteEquipo(
+  tenantId: string,
+  equipoId: string,
+  token?: string | null
+): Promise<void> {
+  await apiFetch(`/tenants/${tenantId}/equipos/${equipoId}`, {
+    method: 'DELETE',
+  }, token);
+}
+
+// ==========================================
+// Amenidades
+// ==========================================
+
+/**
+ * Interfaz de Amenidad
+ */
+export interface Amenidad {
+  id: string;
+  tenant_id: string | null;
+  nombre: string;
+  nombre_traducciones: Record<string, string> | null;
+  icono: string | null;
+  categoria: string;
+  activo: boolean;
+  es_global: boolean;
+  created_at: string;
+  updated_at: string;
+}
+
+/**
+ * Interfaz de Categoría de Amenidad
+ */
+export interface CategoriaAmenidad {
+  codigo: string;
+  nombre: string;
+}
+
+/**
+ * Obtiene las amenidades del tenant
+ * @param tenantId - ID del tenant
+ * @param incluirInactivas - Si incluir las inactivas
+ * @param token - Token de autenticación opcional
+ */
+export async function getAmenidadesTenant(
+  tenantId: string,
+  incluirInactivas = false,
+  token?: string | null
+): Promise<Amenidad[]> {
+  let url = `/tenants/${tenantId}/amenidades`;
+  if (incluirInactivas) url += '?incluirInactivas=true';
+  const response = await apiFetch(url, {}, token);
+  const data = await response.json();
+  return data.amenidades || data || [];
+}
+
+/**
+ * Actualiza una amenidad del tenant
+ * @param tenantId - ID del tenant
+ * @param amenidadId - ID de la amenidad
+ * @param amenidad - Datos a actualizar
+ * @param token - Token de autenticación opcional
+ */
+export async function updateAmenidadTenant(
+  tenantId: string,
+  amenidadId: string,
+  amenidad: Partial<Amenidad>,
+  token?: string | null
+): Promise<Amenidad> {
+  const response = await apiFetch(`/tenants/${tenantId}/amenidades/${amenidadId}`, {
+    method: 'PUT',
+    body: JSON.stringify(amenidad),
+  }, token);
+  const data = await response.json();
+  return data.amenidad || data;
+}
+
+/**
+ * Elimina una amenidad del tenant
+ * @param tenantId - ID del tenant
+ * @param amenidadId - ID de la amenidad
+ * @param token - Token de autenticación opcional
+ */
+export async function deleteAmenidadTenant(
+  tenantId: string,
+  amenidadId: string,
+  token?: string | null
+): Promise<void> {
+  await apiFetch(`/tenants/${tenantId}/amenidades/${amenidadId}`, {
+    method: 'DELETE',
+  }, token);
+}
+

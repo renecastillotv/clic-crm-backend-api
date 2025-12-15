@@ -1,0 +1,233 @@
+---
+/**
+ * VideoDetailClic.astro
+ * Componente para mostrar un video individual con embed
+ */
+
+import type { ComponenteDataEstructurado } from '../../types/componentesEstructurado';
+
+interface Props {
+  datos: ComponenteDataEstructurado;
+  tema?: Record<string, string>;
+  baseUrl?: string;
+}
+
+const { datos, tema = {}, baseUrl = '' } = Astro.props;
+
+const staticData = datos?.static_data || {};
+const dynamicData = datos?.dynamic_data || {};
+const styles = datos?.styles || {};
+const toggles = datos?.toggles || {};
+
+// Obtener datos del video (puede venir de video, datos.video, o de resolved)
+// El routeResolver inyecta el video en datos.video
+const video = datos?.video || (dynamicData?.resolved && Array.isArray(dynamicData.resolved) && dynamicData.resolved.length > 0 ? dynamicData.resolved[0] : null);
+
+// Debug
+console.log('🎥 VideoDetailClic - Datos recibidos:', {
+  tieneDatos: !!datos,
+  tieneVideo: !!datos?.video,
+  tieneDynamicData: !!dynamicData,
+  tieneResolved: !!dynamicData?.resolved,
+  resolvedLength: Array.isArray(dynamicData?.resolved) ? dynamicData.resolved.length : 0,
+  video: video,
+  datosKeys: datos ? Object.keys(datos) : [],
+});
+
+// Función para extraer ID de YouTube
+function extractYouTubeId(url: string): string {
+  if (!url) return '';
+  const regExp = /^.*(youtu.be\/|v\/|u\/\w\/|embed\/|watch\?v=|&v=)([^#&?]*).*/;
+  const match = url.match(regExp);
+  return (match && match[2].length === 11) ? match[2] : '';
+}
+
+// Si no hay video, mostrar mensaje
+const hasVideo = !!video;
+
+// Generar embed URL solo si hay video
+const videoUrl = hasVideo ? (video.url_video || video.url || '') : '';
+const youtubeId = hasVideo ? extractYouTubeId(videoUrl) : '';
+const embedUrl = hasVideo ? (youtubeId ? `https://www.youtube.com/embed/${youtubeId}` : videoUrl) : '';
+
+const title = hasVideo ? (video.title || video.titulo || 'Video') : 'Video no encontrado';
+const description = hasVideo ? (video.description || video.descripcion || '') : '';
+const views = hasVideo ? (video.views || video.vistas || 0) : 0;
+const duration = hasVideo ? (video.duration || video.duracion || '') : '';
+const categoriaNombre = hasVideo ? (video.categoria_nombre || 'General') : 'General';
+const categoriaSlug = hasVideo ? (video.categoria_slug || 'general') : 'general';
+---
+
+{!hasVideo ? (
+  <section class="video-detail-clic">
+    <div class="video-detail-container">
+      <p>No se encontró información del video.</p>
+    </div>
+  </section>
+) : (
+
+<section 
+  class="video-detail-clic"
+  style={`
+    padding: ${styles.spacing?.padding || '2rem 1rem'};
+    background: ${styles.colors?.background || '#ffffff'};
+  `}
+>
+  <div class="video-detail-container">
+    <!-- Video Embed -->
+    <div class="video-embed-wrapper">
+      <iframe
+        src={embedUrl}
+        title={title}
+        frameborder="0"
+        allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
+        allowfullscreen
+        class="video-embed"
+      ></iframe>
+    </div>
+
+    <!-- Video Info -->
+    <div class="video-info">
+      <div class="video-header">
+        <div class="video-meta">
+          <span class="video-category">{categoriaNombre}</span>
+          {views > 0 && (
+            <span class="video-views">{views.toLocaleString()} vistas</span>
+          )}
+          {duration && (
+            <span class="video-duration">{duration}</span>
+          )}
+        </div>
+        <h1 class="video-title" style={`color: ${tema.text || '#1a202c'};`}>
+          {title}
+        </h1>
+      </div>
+
+      {description && (
+        <div class="video-description">
+          <p>{description}</p>
+        </div>
+      )}
+
+      <!-- Related Videos o acciones -->
+      <div class="video-actions">
+        <a 
+          href={`${baseUrl}/videos/${categoriaSlug}`}
+          class="back-link"
+        >
+          ← Volver a {categoriaNombre}
+        </a>
+      </div>
+    </div>
+  </div>
+</section>
+)}
+
+<style>
+  .video-detail-clic {
+    width: 100%;
+    max-width: 1200px;
+    margin: 0 auto;
+  }
+
+  .video-detail-container {
+    display: flex;
+    flex-direction: column;
+    gap: 2rem;
+  }
+
+  .video-embed-wrapper {
+    position: relative;
+    width: 100%;
+    padding-bottom: 56.25%; /* 16:9 aspect ratio */
+    height: 0;
+    overflow: hidden;
+    background: #000;
+    border-radius: 8px;
+  }
+
+  .video-embed {
+    position: absolute;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    border: none;
+  }
+
+  .video-info {
+    padding: 0 1rem;
+  }
+
+  .video-header {
+    margin-bottom: 1.5rem;
+  }
+
+  .video-meta {
+    display: flex;
+    gap: 1rem;
+    align-items: center;
+    margin-bottom: 1rem;
+    flex-wrap: wrap;
+  }
+
+  .video-category {
+    background: #667eea;
+    color: white;
+    padding: 0.25rem 0.75rem;
+    border-radius: 20px;
+    font-size: 0.875rem;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+  }
+
+  .video-views,
+  .video-duration {
+    color: #718096;
+    font-size: 0.875rem;
+  }
+
+  .video-title {
+    font-size: 2rem;
+    font-weight: 700;
+    line-height: 1.2;
+    margin: 0;
+  }
+
+  @media (min-width: 768px) {
+    .video-title {
+      font-size: 2.5rem;
+    }
+  }
+
+  .video-description {
+    margin-bottom: 1.5rem;
+  }
+
+  .video-description p {
+    font-size: 1.125rem;
+    line-height: 1.7;
+    color: #4a5568;
+    margin: 0;
+  }
+
+  .video-actions {
+    padding-top: 1.5rem;
+    border-top: 1px solid #e2e8f0;
+  }
+
+  .back-link {
+    display: inline-flex;
+    align-items: center;
+    color: #667eea;
+    text-decoration: none;
+    font-weight: 500;
+    transition: color 0.2s;
+  }
+
+  .back-link:hover {
+    color: #764ba2;
+  }
+</style>
+

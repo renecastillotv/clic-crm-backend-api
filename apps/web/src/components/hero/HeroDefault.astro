@@ -1,0 +1,439 @@
+---
+/**
+ * HeroDefault.astro
+ * Variante por defecto del componente Hero - Estilo inmobiliario profesional
+ *
+ * TODOS los textos vienen desde static_data (BD), nada hardcodeado
+ */
+
+import type { ComponenteDataEstructurado } from '../../types/componentesEstructurado';
+
+interface Props {
+  datos: ComponenteDataEstructurado;
+  tema?: Record<string, string>;
+  baseUrl?: string;
+}
+
+const { datos, tema = {}, baseUrl = '' } = Astro.props;
+
+// Acceso directo a datos estructurados
+const staticData = datos?.static_data || {};
+const styles = datos?.styles || {};
+const toggles = datos?.toggles || {};
+
+// ============================================================
+// TEXTOS CONFIGURABLES (todos vienen de BD/catálogo)
+// ============================================================
+
+// Textos principales
+const badge = staticData?.badge;
+const titulo = staticData?.titulo;
+const subtitulo = staticData?.subtitulo;
+const textoBoton = staticData?.textoBoton;
+
+// URL del botón
+const urlBotonOriginal = staticData?.urlBoton || '/propiedades';
+const urlBoton = urlBotonOriginal.startsWith('http') || urlBotonOriginal.startsWith('#')
+  ? urlBotonOriginal
+  : `${baseUrl}${urlBotonOriginal.startsWith('/') ? urlBotonOriginal : '/' + urlBotonOriginal}`;
+
+// Imagen de fondo
+const imagenFondo = staticData?.imagenFondo;
+
+// Stats (array configurable)
+const stats: Array<{numero: string; etiqueta: string}> = staticData?.stats || [];
+const mostrarStats = toggles?.mostrarStats !== false && stats.length > 0;
+
+// Buscador
+const mostrarBuscador = toggles?.mostrarBuscador !== false;
+const buscadorTabs: Array<{valor: string; etiqueta: string}> = staticData?.buscador_tabs || [];
+const placeholderUbicacion = staticData?.buscador_placeholder_ubicacion || '';
+const labelTipo = staticData?.buscador_label_tipo || 'Tipo';
+const labelPrecio = staticData?.buscador_label_precio || 'Precio';
+const textoBuscar = staticData?.buscador_texto_boton || 'Buscar';
+
+// ============================================================
+// ESTILOS
+// ============================================================
+
+const primaryColor = styles.colors?.primary || tema?.primary || null;
+const textColor = styles.colors?.text || tema?.text || null;
+const backgroundColor = tema?.background || '#ffffff';
+const buttonBackgroundColor = backgroundColor || '#ffffff';
+const buttonTextColor = textColor || '#1a202c';
+---
+
+<section
+  class="hero-default"
+  style={imagenFondo ? `background-image: url('${imagenFondo}'); --button-bg: ${buttonBackgroundColor}; --button-text: ${buttonTextColor}; --primary: ${primaryColor || '#667eea'};` : `--button-bg: ${buttonBackgroundColor}; --button-text: ${buttonTextColor}; --primary: ${primaryColor || '#667eea'};`}
+  data-component="hero-default"
+>
+  <div class="hero-overlay"></div>
+  <div class="hero-content">
+    {badge && <span class="hero-badge">{badge}</span>}
+    {titulo && <h1 class="hero-title">{titulo}</h1>}
+    {subtitulo && <p class="hero-subtitle">{subtitulo}</p>}
+
+    {mostrarBuscador && buscadorTabs.length > 0 && (
+      <div class="hero-search-box">
+        <form class="hero-search-form" action={`${baseUrl}/propiedades`} method="GET">
+          <div class="search-tabs">
+            {buscadorTabs.map((tab, i) => (
+              <button
+                type="button"
+                class={`search-tab ${i === 0 ? 'active' : ''}`}
+                data-operacion={tab.valor}
+              >
+                {tab.etiqueta}
+              </button>
+            ))}
+          </div>
+          <div class="search-inputs">
+            <div class="search-field">
+              <label>Ubicación</label>
+              <input type="text" name="ubicacion" placeholder={placeholderUbicacion} />
+            </div>
+            <div class="search-field">
+              <label>{labelTipo}</label>
+              <select name="tipo">
+                <option value="">Todos</option>
+                <option value="casa">Casa</option>
+                <option value="apartamento">Apartamento</option>
+                <option value="terreno">Terreno</option>
+                <option value="local">Local</option>
+                <option value="oficina">Oficina</option>
+              </select>
+            </div>
+            <div class="search-field">
+              <label>{labelPrecio}</label>
+              <select name="precio_max">
+                <option value="">Sin límite</option>
+                <option value="100000">$100,000</option>
+                <option value="200000">$200,000</option>
+                <option value="300000">$300,000</option>
+                <option value="500000">$500,000</option>
+                <option value="1000000">$1,000,000+</option>
+              </select>
+            </div>
+            <input type="hidden" name="operacion" value={buscadorTabs[0]?.valor || 'venta'} class="operacion-input" />
+            <button type="submit" class="search-button">
+              <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="8"></circle><path d="m21 21-4.3-4.3"></path></svg>
+              {textoBuscar}
+            </button>
+          </div>
+        </form>
+      </div>
+    )}
+
+    {!mostrarBuscador && textoBoton && (
+      <a href={urlBoton} class="hero-button">
+        {textoBoton}
+      </a>
+    )}
+
+    {mostrarStats && (
+      <div class="hero-stats">
+        {stats.map((stat) => (
+          <div class="stat">
+            <span class="stat-number">{stat.numero}</span>
+            <span class="stat-label">{stat.etiqueta}</span>
+          </div>
+        ))}
+      </div>
+    )}
+  </div>
+</section>
+
+<script>
+  // Manejar tabs de búsqueda
+  document.querySelectorAll('.search-tab').forEach(tab => {
+    tab.addEventListener('click', (e) => {
+      const target = e.currentTarget as HTMLElement;
+      document.querySelectorAll('.search-tab').forEach(t => t.classList.remove('active'));
+      target.classList.add('active');
+      const operacion = target.dataset.operacion;
+      const input = document.querySelector('.operacion-input') as HTMLInputElement;
+      if (input && operacion) {
+        input.value = operacion;
+      }
+    });
+  });
+</script>
+
+<style is:global>
+  .hero-default {
+    min-height: 600px;
+    height: auto;
+    max-height: none;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    background-size: cover !important;
+    background-position: center !important;
+    background-repeat: no-repeat !important;
+    position: relative;
+    padding: 5rem 2rem;
+    flex-shrink: 0;
+  }
+
+  .hero-overlay {
+    position: absolute;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    background: linear-gradient(135deg, rgba(0,0,0,0.6) 0%, rgba(0,0,0,0.4) 100%);
+    z-index: 1;
+  }
+
+  .hero-content {
+    position: relative;
+    z-index: 2;
+    text-align: center;
+    color: white;
+    max-width: 900px;
+    width: 100%;
+  }
+
+  .hero-badge {
+    display: inline-block;
+    background: var(--primary, #667eea);
+    color: white;
+    padding: 0.5rem 1.25rem;
+    border-radius: 50px;
+    font-size: 0.9rem;
+    font-weight: 600;
+    margin-bottom: 1.5rem;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+  }
+
+  .hero-title {
+    font-size: 3.5rem;
+    font-weight: 800;
+    margin: 0 0 1rem 0;
+    line-height: 1.1;
+    text-shadow: 0 2px 10px rgba(0,0,0,0.3);
+  }
+
+  .hero-subtitle {
+    font-size: 1.4rem;
+    margin: 0 0 2.5rem 0;
+    opacity: 0.95;
+    line-height: 1.5;
+    font-weight: 400;
+  }
+
+  .hero-search-box {
+    background: white;
+    border-radius: 16px;
+    padding: 1.5rem;
+    box-shadow: 0 20px 60px rgba(0,0,0,0.3);
+    max-width: 800px;
+    margin: 0 auto 2.5rem;
+  }
+
+  .search-tabs {
+    display: flex;
+    gap: 0.5rem;
+    margin-bottom: 1.25rem;
+    border-bottom: 2px solid #e2e8f0;
+    padding-bottom: 1rem;
+  }
+
+  .search-tab {
+    padding: 0.6rem 1.5rem;
+    border: none;
+    background: transparent;
+    color: #64748b;
+    font-size: 1rem;
+    font-weight: 600;
+    cursor: pointer;
+    border-radius: 8px;
+    transition: all 0.2s;
+  }
+
+  .search-tab:hover {
+    background: #f1f5f9;
+    color: #334155;
+  }
+
+  .search-tab.active {
+    background: var(--primary, #667eea);
+    color: white;
+  }
+
+  .search-inputs {
+    display: grid;
+    grid-template-columns: 2fr 1fr 1fr auto;
+    gap: 1rem;
+    align-items: end;
+  }
+
+  .search-field {
+    text-align: left;
+  }
+
+  .search-field label {
+    display: block;
+    font-size: 0.8rem;
+    font-weight: 600;
+    color: #64748b;
+    margin-bottom: 0.4rem;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+  }
+
+  .search-field input,
+  .search-field select {
+    width: 100%;
+    padding: 0.85rem 1rem;
+    border: 2px solid #e2e8f0;
+    border-radius: 10px;
+    font-size: 1rem;
+    color: #1e293b;
+    background: #f8fafc;
+    transition: border-color 0.2s, box-shadow 0.2s;
+  }
+
+  .search-field input:focus,
+  .search-field select:focus {
+    outline: none;
+    border-color: var(--primary, #667eea);
+    box-shadow: 0 0 0 3px rgba(102, 126, 234, 0.15);
+    background: white;
+  }
+
+  .search-field input::placeholder {
+    color: #94a3b8;
+  }
+
+  .search-button {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 0.5rem;
+    padding: 0.85rem 1.75rem;
+    background: var(--primary, #667eea);
+    color: white;
+    border: none;
+    border-radius: 10px;
+    font-size: 1rem;
+    font-weight: 600;
+    cursor: pointer;
+    transition: all 0.2s;
+    white-space: nowrap;
+  }
+
+  .search-button:hover {
+    filter: brightness(0.9);
+    transform: translateY(-2px);
+    box-shadow: 0 8px 20px rgba(0,0,0,0.2);
+  }
+
+  .search-button svg {
+    width: 20px;
+    height: 20px;
+  }
+
+  .hero-stats {
+    display: flex;
+    justify-content: center;
+    gap: 3rem;
+    margin-top: 2rem;
+    padding-top: 2rem;
+    border-top: 1px solid rgba(255,255,255,0.2);
+  }
+
+  .stat {
+    text-align: center;
+  }
+
+  .stat-number {
+    display: block;
+    font-size: 2.5rem;
+    font-weight: 800;
+    color: white;
+    line-height: 1;
+    margin-bottom: 0.25rem;
+  }
+
+  .stat-label {
+    font-size: 0.95rem;
+    color: rgba(255,255,255,0.85);
+    font-weight: 500;
+  }
+
+  .hero-button {
+    display: inline-block;
+    padding: 1.1rem 2.75rem;
+    background: var(--button-bg, #ffffff) !important;
+    color: var(--button-text, #1a202c) !important;
+    text-decoration: none;
+    border-radius: 10px;
+    font-weight: 600;
+    font-size: 1.1rem;
+    transition: transform 0.2s, box-shadow 0.2s;
+    border: none;
+  }
+
+  .hero-button:hover {
+    transform: translateY(-3px);
+    box-shadow: 0 12px 30px rgba(0, 0, 0, 0.25);
+  }
+
+  @media (max-width: 900px) {
+    .search-inputs {
+      grid-template-columns: 1fr 1fr;
+    }
+    .search-button {
+      grid-column: span 2;
+    }
+  }
+
+  @media (max-width: 768px) {
+    .hero-default {
+      min-height: 500px;
+      padding: 3rem 1.5rem;
+    }
+    .hero-title {
+      font-size: 2.25rem;
+    }
+    .hero-subtitle {
+      font-size: 1.1rem;
+    }
+    .hero-search-box {
+      padding: 1rem;
+    }
+    .search-inputs {
+      grid-template-columns: 1fr;
+    }
+    .search-button {
+      grid-column: auto;
+      width: 100%;
+    }
+    .hero-stats {
+      gap: 1.5rem;
+      flex-wrap: wrap;
+    }
+    .stat-number {
+      font-size: 1.75rem;
+    }
+    .stat-label {
+      font-size: 0.85rem;
+    }
+  }
+
+  @media (max-width: 480px) {
+    .hero-title {
+      font-size: 1.85rem;
+    }
+    .search-tabs {
+      justify-content: center;
+    }
+    .search-tab {
+      padding: 0.5rem 1rem;
+      font-size: 0.9rem;
+    }
+  }
+</style>

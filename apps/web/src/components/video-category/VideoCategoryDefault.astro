@@ -1,0 +1,369 @@
+---
+/**
+ * VideoCategoryDefault.astro
+ * Muestra info de categoría + videos filtrados por esa categoría
+ */
+
+import type { ComponenteDataEstructurado } from '../../types/componentesEstructurado';
+import ContentBreadcrumbs from '../breadcrumbs/ContentBreadcrumbs.astro';
+
+interface Props {
+  datos: ComponenteDataEstructurado;
+  tema?: Record<string, string>;
+  baseUrl?: string;
+}
+
+const { datos, tema = {}, baseUrl = '' } = Astro.props;
+
+const staticData = datos?.static_data || {};
+const dynamicData = datos?.dynamic_data || {};
+const styles = datos?.styles || {};
+
+// El nuevo formato de resolved puede ser:
+// 1. {categoria, items} - objeto directo
+// 2. [{categoria, items}] - array con un solo elemento (cuando viene de la API)
+// 3. array de videos directo (formato antiguo)
+let resolvedData = dynamicData?.resolved || {};
+
+// Si es un array, puede ser [{categoria, items}] o [videos...]
+if (Array.isArray(resolvedData)) {
+  // Verificar si es un array con objeto {categoria, items}
+  if (resolvedData.length === 1 && resolvedData[0]?.categoria !== undefined) {
+    resolvedData = resolvedData[0]; // Extraer el objeto del array
+  }
+}
+
+const isNewFormat = resolvedData && typeof resolvedData === 'object' && !Array.isArray(resolvedData) && ('items' in resolvedData || 'categoria' in resolvedData);
+
+// Categoría actual - puede venir del nuevo formato, de datos.categoria o de dynamicData.categoria
+const categoria = isNewFormat
+  ? resolvedData.categoria
+  : (datos?.categoria || dynamicData?.categoria || null);
+
+// Videos - pueden venir del nuevo formato {items} o ser un array directo
+const videos = isNewFormat
+  ? (resolvedData.items || [])
+  : (Array.isArray(dynamicData?.resolved) ? dynamicData.resolved : (dynamicData?.videos || []));
+
+const hasCategoria = !!categoria;
+const categoriaNombre = hasCategoria ? (categoria.nombre || 'Categoría') : 'Categoría';
+const categoriaDescripcion = hasCategoria ? (categoria.descripcion || '') : '';
+const categoriaSlug = hasCategoria ? categoria.slug : '';
+
+// Mapeo de iconos texto a emoji
+const iconoMap: Record<string, string> = {
+  'video': '🎬',
+  'play': '▶️',
+  'film': '🎞️',
+  'camera': '📹',
+  'youtube': '📺',
+  'tv': '📺',
+  'star': '⭐',
+  'heart': '❤️',
+  'home': '🏠',
+  'building': '🏢',
+  'key': '🔑',
+  'search': '🔍',
+  'trending-up': '📈',
+  'dollar-sign': '💰',
+  'users': '👥',
+  'book': '📚',
+  'lightbulb': '💡',
+  'map': '🗺️',
+  'default': '🎬'
+};
+
+function getIcono(icono: string | undefined): string {
+  if (!icono) return iconoMap['default'];
+  // Si ya es un emoji, devolverlo tal cual
+  if (/[\u{1F300}-\u{1F9FF}]/u.test(icono)) return icono;
+  // Si es texto, buscar en el mapeo
+  return iconoMap[icono.toLowerCase()] || iconoMap['default'];
+}
+
+const categoriaIcono = getIcono(hasCategoria ? categoria.icono : undefined);
+
+// Breadcrumbs items
+const breadcrumbItems = [
+  { label: 'Videos', href: `${baseUrl}/videos` },
+  { label: categoriaNombre }
+];
+
+// Helper para YouTube
+function extractYouTubeId(url: string): string {
+  if (!url) return '';
+  const match = url.match(/^.*(youtu.be\/|v\/|u\/\w\/|embed\/|watch\?v=|&v=)([^#&?]*).*/);
+  return (match && match[2]?.length === 11) ? match[2] : '';
+}
+---
+
+<!-- Hero de categoría con gradiente -->
+<section class="category-hero">
+  <div class="hero-container">
+    <ContentBreadcrumbs items={breadcrumbItems} variant="light" />
+
+    <div class="category-info">
+      {categoriaIcono && <span class="category-icon">{categoriaIcono}</span>}
+      <h1 class="category-title">{categoriaNombre}</h1>
+    </div>
+
+    {categoriaDescripcion && (
+      <p class="category-description">{categoriaDescripcion}</p>
+    )}
+
+    <div class="category-stats">
+      <span class="video-count">{videos.length} videos</span>
+    </div>
+  </div>
+</section>
+
+<section class="video-category">
+  <div class="container">
+    <!-- Grid de videos -->
+    {videos.length > 0 ? (
+      <div class="video-grid">
+        {videos.map((video: any) => {
+          const youtubeId = extractYouTubeId(video.video_url || video.url || '');
+          let thumbnail = video.thumbnail_url || video.thumbnail || '';
+          if (!thumbnail && youtubeId) {
+            thumbnail = `https://img.youtube.com/vi/${youtubeId}/mqdefault.jpg`;
+          }
+
+          const title = video.titulo || video.title || 'Video';
+          const description = video.descripcion || video.description || '';
+          const views = video.vistas || video.views || 0;
+          const duration = video.duracion || video.duration || '';
+          const videoSlug = video.slug || video.id;
+          // Usar categoriaSlug si está disponible, o categoria_slug del video como fallback
+          const videoCategoria = categoriaSlug || video.categoria_slug || 'general';
+          const url = `${baseUrl}/videos/${videoCategoria}/${videoSlug}`;
+
+          return (
+            <article class="video-card">
+              <a href={url} class="card-link">
+                <div class="thumbnail">
+                  <img src={thumbnail} alt={title} loading="lazy" />
+                  <div class="play-overlay">
+                    <svg fill="currentColor" viewBox="0 0 24 24">
+                      <path d="M8 5v14l11-7z"/>
+                    </svg>
+                  </div>
+                  {duration && <span class="duration">{duration}</span>}
+                </div>
+                <div class="info">
+                  <h3 class="title">{title}</h3>
+                  {description && <p class="description">{description}</p>}
+                  {views > 0 && <span class="views">{views.toLocaleString()} vistas</span>}
+                </div>
+              </a>
+            </article>
+          );
+        })}
+      </div>
+    ) : (
+      <div class="empty-state">
+        <svg fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 10l4.553-2.276A1 1 0 0121 8.618v6.764a1 1 0 01-1.447.894L15 14M5 18h8a2 2 0 002-2V8a2 2 0 00-2-2H5a2 2 0 00-2 2v8a2 2 0 002 2z" />
+        </svg>
+        <p>No hay videos en esta categoría</p>
+        <a href={`${baseUrl}/videos`} class="back-btn">Ver todos los videos</a>
+      </div>
+    )}
+  </div>
+</section>
+
+<style>
+  /* Hero con gradiente */
+  .category-hero {
+    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+    padding: 2rem 1rem 2.5rem;
+    color: white;
+  }
+
+  .hero-container {
+    max-width: 1200px;
+    margin: 0 auto;
+    text-align: center;
+  }
+
+  .category-info {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 0.75rem;
+    margin: 1.5rem 0 0.75rem;
+  }
+
+  .category-icon {
+    font-size: 2.5rem;
+  }
+
+  .category-title {
+    font-size: 2rem;
+    font-weight: 700;
+    margin: 0;
+    color: white;
+  }
+
+  .category-description {
+    opacity: 0.9;
+    max-width: 600px;
+    margin: 0 auto 1rem;
+    line-height: 1.6;
+  }
+
+  .category-stats {
+    display: flex;
+    justify-content: center;
+    gap: 1rem;
+  }
+
+  .video-count {
+    background: rgba(255, 255, 255, 0.2);
+    color: white;
+    padding: 0.25rem 0.75rem;
+    border-radius: 20px;
+    font-size: 0.875rem;
+    font-weight: 500;
+  }
+
+  /* Grid de videos */
+  .video-category {
+    padding: 2rem 1rem 4rem;
+    min-height: 40vh;
+    background: #f7fafc;
+  }
+
+  .container {
+    max-width: 1200px;
+    margin: 0 auto;
+  }
+
+  .video-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
+    gap: 1.5rem;
+  }
+
+  .video-card {
+    background: white;
+    border-radius: 8px;
+    overflow: hidden;
+    box-shadow: 0 2px 8px rgba(0,0,0,0.08);
+    transition: transform 0.2s, box-shadow 0.2s;
+  }
+
+  .video-card:hover {
+    transform: translateY(-4px);
+    box-shadow: 0 8px 20px rgba(0,0,0,0.12);
+  }
+
+  .card-link {
+    display: block;
+    text-decoration: none;
+    color: inherit;
+  }
+
+  .thumbnail {
+    position: relative;
+    padding-bottom: 56.25%;
+    background: #e2e8f0;
+  }
+
+  .thumbnail img {
+    position: absolute;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+  }
+
+  .play-overlay {
+    position: absolute;
+    inset: 0;
+    background: rgba(0,0,0,0.3);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    opacity: 0;
+    transition: opacity 0.2s;
+  }
+
+  .video-card:hover .play-overlay {
+    opacity: 1;
+  }
+
+  .play-overlay svg {
+    width: 48px;
+    height: 48px;
+    color: white;
+  }
+
+  .duration {
+    position: absolute;
+    bottom: 8px;
+    right: 8px;
+    background: rgba(0,0,0,0.8);
+    color: white;
+    padding: 2px 6px;
+    border-radius: 4px;
+    font-size: 0.75rem;
+  }
+
+  .info {
+    padding: 1rem;
+  }
+
+  .title {
+    font-size: 1rem;
+    font-weight: 600;
+    margin: 0 0 0.5rem;
+    color: #1a202c;
+    display: -webkit-box;
+    -webkit-line-clamp: 2;
+    -webkit-box-orient: vertical;
+    overflow: hidden;
+  }
+
+  .description {
+    font-size: 0.875rem;
+    color: #718096;
+    margin: 0 0 0.5rem;
+    display: -webkit-box;
+    -webkit-line-clamp: 2;
+    -webkit-box-orient: vertical;
+    overflow: hidden;
+  }
+
+  .views {
+    font-size: 0.75rem;
+    color: #a0aec0;
+  }
+
+  .empty-state {
+    text-align: center;
+    padding: 4rem 1rem;
+    color: #a0aec0;
+  }
+
+  .empty-state svg {
+    width: 48px;
+    height: 48px;
+    margin-bottom: 1rem;
+  }
+
+  .back-btn {
+    display: inline-block;
+    margin-top: 1rem;
+    background: #667eea;
+    color: white;
+    padding: 0.5rem 1rem;
+    border-radius: 6px;
+    text-decoration: none;
+  }
+
+  @media (min-width: 768px) {
+    .category-title { font-size: 2.5rem; }
+  }
+</style>

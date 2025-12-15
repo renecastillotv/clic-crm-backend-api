@@ -1,0 +1,265 @@
+---
+/**
+ * VideoDetailDefault.astro
+ * Detalle de video individual con embed
+ */
+
+import type { ComponenteDataEstructurado } from '../../types/componentesEstructurado';
+import ContentBreadcrumbs from '../breadcrumbs/ContentBreadcrumbs.astro';
+
+interface Props {
+  datos: ComponenteDataEstructurado;
+  tema?: Record<string, string>;
+  baseUrl?: string;
+}
+
+const { datos, tema = {}, baseUrl = '' } = Astro.props;
+
+const dynamicData = datos?.dynamic_data || {};
+const styles = datos?.styles || {};
+
+// Video puede venir de diferentes lugares
+const video = datos?.video || (dynamicData?.resolved?.[0]) || null;
+
+// Helper para extraer ID de YouTube
+function extractYouTubeId(url: string): string {
+  if (!url) return '';
+  const match = url.match(/^.*(youtu.be\/|v\/|u\/\w\/|embed\/|watch\?v=|&v=)([^#&?]*).*/);
+  return (match && match[2]?.length === 11) ? match[2] : '';
+}
+
+// Helper para formatear duración (segundos a MM:SS o HH:MM:SS)
+function formatDuration(duration: string | number): string {
+  if (!duration) return '';
+
+  // Si ya está formateado (contiene :), devolverlo tal cual
+  if (typeof duration === 'string' && duration.includes(':')) {
+    return duration;
+  }
+
+  // Convertir a número de segundos
+  const totalSeconds = typeof duration === 'string' ? parseInt(duration, 10) : duration;
+  if (isNaN(totalSeconds) || totalSeconds <= 0) return '';
+
+  const hours = Math.floor(totalSeconds / 3600);
+  const minutes = Math.floor((totalSeconds % 3600) / 60);
+  const seconds = totalSeconds % 60;
+
+  if (hours > 0) {
+    return `${hours}:${minutes.toString().padStart(2, '0')}:${seconds.toString().padStart(2, '0')}`;
+  }
+  return `${minutes}:${seconds.toString().padStart(2, '0')}`;
+}
+
+const hasVideo = !!video;
+const videoUrl = hasVideo ? (video.video_url || video.url || '') : '';
+const youtubeId = extractYouTubeId(videoUrl);
+// Agregar autoplay=1 y mute=1 (mute requerido para autoplay en navegadores modernos)
+const embedUrl = youtubeId ? `https://www.youtube.com/embed/${youtubeId}?autoplay=1&mute=1&rel=0` : videoUrl;
+
+const title = hasVideo ? (video.titulo || video.title || 'Video') : 'Video no encontrado';
+const description = hasVideo ? (video.descripcion || video.description || '') : '';
+const views = hasVideo ? (video.vistas || video.views || 0) : 0;
+const rawDuration = hasVideo ? (video.duracion || video.duration || '') : '';
+const duration = formatDuration(rawDuration);
+const categoriaNombre = hasVideo ? (video.categoria_nombre || 'General') : '';
+const categoriaSlug = hasVideo ? (video.categoria_slug || 'general') : '';
+
+// Extracto corto de la descripción para el hero
+const extracto = description ? (description.length > 150 ? description.substring(0, 150) + '...' : description) : '';
+
+// Colores
+const primaryColor = tema?.primary || '#667eea';
+const secondaryColor = tema?.secondary || '#764ba2';
+
+// Breadcrumbs items
+const breadcrumbItems = [
+  { label: 'Videos', href: `${baseUrl}/videos` },
+  { label: categoriaNombre, href: `${baseUrl}/videos/${categoriaSlug}` },
+  { label: title }
+];
+---
+
+{hasVideo && (
+  <section class="video-hero" style={`--primary: ${primaryColor}; --secondary: ${secondaryColor};`}>
+    <div class="hero-container">
+      <div class="breadcrumbs-wrapper">
+        <ContentBreadcrumbs items={breadcrumbItems} variant="light" />
+      </div>
+
+      <h1 class="hero-title">{title}</h1>
+      {extracto && <p class="hero-extracto">{extracto}</p>}
+
+      <div class="hero-meta">
+        <span class="hero-categoria">{categoriaNombre}</span>
+        {views > 0 && <span class="hero-vistas">{views.toLocaleString()} vistas</span>}
+        {duration && <span class="hero-duracion">{duration}</span>}
+      </div>
+    </div>
+  </section>
+)}
+
+<section class="video-detail" style={`background: ${styles.colors?.background || '#ffffff'};`}>
+  <div class="container">
+    {!hasVideo ? (
+      <div class="not-found">
+        <svg fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 10l4.553-2.276A1 1 0 0121 8.618v6.764a1 1 0 01-1.447.894L15 14M5 18h8a2 2 0 002-2V8a2 2 0 00-2-2H5a2 2 0 00-2 2v8a2 2 0 002 2z" />
+        </svg>
+        <h2>Video no encontrado</h2>
+        <p>El video que buscas no existe o ha sido eliminado.</p>
+        <a href={`${baseUrl}/videos`} class="back-btn">Ver todos los videos</a>
+      </div>
+    ) : (
+      <>
+        <div class="video-wrapper">
+          <iframe
+            src={embedUrl}
+            title={title}
+            frameborder="0"
+            allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
+            allowfullscreen
+          ></iframe>
+        </div>
+
+        {description && (
+          <div class="video-description">
+            <p>{description}</p>
+          </div>
+        )}
+      </>
+    )}
+  </div>
+</section>
+
+<style>
+  /* Hero styles */
+  .video-hero {
+    background: linear-gradient(135deg, var(--primary) 0%, var(--secondary) 100%);
+    padding: 2rem 1rem 2.5rem;
+    color: white;
+  }
+
+  .hero-container {
+    max-width: 900px;
+    margin: 0 auto;
+  }
+
+  .breadcrumbs-wrapper {
+    margin-bottom: 1.5rem;
+  }
+
+  .hero-title {
+    font-size: 1.75rem;
+    font-weight: 700;
+    margin: 0 0 0.75rem;
+    line-height: 1.3;
+  }
+
+  .hero-extracto {
+    font-size: 1rem;
+    opacity: 0.9;
+    margin: 0 0 1rem;
+    line-height: 1.5;
+  }
+
+  .hero-meta {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.75rem;
+    align-items: center;
+  }
+
+  .hero-categoria {
+    background: rgba(255, 255, 255, 0.2);
+    padding: 0.25rem 0.75rem;
+    border-radius: 20px;
+    font-size: 0.75rem;
+    font-weight: 600;
+    text-transform: uppercase;
+  }
+
+  .hero-vistas, .hero-duracion {
+    font-size: 0.875rem;
+    opacity: 0.85;
+  }
+
+  @media (min-width: 768px) {
+    .hero-title { font-size: 2.25rem; }
+  }
+
+  /* Video detail styles */
+  .video-detail {
+    padding: 2rem 1rem;
+    min-height: 60vh;
+  }
+
+  .container {
+    max-width: 900px;
+    margin: 0 auto;
+  }
+
+  .not-found {
+    text-align: center;
+    padding: 4rem 1rem;
+  }
+
+  .not-found svg {
+    width: 64px;
+    height: 64px;
+    color: #cbd5e0;
+    margin-bottom: 1rem;
+  }
+
+  .not-found h2 {
+    font-size: 1.5rem;
+    color: #4a5568;
+    margin: 0 0 0.5rem;
+  }
+
+  .not-found p {
+    color: #718096;
+    margin: 0 0 1.5rem;
+  }
+
+  .back-btn {
+    display: inline-block;
+    background: #667eea;
+    color: white;
+    padding: 0.75rem 1.5rem;
+    border-radius: 8px;
+    text-decoration: none;
+    font-weight: 500;
+  }
+
+  .video-wrapper {
+    position: relative;
+    padding-bottom: 56.25%;
+    height: 0;
+    background: #000;
+    border-radius: 8px;
+    overflow: hidden;
+    margin-bottom: 1.5rem;
+  }
+
+  .video-wrapper iframe {
+    position: absolute;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    border: none;
+  }
+
+  .video-description {
+    margin-bottom: 1.5rem;
+    padding: 0 0.5rem;
+  }
+
+  .video-description p {
+    color: #4a5568;
+    line-height: 1.7;
+    margin: 0;
+    white-space: pre-line;
+  }
+</style>

@@ -1,0 +1,585 @@
+---
+/**
+ * ArticleDetailDefault.astro
+ * Vista detallada de un articulo/blog individual
+ * Muestra el contenido completo del articulo o un mensaje si no se encuentra
+ */
+
+import ContentBreadcrumbs from '../breadcrumbs/ContentBreadcrumbs.astro';
+
+interface Props {
+  datos?: any;
+  articulo?: any;
+  tema?: Record<string, string>;
+  baseUrl?: string;
+}
+
+const { datos, articulo, tema = {}, baseUrl = '' } = Astro.props;
+
+const staticData = datos?.static_data || {};
+const toggles = datos?.toggles || {};
+const dynamicData = datos?.dynamic_data || {};
+
+// El articulo puede venir desde resolvedData o desde datos del componente
+// La API puede devolver un array o un objeto, manejar ambos casos
+let articuloData = articulo || datos?.articulo || dynamicData?.resolved;
+if (Array.isArray(articuloData)) {
+  articuloData = articuloData[0];
+}
+
+// Colores del tema
+const primaryColor = tema?.primary || '#667eea';
+const secondaryColor = tema?.secondary || '#764ba2';
+
+// Si no hay articulo, mostrar mensaje
+const hasArticulo = articuloData && (articuloData.id || articuloData.titulo);
+
+// Formatear fecha
+function formatDate(dateStr: string): string {
+  if (!dateStr) return '';
+  try {
+    const date = new Date(dateStr);
+    return date.toLocaleDateString('es-ES', {
+      year: 'numeric',
+      month: 'long',
+      day: 'numeric'
+    });
+  } catch {
+    return dateStr;
+  }
+}
+
+// Calcular tiempo de lectura aproximado
+function calcReadTime(content: string): string {
+  if (!content) return '5 min';
+  const words = content.split(/\s+/).length;
+  const minutes = Math.ceil(words / 200);
+  return `${minutes} min`;
+}
+
+// Extraer datos del articulo
+const titulo = articuloData?.titulo || 'Articulo';
+const categoria = articuloData?.categoria || '';
+const categoriaSlug = articuloData?.categoria_slug || 'general';
+const extracto = articuloData?.extracto || articuloData?.excerpt || '';
+const autor = articuloData?.autor || '';
+const autorFoto = articuloData?.autor_foto || '';
+const fechaPublicacion = articuloData?.fecha_publicacion || '';
+const imagenPrincipal = articuloData?.imagen_principal || articuloData?.imagen || articuloData?.imagen_portada || '';
+const contenido = articuloData?.contenido || '';
+const tags = articuloData?.tags || [];
+const relacionados = articuloData?.relacionados || [];
+const readTime = calcReadTime(contenido);
+
+// Breadcrumbs
+const breadcrumbItems = [
+  { label: 'Artículos', href: `${baseUrl}/articulos` },
+  { label: categoria || 'General', href: `${baseUrl}/articulos/${categoriaSlug}` },
+  { label: titulo }
+];
+
+// URL actual para compartir
+const currentUrl = Astro.url.href;
+---
+
+{hasArticulo && (
+  <section class="article-hero" style={`--primary: ${primaryColor}; --secondary: ${secondaryColor};`}>
+    <div class="hero-container">
+      <ContentBreadcrumbs items={breadcrumbItems} variant="light" />
+
+      <h1 class="hero-title">{titulo}</h1>
+      {extracto && <p class="hero-extracto">{extracto}</p>}
+
+      <div class="hero-meta">
+        {categoria && <span class="hero-categoria">{categoria}</span>}
+        {fechaPublicacion && <span class="hero-fecha">{formatDate(fechaPublicacion)}</span>}
+        <span class="hero-lectura">{readTime} de lectura</span>
+      </div>
+    </div>
+  </section>
+)}
+
+<section class="article-detail-section" style={`--primary: ${primaryColor}; --secondary: ${secondaryColor};`}>
+  <div class="article-detail-container">
+    {hasArticulo ? (
+      <>
+
+        {imagenPrincipal && (
+          <div class="article-featured-image">
+            <img src={imagenPrincipal} alt={titulo} />
+          </div>
+        )}
+
+        <article class="article-content">
+          {contenido ? (
+            <div class="content-body" set:html={contenido} />
+          ) : (
+            <p class="no-content">Este articulo no tiene contenido disponible.</p>
+          )}
+        </article>
+
+        {tags.length > 0 && (
+          <div class="article-tags">
+            <span class="tags-label">Etiquetas:</span>
+            <div class="tags-list">
+              {tags.map((tag: string) => (
+                <a href={`${baseUrl}/articulos?tag=${encodeURIComponent(tag)}`} class="tag">
+                  {tag}
+                </a>
+              ))}
+            </div>
+          </div>
+        )}
+
+        <div class="article-share">
+          <span class="share-label">Compartir:</span>
+          <div class="share-buttons">
+            <a
+              href={`https://www.facebook.com/sharer/sharer.php?u=${encodeURIComponent(currentUrl)}`}
+              target="_blank"
+              rel="noopener"
+              class="share-btn facebook"
+              title="Compartir en Facebook"
+            >
+              FB
+            </a>
+            <a
+              href={`https://twitter.com/intent/tweet?url=${encodeURIComponent(currentUrl)}&text=${encodeURIComponent(titulo)}`}
+              target="_blank"
+              rel="noopener"
+              class="share-btn twitter"
+              title="Compartir en Twitter"
+            >
+              TW
+            </a>
+            <a
+              href={`https://wa.me/?text=${encodeURIComponent(titulo + ' ' + currentUrl)}`}
+              target="_blank"
+              rel="noopener"
+              class="share-btn whatsapp"
+              title="Compartir en WhatsApp"
+            >
+              WA
+            </a>
+            <a
+              href={`mailto:?subject=${encodeURIComponent(titulo)}&body=${encodeURIComponent('Te comparto este articulo: ' + currentUrl)}`}
+              class="share-btn email"
+              title="Compartir por Email"
+            >
+              @
+            </a>
+          </div>
+        </div>
+
+        {relacionados.length > 0 && (
+          <div class="related-articles">
+            <h2>Articulos Relacionados</h2>
+            <div class="related-grid">
+              {relacionados.slice(0, 3).map((rel: any) => {
+                const relSlug = rel.slug || rel.id;
+                const relCatSlug = rel.categoria_slug || 'general';
+                const relUrl = `${baseUrl}/articulos/${relCatSlug}/${relSlug}`;
+                const relTitulo = rel.titulo || 'Articulo';
+                const relImagen = rel.imagen_principal || rel.imagen || '';
+                const relFecha = rel.fecha_publicacion || '';
+
+                return (
+                  <a href={relUrl} class="related-card">
+                    {relImagen && (
+                      <div class="related-image">
+                        <img src={relImagen} alt={relTitulo} loading="lazy" />
+                      </div>
+                    )}
+                    <div class="related-info">
+                      <h3>{relTitulo}</h3>
+                      {relFecha && (
+                        <span class="related-date">{formatDate(relFecha)}</span>
+                      )}
+                    </div>
+                  </a>
+                );
+              })}
+            </div>
+          </div>
+        )}
+
+      </>
+    ) : (
+      <div class="not-found">
+        <div class="not-found-icon">?</div>
+        <h1>Articulo no encontrado</h1>
+        <p>No pudimos encontrar el articulo que estas buscando.</p>
+        <a href={`${baseUrl}/articulos`} class="back-btn">Ver todos los articulos</a>
+      </div>
+    )}
+  </div>
+</section>
+
+<style>
+  /* Hero styles */
+  .article-hero {
+    background: linear-gradient(135deg, var(--primary) 0%, var(--secondary) 100%);
+    padding: 2rem 1rem 2.5rem;
+    color: white;
+  }
+
+  .hero-container {
+    max-width: 800px;
+    margin: 0 auto;
+  }
+
+  .hero-title {
+    font-size: 2rem;
+    font-weight: 700;
+    margin: 1.5rem 0 0.75rem;
+    line-height: 1.3;
+  }
+
+  .hero-extracto {
+    font-size: 1.1rem;
+    opacity: 0.9;
+    margin: 0 0 1rem;
+    line-height: 1.6;
+  }
+
+  .hero-meta {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.75rem;
+    align-items: center;
+  }
+
+  .hero-categoria {
+    background: rgba(255, 255, 255, 0.2);
+    padding: 0.25rem 0.75rem;
+    border-radius: 20px;
+    font-size: 0.75rem;
+    font-weight: 600;
+    text-transform: uppercase;
+  }
+
+  .hero-fecha,
+  .hero-lectura {
+    font-size: 0.875rem;
+    opacity: 0.85;
+  }
+
+  @media (min-width: 768px) {
+    .hero-title {
+      font-size: 2.5rem;
+    }
+  }
+
+  .article-detail-section {
+    padding: 3rem 2rem;
+    background: var(--background-color, #f8f9fa);
+    min-height: 60vh;
+  }
+
+  .article-detail-container {
+    max-width: 800px;
+    margin: 0 auto;
+  }
+
+  .article-featured-image {
+    margin-bottom: 2rem;
+    border-radius: 16px;
+    overflow: hidden;
+    box-shadow: 0 4px 20px rgba(0,0,0,0.1);
+  }
+
+  .article-featured-image img {
+    width: 100%;
+    height: auto;
+    display: block;
+  }
+
+  .article-content {
+    background: white;
+    padding: 2.5rem;
+    border-radius: 16px;
+    margin-bottom: 2rem;
+    box-shadow: 0 2px 8px rgba(0,0,0,0.05);
+  }
+
+  .content-body {
+    font-size: 1.1rem;
+    line-height: 1.8;
+    color: var(--text-color, #1a202c);
+  }
+
+  .content-body :global(h2) {
+    font-size: 1.5rem;
+    margin: 2rem 0 1rem 0;
+    color: var(--text-color, #1a202c);
+  }
+
+  .content-body :global(h3) {
+    font-size: 1.25rem;
+    margin: 1.5rem 0 0.75rem 0;
+    color: var(--text-color, #1a202c);
+  }
+
+  .content-body :global(p) {
+    margin: 0 0 1.25rem 0;
+  }
+
+  .content-body :global(ul),
+  .content-body :global(ol) {
+    margin: 0 0 1.25rem 1.5rem;
+  }
+
+  .content-body :global(li) {
+    margin-bottom: 0.5rem;
+  }
+
+  .content-body :global(img) {
+    max-width: 100%;
+    height: auto;
+    border-radius: 8px;
+    margin: 1.5rem 0;
+  }
+
+  .content-body :global(blockquote) {
+    border-left: 4px solid var(--primary);
+    padding-left: 1.5rem;
+    margin: 1.5rem 0;
+    font-style: italic;
+    color: var(--text-secondary, #718096);
+  }
+
+  .content-body :global(a) {
+    color: var(--primary);
+    text-decoration: none;
+  }
+
+  .content-body :global(a:hover) {
+    text-decoration: underline;
+  }
+
+  .no-content {
+    text-align: center;
+    color: var(--text-secondary, #718096);
+    font-style: italic;
+  }
+
+  .article-tags {
+    display: flex;
+    align-items: center;
+    gap: 1rem;
+    padding: 1.5rem;
+    background: white;
+    border-radius: 12px;
+    margin-bottom: 1.5rem;
+    flex-wrap: wrap;
+  }
+
+  .tags-label {
+    font-weight: 600;
+    color: var(--text-color, #1a202c);
+  }
+
+  .tags-list {
+    display: flex;
+    gap: 0.5rem;
+    flex-wrap: wrap;
+  }
+
+  .tag {
+    padding: 0.35rem 0.85rem;
+    background: #f7fafc;
+    color: var(--text-secondary, #718096);
+    border-radius: 20px;
+    font-size: 0.85rem;
+    text-decoration: none;
+    transition: background 0.2s, color 0.2s;
+  }
+
+  .tag:hover {
+    background: var(--primary);
+    color: white;
+  }
+
+  .article-share {
+    display: flex;
+    align-items: center;
+    gap: 1rem;
+    padding: 1.5rem;
+    background: white;
+    border-radius: 12px;
+    margin-bottom: 2rem;
+  }
+
+  .share-label {
+    font-weight: 600;
+    color: var(--text-color, #1a202c);
+  }
+
+  .share-buttons {
+    display: flex;
+    gap: 0.5rem;
+  }
+
+  .share-btn {
+    width: 40px;
+    height: 40px;
+    border-radius: 50%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    color: white;
+    transition: transform 0.2s, opacity 0.2s;
+    text-decoration: none;
+    font-size: 0.75rem;
+    font-weight: 700;
+  }
+
+  .share-btn:hover {
+    transform: scale(1.1);
+  }
+
+  .share-btn.facebook {
+    background: #1877f2;
+  }
+
+  .share-btn.twitter {
+    background: #1da1f2;
+  }
+
+  .share-btn.whatsapp {
+    background: #25d366;
+  }
+
+  .share-btn.email {
+    background: var(--primary);
+  }
+
+  .related-articles {
+    margin-bottom: 2rem;
+  }
+
+  .related-articles h2 {
+    font-size: 1.5rem;
+    margin: 0 0 1.5rem 0;
+    color: var(--text-color, #1a202c);
+  }
+
+  .related-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(240px, 1fr));
+    gap: 1.5rem;
+  }
+
+  .related-card {
+    background: white;
+    border-radius: 12px;
+    overflow: hidden;
+    text-decoration: none;
+    color: inherit;
+    box-shadow: 0 2px 8px rgba(0,0,0,0.05);
+    transition: transform 0.2s, box-shadow 0.2s;
+  }
+
+  .related-card:hover {
+    transform: translateY(-4px);
+    box-shadow: 0 8px 24px rgba(0,0,0,0.1);
+  }
+
+  .related-image {
+    height: 140px;
+    background: #e2e8f0;
+  }
+
+  .related-image img {
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+  }
+
+  .related-info {
+    padding: 1rem;
+  }
+
+  .related-info h3 {
+    font-size: 1rem;
+    margin: 0 0 0.5rem 0;
+    color: var(--text-color, #1a202c);
+    display: -webkit-box;
+    -webkit-line-clamp: 2;
+    -webkit-box-orient: vertical;
+    overflow: hidden;
+  }
+
+  .related-date {
+    font-size: 0.8rem;
+    color: var(--text-secondary, #718096);
+  }
+
+  .not-found {
+    text-align: center;
+    padding: 4rem 2rem;
+    background: white;
+    border-radius: 16px;
+  }
+
+  .not-found-icon {
+    font-size: 5rem;
+    margin-bottom: 1rem;
+    color: #a0aec0;
+  }
+
+  .not-found h1 {
+    font-size: 2rem;
+    margin: 0 0 0.5rem 0;
+    color: var(--text-color, #1a202c);
+  }
+
+  .not-found p {
+    color: var(--text-secondary, #718096);
+    margin: 0 0 2rem 0;
+  }
+
+  .back-btn {
+    display: inline-block;
+    padding: 0.75rem 1.5rem;
+    background: var(--primary);
+    color: white;
+    text-decoration: none;
+    border-radius: 8px;
+    font-weight: 500;
+    transition: transform 0.2s;
+  }
+
+  .back-btn:hover {
+    transform: translateY(-2px);
+  }
+
+  @media (max-width: 768px) {
+    .article-title {
+      font-size: 1.75rem;
+    }
+
+    .article-excerpt {
+      font-size: 1.1rem;
+    }
+
+    .article-content {
+      padding: 1.5rem;
+    }
+
+    .content-body {
+      font-size: 1rem;
+    }
+
+    .meta-info {
+      flex-direction: column;
+      gap: 0.5rem;
+    }
+
+    .article-tags,
+    .article-share {
+      flex-direction: column;
+      align-items: flex-start;
+    }
+  }
+</style>

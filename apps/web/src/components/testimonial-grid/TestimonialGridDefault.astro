@@ -1,0 +1,364 @@
+---
+/**
+ * TestimonialGridDefault.astro
+ * Grid de testimonios con datos dinamicos desde la API
+ */
+
+interface Props {
+  datos?: any;
+  tema?: Record<string, string>;
+  baseUrl?: string;
+}
+
+const { datos, tema = {}, baseUrl = '' } = Astro.props;
+
+const staticData = datos?.static_data || {};
+const toggles = datos?.toggles || {};
+const dynamicData = datos?.dynamic_data || {};
+
+// Datos estaticos del componente
+const titulo = staticData?.titulo || 'Testimonios de Clientes';
+const subtitulo = staticData?.subtitulo || '';
+
+// Toggles
+const mostrarRating = toggles?.mostrarRating ?? true;
+const mostrarFoto = toggles?.mostrarFoto ?? true;
+const mostrarCategoria = toggles?.mostrarCategoria ?? true;
+
+// Testimonios dinamicos
+const testimonios = dynamicData?.resolved || datos?.testimonios || [];
+
+// Colores del tema
+const primaryColor = tema?.primary || '#667eea';
+const secondaryColor = tema?.secondary || '#764ba2';
+
+// Formatear fecha
+function formatDate(dateString: string): string {
+  if (!dateString) return '';
+  try {
+    const date = new Date(dateString);
+    return date.toLocaleDateString('es-ES', {
+      year: 'numeric',
+      month: 'long',
+    });
+  } catch {
+    return dateString;
+  }
+}
+
+// Generar estrellas
+function getStars(rating: number): string {
+  return '★'.repeat(Math.min(5, Math.max(0, rating || 5)));
+}
+---
+
+<section class="testimonial-grid-section" style={`--primary: ${primaryColor}; --secondary: ${secondaryColor};`}>
+  <div class="testimonial-grid-container">
+    {(titulo || subtitulo) && (
+      <div class="section-header">
+        {titulo && <h2 class="section-title">{titulo}</h2>}
+        {subtitulo && <p class="section-subtitle">{subtitulo}</p>}
+      </div>
+    )}
+
+    {testimonios.length > 0 ? (
+      <div class="testimonials-grid">
+        {testimonios.map((testimonio: any, index: number) => {
+          const nombre = testimonio.cliente_nombre || testimonio.nombre_cliente || testimonio.client_name || 'Cliente';
+          const contenido = testimonio.contenido || testimonio.testimonio || testimonio.full_testimonial || '';
+          const rating = testimonio.rating || testimonio.calificacion || 5;
+          const foto = testimonio.foto_url || testimonio.client_avatar || testimonio.cliente_foto || '';
+          const cargo = testimonio.cargo || testimonio.cliente_cargo || '';
+          const empresa = testimonio.empresa || testimonio.cliente_empresa || '';
+          const ubicacion = testimonio.ubicacion || testimonio.cliente_ubicacion || testimonio.client_location || '';
+          const categoriaSlug = testimonio.categoria_slug || 'general';
+          const testimonioSlug = testimonio.slug || testimonio.id;
+          const url = `${baseUrl}/testimonios/${categoriaSlug}/${testimonioSlug}`;
+          const fecha = testimonio.fecha || '';
+          const verificado = testimonio.verificado || testimonio.client_verified || false;
+          const isFeatured = index === 0;
+
+          return (
+            <article class={`testimonial-card ${isFeatured ? 'featured' : ''}`}>
+              <a href={url} class="card-link">
+                {mostrarRating && (
+                  <div class="rating">
+                    <span class="stars">{getStars(rating)}</span>
+                    <span class="rating-number">{rating}/5</span>
+                  </div>
+                )}
+
+                <blockquote class="testimonial-content">
+                  "{contenido}"
+                </blockquote>
+
+                <div class="testimonial-author">
+                  {mostrarFoto && foto && (
+                    <div class="author-photo">
+                      <img src={foto} alt={nombre} loading="lazy" />
+                    </div>
+                  )}
+                  {mostrarFoto && !foto && (
+                    <div class="author-photo placeholder">
+                      <span>{nombre.charAt(0)}</span>
+                    </div>
+                  )}
+                  <div class="author-info">
+                    <div class="author-name">
+                      {nombre}
+                      {verificado && <span class="verified" title="Verificado">✓</span>}
+                    </div>
+                    {(cargo || empresa) && (
+                      <div class="author-role">{cargo}{cargo && empresa ? ' - ' : ''}{empresa}</div>
+                    )}
+                    {ubicacion && (
+                      <div class="author-location">{ubicacion}</div>
+                    )}
+                  </div>
+                </div>
+
+                {mostrarCategoria && testimonio.categoria_nombre && (
+                  <span class="testimonial-category">{testimonio.categoria_nombre}</span>
+                )}
+              </a>
+            </article>
+          );
+        })}
+      </div>
+    ) : (
+      <div class="empty-state">
+        <div class="empty-icon">💬</div>
+        <h3>No hay testimonios disponibles</h3>
+        <p>Actualmente no tenemos testimonios publicados.</p>
+      </div>
+    )}
+
+    {testimonios.length > 0 && (
+      <div class="testimonials-count">
+        <span>Mostrando {testimonios.length} testimonio{testimonios.length !== 1 ? 's' : ''}</span>
+      </div>
+    )}
+  </div>
+</section>
+
+<style>
+  .testimonial-grid-section {
+    padding: 4rem 2rem;
+    background: var(--background-color, #f8f9fa);
+  }
+
+  .testimonial-grid-container {
+    max-width: 1200px;
+    margin: 0 auto;
+  }
+
+  .section-header {
+    text-align: center;
+    margin-bottom: 3rem;
+  }
+
+  .section-title {
+    font-size: 2rem;
+    font-weight: 700;
+    color: var(--text-color, #1a202c);
+    margin: 0 0 0.5rem 0;
+  }
+
+  .section-subtitle {
+    font-size: 1.1rem;
+    color: var(--text-secondary, #718096);
+    margin: 0;
+  }
+
+  .testimonials-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(350px, 1fr));
+    gap: 1.5rem;
+  }
+
+  .testimonial-card {
+    background: white;
+    border-radius: 16px;
+    overflow: hidden;
+    box-shadow: 0 4px 12px rgba(0,0,0,0.08);
+    transition: transform 0.2s, box-shadow 0.2s;
+  }
+
+  .testimonial-card:hover {
+    transform: translateY(-4px);
+    box-shadow: 0 8px 24px rgba(0,0,0,0.12);
+  }
+
+  .testimonial-card.featured {
+    grid-column: span 2;
+  }
+
+  .card-link {
+    display: block;
+    padding: 1.5rem;
+    text-decoration: none;
+    color: inherit;
+    height: 100%;
+  }
+
+  .rating {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    margin-bottom: 1rem;
+  }
+
+  .stars {
+    color: #fbbf24;
+    font-size: 1.25rem;
+    letter-spacing: 2px;
+  }
+
+  .rating-number {
+    font-size: 0.85rem;
+    color: #718096;
+  }
+
+  .testimonial-content {
+    font-size: 1rem;
+    color: #4a5568;
+    line-height: 1.7;
+    margin: 0 0 1.5rem 0;
+    font-style: italic;
+    display: -webkit-box;
+    -webkit-line-clamp: 4;
+    -webkit-box-orient: vertical;
+    overflow: hidden;
+  }
+
+  .testimonial-card.featured .testimonial-content {
+    -webkit-line-clamp: 6;
+  }
+
+  .testimonial-author {
+    display: flex;
+    align-items: center;
+    gap: 1rem;
+  }
+
+  .author-photo {
+    width: 48px;
+    height: 48px;
+    border-radius: 50%;
+    overflow: hidden;
+    flex-shrink: 0;
+  }
+
+  .author-photo img {
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+  }
+
+  .author-photo.placeholder {
+    background: linear-gradient(135deg, var(--primary) 0%, var(--secondary) 100%);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    color: white;
+    font-weight: 600;
+    font-size: 1.25rem;
+  }
+
+  .author-info {
+    flex: 1;
+  }
+
+  .author-name {
+    font-weight: 600;
+    color: #1a202c;
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+  }
+
+  .verified {
+    background: #48bb78;
+    color: white;
+    width: 18px;
+    height: 18px;
+    border-radius: 50%;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 0.7rem;
+  }
+
+  .author-role {
+    font-size: 0.85rem;
+    color: #718096;
+    margin-top: 0.25rem;
+  }
+
+  .author-location {
+    font-size: 0.8rem;
+    color: #a0aec0;
+    margin-top: 0.25rem;
+  }
+
+  .testimonial-category {
+    display: inline-block;
+    margin-top: 1rem;
+    padding: 0.25rem 0.75rem;
+    background: var(--primary);
+    color: white;
+    border-radius: 4px;
+    font-size: 0.75rem;
+    font-weight: 600;
+    text-transform: uppercase;
+  }
+
+  .empty-state {
+    text-align: center;
+    padding: 4rem 2rem;
+    background: white;
+    border-radius: 16px;
+    box-shadow: 0 2px 8px rgba(0,0,0,0.05);
+  }
+
+  .empty-icon {
+    font-size: 4rem;
+    margin-bottom: 1rem;
+  }
+
+  .empty-state h3 {
+    font-size: 1.5rem;
+    color: var(--text-color, #1a202c);
+    margin: 0 0 0.5rem 0;
+  }
+
+  .empty-state p {
+    color: var(--text-secondary, #718096);
+    margin: 0;
+  }
+
+  .testimonials-count {
+    margin-top: 2rem;
+    text-align: center;
+    font-size: 0.9rem;
+    color: #718096;
+  }
+
+  @media (max-width: 768px) {
+    .testimonial-grid-section {
+      padding: 2rem 1rem;
+    }
+
+    .section-title {
+      font-size: 1.5rem;
+    }
+
+    .testimonials-grid {
+      grid-template-columns: 1fr;
+    }
+
+    .testimonial-card.featured {
+      grid-column: span 1;
+    }
+  }
+</style>

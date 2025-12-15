@@ -1,0 +1,124 @@
+---
+/**
+ * HeroVariant1.astro
+ * Variante 1 del componente Hero - Con imagen lateral
+ */
+
+import type { ComponenteDataEstructurado } from '../../types/componentesEstructurado';
+
+interface Props {
+  datos: ComponenteDataEstructurado;
+  tema?: Record<string, string>;
+}
+
+const { datos, tema = {} } = Astro.props;
+
+// Acceso directo a datos estructurados
+const staticData = datos.static_data || {};
+const styles = datos.styles || {};
+
+const titulo = staticData.titulo || 'Bienvenido';
+const subtitulo = staticData.subtitulo || '';
+const textoBoton = staticData.textoBoton || 'Comenzar';
+const urlBoton = staticData.urlBoton || '#';
+const imagenFondo = staticData.imagenFondo || '';
+
+// Aplicar estilos personalizados si existen
+const primaryColor = styles.colors?.primary || tema.primary || '#667eea';
+const textColor = styles.colors?.text || tema.text || '#1a202c';
+const textSecondary = tema.textSecondary || '#718096';
+const padding = styles.spacing?.padding || '4rem 2rem';
+const gap = styles.spacing?.gap || '4rem';
+---
+
+<section 
+  class="hero-variant1"
+  style={`
+    --primary-color: ${primaryColor};
+    --text-color: ${textColor};
+    --text-secondary: ${textSecondary};
+    padding: ${padding};
+    gap: ${gap};
+  `}
+>
+  <div class="hero-content">
+    <h1 class="hero-title">{titulo}</h1>
+    {subtitulo && <p class="hero-subtitle">{subtitulo}</p>}
+    {textoBoton && (
+      <a href={urlBoton} class="hero-button">
+        {textoBoton}
+      </a>
+    )}
+  </div>
+  {imagenFondo && (
+    <div class="hero-image">
+      <img src={imagenFondo} alt={titulo} />
+    </div>
+  )}
+</section>
+
+<style>
+  .hero-variant1 {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    align-items: center;
+    max-width: 1200px;
+    margin: 0 auto;
+  }
+
+  .hero-content {
+    text-align: left;
+  }
+
+  .hero-title {
+    font-size: 3rem;
+    font-weight: 700;
+    margin: 0 0 1.5rem 0;
+    color: var(--text-color, #1a202c);
+    line-height: 1.2;
+  }
+
+  .hero-subtitle {
+    font-size: 1.25rem;
+    margin: 0 0 2rem 0;
+    color: var(--text-secondary, #718096);
+    line-height: 1.6;
+  }
+
+  .hero-button {
+    display: inline-block;
+    padding: 1rem 2.5rem;
+    background: var(--primary-color, #667eea);
+    color: white;
+    text-decoration: none;
+    border-radius: 8px;
+    font-weight: 600;
+    font-size: 1.1rem;
+    transition: transform 0.2s, box-shadow 0.2s;
+  }
+
+  .hero-button:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 10px 25px rgba(102, 126, 234, 0.4);
+  }
+
+  .hero-image img {
+    width: 100%;
+    height: auto;
+    border-radius: 12px;
+    box-shadow: 0 20px 60px rgba(0, 0, 0, 0.2);
+  }
+
+  @media (max-width: 968px) {
+    .hero-variant1 {
+      grid-template-columns: 1fr;
+      gap: 2rem;
+    }
+
+    .hero-content {
+      text-align: center;
+    }
+  }
+</style>
+
+

@@ -1,0 +1,394 @@
+---
+/**
+ * HeroClic.astro
+ * Hero estilo CLIC Inmobiliaria - Fiel al diseño de pa.clicinmobiliaria.com
+ *
+ * Elementos:
+ * - Badge superior con icono verify (Fundada por René Castillo)
+ * - Título grande blanco
+ * - Subtítulo naranja "La Inmobiliaria del Contenido"
+ * - Descripción
+ * - Badges de beneficios (Asesoría personalizada, Experiencia local, etc.)
+ */
+
+import type { ComponenteDataEstructurado } from '../../types/componentesEstructurado';
+
+interface Props {
+  datos: ComponenteDataEstructurado;
+  tema?: Record<string, string>;
+  baseUrl?: string;
+}
+
+interface Beneficio {
+  texto: string;
+  color: string;
+}
+
+const { datos, tema = {}, baseUrl = '' } = Astro.props;
+
+const staticData = datos?.static_data || {};
+const styles = datos?.styles || {};
+const toggles = datos?.toggles || {};
+
+// === DATOS ===
+const badgeTexto = staticData.badgeTexto || 'Fundada por René Castillo';
+const badgeSubtexto = staticData.badgeSubtexto || 'Presentador TV 18 años';
+const titulo = staticData.titulo || 'Encuentra Tu Propiedad Soñada en República Dominicana';
+const subtitulo = staticData.subtitulo || 'La Inmobiliaria del Contenido';
+const descripcion = staticData.descripcion || 'Descubre casas de lujo, oportunidades de inversión y rentas vacacionales en el paraíso con René Castillo';
+
+const imagenFondo = staticData.imagenFondo || 'https://pacewqgypevfgjmdsorz.supabase.co/storage/v1/object/public/public-assets/images/hero-clic-drone.jpg';
+
+// Toggles
+const mostrarBadge = toggles.mostrarBadge !== false;
+const mostrarSubtitulo = toggles.mostrarSubtitulo !== false;
+const mostrarDescripcion = toggles.mostrarDescripcion !== false;
+const mostrarBeneficios = toggles.mostrarBeneficios !== false;
+
+// === COLORES CONFIGURABLES ===
+// Todos los colores vienen de styles o tema, con valores por defecto de CLIC
+const colorPrimario = styles.colorPrimario || tema?.primary || '#f04e00';
+// El icono de verificación siempre es azul (estándar de UI), no usa colores de marca
+const colorVerifyIcon = '#3b82f6'; // Azul estándar de verified badge
+const colorTextoHero = styles.colorTextoHero || tema?.textOnDark || '#ffffff';
+const colorTextoHeroSecundario = styles.colorTextoHeroSecundario || 'rgba(255, 255, 255, 0.9)';
+const colorTextoHeroTertiary = styles.colorTextoHeroTertiary || 'rgba(255, 255, 255, 0.75)';
+const colorTextoHeroSeparator = styles.colorTextoHeroSeparator || 'rgba(255, 255, 255, 0.5)';
+
+// Overlay configurable
+const overlayOpacity = styles.overlayOpacity || {
+  start: 0.4,
+  mid: 0.5,
+  end: 0.6
+};
+
+// Badge background configurable
+const badgeBackground = styles.badgeBackground || 'rgba(0, 0, 0, 0.4)';
+const badgeBorder = styles.badgeBorder || 'rgba(255, 255, 255, 0.1)';
+
+// Beneficios: Si no vienen en static_data, usar colores del tema o defaults
+const beneficiosDefault: Beneficio[] = Array.isArray(staticData.beneficios) ? [] : [
+  { 
+    texto: 'Asesoría personalizada', 
+    color: styles.beneficio1Color || tema?.accent || '#3b82f6' 
+  },
+  { 
+    texto: 'Experiencia local', 
+    color: styles.beneficio2Color || tema?.warning || '#f59e0b' 
+  },
+  { 
+    texto: 'Proceso transparente', 
+    color: styles.beneficio3Color || tema?.success || '#10b981' 
+  }
+];
+const beneficios: Beneficio[] = Array.isArray(staticData.beneficios) && staticData.beneficios.length > 0 
+  ? staticData.beneficios 
+  : beneficiosDefault;
+---
+
+<section
+  class="hero-clic"
+  style={`
+    --hc-primary: ${colorPrimario};
+    --hc-verify-icon: ${colorVerifyIcon};
+    --hc-text-hero: ${colorTextoHero};
+    --hc-text-hero-sec: ${colorTextoHeroSecundario};
+    --hc-text-hero-ter: ${colorTextoHeroTertiary};
+    --hc-text-hero-sep: ${colorTextoHeroSeparator};
+    --hc-overlay-start: rgba(0, 0, 0, ${overlayOpacity.start});
+    --hc-overlay-mid: rgba(0, 0, 0, ${overlayOpacity.mid});
+    --hc-overlay-end: rgba(0, 0, 0, ${overlayOpacity.end});
+    --hc-badge-bg: ${badgeBackground};
+    --hc-badge-border: ${badgeBorder};
+    background-image: url('${imagenFondo}');
+  `}
+>
+  <div class="hero-overlay"></div>
+
+  {/* Badge superior flotante en el borde */}
+  {mostrarBadge && (
+    <div class="hero-badge-top">
+      <svg class="verify-icon" viewBox="0 0 24 24" fill="currentColor">
+        <path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm-2 15l-5-5 1.41-1.41L10 14.17l7.59-7.59L19 8l-9 9z"/>
+      </svg>
+      <span class="badge-text">{badgeTexto}</span>
+      <span class="badge-separator">•</span>
+      <span class="badge-subtext">{badgeSubtexto}</span>
+    </div>
+  )}
+
+  <div class="hero-content">
+
+    {/* Título principal */}
+    <h1 class="hero-title">{titulo}</h1>
+
+    {/* Subtítulo naranja */}
+    {mostrarSubtitulo && subtitulo && (
+      <p class="hero-subtitle">{subtitulo}</p>
+    )}
+
+    {/* Descripción */}
+    {mostrarDescripcion && descripcion && (
+      <p class="hero-description">{descripcion}</p>
+    )}
+
+    {/* Espacio para buscador (slot futuro) */}
+    <div class="hero-search-placeholder">
+      <slot name="buscador" />
+    </div>
+  </div>
+
+  {/* Badges de beneficios - FUERA del content, en el fondo */}
+  {mostrarBeneficios && beneficios.length > 0 && (
+    <div class="hero-benefits">
+      {beneficios.map((beneficio) => (
+        <div class="benefit-item">
+          <span class="benefit-dot" style={`background-color: ${beneficio.color};`}></span>
+          <span class="benefit-text">{beneficio.texto}</span>
+        </div>
+      ))}
+    </div>
+  )}
+</section>
+
+<style>
+  .hero-clic {
+    position: relative;
+    min-height: 75vh;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    background-size: cover;
+    background-position: center;
+    background-repeat: no-repeat;
+    padding: 4rem 2rem 3rem;
+    font-family: Inter, ui-sans-serif, system-ui, -apple-system, sans-serif;
+  }
+
+  .hero-overlay {
+    position: absolute;
+    inset: 0;
+    background: linear-gradient(
+      to bottom,
+      var(--hc-overlay-start) 0%,
+      var(--hc-overlay-mid) 50%,
+      var(--hc-overlay-end) 100%
+    );
+    z-index: 1;
+  }
+
+  /* Badge flotante en el borde superior */
+  .hero-badge-top {
+    position: absolute;
+    top: 1.5rem;
+    left: 50%;
+    transform: translateX(-50%);
+    z-index: 10;
+    display: inline-flex;
+    align-items: center;
+    gap: 0.5rem;
+    background: var(--hc-badge-bg);
+    backdrop-filter: blur(12px);
+    -webkit-backdrop-filter: blur(12px);
+    padding: 0.625rem 1.5rem;
+    border-radius: 50px;
+    border: 1px solid var(--hc-badge-border);
+  }
+
+  .hero-badge-top .verify-icon {
+    width: 18px;
+    height: 18px;
+    color: var(--hc-verify-icon);
+    flex-shrink: 0;
+  }
+
+  .hero-badge-top .badge-text {
+    color: var(--hc-text-hero);
+    font-size: 0.9375rem;
+    font-weight: 500;
+  }
+
+  .hero-badge-top .badge-separator {
+    color: var(--hc-text-hero-sep);
+    font-size: 0.875rem;
+  }
+
+  .hero-badge-top .badge-subtext {
+    color: var(--hc-text-hero-ter);
+    font-size: 0.9375rem;
+    font-weight: 400;
+  }
+
+  .hero-content {
+    position: relative;
+    z-index: 2;
+    text-align: center;
+    max-width: 64rem; /* max-w-5xl = 1024px */
+    width: 100%;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    padding-top: 1rem;
+  }
+
+  /* Título - Igual al original: lg:text-5xl = 3rem */
+  .hero-title {
+    font-size: 3rem; /* lg:text-5xl */
+    font-weight: 700;
+    color: var(--hc-text-hero);
+    margin: 0 0 1.25rem 0;
+    line-height: 1.25; /* leading-tight */
+    max-width: 100%;
+    text-shadow: 0 2px 20px rgba(0, 0, 0, 0.3);
+    letter-spacing: -0.01em;
+  }
+
+  /* Subtítulo naranja - lg:text-3xl = 1.875rem */
+  .hero-subtitle {
+    font-size: 1.875rem; /* lg:text-3xl */
+    font-weight: 700;
+    color: var(--hc-primary);
+    margin: 0 0 1.5rem 0;
+    line-height: 1.25; /* leading-tight */
+  }
+
+  /* Descripción - lg:text-xl = 1.25rem */
+  .hero-description {
+    font-size: 1.25rem; /* lg:text-xl */
+    color: var(--hc-text-hero-sec);
+    margin: 0 0 2.5rem 0;
+    line-height: 1.625; /* leading-relaxed */
+    max-width: 64rem; /* max-w-5xl */
+    font-weight: 400;
+  }
+
+  /* Placeholder para buscador */
+  .hero-search-placeholder {
+    width: 100%;
+    max-width: 1000px;
+    margin-bottom: 2.5rem;
+  }
+
+  .hero-search-placeholder:empty {
+    display: none;
+  }
+
+  /* Badges de beneficios - En el fondo, no absolute */
+  .hero-benefits {
+    position: relative;
+    z-index: 10;
+    display: flex;
+    flex-wrap: wrap;
+    justify-content: center;
+    gap: 2rem;
+    margin-top: auto;
+    padding-top: 2rem;
+  }
+
+  .benefit-item {
+    display: flex;
+    align-items: center;
+    gap: 0.625rem;
+  }
+
+  .benefit-dot {
+    width: 12px;
+    height: 12px;
+    border-radius: 50%;
+    flex-shrink: 0;
+  }
+
+  .benefit-text {
+    color: var(--hc-text-hero);
+    font-size: 1.0625rem;
+    font-weight: 500;
+  }
+
+  /* Responsive - siguiendo breakpoints de Tailwind */
+  /* lg: 1024px+ (ya definido arriba) */
+
+  /* md: 768px - 1023px */
+  @media (max-width: 1023px) {
+    .hero-title {
+      font-size: 2.25rem; /* md:text-4xl */
+    }
+    .hero-subtitle {
+      font-size: 1.5rem; /* md:text-2xl */
+    }
+    .hero-description {
+      font-size: 1.125rem; /* md:text-lg (realmente xl pero ajustado) */
+    }
+  }
+
+  /* sm: hasta 767px */
+  @media (max-width: 767px) {
+    .hero-clic {
+      min-height: 70vh;
+      padding: 4rem 1.5rem 2.5rem;
+    }
+    .hero-badge-top {
+      top: 0.75rem;
+      padding: 0.5rem 1rem;
+      gap: 0.375rem;
+    }
+    .hero-badge-top .badge-text,
+    .hero-badge-top .badge-subtext {
+      font-size: 0.8125rem;
+    }
+    .hero-badge-top .verify-icon {
+      width: 16px;
+      height: 16px;
+    }
+    .hero-title {
+      font-size: 1.875rem; /* text-3xl */
+    }
+    .hero-subtitle {
+      font-size: 1.25rem; /* text-xl */
+    }
+    .hero-description {
+      font-size: 1.125rem; /* text-lg */
+    }
+    .hero-benefits {
+      gap: 1rem;
+    }
+    .benefit-text {
+      font-size: 0.875rem;
+    }
+  }
+
+  /* xs: hasta 480px */
+  @media (max-width: 480px) {
+    .hero-clic {
+      min-height: 65vh;
+      padding: 3.5rem 1rem 2rem;
+    }
+    .hero-title {
+      font-size: 1.5rem;
+    }
+    .hero-subtitle {
+      font-size: 1.125rem;
+    }
+    .hero-description {
+      font-size: 1rem;
+    }
+    .hero-badge-top {
+      flex-wrap: wrap;
+      justify-content: center;
+      text-align: center;
+      max-width: 90%;
+    }
+    .hero-badge-top .badge-separator {
+      display: none;
+    }
+    .hero-badge-top .badge-subtext {
+      width: 100%;
+      margin-top: 0.125rem;
+    }
+    .hero-benefits {
+      flex-direction: column;
+      align-items: center;
+      gap: 0.5rem;
+    }
+  }
+</style>

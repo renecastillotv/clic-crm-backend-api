@@ -1,0 +1,439 @@
+/* CrmSitioWeb - Estilos Premium */
+
+.sitio-web-container {
+  padding: var(--premium-spacing-lg);
+}
+
+.sitio-web-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: var(--premium-spacing-md);
+}
+
+/* Tabs */
+.tabs-container {
+  margin-bottom: var(--premium-spacing-lg);
+  border-bottom: 2px solid var(--premium-card-border);
+}
+
+.tabs {
+  display: flex;
+  gap: 4px;
+}
+
+.tab {
+  padding: 12px 20px;
+  background: transparent;
+  border: none;
+  border-bottom: 3px solid transparent;
+  cursor: pointer;
+  font-size: 15px;
+  font-weight: 600;
+  color: var(--premium-text-muted);
+  transition: all 0.2s;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.tab:hover {
+  color: var(--premium-text-strong);
+  background: var(--premium-hover-bg, rgba(0, 0, 0, 0.03));
+}
+
+.tab.active {
+  color: var(--premium-primary);
+  border-bottom-color: var(--premium-primary);
+}
+
+.tab-badge {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: 2px 8px;
+  background: var(--premium-badge-bg, #e2e8f0);
+  color: var(--premium-badge-text, #64748b);
+  border-radius: 12px;
+  font-size: 12px;
+  font-weight: 600;
+  min-width: 24px;
+}
+
+.tab.active .tab-badge {
+  background: var(--premium-primary);
+  color: white;
+}
+
+.tab-badge-custom {
+  background: var(--premium-success-bg, #d1fae5);
+  color: var(--premium-success-text, #065f46);
+}
+
+.tab.active .tab-badge-custom {
+  background: var(--premium-success);
+  color: white;
+}
+
+/* Table Styles */
+.paginas-table {
+  background: var(--premium-card-bg);
+  border: 1px solid var(--premium-card-border);
+  border-radius: var(--premium-radius-medium);
+  overflow: hidden;
+}
+
+.table-header {
+  display: grid;
+  grid-template-columns: 150px 1fr 200px 100px 200px 100px;
+  gap: 16px;
+  padding: 16px 20px;
+  background: var(--premium-header-bg, #f8fafc);
+  border-bottom: 2px solid var(--premium-card-border);
+  font-weight: 600;
+  font-size: 13px;
+  color: var(--premium-text-muted);
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+}
+
+.table-body {
+  max-height: 600px;
+  overflow-y: auto;
+}
+
+.table-row {
+  display: grid;
+  grid-template-columns: 150px 1fr 200px 100px 200px 100px;
+  gap: 16px;
+  padding: 16px 20px;
+  border-bottom: 1px solid var(--premium-card-border);
+  align-items: center;
+  transition: background 0.15s;
+}
+
+.table-row:hover {
+  background: var(--premium-hover-bg, rgba(0, 0, 0, 0.02));
+}
+
+.table-row:last-child {
+  border-bottom: none;
+}
+
+.col-codigo code,
+.col-url code {
+  padding: 4px 8px;
+  background: var(--premium-code-bg, #f1f5f9);
+  border-radius: 4px;
+  font-size: 13px;
+  font-family: 'Monaco', 'Menlo', 'Consolas', monospace;
+  color: var(--premium-code-text, #475569);
+}
+
+.col-nombre strong {
+  color: var(--premium-text-strong);
+  font-weight: 600;
+}
+
+.badge {
+  display: inline-flex;
+  padding: 4px 10px;
+  border-radius: 12px;
+  font-size: 12px;
+  font-weight: 600;
+  background: var(--premium-badge-bg, #e2e8f0);
+  color: var(--premium-badge-text, #64748b);
+}
+
+.badge-success {
+  background: var(--premium-success-bg, #d1fae5);
+  color: var(--premium-success-text, #065f46);
+}
+
+.badge-info {
+  background: var(--premium-info-bg, #dbeafe);
+  color: var(--premium-info-text, #1e40af);
+}
+
+.badge-warning {
+  background: var(--premium-warning-bg, #fef3c7);
+  color: var(--premium-warning-text, #92400e);
+}
+
+.badge-gray {
+  background: var(--premium-gray-bg, #f1f5f9);
+  color: var(--premium-gray-text, #64748b);
+}
+
+.status-badges {
+  display: flex;
+  gap: 6px;
+  flex-wrap: wrap;
+}
+
+.btn-icon {
+  padding: 8px;
+  background: transparent;
+  border: 1px solid var(--premium-card-border);
+  border-radius: 6px;
+  cursor: pointer;
+  color: var(--premium-icon-default);
+  transition: all 0.2s;
+}
+
+.btn-icon:hover {
+  background: var(--premium-hover-bg);
+  border-color: var(--premium-primary);
+  color: var(--premium-primary);
+}
+
+.tab-content {
+  animation: fadeIn 0.2s ease-in;
+}
+
+@keyframes fadeIn {
+  from {
+    opacity: 0;
+    transform: translateY(-4px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.sitio-web-header-content h2 {
+  font-size: 28px;
+  font-weight: 700;
+  color: var(--premium-text-strong);
+  margin: 0 0 8px 0;
+}
+
+.sitio-web-header-content p {
+  color: var(--premium-text-muted);
+  font-size: 15px;
+  margin: 0;
+}
+
+.sitio-web-grupos {
+  display: flex;
+  flex-direction: column;
+  gap: var(--premium-spacing-lg);
+}
+
+.sitio-web-grupo {
+  background: var(--premium-card-bg);
+  border-radius: var(--premium-radius-medium);
+  border: 1px solid var(--premium-card-border);
+  box-shadow: var(--premium-elevation-1);
+  overflow: hidden;
+}
+
+.sitio-web-grupo-header {
+  padding: var(--premium-spacing-md) var(--premium-spacing-lg);
+  border-bottom: 1px solid var(--premium-card-border);
+  display: flex;
+  align-items: center;
+  gap: var(--premium-spacing-sm);
+}
+
+.sitio-web-grupo-header-icon {
+  color: var(--premium-icon-default);
+  display: flex;
+  align-items: center;
+}
+
+.sitio-web-grupo-header-info h3 {
+  font-size: 18px;
+  font-weight: 600;
+  color: var(--premium-text-strong);
+  margin: 0 0 4px 0;
+}
+
+.sitio-web-grupo-header-info p {
+  font-size: 13px;
+  color: var(--premium-text-soft);
+  margin: 0;
+}
+
+.sitio-web-grupo-paginas {
+  display: flex;
+  flex-direction: column;
+}
+
+.sitio-web-pagina {
+  padding: var(--premium-spacing-md) var(--premium-spacing-lg);
+  border-bottom: 1px solid var(--premium-card-border);
+  display: flex;
+  align-items: center;
+  justify-between;
+  transition: background var(--premium-transition-fast);
+}
+
+.sitio-web-pagina:last-child {
+  border-bottom: none;
+}
+
+.sitio-web-pagina:hover {
+  background: var(--premium-surface);
+}
+
+.sitio-web-pagina-info {
+  flex: 1;
+}
+
+.sitio-web-pagina-titulo-row {
+  display: flex;
+  align-items: center;
+  gap: var(--premium-spacing-sm);
+  margin-bottom: 6px;
+}
+
+.sitio-web-pagina-titulo {
+  font-size: 15px;
+  font-weight: 500;
+  color: var(--premium-text-main);
+  margin: 0;
+}
+
+.sitio-web-pagina-badge {
+  padding: 2px 8px;
+  font-size: 11px;
+  font-weight: 600;
+  background: var(--premium-accent-light);
+  color: var(--premium-accent);
+  border-radius: 6px;
+}
+
+.sitio-web-pagina-meta {
+  display: flex;
+  align-items: center;
+  gap: var(--premium-spacing-sm);
+  font-size: 13px;
+  color: var(--premium-text-soft);
+}
+
+.sitio-web-pagina-meta span {
+  display: flex;
+  align-items: center;
+}
+
+.sitio-web-pagina-actions {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.sitio-web-icon-button {
+  padding: 8px;
+  background: transparent;
+  border: none;
+  color: var(--premium-icon-default);
+  cursor: pointer;
+  border-radius: 8px;
+  transition: all var(--premium-transition-fast);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.sitio-web-icon-button:hover {
+  background: var(--premium-surface);
+  color: var(--premium-text-main);
+}
+
+.sitio-web-edit-button {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 16px;
+  background: transparent;
+  border: none;
+  color: var(--premium-primary);
+  font-size: 14px;
+  font-weight: 500;
+  cursor: pointer;
+  border-radius: 8px;
+  transition: all var(--premium-transition-fast);
+}
+
+.sitio-web-edit-button:hover {
+  background: var(--premium-primary-light);
+}
+
+.sitio-web-empty {
+  background: var(--premium-card-bg);
+  border-radius: var(--premium-radius-medium);
+  border: 1px solid var(--premium-card-border);
+  padding: var(--premium-spacing-2xl);
+  text-align: center;
+}
+
+.sitio-web-empty-icon {
+  color: var(--premium-icon-default);
+  margin: 0 auto var(--premium-spacing-md);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.sitio-web-empty h3 {
+  font-size: 18px;
+  font-weight: 600;
+  color: var(--premium-text-main);
+  margin: 0 0 8px 0;
+}
+
+.sitio-web-empty p {
+  font-size: 15px;
+  color: var(--premium-text-muted);
+  margin: 0 0 var(--premium-spacing-md) 0;
+}
+
+.sitio-web-loading {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 400px;
+}
+
+.sitio-web-loading-icon {
+  width: 32px;
+  height: 32px;
+  color: var(--premium-primary);
+  animation: spin 1s linear infinite;
+}
+
+@keyframes spin {
+  from {
+    transform: rotate(0deg);
+  }
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+.sitio-web-error {
+  background: var(--premium-error-light);
+  border: 1px solid var(--premium-error);
+  border-radius: var(--premium-radius-medium);
+  padding: var(--premium-spacing-md);
+}
+
+.sitio-web-error p {
+  color: var(--premium-error);
+  margin: 0 0 8px 0;
+}
+
+.sitio-web-error-button {
+  background: transparent;
+  border: none;
+  color: var(--premium-error);
+  font-weight: 600;
+  cursor: pointer;
+  text-decoration: underline;
+}
+
+.sitio-web-error-button:hover {
+  opacity: 0.8;
+}

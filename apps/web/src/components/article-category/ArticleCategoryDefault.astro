@@ -1,0 +1,428 @@
+---
+/**
+ * ArticleCategoryDefault.astro
+ * Muestra info de categoria + articulos filtrados por esa categoria
+ * Con hero que muestra nombre y descripcion de la categoria
+ */
+
+import type { ComponenteDataEstructurado } from '../../types/componentesEstructurado';
+import ContentBreadcrumbs from '../breadcrumbs/ContentBreadcrumbs.astro';
+
+interface Props {
+  datos: ComponenteDataEstructurado;
+  tema?: Record<string, string>;
+  baseUrl?: string;
+}
+
+const { datos, tema = {}, baseUrl = '' } = Astro.props;
+
+const staticData = datos?.static_data || {};
+const dynamicData = datos?.dynamic_data || {};
+const styles = datos?.styles || {};
+
+// El nuevo formato de resolved puede ser:
+// 1. {categoria, items} - objeto directo
+// 2. [{categoria, items}] - array con un solo elemento (cuando viene de la API)
+// 3. array de articulos directo (formato antiguo)
+let resolvedData = dynamicData?.resolved || {};
+
+// Si es un array, puede ser [{categoria, items}] o [articulos...]
+if (Array.isArray(resolvedData)) {
+  // Verificar si es un array con objeto {categoria, items}
+  if (resolvedData.length === 1 && resolvedData[0]?.categoria !== undefined) {
+    resolvedData = resolvedData[0]; // Extraer el objeto del array
+  }
+}
+
+const isNewFormat = resolvedData && typeof resolvedData === 'object' && !Array.isArray(resolvedData) && ('items' in resolvedData || 'categoria' in resolvedData);
+
+// Categoria actual - puede venir del nuevo formato, de datos.categoria o de dynamicData.categoria
+const categoria = isNewFormat
+  ? resolvedData.categoria
+  : (datos?.categoria || dynamicData?.categoria || null);
+
+// Articulos - pueden venir del nuevo formato {items} o ser un array directo
+const articulos = isNewFormat
+  ? (resolvedData.items || [])
+  : (Array.isArray(dynamicData?.resolved) ? dynamicData.resolved : (dynamicData?.articulos || []));
+
+const hasCategoria = !!categoria;
+const categoriaNombre = hasCategoria ? (categoria.nombre || 'Categoria') : 'Categoria';
+const categoriaDescripcion = hasCategoria ? (categoria.descripcion || '') : '';
+const categoriaSlug = hasCategoria
+  ? categoria.slug
+  : (articulos[0]?.categoria_slug || 'general');
+
+// Mapeo de iconos
+const iconoMap: Record<string, string> = {
+  'home': '🏠',
+  'trending-up': '📈',
+  'dollar-sign': '💰',
+  'building': '🏢',
+  'key': '🔑',
+  'search': '🔍',
+  'heart': '❤️',
+  'star': '⭐',
+  'file-text': '📄',
+  'book': '📚',
+  'lightbulb': '💡',
+  'chart': '📊',
+  'map': '🗺️',
+  'users': '👥',
+  'default': '📝'
+};
+
+function getIcono(icono: string | undefined): string {
+  if (!icono) return iconoMap['default'];
+  if (/[\u{1F300}-\u{1F9FF}]/u.test(icono)) return icono;
+  return iconoMap[icono] || iconoMap['default'];
+}
+
+const categoriaIcono = getIcono(hasCategoria ? categoria.icono : undefined);
+
+// Colores del tema
+const primaryColor = tema?.primary || '#667eea';
+const secondaryColor = tema?.secondary || '#764ba2';
+
+// Breadcrumbs
+const breadcrumbItems = [
+  { label: 'Artículos', href: `${baseUrl}/articulos` },
+  { label: categoriaNombre }
+];
+
+// Formatear fecha
+function formatDate(dateString: string): string {
+  if (!dateString) return '';
+  try {
+    const date = new Date(dateString);
+    return date.toLocaleDateString('es-ES', {
+      year: 'numeric',
+      month: 'long',
+      day: 'numeric'
+    });
+  } catch {
+    return dateString;
+  }
+}
+---
+
+<section class="article-category-page" style={`--primary: ${primaryColor}; --secondary: ${secondaryColor};`}>
+  <!-- Hero de Categoria -->
+  <div class="category-hero">
+    <div class="hero-container">
+      <ContentBreadcrumbs items={breadcrumbItems} variant="light" />
+
+      <div class="hero-content">
+        <span class="category-icon">{categoriaIcono}</span>
+        <h1 class="category-title">{categoriaNombre}</h1>
+        {categoriaDescripcion && (
+          <p class="category-description">{categoriaDescripcion}</p>
+        )}
+        <div class="category-stats">
+          <span class="article-count">{articulos.length} articulo{articulos.length !== 1 ? 's' : ''}</span>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Grid de articulos -->
+  <div class="articles-section">
+    <div class="container">
+      {articulos.length > 0 ? (
+        <div class="article-grid">
+          {articulos.map((articulo: any, index: number) => {
+            const titulo = articulo.titulo || articulo.title || 'Articulo';
+            const excerpt = articulo.excerpt || articulo.extracto || articulo.descripcion || '';
+            const imagen = articulo.imagen_principal || articulo.imagen || articulo.imagen_portada || '';
+            const autor = articulo.autor || articulo.autor_nombre || '';
+            const fecha = articulo.fecha_publicacion || '';
+            const articuloSlug = articulo.slug || articulo.id;
+            const articuloCategoria = categoriaSlug || articulo.categoria_slug || 'general';
+            const url = `${baseUrl}/articulos/${articuloCategoria}/${articuloSlug}`;
+            const isFeatured = index === 0;
+
+            return (
+              <article class={`article-card ${isFeatured ? 'featured' : ''}`}>
+                <a href={url} class="card-link">
+                  <div class="article-image">
+                    {imagen ? (
+                      <img src={imagen} alt={titulo} loading="lazy" />
+                    ) : (
+                      <div class="no-image">
+                        <span class="placeholder">A</span>
+                      </div>
+                    )}
+                  </div>
+                  <div class="article-content">
+                    <div class="article-meta">
+                      {fecha && (
+                        <span class="article-date">{formatDate(fecha)}</span>
+                      )}
+                      {autor && (
+                        <span class="article-author">por {autor}</span>
+                      )}
+                    </div>
+                    <h3 class="article-title">{titulo}</h3>
+                    {excerpt && <p class="article-excerpt">{excerpt}</p>}
+                    <span class="read-more">Leer mas</span>
+                  </div>
+                </a>
+              </article>
+            );
+          })}
+        </div>
+      ) : (
+        <div class="empty-state">
+          <div class="empty-icon">?</div>
+          <h3>No hay articulos en esta categoria</h3>
+          <p>Actualmente no tenemos articulos publicados en esta categoria.</p>
+          <a href={`${baseUrl}/articulos`} class="back-btn">Ver todos los articulos</a>
+        </div>
+      )}
+    </div>
+  </div>
+</section>
+
+<style>
+  .article-category-page {
+    min-height: 60vh;
+  }
+
+  .category-hero {
+    background: linear-gradient(135deg, var(--primary) 0%, var(--secondary) 100%);
+    padding: 3rem 1rem 4rem;
+    color: white;
+  }
+
+  .hero-container {
+    max-width: 800px;
+    margin: 0 auto;
+    text-align: center;
+  }
+
+  .hero-content {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 1rem;
+    margin-top: 1.5rem;
+  }
+
+  .category-icon {
+    font-size: 4rem;
+    line-height: 1;
+  }
+
+  .category-title {
+    font-size: 2.5rem;
+    font-weight: 700;
+    margin: 0;
+    text-shadow: 0 2px 4px rgba(0,0,0,0.1);
+  }
+
+  .category-description {
+    font-size: 1.2rem;
+    max-width: 600px;
+    margin: 0;
+    opacity: 0.9;
+    line-height: 1.6;
+  }
+
+  .category-stats {
+    margin-top: 0.5rem;
+  }
+
+  .article-count {
+    background: rgba(255,255,255,0.2);
+    padding: 0.5rem 1.25rem;
+    border-radius: 20px;
+    font-size: 0.9rem;
+    font-weight: 500;
+  }
+
+  .articles-section {
+    padding: 3rem 1rem 4rem;
+    background: #f7fafc;
+  }
+
+  .container {
+    max-width: 1200px;
+    margin: 0 auto;
+  }
+
+  .article-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(350px, 1fr));
+    gap: 1.5rem;
+  }
+
+  .article-card {
+    background: white;
+    border-radius: 16px;
+    overflow: hidden;
+    box-shadow: 0 4px 12px rgba(0,0,0,0.08);
+    transition: transform 0.2s, box-shadow 0.2s;
+  }
+
+  .article-card:hover {
+    transform: translateY(-4px);
+    box-shadow: 0 8px 24px rgba(0,0,0,0.12);
+  }
+
+  .article-card.featured {
+    grid-column: span 2;
+  }
+
+  .article-card.featured .article-image {
+    height: 300px;
+  }
+
+  .card-link {
+    display: block;
+    text-decoration: none;
+    color: inherit;
+  }
+
+  .article-image {
+    position: relative;
+    height: 200px;
+    background: linear-gradient(135deg, #e2e8f0 0%, #cbd5e0 100%);
+  }
+
+  .article-image img {
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+  }
+
+  .no-image {
+    width: 100%;
+    height: 100%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    color: #a0aec0;
+    font-size: 3rem;
+    font-weight: bold;
+  }
+
+  .placeholder {
+    opacity: 0.5;
+  }
+
+  .article-content {
+    padding: 1.5rem;
+  }
+
+  .article-meta {
+    display: flex;
+    gap: 1rem;
+    margin-bottom: 0.75rem;
+    font-size: 0.85rem;
+    color: #718096;
+  }
+
+  .article-title {
+    font-size: 1.25rem;
+    font-weight: 600;
+    margin: 0 0 0.75rem;
+    color: #1a202c;
+    line-height: 1.3;
+  }
+
+  .article-card.featured .article-title {
+    font-size: 1.5rem;
+  }
+
+  .article-excerpt {
+    font-size: 0.95rem;
+    color: #718096;
+    margin: 0 0 1rem;
+    line-height: 1.6;
+    display: -webkit-box;
+    -webkit-line-clamp: 3;
+    -webkit-box-orient: vertical;
+    overflow: hidden;
+  }
+
+  .read-more {
+    display: inline-block;
+    color: var(--primary);
+    font-weight: 500;
+    font-size: 0.9rem;
+  }
+
+  .empty-state {
+    text-align: center;
+    padding: 4rem 2rem;
+    background: white;
+    border-radius: 16px;
+    box-shadow: 0 2px 8px rgba(0,0,0,0.05);
+  }
+
+  .empty-icon {
+    font-size: 4rem;
+    margin-bottom: 1rem;
+    color: #a0aec0;
+  }
+
+  .empty-state h3 {
+    font-size: 1.5rem;
+    color: #1a202c;
+    margin: 0 0 0.5rem;
+  }
+
+  .empty-state p {
+    color: #718096;
+    margin: 0 0 1.5rem;
+  }
+
+  .back-btn {
+    display: inline-block;
+    padding: 0.75rem 1.5rem;
+    background: var(--primary);
+    color: white;
+    text-decoration: none;
+    border-radius: 8px;
+    font-weight: 500;
+    transition: transform 0.2s;
+  }
+
+  .back-btn:hover {
+    transform: translateY(-2px);
+  }
+
+  @media (max-width: 768px) {
+    .category-hero {
+      padding: 2rem 1rem 3rem;
+    }
+
+    .category-icon {
+      font-size: 3rem;
+    }
+
+    .category-title {
+      font-size: 1.75rem;
+    }
+
+    .category-description {
+      font-size: 1rem;
+    }
+
+    .article-grid {
+      grid-template-columns: 1fr;
+    }
+
+    .article-card.featured {
+      grid-column: span 1;
+    }
+
+    .article-card.featured .article-image {
+      height: 200px;
+    }
+
+    .article-card.featured .article-title {
+      font-size: 1.25rem;
+    }
+  }
+</style>

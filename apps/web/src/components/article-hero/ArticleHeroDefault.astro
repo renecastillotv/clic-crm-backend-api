@@ -1,0 +1,346 @@
+---
+/**
+ * ArticleHeroDefault.astro
+ * Hero para la página principal de artículos/blog con título, categorías y buscador
+ */
+
+import type { ComponenteDataEstructurado } from '../../types/componentesEstructurado';
+
+interface Props {
+  datos: ComponenteDataEstructurado;
+  tema?: Record<string, string>;
+  baseUrl?: string;
+}
+
+const { datos, tema = {}, baseUrl = '' } = Astro.props;
+
+const staticData = datos?.static_data || {};
+const dynamicData = datos?.dynamic_data || {};
+const styles = datos?.styles || {};
+const toggles = datos?.toggles || {};
+
+// Configuración
+const titulo = staticData.titulo || 'Blog';
+const subtitulo = staticData.subtitulo || 'Artículos, guías y noticias del sector inmobiliario';
+const mostrarBuscador = toggles.mostrarBuscador !== false;
+const mostrarCategorias = toggles.mostrarCategorias !== false;
+const mostrarStats = toggles.mostrarStats !== false;
+
+// Categorías desde dynamic_data
+const categorias = dynamicData?.resolved || dynamicData?.categorias || [];
+
+// Calcular totalArticulos sumando total_items de cada categoría (como en videos)
+let totalArticulos = dynamicData?.totalArticulos || 0;
+if (totalArticulos === 0 && categorias.length > 0) {
+  totalArticulos = categorias.reduce((acc: number, cat: any) => acc + (cat.total_items || cat.count || 0), 0);
+}
+
+// Colores
+const bgGradient = styles.colors?.background || 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)';
+
+// Mapeo de iconos de texto a emojis
+const iconoMap: Record<string, string> = {
+  'home': '🏠',
+  'trending-up': '📈',
+  'dollar-sign': '💰',
+  'building': '🏢',
+  'key': '🔑',
+  'search': '🔍',
+  'heart': '❤️',
+  'star': '⭐',
+  'file-text': '📄',
+  'book': '📚',
+  'lightbulb': '💡',
+  'chart': '📊',
+  'map': '🗺️',
+  'users': '👥',
+  'default': '📝'
+};
+
+function getIcono(icono: string | undefined): string {
+  if (!icono) return iconoMap['default'];
+  // Si ya es un emoji (contiene caracteres unicode especiales), devolverlo tal cual
+  if (/[\u{1F300}-\u{1F9FF}]/u.test(icono)) return icono;
+  // Si es un nombre de icono, buscar en el mapa
+  return iconoMap[icono] || iconoMap['default'];
+}
+---
+
+<section class="article-hero" style={`background: ${bgGradient};`}>
+  <div class="container">
+    <div class="hero-content">
+      <h1 class="title">{titulo}</h1>
+      <p class="subtitle">{subtitulo}</p>
+
+      {mostrarStats && (
+        <div class="stats">
+          <div class="stat">
+            <span class="stat-number">{totalArticulos}</span>
+            <span class="stat-label">Artículos</span>
+          </div>
+          <div class="divider"></div>
+          <div class="stat">
+            <span class="stat-number">{categorias.length}</span>
+            <span class="stat-label">Categorías</span>
+          </div>
+        </div>
+      )}
+
+      {mostrarBuscador && (
+        <div class="search-box">
+          <input
+            type="text"
+            placeholder="Buscar artículos..."
+            class="search-input"
+            id="article-search"
+          />
+          <button class="search-btn" aria-label="Buscar">
+            <svg fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
+            </svg>
+          </button>
+        </div>
+      )}
+    </div>
+
+    {mostrarCategorias && categorias.length > 0 && (
+      <div class="categories-section">
+        <h3 class="categories-title">Explorar por categoría</h3>
+        <div class="categories-grid">
+          {categorias.map((cat: any) => (
+            <a href={`${baseUrl}/articulos/${cat.slug}`} class="category-card">
+              <span class="category-icon">{getIcono(cat.icono)}</span>
+              <span class="category-name">{cat.nombre}</span>
+              {cat.count > 0 && (
+                <span class="category-count">{cat.count}</span>
+              )}
+            </a>
+          ))}
+        </div>
+      </div>
+    )}
+  </div>
+</section>
+
+<style>
+  .article-hero {
+    padding: 2rem 1rem 2.5rem;
+    color: white;
+  }
+
+  .container {
+    max-width: 1200px;
+    margin: 0 auto;
+  }
+
+  .hero-content {
+    text-align: center;
+    margin-bottom: 2rem;
+  }
+
+  .title {
+    font-size: 2rem;
+    font-weight: 700;
+    margin: 0 0 0.5rem;
+  }
+
+  .subtitle {
+    font-size: 1rem;
+    opacity: 0.9;
+    margin: 0 0 1.5rem;
+    max-width: 600px;
+    margin-left: auto;
+    margin-right: auto;
+  }
+
+  .stats {
+    display: flex;
+    justify-content: center;
+    gap: 1.5rem;
+    margin-bottom: 1.5rem;
+  }
+
+  .stat {
+    text-align: center;
+  }
+
+  .stat-number {
+    display: block;
+    font-size: 2rem;
+    font-weight: 700;
+  }
+
+  .stat-label {
+    font-size: 0.875rem;
+    opacity: 0.8;
+    text-transform: uppercase;
+  }
+
+  .divider {
+    width: 1px;
+    background: rgba(255,255,255,0.3);
+  }
+
+  .search-box {
+    display: flex;
+    max-width: 500px;
+    margin: 0 auto;
+    background: white;
+    border-radius: 50px;
+    overflow: hidden;
+    box-shadow: 0 4px 20px rgba(0,0,0,0.15);
+  }
+
+  .search-input {
+    flex: 1;
+    padding: 1rem 1.5rem;
+    border: none;
+    font-size: 1rem;
+    color: #333;
+    outline: none;
+  }
+
+  .search-input::placeholder {
+    color: #999;
+  }
+
+  .search-btn {
+    padding: 0 1.5rem;
+    background: #667eea;
+    border: none;
+    cursor: pointer;
+    transition: background 0.2s;
+  }
+
+  .search-btn:hover {
+    background: #5a67d8;
+  }
+
+  .search-btn svg {
+    width: 24px;
+    height: 24px;
+    color: white;
+  }
+
+  .categories-section {
+    margin-top: 2rem;
+  }
+
+  .categories-title {
+    text-align: center;
+    font-size: 1rem;
+    font-weight: 500;
+    margin: 0 0 1.5rem;
+    opacity: 0.9;
+    text-transform: uppercase;
+    letter-spacing: 1px;
+  }
+
+  .categories-grid {
+    display: flex;
+    flex-wrap: wrap;
+    justify-content: center;
+    gap: 1rem;
+  }
+
+  .category-card {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    padding: 0.75rem 1.25rem;
+    background: rgba(255,255,255,0.15);
+    backdrop-filter: blur(10px);
+    border-radius: 50px;
+    text-decoration: none;
+    color: white;
+    transition: background 0.2s, transform 0.2s;
+  }
+
+  .category-card:hover {
+    background: rgba(255,255,255,0.25);
+    transform: translateY(-2px);
+  }
+
+  .category-icon {
+    font-size: 1.25rem;
+  }
+
+  .category-name {
+    font-weight: 500;
+  }
+
+  .category-count {
+    background: rgba(255,255,255,0.3);
+    padding: 0.2rem 0.6rem;
+    border-radius: 20px;
+    font-size: 0.75rem;
+    font-weight: 600;
+  }
+
+  @media (min-width: 768px) {
+    .title {
+      font-size: 2.5rem;
+    }
+  }
+
+  @media (max-width: 480px) {
+    .stats {
+      gap: 1rem;
+    }
+
+    .stat-number {
+      font-size: 1.5rem;
+    }
+
+    .category-card {
+      padding: 0.5rem 0.75rem;
+      font-size: 0.85rem;
+    }
+  }
+</style>
+
+<script>
+  // Búsqueda de artículos con filtrado en vivo
+  const searchInput = document.getElementById('article-search') as HTMLInputElement;
+  const searchBtn = document.querySelector('.search-btn') as HTMLButtonElement;
+
+  function performSearch() {
+    const query = searchInput?.value.trim().toLowerCase();
+    if (!query) {
+      // Mostrar todos los artículos
+      document.querySelectorAll('.article-card, .articles-grid > a').forEach(card => {
+        (card as HTMLElement).style.display = '';
+      });
+      return;
+    }
+
+    // Filtrar artículos por título, excerpt o categoría
+    document.querySelectorAll('.article-card, .articles-grid > a').forEach(card => {
+      const title = card.querySelector('.article-title')?.textContent?.toLowerCase() || '';
+      const excerpt = card.querySelector('.article-excerpt')?.textContent?.toLowerCase() || '';
+      const category = card.querySelector('.article-category')?.textContent?.toLowerCase() || '';
+      const matches = title.includes(query) || excerpt.includes(query) || category.includes(query);
+      (card as HTMLElement).style.display = matches ? '' : 'none';
+    });
+  }
+
+  if (searchInput) {
+    // Filtrado en vivo mientras escribe
+    searchInput.addEventListener('input', performSearch);
+
+    // También buscar al presionar Enter
+    searchInput.addEventListener('keypress', (e) => {
+      if (e.key === 'Enter') {
+        e.preventDefault();
+        performSearch();
+      }
+    });
+  }
+
+  if (searchBtn) {
+    searchBtn.addEventListener('click', (e) => {
+      e.preventDefault();
+      performSearch();
+    });
+  }
+</script>

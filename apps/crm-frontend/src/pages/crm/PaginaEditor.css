@@ -1,0 +1,554 @@
+/* PaginaEditor - Estilos Premium */
+
+.pagina-editor-container {
+  padding: var(--premium-spacing-lg);
+  max-width: 1400px;
+  margin: 0 auto;
+}
+
+/* ============================================================
+   HEADER DE PÁGINA
+   ============================================================ */
+
+.pagina-editor-header {
+  background: var(--premium-card-bg);
+  border-radius: var(--premium-radius-medium);
+  border: 1px solid var(--premium-card-border);
+  box-shadow: var(--premium-elevation-1);
+  padding: var(--premium-spacing-lg);
+  margin-bottom: var(--premium-spacing-lg);
+}
+
+.pagina-editor-header-top {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: var(--premium-spacing-md);
+}
+
+.pagina-editor-header-info h1 {
+  font-size: 24px;
+  font-weight: 700;
+  color: var(--premium-text-strong);
+  margin: 0 0 4px 0;
+}
+
+.pagina-editor-header-meta {
+  display: flex;
+  align-items: center;
+  gap: var(--premium-spacing-md);
+  font-size: 14px;
+  color: var(--premium-text-soft);
+}
+
+.pagina-editor-header-meta span {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.pagina-editor-badge {
+  padding: 4px 10px;
+  font-size: 12px;
+  font-weight: 600;
+  background: var(--premium-accent-light);
+  color: var(--premium-accent);
+  border-radius: 6px;
+}
+
+.pagina-editor-header-actions {
+  display: flex;
+  align-items: center;
+  gap: var(--premium-spacing-sm);
+}
+
+/* ============================================================
+   COMPONENTES DE LA PÁGINA
+   ============================================================ */
+
+.pagina-editor-section {
+  background: var(--premium-card-bg);
+  border-radius: var(--premium-radius-medium);
+  border: 1px solid var(--premium-card-border);
+  box-shadow: var(--premium-elevation-1);
+  overflow: hidden;
+}
+
+.pagina-editor-section-header {
+  padding: var(--premium-spacing-md) var(--premium-spacing-lg);
+  border-bottom: 1px solid var(--premium-card-border);
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.pagina-editor-section-title {
+  display: flex;
+  align-items: center;
+  gap: var(--premium-spacing-sm);
+}
+
+.pagina-editor-section-title h2 {
+  font-size: 18px;
+  font-weight: 600;
+  color: var(--premium-text-strong);
+  margin: 0;
+}
+
+.pagina-editor-section-subtitle {
+  font-size: 14px;
+  color: var(--premium-text-soft);
+  margin: 0;
+}
+
+/* ============================================================
+   LISTA DE COMPONENTES
+   ============================================================ */
+
+.pagina-editor-componentes-list {
+  padding: var(--premium-spacing-md);
+}
+
+.pagina-editor-componente-item {
+  background: var(--premium-surface);
+  border: 1px solid var(--premium-card-border);
+  border-radius: var(--premium-radius-small);
+  padding: var(--premium-spacing-md);
+  margin-bottom: var(--premium-spacing-sm);
+  display: flex;
+  align-items: center;
+  gap: var(--premium-spacing-md);
+  transition: all var(--premium-transition-fast);
+  cursor: grab;
+}
+
+.pagina-editor-componente-item:hover {
+  border-color: var(--premium-primary);
+  box-shadow: var(--premium-elevation-1);
+}
+
+.pagina-editor-componente-item:active {
+  cursor: grabbing;
+}
+
+.pagina-editor-componente-item.dragging {
+  opacity: 0.5;
+  cursor: grabbing;
+}
+
+.pagina-editor-componente-drag-handle {
+  color: var(--premium-icon-default);
+  cursor: grab;
+  display: flex;
+  align-items: center;
+}
+
+.pagina-editor-componente-info {
+  flex: 1;
+  min-width: 0;
+}
+
+.pagina-editor-componente-title {
+  font-size: 15px;
+  font-weight: 500;
+  color: var(--premium-text-main);
+  margin: 0 0 4px 0;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.pagina-editor-componente-tipo-badge {
+  padding: 2px 8px;
+  font-size: 11px;
+  font-weight: 600;
+  background: var(--premium-primary-light);
+  color: var(--premium-primary);
+  border-radius: 4px;
+}
+
+.pagina-editor-componente-meta {
+  font-size: 13px;
+  color: var(--premium-text-soft);
+  display: flex;
+  align-items: center;
+  gap: var(--premium-spacing-sm);
+}
+
+.pagina-editor-componente-actions {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+/* ============================================================
+   BOTONES
+   ============================================================ */
+
+.pagina-editor-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 16px;
+  font-size: 14px;
+  font-weight: 500;
+  border-radius: 8px;
+  cursor: pointer;
+  transition: all var(--premium-transition-fast);
+  border: none;
+  outline: none;
+}
+
+.pagina-editor-btn-primary {
+  background: var(--premium-primary);
+  color: white;
+}
+
+.pagina-editor-btn-primary:hover {
+  background: var(--premium-primary-dark);
+  box-shadow: var(--premium-elevation-2);
+}
+
+.pagina-editor-btn-secondary {
+  background: transparent;
+  color: var(--premium-text-main);
+  border: 1px solid var(--premium-card-border);
+}
+
+.pagina-editor-btn-secondary:hover {
+  background: var(--premium-surface);
+  border-color: var(--premium-primary);
+}
+
+.pagina-editor-btn-icon {
+  padding: 8px;
+  background: transparent;
+  border: none;
+  color: var(--premium-icon-default);
+  cursor: pointer;
+  border-radius: 8px;
+  transition: all var(--premium-transition-fast);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.pagina-editor-btn-icon:hover {
+  background: var(--premium-surface);
+  color: var(--premium-text-main);
+}
+
+.pagina-editor-btn-icon.danger:hover {
+  background: var(--premium-error-light);
+  color: var(--premium-error);
+}
+
+.pagina-editor-btn:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+/* ============================================================
+   TOGGLE SWITCH
+   ============================================================ */
+
+.pagina-editor-toggle {
+  position: relative;
+  display: inline-block;
+  width: 44px;
+  height: 24px;
+}
+
+.pagina-editor-toggle input {
+  opacity: 0;
+  width: 0;
+  height: 0;
+}
+
+.pagina-editor-toggle-slider {
+  position: absolute;
+  cursor: pointer;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background-color: var(--premium-border);
+  transition: 0.3s;
+  border-radius: 24px;
+}
+
+.pagina-editor-toggle-slider:before {
+  position: absolute;
+  content: "";
+  height: 18px;
+  width: 18px;
+  left: 3px;
+  bottom: 3px;
+  background-color: white;
+  transition: 0.3s;
+  border-radius: 50%;
+}
+
+.pagina-editor-toggle input:checked + .pagina-editor-toggle-slider {
+  background-color: var(--premium-success);
+}
+
+.pagina-editor-toggle input:checked + .pagina-editor-toggle-slider:before {
+  transform: translateX(20px);
+}
+
+/* ============================================================
+   EMPTY STATE
+   ============================================================ */
+
+.pagina-editor-empty {
+  padding: var(--premium-spacing-2xl);
+  text-align: center;
+}
+
+.pagina-editor-empty-icon {
+  width: 64px;
+  height: 64px;
+  margin: 0 auto var(--premium-spacing-md);
+  color: var(--premium-icon-default);
+  opacity: 0.5;
+}
+
+.pagina-editor-empty h3 {
+  font-size: 18px;
+  font-weight: 600;
+  color: var(--premium-text-main);
+  margin: 0 0 8px 0;
+}
+
+.pagina-editor-empty p {
+  font-size: 15px;
+  color: var(--premium-text-muted);
+  margin: 0 0 var(--premium-spacing-lg) 0;
+}
+
+/* ============================================================
+   LOADING Y ERROR
+   ============================================================ */
+
+.pagina-editor-loading {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 400px;
+}
+
+.pagina-editor-loading-icon {
+  width: 32px;
+  height: 32px;
+  color: var(--premium-primary);
+  animation: spin 1s linear infinite;
+}
+
+@keyframes spin {
+  from {
+    transform: rotate(0deg);
+  }
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+.pagina-editor-error {
+  background: var(--premium-error-light);
+  border: 1px solid var(--premium-error);
+  border-radius: var(--premium-radius-medium);
+  padding: var(--premium-spacing-md);
+  margin-bottom: var(--premium-spacing-lg);
+}
+
+.pagina-editor-error p {
+  color: var(--premium-error);
+  margin: 0 0 8px 0;
+  font-weight: 500;
+}
+
+.pagina-editor-error-button {
+  background: transparent;
+  border: none;
+  color: var(--premium-error);
+  font-weight: 600;
+  cursor: pointer;
+  text-decoration: underline;
+}
+
+.pagina-editor-error-button:hover {
+  opacity: 0.8;
+}
+
+/* ============================================================
+   MODAL
+   ============================================================ */
+
+.pagina-editor-modal-overlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.5);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 50;
+}
+
+.pagina-editor-modal {
+  background: var(--premium-card-bg);
+  border-radius: var(--premium-radius-medium);
+  box-shadow: var(--premium-elevation-3);
+  width: 100%;
+  max-width: 600px;
+  max-height: 80vh;
+  overflow: hidden;
+  display: flex;
+  flex-direction: column;
+}
+
+.pagina-editor-modal-header {
+  padding: var(--premium-spacing-lg);
+  border-bottom: 1px solid var(--premium-card-border);
+}
+
+.pagina-editor-modal-header h3 {
+  font-size: 20px;
+  font-weight: 600;
+  color: var(--premium-text-strong);
+  margin: 0 0 4px 0;
+}
+
+.pagina-editor-modal-header p {
+  font-size: 14px;
+  color: var(--premium-text-soft);
+  margin: 0;
+}
+
+.pagina-editor-modal-content {
+  flex: 1;
+  overflow-y: auto;
+  padding: var(--premium-spacing-lg);
+}
+
+.pagina-editor-modal-footer {
+  padding: var(--premium-spacing-lg);
+  border-top: 1px solid var(--premium-card-border);
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: var(--premium-spacing-sm);
+}
+
+/* Form elements en modal */
+.pagina-editor-form-group {
+  margin-bottom: var(--premium-spacing-md);
+}
+
+.pagina-editor-form-label {
+  display: block;
+  font-size: 14px;
+  font-weight: 500;
+  color: var(--premium-text-main);
+  margin-bottom: 8px;
+}
+
+.pagina-editor-form-select {
+  width: 100%;
+  padding: 10px 12px;
+  font-size: 14px;
+  color: var(--premium-text-main);
+  background: var(--premium-surface);
+  border: 1px solid var(--premium-card-border);
+  border-radius: var(--premium-radius-small);
+  transition: all var(--premium-transition-fast);
+}
+
+.pagina-editor-form-select:focus {
+  outline: none;
+  border-color: var(--premium-primary);
+  box-shadow: 0 0 0 3px var(--premium-primary-light);
+}
+
+.pagina-editor-variante-grid {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: var(--premium-spacing-sm);
+}
+
+.pagina-editor-variante-card {
+  padding: var(--premium-spacing-md);
+  border: 2px solid var(--premium-card-border);
+  border-radius: var(--premium-radius-small);
+  background: var(--premium-surface);
+  cursor: pointer;
+  transition: all var(--premium-transition-fast);
+  text-align: left;
+}
+
+.pagina-editor-variante-card:hover {
+  border-color: var(--premium-primary);
+  background: var(--premium-primary-light);
+}
+
+.pagina-editor-variante-card.selected {
+  border-color: var(--premium-primary);
+  background: var(--premium-primary-light);
+}
+
+.pagina-editor-variante-card h4 {
+  font-size: 15px;
+  font-weight: 500;
+  color: var(--premium-text-main);
+  margin: 0 0 4px 0;
+}
+
+.pagina-editor-variante-card p {
+  font-size: 12px;
+  color: var(--premium-text-soft);
+  margin: 0;
+}
+
+/* ============================================================
+   RESPONSIVE
+   ============================================================ */
+
+@media (max-width: 768px) {
+  .pagina-editor-container {
+    padding: var(--premium-spacing-md);
+  }
+
+  .pagina-editor-header-top {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: var(--premium-spacing-md);
+  }
+
+  .pagina-editor-header-actions {
+    width: 100%;
+  }
+
+  .pagina-editor-btn {
+    width: 100%;
+    justify-content: center;
+  }
+
+  .pagina-editor-componente-item {
+    flex-direction: column;
+    align-items: flex-start;
+  }
+
+  .pagina-editor-componente-actions {
+    width: 100%;
+    justify-content: flex-end;
+  }
+
+  .pagina-editor-modal {
+    max-width: 95%;
+    max-height: 90vh;
+  }
+
+  .pagina-editor-variante-grid {
+    grid-template-columns: 1fr;
+  }
+}

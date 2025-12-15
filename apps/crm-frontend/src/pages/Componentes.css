@@ -1,0 +1,457 @@
+.componentes-container {
+  max-width: 1600px;
+}
+
+.page-header {
+  margin-bottom: 2rem;
+}
+
+.page-header h2 {
+  margin: 0 0 0.5rem 0;
+  color: #1a202c;
+  font-size: 1.75rem;
+}
+
+.page-header p {
+  margin: 0;
+  color: #718096;
+  font-size: 1rem;
+}
+
+.filtros-componentes {
+  display: flex;
+  gap: 0.75rem;
+  margin-bottom: 2rem;
+  flex-wrap: wrap;
+}
+
+.filtro-btn {
+  padding: 0.5rem 1.25rem;
+  background: white;
+  border: 2px solid #e2e8f0;
+  border-radius: 8px;
+  font-weight: 600;
+  color: #4a5568;
+  cursor: pointer;
+  transition: all 0.2s;
+  font-size: 0.9rem;
+}
+
+.filtro-btn:hover {
+  border-color: #cbd5e0;
+  background: #f7fafc;
+}
+
+.filtro-btn.active {
+  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+  color: white;
+  border-color: transparent;
+}
+
+.componentes-grid {
+  display: grid;
+  grid-template-columns: 320px 1fr;
+  gap: 2rem;
+  margin-top: 2rem;
+}
+
+.components-panel {
+  background: white;
+  border-radius: 12px;
+  padding: 1.5rem;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
+  height: fit-content;
+}
+
+.components-panel h3 {
+  margin: 0 0 1rem 0;
+  color: #1a202c;
+  font-size: 1.1rem;
+}
+
+.components-list {
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+}
+
+.component-card {
+  display: flex;
+  align-items: center;
+  gap: 1rem;
+  padding: 1rem;
+  background: #f7fafc;
+  border: 2px solid transparent;
+  border-radius: 8px;
+  cursor: pointer;
+  transition: all 0.2s;
+  text-align: left;
+  width: 100%;
+}
+
+.component-card:hover {
+  background: #edf2f7;
+  border-color: #cbd5e0;
+  transform: translateX(4px);
+}
+
+.component-card.selected {
+  background: #e6fffa;
+  border-color: #667eea;
+  box-shadow: 0 2px 8px rgba(102, 126, 234, 0.2);
+}
+
+.component-icon {
+  font-size: 1.75rem;
+  width: 40px;
+  height: 40px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 8px;
+  flex-shrink: 0;
+}
+
+.component-info {
+  flex: 1;
+  min-width: 0;
+}
+
+.component-name {
+  font-weight: 600;
+  color: #2d3748;
+  font-size: 0.95rem;
+  margin-bottom: 0.25rem;
+}
+
+.component-category {
+  font-size: 0.75rem;
+  color: #718096;
+  text-transform: capitalize;
+}
+
+.form-panel {
+  background: white;
+  border-radius: 12px;
+  padding: 2rem;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
+  max-height: calc(100vh - 200px);
+  overflow-y: auto;
+}
+
+.form-header {
+  margin-bottom: 2rem;
+  padding-bottom: 1.5rem;
+  border-bottom: 2px solid #e2e8f0;
+}
+
+.form-header h3 {
+  margin: 0 0 0.5rem 0;
+  color: #1a202c;
+  font-size: 1.5rem;
+}
+
+.form-description {
+  margin: 0;
+  color: #718096;
+  font-size: 0.95rem;
+}
+
+.variantes-section {
+  margin-bottom: 2rem;
+  padding: 1.5rem;
+  background: #f7fafc;
+  border-radius: 8px;
+}
+
+.variantes-section label {
+  display: block;
+  font-weight: 600;
+  color: #2d3748;
+  margin-bottom: 1rem;
+  font-size: 0.9rem;
+}
+
+.variantes-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(120px, 1fr));
+  gap: 0.75rem;
+}
+
+.variante-btn {
+  padding: 0.75rem 1rem;
+  background: white;
+  border: 2px solid #e2e8f0;
+  border-radius: 8px;
+  font-weight: 600;
+  color: #4a5568;
+  cursor: pointer;
+  transition: all 0.2s;
+  font-size: 0.85rem;
+}
+
+.variante-btn:hover {
+  border-color: #cbd5e0;
+  background: #f7fafc;
+}
+
+.variante-btn.active {
+  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+  color: white;
+  border-color: transparent;
+}
+
+.form-fields h4 {
+  margin: 0 0 1.5rem 0;
+  color: #1a202c;
+  font-size: 1.1rem;
+  padding-bottom: 0.75rem;
+  border-bottom: 1px solid #e2e8f0;
+}
+
+.form-fields {
+  display: flex;
+  flex-direction: column;
+  gap: 1.5rem;
+}
+
+.form-field {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+}
+
+.form-field label {
+  font-weight: 600;
+  color: #2d3748;
+  font-size: 0.9rem;
+  display: block;
+  margin-bottom: 0.5rem;
+}
+
+.required {
+  color: #f56565;
+  margin-left: 0.25rem;
+}
+
+.field-description {
+  display: block;
+  font-size: 0.8rem;
+  color: #718096;
+  margin-bottom: 0.5rem;
+  font-style: italic;
+}
+
+.checkbox-label {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  cursor: pointer;
+  padding: 0.75rem;
+  background: #f7fafc;
+  border-radius: 8px;
+  border: 2px solid #e2e8f0;
+  transition: all 0.2s;
+}
+
+.checkbox-label:hover {
+  border-color: #cbd5e0;
+  background: #edf2f7;
+}
+
+.checkbox-label input[type="checkbox"] {
+  width: 20px;
+  height: 20px;
+  cursor: pointer;
+}
+
+.form-field input,
+.form-field textarea {
+  padding: 0.75rem;
+  border: 2px solid #e2e8f0;
+  border-radius: 8px;
+  font-size: 1rem;
+  font-family: inherit;
+  transition: border-color 0.2s;
+}
+
+.form-field input:focus,
+.form-field textarea:focus {
+  outline: none;
+  border-color: #667eea;
+}
+
+.form-actions {
+  display: flex;
+  gap: 1rem;
+  margin-top: 2rem;
+  justify-content: flex-end;
+}
+
+.cancel-button,
+.save-button {
+  padding: 0.75rem 1.5rem;
+  border: none;
+  border-radius: 8px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.2s;
+}
+
+.cancel-button {
+  background: #e2e8f0;
+  color: #4a5568;
+}
+
+.cancel-button:hover {
+  background: #cbd5e0;
+}
+
+.save-button {
+  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+  color: white;
+}
+
+.save-button:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 10px 20px rgba(102, 126, 234, 0.4);
+}
+
+.empty-state {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  padding: 4rem 2rem;
+  text-align: center;
+  color: #718096;
+}
+
+.empty-icon {
+  font-size: 4rem;
+  margin-bottom: 1rem;
+}
+
+.saved-components {
+  margin-top: 3rem;
+}
+
+.saved-components h3 {
+  margin: 0 0 1.5rem 0;
+  color: #1a202c;
+  font-size: 1.25rem;
+}
+
+.components-grid-list {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
+  gap: 1.5rem;
+}
+
+.saved-component-card {
+  background: white;
+  border-radius: 12px;
+  padding: 1.5rem;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
+  transition: transform 0.2s, box-shadow 0.2s;
+}
+
+.saved-component-card:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+}
+
+.saved-component-header {
+  display: flex;
+  align-items: center;
+  gap: 1rem;
+  margin-bottom: 1rem;
+  padding-bottom: 1rem;
+  border-bottom: 1px solid #e2e8f0;
+}
+
+.component-icon-small {
+  font-size: 2rem;
+  width: 50px;
+  height: 50px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: #f7fafc;
+  border-radius: 10px;
+  flex-shrink: 0;
+}
+
+.saved-component-info {
+  flex: 1;
+  min-width: 0;
+}
+
+.saved-component-info .component-name {
+  display: block;
+  font-weight: 600;
+  color: #2d3748;
+  margin-bottom: 0.25rem;
+  font-size: 1rem;
+}
+
+.component-variante {
+  display: block;
+  font-size: 0.8rem;
+  color: #718096;
+}
+
+.component-status {
+  flex-shrink: 0;
+}
+
+.status-badge {
+  padding: 0.25rem 0.75rem;
+  border-radius: 12px;
+  font-size: 0.75rem;
+  font-weight: 600;
+  text-transform: uppercase;
+}
+
+.status-badge.active {
+  background: #c6f6d5;
+  color: #22543d;
+}
+
+.status-badge.inactive {
+  background: #fed7d7;
+  color: #742a2a;
+}
+
+.saved-component-actions {
+  display: flex;
+  gap: 0.75rem;
+  flex-wrap: wrap;
+}
+
+.btn-action {
+  padding: 0.5rem 1rem;
+  border: none;
+  border-radius: 6px;
+  font-weight: 600;
+  font-size: 0.85rem;
+  cursor: pointer;
+  transition: all 0.2s;
+  background: #edf2f7;
+  color: #4a5568;
+}
+
+.btn-action:hover {
+  background: #e2e8f0;
+}
+
+.btn-action.danger {
+  background: #fed7d7;
+  color: #c53030;
+}
+
+.btn-action.danger:hover {
+  background: #fc8181;
+  color: white;
+}
+

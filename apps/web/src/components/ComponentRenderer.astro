@@ -1,0 +1,167 @@
+---
+/**
+ * ComponentRenderer.astro
+ * 
+ * Renderiza componentes dinámicamente según su tipo y variante
+ * Soporta componentes estándar y componentes personalizados (custom)
+ */
+
+import HeroDefault from './hero/HeroDefault.astro';
+import HeroVariant1 from './hero/HeroVariant1.astro';
+import HeroVariant2 from './hero/HeroVariant2.astro';
+import HeroVariant3 from './hero/HeroVariant3.astro';
+
+import FooterDefault from './footer/FooterDefault.astro';
+import HeaderDefault from './header/HeaderDefault.astro';
+
+// Componentes de propiedades
+import PropertyListDefault from './property-list/PropertyListDefault.astro';
+import PropertyCardDefault from './property-card/PropertyCardDefault.astro';
+import PropertyDetailDefault from './property-detail/PropertyDetailDefault.astro';
+import PaginationDefault from './pagination/PaginationDefault.astro';
+
+// Componentes de formularios
+import ContactFormDefault from './contact-form/ContactFormDefault.astro';
+import SearchBarDefault from './search-bar/SearchBarDefault.astro';
+import FilterPanelDefault from './filter-panel/FilterPanelDefault.astro';
+
+// Componentes de contenido
+import CTADefault from './cta/CTADefault.astro';
+import FeaturesDefault from './features/FeaturesDefault.astro';
+import TestimonialsDefault from './testimonials/TestimonialsDefault.astro';
+import TestimonialsClic from './testimonials/TestimonialsClic.astro';
+import BlogListDefault from './blog-list/BlogListDefault.astro';
+
+// Componentes CLIC Premium
+import PropertyCarouselClic from './property-carousel/PropertyCarouselClic.astro';
+import VideoGalleryClic from './video-gallery/VideoGalleryClic.astro';
+import RelatedArticlesClic from './related-articles/RelatedArticlesClic.astro';
+import PopularLocationsClic from './popular-locations/PopularLocationsClic.astro';
+import DynamicFAQsClic from './dynamic-faqs/DynamicFAQsClic.astro';
+
+// Placeholders para componentes no implementados aún
+import Placeholder from './placeholder/Placeholder.astro';
+
+// Componentes personalizados (custom)
+import CustomComponent from './custom/CustomComponent.astro';
+
+import type { ComponenteConfigurado, TipoComponente, VarianteComponente } from '../types/componentes';
+import type { ComponenteDataEstructurado } from '../types/componentesEstructurado';
+
+interface Props {
+  componente: ComponenteConfigurado;
+  tema?: Record<string, string>;
+  baseUrl?: string;
+}
+
+const { componente, tema = {}, baseUrl = '' } = Astro.props;
+
+// Función para obtener el componente correcto según tipo y variante
+function getComponent(tipo: TipoComponente, variante: VarianteComponente) {
+  const componentMap: Record<string, any> = {
+    // Layout
+    'header-default': HeaderDefault,
+    'footer-default': FooterDefault,
+    'hero-default': HeroDefault,
+    'hero-variant1': HeroVariant1,
+    'hero-variant2': HeroVariant2,
+    'hero-variant3': HeroVariant3,
+    
+    // Display
+    'property_list-default': PropertyListDefault,
+    'property_card-default': PropertyCardDefault,
+    'property_detail-default': PropertyDetailDefault,
+    'blog_list-default': BlogListDefault,
+    
+    // Navigation
+    'pagination-default': PaginationDefault,
+    
+    // Forms
+    'contact_form-default': ContactFormDefault,
+    'search_bar-default': SearchBarDefault,
+    'filter_panel-default': FilterPanelDefault,
+    
+    // Content
+    'cta-default': CTADefault,
+    'features-default': FeaturesDefault,
+    'testimonials-default': TestimonialsDefault,
+    'testimonials-clic': TestimonialsClic,
+    
+    // CLIC Premium Components
+    'property_carousel-clic': PropertyCarouselClic,
+    'video_gallery-clic': VideoGalleryClic,
+    'related_articles-clic': RelatedArticlesClic,
+    'popular_locations-clic': PopularLocationsClic,
+    'dynamic_faqs-clic': DynamicFAQsClic,
+  };
+
+  const key = `${tipo}-${variante}`;
+  const component = componentMap[key];
+  
+  // Si no se encuentra el componente con la variante especificada, intentar con la primera variante disponible
+  // Esto es útil para componentes CLIC que solo tienen variante 'clic' pero se crean con 'default'
+  if (!component) {
+    const tipoKey = tipo as keyof typeof componentMap;
+    // Buscar cualquier variante de este tipo
+    const availableKeys = Object.keys(componentMap).filter(k => k.startsWith(`${tipo}-`));
+    if (availableKeys.length > 0) {
+      // Retornar la primera variante disponible de este tipo
+      return componentMap[availableKeys[0] as keyof typeof componentMap] || null;
+    }
+  }
+  
+  return component || null;
+}
+
+const Component = getComponent(componente.tipo, componente.variante);
+const isCustom = componente.tipo === 'custom';
+
+// Debug: Verificar que tenemos datos
+if (!componente.datos) {
+  console.warn(`⚠️ Componente ${componente.tipo} (${componente.variante}) no tiene datos`);
+}
+
+// Debug: Verificar que el componente está mapeado
+if (!isCustom && !Component) {
+  console.warn(`⚠️ Componente ${componente.tipo}-${componente.variante} no está mapeado`);
+  console.warn(`🔍 Clave buscada: ${componente.tipo}-${componente.variante}`);
+  console.warn(`🔍 Claves disponibles:`, Object.keys(componentMap));
+}
+
+---
+
+{isCustom ? (
+  <CustomComponent
+    componente={componente}
+    tema={tema}
+    baseUrl={baseUrl}
+  />
+) : componente.tipo === 'property_detail' ? (
+  <PropertyDetailDefault
+    datos={componente.datos}
+    tema={tema}
+    baseUrl={baseUrl}
+  />
+) : Component ? (
+  <Component
+    datos={componente.datos || { static_data: {}, styles: {}, toggles: {} }}
+    tema={tema}
+    baseUrl={baseUrl}
+  />
+) : (
+  <Placeholder
+    tipo={componente.tipo}
+    variante={componente.variante}
+  />
+)}
+<style>
+  .component-error {
+    padding: 2rem;
+    background: #fed7d7;
+    color: #742a2a;
+    border-radius: 8px;
+    text-align: center;
+  }
+</style>
+
+

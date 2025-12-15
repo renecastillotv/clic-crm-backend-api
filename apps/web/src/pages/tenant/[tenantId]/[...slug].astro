@@ -1,0 +1,225 @@
+---
+/**
+ * [...slug].astro para /tenant/[tenantId]/[...slug]
+ * 
+ * Esta es la ruta principal para páginas de tenants
+ * Maneja: 
+ * - /tenant/[tenantId]/ → Homepage del tenant
+ * - /tenant/[tenantId]/propiedades → Listado de propiedades
+ * - /tenant/[tenantId]/propiedades/1 → Propiedad individual
+ * - /tenant/[tenantId]/blog → Blog
+ * - /tenant/[tenantId]/cualquier/ruta/multi/nivel → Cualquier ruta
+ */
+
+import PageLayout from '../../../layouts/PageLayout.astro';
+
+const { tenantId } = Astro.params;
+const slug = Astro.params.slug; // Puede ser string o array (cuando es [...slug])
+
+if (!tenantId) {
+  return Astro.redirect('/404');
+}
+
+// Detectar idioma desde la URL
+const pathnameFull = Astro.url.pathname;
+let detectedLanguage = 'es'; // default
+
+// Detectar idioma desde la URL: /tenant/clic/en/ o /tenant/clic/en/articles
+if (pathnameFull.includes('/en/') || pathnameFull.match(/\/en(\/|$)/)) {
+  detectedLanguage = 'en';
+} else if (pathnameFull.includes('/fr/') || pathnameFull.match(/\/fr(\/|$)/)) {
+  detectedLanguage = 'fr';
+}
+
+// Construir pathname desde el slug (sin el prefijo de idioma)
+// IMPORTANTE: Si no hay slug (undefined/null), significa que estamos en la homepage
+// Por ejemplo: /tenant/demo/ → tenantId="demo", slug=undefined → pathname="/"
+// Por ejemplo: /tenant/demo/propiedades → tenantId="demo", slug="propiedades" → pathname="/propiedades"
+// Por ejemplo: /tenant/demo/en/ → tenantId="demo", slug=["en"] → pathname="/" (homepage en inglés)
+// Por ejemplo: /tenant/demo/en/articles → tenantId="demo", slug=["en", "articles"] → pathname="/articles"
+
+let pathname = '/';
+
+// Solo construir pathname si hay un slug definido Y NO es igual al tenantId
+// Filtrar también los prefijos de idioma (en, fr)
+if (slug !== undefined && slug !== null) {
+  if (Array.isArray(slug)) {
+    // Filtrar valores vacíos, tenantId, y prefijos de idioma
+    const filtered = slug.filter(s => 
+      s !== undefined && 
+      s !== null && 
+      s !== '' && 
+      s !== tenantId && 
+      s !== 'en' && 
+      s !== 'fr'
+    );
+    if (filtered.length > 0) {
+      pathname = '/' + filtered.join('/');
+    }
+  } else if (typeof slug === 'string' && slug.trim() !== '' && slug.trim() !== tenantId && slug.trim() !== 'en' && slug.trim() !== 'fr') {
+    pathname = '/' + slug.trim();
+  }
+}
+// Si slug es undefined/null o es igual a tenantId, pathname ya está en '/' (homepage)
+
+// Normalizar pathname
+pathname = (pathname || '').trim();
+if (!pathname || pathname === '') {
+  pathname = '/';
+}
+if (!pathname.startsWith('/')) {
+  pathname = '/' + pathname;
+}
+pathname = pathname.replace(/\/+/g, '/');
+if (pathname.length > 1 && pathname.endsWith('/')) {
+  pathname = pathname.slice(0, -1);
+}
+
+// LLAMADA ÚNICA A LA API - La API resuelve TODO
+// El endpoint auto-detecta si tenantId es un slug o un UUID
+let paginaCompleta = null;
+try {
+  const API_URL = import.meta.env.PUBLIC_API_URL || 'http://localhost:3001';
+
+  // Incluir query parameters de la URL original (ref, utm_*, etc.)
+  const queryString = Astro.url.search || '';
+  const pathnameWithQuery = pathname + queryString;
+
+  // Pasar el idioma detectado a la API
+  const apiUrl = `${API_URL}/api/tenants/${tenantId}/resolve?pathname=${encodeURIComponent(pathnameWithQuery)}&language=${detectedLanguage}`;
+
+  const response = await fetch(
+    apiUrl,
+    {
+      cache: 'no-store',
+      headers: {
+        'Cache-Control': 'no-cache',
+        'Accept-Language': detectedLanguage, // También como header estándar
+      },
+    }
+  );
+  
+  if (response.ok) {
+    paginaCompleta = await response.json();
+  } else if (response.status === 404) {
+    return Astro.redirect('/404');
+  } else {
+    throw new Error(`Error ${response.status}: ${response.statusText}`);
+  }
+} catch (error) {
+  console.error('Error al resolver ruta:', error);
+  return Astro.redirect('/404');
+}
+
+// Validar que tenemos datos
+if (!paginaCompleta || !paginaCompleta.page) {
+  return Astro.redirect('/404');
+}
+
+const pagina = paginaCompleta.page;
+const tema = paginaCompleta.theme;
+const componentes = paginaCompleta.components;
+const resolvedData = paginaCompleta.resolvedData; // Datos resueltos para páginas single (ej: propiedad individual)
+
+// Debug: Logs para consola del navegador
+console.log('📄 Página completa recibida:', {
+  paginaTitulo: pagina?.titulo,
+  paginaSlug: pagina?.slug,
+  componentesCount: componentes?.length || 0,
+  componentes: componentes?.map((c: any) => ({
+    tipo: c.tipo,
+    variante: c.variante,
+    tieneDynamicData: !!c.datos?.dynamic_data,
+    dataType: c.datos?.dynamic_data?.dataType,
+    tieneResolved: !!c.datos?.dynamic_data?.resolved,
+  })),
+});
+
+// Buscar específicamente video_gallery
+const videoGallery = componentes?.find((c: any) => c.tipo === 'video_gallery');
+if (videoGallery) {
+  console.log('🎥 VideoGallery encontrado en componentes:', {
+    id: videoGallery.id,
+    tipo: videoGallery.tipo,
+    variante: videoGallery.variante,
+    datos: videoGallery.datos,
+    dynamicData: videoGallery.datos?.dynamic_data,
+  });
+} else {
+  console.warn('⚠️ VideoGallery NO encontrado en los componentes de la página');
+  console.log('📋 Componentes disponibles:', componentes?.map((c: any) => `${c.tipo}-${c.variante}`));
+}
+
+// El tenantId real ya viene en la respuesta de la página (page.tenantId)
+// No necesitamos hacer otra llamada a la API
+const tenantIdReal = pagina.tenantId || tenantId;
+
+// Debug: Logs del servidor (se ven en terminal, no en navegador)
+console.log('📄 [SERVER] Página completa recibida:', {
+  paginaTitulo: pagina?.titulo,
+  paginaSlug: pagina?.slug,
+  componentesCount: componentes?.length || 0,
+  videoGallery: componentes?.find((c: any) => c.tipo === 'video_gallery'),
+});
+---
+
+<script is:inline>
+  // Logs del lado del cliente (se ejecutan en el navegador - F12)
+  console.log('📄 [CLIENT] Script de página ejecutado');
+  
+  function checkPage() {
+    console.log('📄 [CLIENT] DOM cargado - Verificando componentes');
+    
+    // Buscar todos los componentes video_gallery
+    const videoGalleries = document.querySelectorAll('.video-gallery-clic');
+    console.log(`🎥 [CLIENT] VideoGalleries encontrados en DOM: ${videoGalleries.length}`);
+    
+    if (videoGalleries.length > 0) {
+      videoGalleries.forEach((gallery, index) => {
+        const videoCards = gallery.querySelectorAll('.video-card');
+        const emptyState = gallery.querySelector('.text-center');
+        console.log(`🎥 [CLIENT] VideoGallery #${index + 1}:`, {
+          existe: !!gallery,
+          tieneVideos: videoCards.length,
+          tieneEmptyState: !!emptyState,
+          html: gallery.innerHTML.substring(0, 200) + '...',
+        });
+      });
+    } else {
+      console.warn('⚠️ [CLIENT] No se encontró ningún VideoGallery en el DOM');
+      
+      // Listar todas las secciones
+      const sections = document.querySelectorAll('section');
+      console.log(`📋 [CLIENT] Secciones encontradas: ${sections.length}`);
+      sections.forEach((section, i) => {
+        const classes = Array.from(section.classList).join(', ');
+        console.log(`  [${i}] ${section.tagName} - clases: ${classes}`);
+      });
+      
+      // Buscar componentes con data-component
+      const components = document.querySelectorAll('[data-component]');
+      console.log(`📋 [CLIENT] Componentes con data-component: ${components.length}`);
+      components.forEach((comp, i) => {
+        console.log(`  [${i}] ${comp.getAttribute('data-component')}`);
+      });
+    }
+  }
+  
+  // Ejecutar inmediatamente y también cuando el DOM esté listo
+  if (document.readyState === 'loading') {
+    document.addEventListener('DOMContentLoaded', checkPage);
+  } else {
+    setTimeout(checkPage, 100); // Pequeño delay para asegurar que todo esté renderizado
+  }
+</script>
+
+<PageLayout
+  title={pagina.titulo}
+  description={pagina.descripcion}
+  tenantId={tenantIdReal}
+  tenantSlug={tenantId}
+  componentes={componentes}
+  tema={tema}
+  resolvedData={resolvedData}
+/>
+

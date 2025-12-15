@@ -1,0 +1,294 @@
+---
+/**
+ * FounderStoryClic.astro
+ *
+ * Sección "La Historia de CLIC" con el perfil de René Castillo
+ * Layout: Imagen izquierda, texto derecha (como pa.clicinmobiliaria.com)
+ */
+
+import type { TemaColores } from '../../types/componentes';
+
+interface Props {
+  datos?: {
+    static_data?: {
+      nombre?: string;
+      titulo?: string;
+      subtitulo?: string;
+      descripcion1?: string;
+      descripcion2?: string;
+      imagenUrl?: string;
+      imagenAlt?: string;
+      perfilUrl?: string;
+      stats?: Array<{ valor: string; etiqueta: string }>;
+      badge?: string;
+      botonTexto?: string;
+    };
+    styles?: {
+      backgroundColor?: string;
+      textColor?: string;
+      accentColor?: string;
+    };
+    toggles?: {
+      mostrarBadge?: boolean;
+      mostrarStats?: boolean;
+      mostrarBoton?: boolean;
+    };
+  };
+  tema?: TemaColores;
+  baseUrl?: string;
+}
+
+const { datos = {}, tema, baseUrl = '' } = Astro.props;
+
+const staticData = datos.static_data || {};
+const styles = datos.styles || {};
+const toggles = datos.toggles || {};
+
+// Datos
+const titulo = staticData.titulo || 'La Historia de CLIC';
+const subtitulo = staticData.subtitulo || 'De la Televisión a los Bienes Raíces';
+const descripcion1 = staticData.descripcion1 ||
+  '<strong>René Castillo se ha posicionado como el presentador inmobiliario más reconocido de República Dominicana</strong>, llevando a los televidentes dentro de las casas más exclusivas de celebridades y figuras públicas del país.';
+const descripcion2 = staticData.descripcion2 ||
+  'Con <strong>18 años de experiencia televisiva, 600K+ seguidores en redes sociales y un canal de YouTube con 200K+ suscriptores y millones de visualizaciones</strong>, René combina entretenimiento y bienes raíces de manera única en el mercado dominicano.';
+const imagenUrl = staticData.imagenUrl ||
+  'https://pacewqgypevfgjmdsorz.supabase.co/storage/v1/object/public/public-assets/images/rene%20castillo%20-clic%20con%20placa.png';
+const imagenAlt = staticData.imagenAlt || 'René Castillo con placa de YouTube, presentador de TV y fundador de CLIC';
+const perfilUrl = staticData.perfilUrl || '/asesores/rene-castillo';
+const botonTexto = staticData.botonTexto || 'Ver Perfil Completo';
+
+const stats = staticData.stats || [
+  { valor: '18+', etiqueta: 'Años TV' },
+  { valor: '600K+', etiqueta: 'Seguidores' },
+  { valor: '200K+', etiqueta: 'YouTube' }
+];
+
+const mostrarBadge = toggles.mostrarBadge !== false;
+const mostrarStats = toggles.mostrarStats !== false;
+const mostrarBoton = toggles.mostrarBoton !== false;
+
+// === COLORES CONFIGURABLES ===
+const accentColor = styles.accentColor || tema?.primary || '#f04e00';
+const colorFondo = styles.colorFondo || tema?.background || '#ffffff';
+const colorTexto = styles.colorTexto || tema?.text || '#111827';
+const colorTextoSecondary = styles.colorTextoSecondary || tema?.textSecondary || '#4b5563';
+const colorTextoTertiary = styles.colorTextoTertiary || '#6b7280';
+const colorBorde = styles.colorBorde || tema?.border || '#e5e7eb';
+const colorOverlay = styles.colorOverlay || 'rgba(255, 255, 255, 0.95)';
+const colorSombra = styles.colorSombra || 'rgba(0, 0, 0, 0.2)';
+const colorSombraOverlay = styles.colorSombraOverlay || 'rgba(0, 0, 0, 0.15)';
+---
+
+<section 
+  class="founder-story"
+  style={`
+    --fs-accent: ${accentColor};
+    --fs-bg: ${colorFondo};
+    --fs-text: ${colorTexto};
+    --fs-text-secondary: ${colorTextoSecondary};
+    --fs-text-tertiary: ${colorTextoTertiary};
+    --fs-border: ${colorBorde};
+    --fs-overlay: ${colorOverlay};
+    --fs-sombra: ${colorSombra};
+    --fs-sombra-overlay: ${colorSombraOverlay};
+    background-color: var(--fs-bg);
+  `}
+>
+  <div class="founder-container">
+    <!-- Imagen IZQUIERDA -->
+    <div class="founder-image-col">
+      <a href={baseUrl + perfilUrl} class="founder-image-link">
+        <img
+          src={imagenUrl}
+          alt={imagenAlt}
+          class="founder-image"
+          loading="lazy"
+        />
+        {mostrarBoton && (
+          <div class="founder-cta-overlay">
+            <span>{botonTexto}</span>
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+              <path d="M13 7l5 5m0 0l-5 5m5-5H6"/>
+            </svg>
+          </div>
+        )}
+      </a>
+    </div>
+
+    <!-- Texto DERECHA -->
+    <div class="founder-content-col">
+      {mostrarBadge && (
+        <span class="founder-badge" style={`color: ${accentColor};`}>
+          {titulo}
+        </span>
+      )}
+
+      <h2 class="founder-title">{subtitulo}</h2>
+
+      <div class="founder-text">
+        <p set:html={descripcion1} />
+        <p set:html={descripcion2} />
+      </div>
+
+      {mostrarStats && (
+        <div class="founder-stats">
+          {stats.map((stat) => (
+            <div class="stat-box">
+              <div class="stat-value" style={`color: ${accentColor};`}>{stat.valor}</div>
+              <div class="stat-label">{stat.etiqueta}</div>
+            </div>
+          ))}
+        </div>
+      )}
+    </div>
+  </div>
+</section>
+
+<style>
+  .founder-story {
+    padding: 4rem 0;
+    font-family: Inter, ui-sans-serif, system-ui, -apple-system, sans-serif;
+  }
+
+  .founder-container {
+    max-width: 1200px;
+    margin: 0 auto;
+    padding: 0 1.5rem;
+    display: grid;
+    grid-template-columns: 1fr;
+    gap: 2.5rem;
+    align-items: center;
+  }
+
+  @media (min-width: 1024px) {
+    .founder-container {
+      grid-template-columns: 1fr 1fr;
+      gap: 4rem;
+    }
+  }
+
+  /* Imagen columna */
+  .founder-image-col {
+    order: 2;
+  }
+
+  @media (min-width: 1024px) {
+    .founder-image-col {
+      order: 1;
+    }
+  }
+
+  .founder-image-link {
+    display: block;
+    position: relative;
+    border-radius: 1rem;
+    overflow: hidden;
+    box-shadow: 0 20px 40px -12px var(--fs-sombra);
+  }
+
+  .founder-image {
+    width: 100%;
+    height: auto;
+    display: block;
+    aspect-ratio: 4/3;
+    object-fit: cover;
+    transition: transform 0.4s ease;
+  }
+
+  .founder-image-link:hover .founder-image {
+    transform: scale(1.03);
+  }
+
+  .founder-cta-overlay {
+    position: absolute;
+    bottom: 1rem;
+    left: 1rem;
+    background: var(--fs-overlay);
+    backdrop-filter: blur(4px);
+    padding: 0.625rem 1rem;
+    border-radius: 0.5rem;
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    font-size: 0.875rem;
+    font-weight: 600;
+    color: var(--fs-text);
+    box-shadow: 0 4px 12px var(--fs-sombra-overlay);
+  }
+
+  /* Contenido columna */
+  .founder-content-col {
+    order: 1;
+  }
+
+  @media (min-width: 1024px) {
+    .founder-content-col {
+      order: 2;
+    }
+  }
+
+  .founder-badge {
+    display: inline-block;
+    font-size: 0.75rem;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.1em;
+    margin-bottom: 0.75rem;
+  }
+
+  .founder-title {
+    font-size: 1.75rem;
+    font-weight: 700;
+    color: var(--fs-text);
+    margin: 0 0 1.25rem 0;
+    line-height: 1.25;
+  }
+
+  @media (min-width: 768px) {
+    .founder-title {
+      font-size: 2rem;
+    }
+  }
+
+  .founder-text {
+    display: flex;
+    flex-direction: column;
+    gap: 1rem;
+  }
+
+  .founder-text p {
+    margin: 0;
+    font-size: 1rem;
+    line-height: 1.7;
+    color: var(--fs-text-secondary);
+  }
+
+  .founder-text :global(strong) {
+    color: var(--fs-text);
+    font-weight: 600;
+  }
+
+  .founder-stats {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: 1rem;
+    margin-top: 1.5rem;
+    padding-top: 1.5rem;
+    border-top: 1px solid var(--fs-border);
+  }
+
+  .stat-box {
+    text-align: center;
+  }
+
+  .stat-value {
+    font-size: 1.5rem;
+    font-weight: 700;
+  }
+
+  .stat-label {
+    font-size: 0.75rem;
+    color: var(--fs-text-tertiary);
+    margin-top: 0.25rem;
+  }
+</style>

@@ -1,0 +1,174 @@
+---
+/**
+ * DebugInfo.astro
+ * Componente para mostrar información de debug sobre la detección de tipo de página
+ */
+
+interface Props {
+  datos: {
+    title?: string;
+    subtitle?: string;
+    details?: Record<string, any>;
+    mensaje?: string;
+    rawData?: string;
+  };
+  tema?: Record<string, string>;
+  baseUrl?: string;
+}
+
+const { datos, tema = {} } = Astro.props;
+---
+
+<div class="debug-container">
+  <div class="debug-header">
+    <h2>{datos.title || 'Debug Info'}</h2>
+    {datos.subtitle && <p class="debug-subtitle">{datos.subtitle}</p>}
+  </div>
+
+  {datos.mensaje && (
+    <div class="debug-mensaje">
+      <p>{datos.mensaje}</p>
+    </div>
+  )}
+
+  {datos.details && (
+    <div class="debug-details">
+      <h3>Detalles de detección:</h3>
+      <dl>
+        {Object.entries(datos.details).map(([key, value]) => (
+          <div class="debug-item">
+            <dt>{key}:</dt>
+            <dd>{String(value)}</dd>
+          </div>
+        ))}
+      </dl>
+    </div>
+  )}
+
+  {datos.rawData && (
+    <details class="debug-raw">
+      <summary>Ver datos raw (JSON)</summary>
+      <pre><code>{datos.rawData}</code></pre>
+    </details>
+  )}
+</div>
+
+<style>
+  .debug-container {
+    max-width: 1200px;
+    margin: 2rem auto;
+    padding: 2rem;
+    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+    border-radius: 12px;
+    box-shadow: 0 10px 40px rgba(0, 0, 0, 0.3);
+    color: white;
+    font-family: 'Courier New', monospace;
+  }
+
+  .debug-header {
+    margin-bottom: 1.5rem;
+    border-bottom: 2px solid rgba(255, 255, 255, 0.3);
+    padding-bottom: 1rem;
+  }
+
+  .debug-header h2 {
+    margin: 0;
+    font-size: 1.8rem;
+    font-weight: bold;
+    color: #fff;
+  }
+
+  .debug-subtitle {
+    margin: 0.5rem 0 0;
+    font-size: 1.1rem;
+    opacity: 0.9;
+  }
+
+  .debug-mensaje {
+    background: rgba(255, 255, 255, 0.15);
+    padding: 1rem;
+    border-radius: 8px;
+    margin-bottom: 1.5rem;
+    border-left: 4px solid #ffd700;
+  }
+
+  .debug-mensaje p {
+    margin: 0;
+    font-size: 1rem;
+  }
+
+  .debug-details h3 {
+    margin: 0 0 1rem;
+    font-size: 1.3rem;
+    color: #ffd700;
+  }
+
+  .debug-details dl {
+    margin: 0;
+    display: grid;
+    gap: 0.75rem;
+  }
+
+  .debug-item {
+    display: grid;
+    grid-template-columns: 200px 1fr;
+    gap: 1rem;
+    padding: 0.75rem;
+    background: rgba(255, 255, 255, 0.1);
+    border-radius: 6px;
+  }
+
+  .debug-item dt {
+    font-weight: bold;
+    color: #ffd700;
+  }
+
+  .debug-item dd {
+    margin: 0;
+    word-break: break-word;
+  }
+
+  .debug-raw {
+    margin-top: 1.5rem;
+    background: rgba(0, 0, 0, 0.3);
+    padding: 1rem;
+    border-radius: 8px;
+  }
+
+  .debug-raw summary {
+    cursor: pointer;
+    font-weight: bold;
+    color: #ffd700;
+    margin-bottom: 0.5rem;
+  }
+
+  .debug-raw summary:hover {
+    text-decoration: underline;
+  }
+
+  .debug-raw pre {
+    margin: 1rem 0 0;
+    padding: 1rem;
+    background: rgba(0, 0, 0, 0.5);
+    border-radius: 6px;
+    overflow-x: auto;
+  }
+
+  .debug-raw code {
+    color: #90ee90;
+    font-size: 0.9rem;
+    line-height: 1.5;
+  }
+
+  @media (max-width: 768px) {
+    .debug-container {
+      padding: 1.5rem;
+      margin: 1rem;
+    }
+
+    .debug-item {
+      grid-template-columns: 1fr;
+      gap: 0.5rem;
+    }
+  }
+</style>

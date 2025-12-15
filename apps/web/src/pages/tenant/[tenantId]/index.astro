@@ -1,0 +1,111 @@
+---
+/**
+ * index.astro para /tenant/[tenantSlug]/
+ * 
+ * Maneja la homepage del tenant
+ * Usa el mismo endpoint universal de resolución con pathname="/"
+ * El tenantSlug puede ser un slug (ej: "mi-empresa") o un UUID (para compatibilidad)
+ */
+
+import PageLayout from '../../../layouts/PageLayout.astro';
+
+const { tenantId } = Astro.params; // En realidad es tenantSlug, pero mantenemos el nombre del parámetro
+
+console.log('🔍 DEBUG index.astro:', {
+  tenantId,
+  url: Astro.url.pathname
+});
+
+if (!tenantId) {
+  return Astro.redirect('/404');
+}
+
+// Detectar idioma desde la URL
+const pathnameFull = Astro.url.pathname;
+let detectedLanguage = 'es'; // default
+
+// Detectar idioma desde la URL: /tenant/clic/en/ o /tenant/clic/fr/
+if (pathnameFull.includes('/en/') || pathnameFull.match(/\/en(\/|$)/)) {
+  detectedLanguage = 'en';
+} else if (pathnameFull.includes('/fr/') || pathnameFull.match(/\/fr(\/|$)/)) {
+  detectedLanguage = 'fr';
+}
+
+// LLAMADA ÚNICA A LA API - La API resuelve TODO
+// El endpoint auto-detecta si es slug o UUID
+let paginaCompleta = null;
+try {
+  const API_URL = import.meta.env.PUBLIC_API_URL || 'http://localhost:3001';
+  const apiUrl = `${API_URL}/api/tenants/${tenantId}/resolve?pathname=${encodeURIComponent('/')}&language=${detectedLanguage}`;
+  
+  const response = await fetch(
+    apiUrl,
+    {
+      cache: 'no-store',
+      headers: {
+        'Cache-Control': 'no-cache',
+        'Accept-Language': detectedLanguage, // También como header estándar
+      },
+    }
+  );
+  
+  if (response.ok) {
+    paginaCompleta = await response.json();
+    console.log('📄 [index.astro] Respuesta de la API:', {
+      hasPage: !!paginaCompleta?.page,
+      pageTitulo: paginaCompleta?.page?.titulo,
+      pageSlug: paginaCompleta?.page?.slug,
+      componentesCount: paginaCompleta?.components?.length || 0,
+      componentesKeys: paginaCompleta?.components?.map((c: any) => c.componente_key || c.tipo) || []
+    });
+  } else if (response.status === 404) {
+    console.error('❌ [index.astro] API devolvió 404 para:', `${API_URL}/api/tenants/${tenantId}/resolve?pathname=/`);
+    return Astro.redirect('/404');
+  } else {
+    throw new Error(`Error ${response.status}: ${response.statusText}`);
+  }
+} catch (error) {
+  console.error('Error al resolver ruta:', error);
+  return Astro.redirect('/404');
+}
+
+// Validar que tenemos datos
+if (!paginaCompleta || !paginaCompleta.page) {
+  return Astro.redirect('/404');
+}
+
+const pagina = paginaCompleta.page;
+const tema = paginaCompleta.theme;
+const componentes = paginaCompleta.components;
+
+// Obtener el tenantId real del tenant (si tenantId era un slug, necesitamos el ID real)
+// El endpoint resolve ya resolvió todo usando el slug o UUID, pero necesitamos el ID para PageLayout
+// Intentar obtener el tenant para obtener su ID real si pasamos un slug
+let tenantIdReal = tenantId;
+try {
+  const API_URL = import.meta.env.PUBLIC_API_URL || 'http://localhost:3001';
+  // Verificar si es UUID (tiene guiones y formato específico)
+  const isUUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(tenantId);
+  if (!isUUID) {
+    // Es un slug, obtener el tenant para obtener su ID
+    const tenantResponse = await fetch(`${API_URL}/api/tenants/slug/${tenantId}`);
+    if (tenantResponse.ok) {
+      const tenant = await tenantResponse.json();
+      tenantIdReal = tenant.id;
+    }
+  }
+  // Si es UUID, ya tenemos el ID correcto, no hacer nada
+} catch (error) {
+  // Si falla, asumir que tenantId ya es un UUID válido
+  console.warn('No se pudo obtener tenant por slug, asumiendo que es UUID:', error);
+}
+---
+
+<PageLayout
+  title={pagina.titulo}
+  description={pagina.descripcion}
+  tenantId={tenantIdReal}
+  tenantSlug={tenantId}
+  componentes={componentes}
+  tema={tema}
+/>

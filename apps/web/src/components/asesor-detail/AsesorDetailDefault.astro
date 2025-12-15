@@ -1,0 +1,546 @@
+---
+/**
+ * AsesorDetailDefault.astro
+ * Vista detallada de un asesor individual
+ * Muestra el perfil completo del asesor o un mensaje si no se encuentra
+ */
+
+interface Props {
+  datos?: any;
+  asesor?: any;
+  tema?: Record<string, string>;
+  baseUrl?: string;
+}
+
+const { datos, asesor, tema = {}, baseUrl = '' } = Astro.props;
+
+const staticData = datos?.static_data || {};
+const toggles = datos?.toggles || {};
+
+// El asesor puede venir desde resolvedData o desde datos del componente
+// dynamic_data.resolved puede ser un array (de un solo elemento) o un objeto
+const resolvedData = datos?.dynamic_data?.resolved;
+const rawAsesorData = asesor || datos?.asesor || (Array.isArray(resolvedData) ? resolvedData[0] : resolvedData);
+
+// Normalizar datos del asesor para compatibilidad con la vista
+const asesorData = rawAsesorData ? {
+  ...rawAsesorData,
+  // Nombre completo
+  nombreCompleto: `${rawAsesorData.nombre || ''} ${rawAsesorData.apellido || ''}`.trim() || 'Asesor',
+  // Foto (varios alias posibles)
+  foto: rawAsesorData.foto_url || rawAsesorData.foto || rawAsesorData.avatar_url || rawAsesorData.avatar || null,
+  // Especialidad (primer elemento del array o valor directo)
+  especialidad: Array.isArray(rawAsesorData.especialidades) && rawAsesorData.especialidades.length > 0
+    ? rawAsesorData.especialidades.join(', ')
+    : (rawAsesorData.especialidad || rawAsesorData.cargo || null),
+  // Rating
+  rating: rawAsesorData.calificacion_promedio || rawAsesorData.rating || rawAsesorData.stats?.calificacion_promedio || null,
+  num_reviews: rawAsesorData.total_resenas || rawAsesorData.num_reviews || rawAsesorData.stats?.total_resenas || null,
+  // Propiedades
+  propiedades_activas: rawAsesorData.propiedades_activas || rawAsesorData.stats?.propiedades_activas || 0,
+} : null;
+
+// Colores del tema
+const primaryColor = tema?.primary || '#667eea';
+const secondaryColor = tema?.secondary || '#764ba2';
+
+// Si no hay asesor, mostrar mensaje
+const hasAsesor = asesorData && (asesorData.id || asesorData.nombre);
+---
+
+<section class="asesor-detail-section" style={`--primary: ${primaryColor}; --secondary: ${secondaryColor};`}>
+  <div class="asesor-detail-container">
+    {hasAsesor ? (
+      <>
+        {/* Header del asesor */}
+        <div class="asesor-header">
+          <div class="asesor-avatar-large">
+            {asesorData.foto ? (
+              <img
+                src={asesorData.foto}
+                alt={asesorData.nombreCompleto}
+              />
+            ) : (
+              <div class="avatar-placeholder-large">
+                <span>{(asesorData.nombreCompleto || 'A').charAt(0).toUpperCase()}</span>
+              </div>
+            )}
+          </div>
+          <div class="asesor-header-info">
+            <h1 class="asesor-name">{asesorData.nombreCompleto}</h1>
+            {asesorData.cargo && (
+              <p class="asesor-cargo">{asesorData.cargo}</p>
+            )}
+            {asesorData.especialidad && (
+              <p class="asesor-specialty">{asesorData.especialidad}</p>
+            )}
+            {asesorData.rating !== undefined && (
+              <div class="asesor-rating">
+                <span class="stars">
+                  {[1, 2, 3, 4, 5].map((star) => (
+                    <span class={`star ${star <= Math.round(asesorData.rating) ? 'filled' : ''}`}>★</span>
+                  ))}
+                </span>
+                <span class="rating-value">{asesorData.rating.toFixed(1)}</span>
+                {asesorData.num_reviews && (
+                  <span class="reviews-count">({asesorData.num_reviews} reseñas)</span>
+                )}
+              </div>
+            )}
+            <div class="asesor-actions">
+              {asesorData.telefono && (
+                <a href={`tel:${asesorData.telefono}`} class="action-btn primary">
+                  <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                    <path d="M22 16.92v3a2 2 0 0 1-2.18 2 19.79 19.79 0 0 1-8.63-3.07 19.5 19.5 0 0 1-6-6 19.79 19.79 0 0 1-3.07-8.67A2 2 0 0 1 4.11 2h3a2 2 0 0 1 2 1.72 12.84 12.84 0 0 0 .7 2.81 2 2 0 0 1-.45 2.11L8.09 9.91a16 16 0 0 0 6 6l1.27-1.27a2 2 0 0 1 2.11-.45 12.84 12.84 0 0 0 2.81.7A2 2 0 0 1 22 16.92z"></path>
+                  </svg>
+                  Llamar
+                </a>
+              )}
+              {asesorData.email && (
+                <a href={`mailto:${asesorData.email}`} class="action-btn secondary">
+                  <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                    <path d="M4 4h16c1.1 0 2 .9 2 2v12c0 1.1-.9 2-2 2H4c-1.1 0-2-.9-2-2V6c0-1.1.9-2 2-2z"></path>
+                    <polyline points="22,6 12,13 2,6"></polyline>
+                  </svg>
+                  Enviar Email
+                </a>
+              )}
+              {asesorData.whatsapp && (
+                <a href={`https://wa.me/${asesorData.whatsapp.replace(/\D/g, '')}`} target="_blank" rel="noopener" class="action-btn whatsapp">
+                  <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="currentColor">
+                    <path d="M17.472 14.382c-.297-.149-1.758-.867-2.03-.967-.273-.099-.471-.148-.67.15-.197.297-.767.966-.94 1.164-.173.199-.347.223-.644.075-.297-.15-1.255-.463-2.39-1.475-.883-.788-1.48-1.761-1.653-2.059-.173-.297-.018-.458.13-.606.134-.133.298-.347.446-.52.149-.174.198-.298.298-.497.099-.198.05-.371-.025-.52-.075-.149-.669-1.612-.916-2.207-.242-.579-.487-.5-.669-.51-.173-.008-.371-.01-.57-.01-.198 0-.52.074-.792.372-.272.297-1.04 1.016-1.04 2.479 0 1.462 1.065 2.875 1.213 3.074.149.198 2.096 3.2 5.077 4.487.709.306 1.262.489 1.694.625.712.227 1.36.195 1.871.118.571-.085 1.758-.719 2.006-1.413.248-.694.248-1.289.173-1.413-.074-.124-.272-.198-.57-.347m-5.421 7.403h-.004a9.87 9.87 0 01-5.031-1.378l-.361-.214-3.741.982.998-3.648-.235-.374a9.86 9.86 0 01-1.51-5.26c.001-5.45 4.436-9.884 9.888-9.884 2.64 0 5.122 1.03 6.988 2.898a9.825 9.825 0 012.893 6.994c-.003 5.45-4.437 9.884-9.885 9.884m8.413-18.297A11.815 11.815 0 0012.05 0C5.495 0 .16 5.335.157 11.892c0 2.096.547 4.142 1.588 5.945L.057 24l6.305-1.654a11.882 11.882 0 005.683 1.448h.005c6.554 0 11.89-5.335 11.893-11.893a11.821 11.821 0 00-3.48-8.413z"/>
+                  </svg>
+                  WhatsApp
+                </a>
+              )}
+            </div>
+          </div>
+        </div>
+
+        {/* Biografía */}
+        {asesorData.biografia && (
+          <div class="asesor-bio">
+            <h2>Sobre mí</h2>
+            <p>{asesorData.biografia}</p>
+          </div>
+        )}
+
+        {/* Estadísticas */}
+        <div class="asesor-stats">
+          {asesorData.propiedades_activas !== undefined && (
+            <div class="stat-card">
+              <span class="stat-value">{asesorData.propiedades_activas}</span>
+              <span class="stat-label">Propiedades Activas</span>
+            </div>
+          )}
+          {asesorData.ventas_totales !== undefined && (
+            <div class="stat-card">
+              <span class="stat-value">{asesorData.ventas_totales}</span>
+              <span class="stat-label">Ventas Realizadas</span>
+            </div>
+          )}
+          {asesorData.anos_experiencia !== undefined && (
+            <div class="stat-card">
+              <span class="stat-value">{asesorData.anos_experiencia}</span>
+              <span class="stat-label">Años de Experiencia</span>
+            </div>
+          )}
+        </div>
+
+        {/* Propiedades del asesor */}
+        {asesorData.propiedades && asesorData.propiedades.length > 0 && (
+          <div class="asesor-properties">
+            <h2>Mis Propiedades</h2>
+            <div class="properties-mini-grid">
+              {asesorData.propiedades.slice(0, 4).map((prop: any) => (
+                <a href={`${baseUrl}/propiedades/${prop.slug || prop.id}`} class="property-mini-card">
+                  <div class="mini-image">
+                    {prop.imagen_principal ? (
+                      <img src={prop.imagen_principal} alt={prop.titulo} loading="lazy" />
+                    ) : (
+                      <div class="no-image">🏠</div>
+                    )}
+                  </div>
+                  <div class="mini-info">
+                    <h4>{prop.titulo}</h4>
+                    {prop.precio && (
+                      <span class="mini-price">
+                        {new Intl.NumberFormat('es-DO', { style: 'currency', currency: 'USD' }).format(prop.precio)}
+                      </span>
+                    )}
+                  </div>
+                </a>
+              ))}
+            </div>
+            {asesorData.propiedades.length > 4 && (
+              <a href={`${baseUrl}/propiedades?asesor=${asesorData.id}`} class="view-all-link">
+                Ver todas las propiedades ({asesorData.propiedades.length})
+              </a>
+            )}
+          </div>
+        )}
+
+        {/* Volver */}
+        <div class="back-link">
+          <a href={`${baseUrl}/asesores`}>
+            <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+              <line x1="19" y1="12" x2="5" y2="12"></line>
+              <polyline points="12 19 5 12 12 5"></polyline>
+            </svg>
+            Volver a asesores
+          </a>
+        </div>
+      </>
+    ) : (
+      <div class="not-found">
+        <div class="not-found-icon">👤</div>
+        <h1>Asesor no encontrado</h1>
+        <p>No pudimos encontrar el asesor que estás buscando.</p>
+        <a href={`${baseUrl}/asesores`} class="back-btn">Ver todos los asesores</a>
+      </div>
+    )}
+  </div>
+</section>
+
+<style>
+  .asesor-detail-section {
+    padding: 3rem 2rem;
+    background: var(--background-color, #f8f9fa);
+    min-height: 60vh;
+  }
+
+  .asesor-detail-container {
+    max-width: 900px;
+    margin: 0 auto;
+  }
+
+  .asesor-header {
+    display: flex;
+    gap: 2rem;
+    padding: 2rem;
+    background: white;
+    border-radius: 16px;
+    box-shadow: 0 4px 12px rgba(0,0,0,0.08);
+    margin-bottom: 2rem;
+  }
+
+  .asesor-avatar-large {
+    flex-shrink: 0;
+    width: 150px;
+    height: 150px;
+    border-radius: 50%;
+    overflow: hidden;
+    border: 4px solid var(--primary);
+  }
+
+  .asesor-avatar-large img {
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+  }
+
+  .avatar-placeholder-large {
+    width: 100%;
+    height: 100%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    background: linear-gradient(135deg, var(--primary), var(--secondary));
+    color: white;
+    font-size: 4rem;
+    font-weight: 700;
+  }
+
+  .asesor-header-info {
+    flex: 1;
+  }
+
+  .asesor-name {
+    font-size: 2rem;
+    font-weight: 700;
+    color: var(--text-color, #1a202c);
+    margin: 0 0 0.5rem 0;
+  }
+
+  .asesor-specialty {
+    font-size: 1.1rem;
+    color: var(--primary);
+    margin: 0 0 0.75rem 0;
+    font-weight: 500;
+  }
+
+  .asesor-rating {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    margin-bottom: 1.5rem;
+  }
+
+  .stars {
+    display: flex;
+  }
+
+  .star {
+    color: #e2e8f0;
+    font-size: 1.25rem;
+  }
+
+  .star.filled {
+    color: #f6ad55;
+  }
+
+  .rating-value {
+    font-weight: 600;
+    font-size: 1.1rem;
+  }
+
+  .reviews-count {
+    color: #718096;
+    font-size: 0.9rem;
+  }
+
+  .asesor-actions {
+    display: flex;
+    gap: 0.75rem;
+    flex-wrap: wrap;
+  }
+
+  .action-btn {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    padding: 0.75rem 1.25rem;
+    border-radius: 8px;
+    font-weight: 500;
+    text-decoration: none;
+    transition: transform 0.2s, box-shadow 0.2s;
+  }
+
+  .action-btn:hover {
+    transform: translateY(-2px);
+  }
+
+  .action-btn.primary {
+    background: var(--primary);
+    color: white;
+  }
+
+  .action-btn.secondary {
+    background: #f8f9fa;
+    color: var(--text-color, #1a202c);
+    border: 1px solid var(--border-color, #e2e8f0);
+  }
+
+  .action-btn.whatsapp {
+    background: #25d366;
+    color: white;
+  }
+
+  .asesor-bio {
+    background: white;
+    padding: 1.5rem;
+    border-radius: 12px;
+    margin-bottom: 2rem;
+  }
+
+  .asesor-bio h2 {
+    font-size: 1.25rem;
+    margin: 0 0 1rem 0;
+    color: var(--text-color, #1a202c);
+  }
+
+  .asesor-bio p {
+    color: var(--text-secondary, #718096);
+    line-height: 1.7;
+    margin: 0;
+  }
+
+  .asesor-stats {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+    gap: 1rem;
+    margin-bottom: 2rem;
+  }
+
+  .stat-card {
+    background: white;
+    padding: 1.5rem;
+    border-radius: 12px;
+    text-align: center;
+  }
+
+  .stat-value {
+    display: block;
+    font-size: 2rem;
+    font-weight: 700;
+    color: var(--primary);
+  }
+
+  .stat-label {
+    font-size: 0.85rem;
+    color: var(--text-secondary, #718096);
+  }
+
+  .asesor-properties {
+    background: white;
+    padding: 1.5rem;
+    border-radius: 12px;
+    margin-bottom: 2rem;
+  }
+
+  .asesor-properties h2 {
+    font-size: 1.25rem;
+    margin: 0 0 1rem 0;
+  }
+
+  .properties-mini-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
+    gap: 1rem;
+  }
+
+  .property-mini-card {
+    background: #f8f9fa;
+    border-radius: 8px;
+    overflow: hidden;
+    text-decoration: none;
+    color: inherit;
+    transition: transform 0.2s;
+  }
+
+  .property-mini-card:hover {
+    transform: translateY(-2px);
+  }
+
+  .mini-image {
+    height: 120px;
+    background: #e2e8f0;
+  }
+
+  .mini-image img {
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+  }
+
+  .mini-image .no-image {
+    width: 100%;
+    height: 100%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 2rem;
+  }
+
+  .mini-info {
+    padding: 0.75rem;
+  }
+
+  .mini-info h4 {
+    font-size: 0.9rem;
+    margin: 0 0 0.25rem 0;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+
+  .mini-price {
+    font-size: 0.85rem;
+    color: var(--primary);
+    font-weight: 600;
+  }
+
+  .view-all-link {
+    display: block;
+    text-align: center;
+    margin-top: 1rem;
+    color: var(--primary);
+    text-decoration: none;
+    font-weight: 500;
+  }
+
+  .back-link {
+    text-align: center;
+  }
+
+  .back-link a {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.5rem;
+    color: var(--text-secondary, #718096);
+    text-decoration: none;
+    font-weight: 500;
+    transition: color 0.2s;
+  }
+
+  .back-link a:hover {
+    color: var(--primary);
+  }
+
+  .not-found {
+    text-align: center;
+    padding: 4rem 2rem;
+    background: white;
+    border-radius: 16px;
+  }
+
+  .not-found-icon {
+    font-size: 5rem;
+    margin-bottom: 1rem;
+  }
+
+  .not-found h1 {
+    font-size: 2rem;
+    margin: 0 0 0.5rem 0;
+    color: var(--text-color, #1a202c);
+  }
+
+  .not-found p {
+    color: var(--text-secondary, #718096);
+    margin: 0 0 2rem 0;
+  }
+
+  .back-btn {
+    display: inline-block;
+    padding: 0.75rem 1.5rem;
+    background: var(--primary);
+    color: white;
+    text-decoration: none;
+    border-radius: 8px;
+    font-weight: 500;
+    transition: transform 0.2s;
+  }
+
+  .back-btn:hover {
+    transform: translateY(-2px);
+  }
+
+  @media (max-width: 768px) {
+    .asesor-header {
+      flex-direction: column;
+      align-items: center;
+      text-align: center;
+    }
+
+    .asesor-avatar-large {
+      width: 120px;
+      height: 120px;
+    }
+
+    .avatar-placeholder-large {
+      font-size: 3rem;
+    }
+
+    .asesor-name {
+      font-size: 1.5rem;
+    }
+
+    .asesor-actions {
+      justify-content: center;
+    }
+
+    .asesor-rating {
+      justify-content: center;
+    }
+  }
+</style>

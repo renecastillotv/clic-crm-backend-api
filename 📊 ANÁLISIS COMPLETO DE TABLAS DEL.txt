@@ -1,0 +1,106 @@
+📊 ANÁLISIS COMPLETO DE TABLAS DEL SISTEMA
+Basándome en el código de los servicios, estas son TODAS las tablas que usa el sistema:
+🗂️ GRUPO 1: PÁGINAS Y TIPOS DE PÁGINA
+1.1 tipos_pagina
+Qué es: Catálogo de tipos de página disponibles en el sistema (homepage, propiedades, videos, etc.) Quién la usa: tenantPaginasService.ts Columnas clave:
+codigo, nombre, descripcion, categoria
+plan_minimo - plan requerido para usar esta página
+nivel - orden jerárquico
+es_estandar, es_plantilla, protegida
+1.2 tenant_paginas_activas
+Qué es: Qué páginas tiene ACTIVADAS cada tenant Quién la usa: tenantPaginasService.ts Columnas clave:
+tenant_id, tipo_pagina
+is_visible - si el plan del tenant le permite verla
+is_enabled - si el tenant la activó
+variante_activa - qué variante está usando (default, variant1, etc.)
+configuracion_variantes (JSONB) - configuración guardada de cada variante
+1.3 paginas_web
+Qué es: Páginas CONCRETAS creadas por cada tenant Quién la usa: paginasService.ts Columnas clave:
+id, tenant_id, tipo_pagina
+titulo, slug, descripcion
+contenido (JSONB), meta (JSONB)
+publica, activa, orden, origen (sistema/custom)
+variante, plantilla_id
+configuracion_activa_id - referencia a paginas_configuraciones
+🧩 GRUPO 2: COMPONENTES/SECCIONES
+2.1 catalogo_componentes ✅ IMPORTANTE
+Qué es: Catálogo del sistema con TODOS los componentes disponibles (headers, heroes, CTAs, grids, etc.) Quién la usa: seccionesService.ts Columnas clave:
+tipo - header, footer, hero, cta, property_grid, etc.
+nombre, descripcion, icono, categoria
+variantes (JSONB) - array de variantes disponibles: [{id, nombre, descripcion}]
+campos_config (JSONB) - schema de configuración
+es_global, disponible, orden
+2.2 componentes_web ✅ TABLA PRINCIPAL
+Qué es: Instancias de componentes configurados por cada tenant Quién la usa: seccionesService.ts Columnas clave:
+id, tenant_id, tipo, variante, nombre
+datos (JSONB) - configuración del componente
+activo, orden
+scope - 'tenant' | 'page_type' | 'page'
+tipo_pagina, pagina_id
+es_activo - si esta variante es la activa para renderizar
+config_completa - si tiene todos los campos requeridos
+📝 GRUPO 3: CONTENIDO PERSISTENTE
+3.1 catalogo_campos
+Qué es: Define qué campos tiene cada tipo+variante de componente Quién la usa: contenidoService.ts Columnas clave:
+tipo_componente, variante, campo
+tipo_campo - text, image, array, object, etc.
+categoria - 'static_data' o 'media'
+etiqueta, descripcion, valor_default
+traducible, requerido, orden
+3.2 contenido_campos
+Qué es: Contenido textual/JSON de cada componente por idioma Quién la usa: contenidoService.ts Columnas clave:
+componente_id, campo, idioma
+valor (text), valor_json (JSONB)
+version, actualizado_por
+3.3 contenido_media
+Qué es: Imágenes/videos de cada componente Quién la usa: contenidoService.ts Columnas clave:
+componente_id, campo, tipo_media
+url, alt_text, traducciones_alt
+metadata (JSONB), orden
+🔗 GRUPO 4: RELACIONES PÁGINA-COMPONENTE
+4.1 paginas_componentes
+Qué es: Relación N:M entre páginas y componentes globales Quién la usa: seccionesService.ts - funciones agregarComponenteAPagina, getComponentesPagina Columnas clave:
+pagina_id, componente_id
+orden, activo
+🎨 GRUPO 5: PLANTILLAS Y CONFIGURACIONES
+5.1 plantillas_pagina
+Qué es: Templates predefinidos para páginas (ej: "Homepage Modern", "Property Grid Classic") Quién la usa: paginasService.ts Columnas clave:
+id, codigo, tipo_pagina, nombre
+componentes (JSONB) - array de componentes del template
+configuracion_default (JSONB), estilos (JSONB)
+visible, featured, es_premium
+5.2 paginas_configuraciones
+Qué es: Versiones/configuraciones guardadas de una página (system versioning) Quién la usa: paginasService.ts Columnas clave:
+id, pagina_id, nombre
+plantilla_id, componentes (JSONB), meta (JSONB)
+es_activa
+5.3 paginas_alias
+Qué es: Traducciones de slugs/títulos de páginas (multi-idioma) Quién la usa: paginasService.ts Columnas clave:
+pagina_id, idioma, slug_alias
+titulo_alias, descripcion_alias, activo
+🌍 GRUPO 6: IDIOMAS
+6.1 idiomas
+Qué es: Catálogo de idiomas soportados por el sistema Quién la usa: paginasService.ts Columnas clave:
+codigo (es, en, fr, pt)
+nombre, nombre_nativo
+activo, prioridad
+📊 RESUMEN EJECUTIVO
+Tablas para Tipos de Página (3 tablas):
+tipos_pagina - Catálogo del sistema
+tenant_paginas_activas - Qué tiene activado cada tenant
+paginas_web - Páginas concretas creadas
+Tablas para Componentes/Secciones (3 tablas):
+catalogo_componentes - Catálogo del sistema
+componentes_web - Instancias configuradas por tenant
+paginas_componentes - Relación página-componente
+Tablas para Contenido (3 tablas):
+catalogo_campos - Schema de campos por componente
+contenido_campos - Valores textuales/JSON
+contenido_media - Imágenes/videos
+Tablas para Templates y Versioning (3 tablas):
+plantillas_pagina - Templates predefinidos
+paginas_configuraciones - Versiones de páginas
+paginas_alias - Traducciones multi-idioma
+Tablas de Soporte (1 tabla):
+idiomas - Idiomas disponibles
+✅ TOTAL: 13 TABLAS EN USO
