@@ -1,0 +1,428 @@
+[
+    {
+        "id": "fab59c27-8d21-4732-87a6-ac040b6a7c16",
+        "tenantId": "d43e30b1-61d0-46e5-a760-7595f78dd184",
+        "tipoPagina": "homepage",
+        "variante": "default",
+        "titulo": "Inicio - CLIC Inmobiliaria",
+        "slug": "/",
+        "descripcion": "P\u00c3\u00a1gina principal de CLIC Inmobiliaria",
+        "contenido": {},
+        "meta": {
+            "title": "CLIC Inmobiliaria - Tu aliado en bienes ra\u00c3\u00adces",
+            "keywords": [
+                "inmobiliaria",
+                "propiedades",
+                "bienes ra\u00c3\u00adces",
+                "CLIC"
+            ],
+            "description": "Encuentra la propiedad de tus sue\u00c3\u00b1os con CLIC Inmobiliaria"
+        },
+        "publica": true,
+        "activa": true,
+        "orden": 0,
+        "createdAt": "2025-11-27T17:19:50.297Z",
+        "updatedAt": "2025-11-29T22:02:28.046Z"
+    },
+    {
+        "id": "dc3d9812-abfe-4d68-aac5-b15aaac697fd",
+        "tenantId": "d43e30b1-61d0-46e5-a760-7595f78dd184",
+        "tipoPagina": "video_single",
+        "variante": "default",
+        "titulo": "Apartamento Minimalista en el Centro",
+        "slug": "videos/general/apartamento-minimalista-en-el-centro",
+        "descripcion": "Moderno apartamento de 2 habitaciones con dise\u00c3\u00b1o minimalista",
+        "contenido": {},
+        "meta": {},
+        "publica": true,
+        "activa": true,
+        "orden": 0,
+        "createdAt": "2025-11-29T04:35:22.987Z",
+        "updatedAt": "2025-11-29T04:35:22.987Z"
+    },
+    {
+        "id": "795e15d2-91eb-42be-a54f-957ddbf7c6ef",
+        "tenantId": "d43e30b1-61d0-46e5-a760-7595f78dd184",
+        "tipoPagina": "video_category",
+        "variante": "default",
+        "titulo": "Videos - General",
+        "slug": "videos/general",
+        "descripcion": "Categor\u00c3\u00ada general de videos",
+        "contenido": {},
+        "meta": {},
+        "publica": true,
+        "activa": true,
+        "orden": 0,
+        "createdAt": "2025-11-29T04:35:31.503Z",
+        "updatedAt": "2025-11-29T04:35:31.503Z"
+    },
+    {
+        "id": "a90984de-e74b-400e-bf63-6d1bea27b587",
+        "tenantId": "d43e30b1-61d0-46e5-a760-7595f78dd184",
+        "tipoPagina": "listados_propiedades",
+        "variante": "default",
+        "titulo": "Propiedades",
+        "slug": "/propiedades",
+        "descripcion": "Explora todas nuestras propiedades disponibles",
+        "contenido": {
+            "componentes": [
+                "header",
+                "hero",
+                "property_grid",
+                "footer"
+            ]
+        },
+        "meta": {
+            "title": "Propiedades - CLIC Inmobiliaria"
+        },
+        "publica": true,
+        "activa": true,
+        "orden": 1,
+        "createdAt": "2025-11-30T13:55:16.542Z",
+        "updatedAt": "2025-11-30T13:55:16.542Z"
+    },
+    {
+        "id": "145b8b9a-5813-41f2-b714-7868a73dbc69",
+        "tenantId": "d43e30b1-61d0-46e5-a760-7595f78dd184",
+        "tipoPagina": "directorio_asesores",
+        "variante": "default",
+        "titulo": "Nuestros Asesores",
+        "slug": "/asesores",
+        "descripcion": "Conoce a nuestro equipo de asesores inmobiliarios",
+        "contenido": {
+            "componentes": [
+                "header",
+                "hero",
+                "team_grid",
+                "footer"
+            ]
+        },
+        "meta": {
+            "title": "Asesores - CLIC Inmobiliaria"
+        },
+        "publica": true,
+        "activa": true,
+        "orden": 2,
+        "createdAt": "2025-11-30T13:55:16.542Z",
+        "updatedAt": "2025-11-30T13:55:16.542Z"
+    },
+    {
+        "id": "e6611f7c-9483-4648-a5f0-b5fbe4870829",
+        "tenantId": "d43e30b1-61d0-46e5-a760-7595f78dd184",
+        "tipoPagina": "custom",
+        "variante": "default",
+        "titulo": "Videos",
+        "slug": "videos",
+        "contenido": {},
+        "meta": {},
+        "publica": true,
+        "activa": true,
+        "orden": 4,
+        "createdAt": "2025-11-28T23:41:52.511Z",
+        "updatedAt": "2025-11-28T23:41:52.511Z"
+    },
+    {
+        "id": "1119f115-916a-403b-a10a-1d1e201e2373",
+        "tenantId": "d43e30b1-61d0-46e5-a760-7595f78dd184",
+        "tipoPagina": "directorio_articulos",
+        "variante": "default",
+        "titulo": "Blog",
+        "slug": "/articulos",
+        "descripcion": "Art\u00c3\u00adculos y noticias del sector inmobiliario",
+        "contenido": {
+            "componentes": [
+                "header",
+                "hero",
+                "article_grid",
+                "footer"
+            ]
+        },
+        "meta": {
+            "title": "Blog - CLIC Inmobiliaria"
+        },
+        "publica": true,
+        "activa": true,
+        "orden": 4,
+        "createdAt": "2025-11-30T13:55:16.542Z",
+        "updatedAt": "2025-11-30T13:55:16.542Z"
+    },
+    {
+        "id": "8a05ac3f-3268-4ec3-8584-dc80873c2554",
+        "tenantId": "d43e30b1-61d0-46e5-a760-7595f78dd184",
+        "tipoPagina": "custom",
+        "variante": "default",
+        "titulo": "Vender",
+        "slug": "vender",
+        "contenido": {},
+        "meta": {},
+        "publica": true,
+        "activa": true,
+        "orden": 5,
+        "createdAt": "2025-11-29T01:53:33.869Z",
+        "updatedAt": "2025-11-29T01:53:33.869Z"
+    },
+    {
+        "id": "66c6f658-dd43-43b4-bc79-26dca5a38725",
+        "tenantId": "d43e30b1-61d0-46e5-a760-7595f78dd184",
+        "tipoPagina": "testimonios",
+        "variante": "default",
+        "titulo": "Testimonios",
+        "slug": "testimonios",
+        "descripcion": "Testimonios - P\u00c3\u00a1gina del sitio web",
+        "contenido": {},
+        "meta": {
+            "title": "Testimonios",
+            "description": "Testimonios - CLIC Inmobiliaria"
+        },
+        "publica": true,
+        "activa": false,
+        "orden": 5,
+        "createdAt": "2025-11-29T05:38:49.843Z",
+        "updatedAt": "2025-11-29T05:38:49.843Z"
+    },
+    {
+        "id": "63658a6c-ba29-4ba1-84f7-c215db48b54c",
+        "tenantId": "d43e30b1-61d0-46e5-a760-7595f78dd184",
+        "tipoPagina": "contacto",
+        "variante": "default",
+        "titulo": "Contacto",
+        "slug": "/contacto",
+        "descripcion": "Ponte en contacto con nosotros",
+        "contenido": {
+            "componentes": [
+                "header",
+                "hero",
+                "contact_info",
+                "contact_form",
+                "map",
+                "footer"
+            ]
+        },
+        "meta": {
+            "title": "Contacto - CLIC Inmobiliaria"
+        },
+        "publica": true,
+        "activa": true,
+        "orden": 5,
+        "createdAt": "2025-11-30T13:55:16.542Z",
+        "updatedAt": "2025-11-30T13:55:16.542Z"
+    },
+    {
+        "id": "79399f10-9dfd-4286-8481-58420922cfbe",
+        "tenantId": "d43e30b1-61d0-46e5-a760-7595f78dd184",
+        "tipoPagina": "landing_page",
+        "variante": "default",
+        "titulo": "Landing Page",
+        "slug": "proyectos",
+        "descripcion": "Landing Page - P\u00c3\u00a1gina del sitio web",
+        "contenido": {},
+        "meta": {
+            "title": "Landing Page",
+            "description": "Landing Page - CLIC Inmobiliaria"
+        },
+        "publica": true,
+        "activa": false,
+        "orden": 6,
+        "createdAt": "2025-11-29T05:38:49.843Z",
+        "updatedAt": "2025-11-29T05:38:49.843Z"
+    },
+    {
+        "id": "f7350f1d-bd62-4af8-8a3f-8c53b8c36c1e",
+        "tenantId": "d43e30b1-61d0-46e5-a760-7595f78dd184",
+        "tipoPagina": "video_category",
+        "variante": "default",
+        "titulo": "Videos de CLIC",
+        "slug": "videos-categoria",
+        "contenido": {},
+        "meta": {},
+        "publica": true,
+        "activa": true,
+        "orden": 8,
+        "createdAt": "2025-11-29T04:43:46.359Z",
+        "updatedAt": "2025-11-29T04:44:12.157Z"
+    },
+    {
+        "id": "32bb697a-a3a3-4500-bba7-e6908f6e77f9",
+        "tenantId": "d43e30b1-61d0-46e5-a760-7595f78dd184",
+        "tipoPagina": "single_articulo",
+        "variante": "default",
+        "titulo": "Detalle de Art\u00c3\u00adculo",
+        "slug": "/articulos/:slug",
+        "descripcion": "Plantilla para mostrar un art\u00c3\u00adculo",
+        "contenido": {
+            "componentes": [
+                "header",
+                "article_detail",
+                "related_articles",
+                "footer"
+            ]
+        },
+        "meta": {
+            "title": "Art\u00c3\u00adculo - CLIC Inmobiliaria"
+        },
+        "publica": true,
+        "activa": true,
+        "orden": 11,
+        "createdAt": "2025-11-30T13:55:16.542Z",
+        "updatedAt": "2025-11-30T13:55:16.542Z"
+    },
+    {
+        "id": "fa014162-8cdf-4d97-a512-f33fd24fa158",
+        "tenantId": "d43e30b1-61d0-46e5-a760-7595f78dd184",
+        "tipoPagina": "single_asesor",
+        "variante": "default",
+        "titulo": "Perfil de Asesor",
+        "slug": "/asesores/:slug",
+        "descripcion": "Plantilla para mostrar perfil de asesor",
+        "contenido": {
+            "componentes": [
+                "header",
+                "agent_profile",
+                "agent_listings",
+                "contact_form",
+                "footer"
+            ]
+        },
+        "meta": {
+            "title": "Asesor - CLIC Inmobiliaria"
+        },
+        "publica": true,
+        "activa": true,
+        "orden": 12,
+        "createdAt": "2025-11-30T13:55:16.542Z",
+        "updatedAt": "2025-11-30T13:55:16.542Z"
+    },
+    {
+        "id": "3a6d788e-ab36-469f-adb5-11934314c681",
+        "tenantId": "d43e30b1-61d0-46e5-a760-7595f78dd184",
+        "tipoPagina": "politicas_privacidad",
+        "variante": "default",
+        "titulo": "Pol\u00c3\u00adticas de Privacidad",
+        "slug": "politicas-privacidad",
+        "descripcion": "Pol\u00c3\u00adticas de Privacidad - P\u00c3\u00a1gina del sitio web",
+        "contenido": {},
+        "meta": {
+            "title": "Pol\u00c3\u00adticas de Privacidad",
+            "description": "Pol\u00c3\u00adticas de Privacidad - CLIC Inmobiliaria"
+        },
+        "publica": true,
+        "activa": false,
+        "orden": 90,
+        "createdAt": "2025-11-29T05:38:49.843Z",
+        "updatedAt": "2025-11-29T05:38:49.843Z"
+    },
+    {
+        "id": "333342c1-853c-4108-9f20-25ea09fe5d0a",
+        "tenantId": "d43e30b1-61d0-46e5-a760-7595f78dd184",
+        "tipoPagina": "terminos_condiciones",
+        "variante": "default",
+        "titulo": "T\u00c3\u00a9rminos y Condiciones",
+        "slug": "terminos-condiciones",
+        "descripcion": "T\u00c3\u00a9rminos y Condiciones - P\u00c3\u00a1gina del sitio web",
+        "contenido": {},
+        "meta": {
+            "title": "T\u00c3\u00a9rminos y Condiciones",
+            "description": "T\u00c3\u00a9rminos y Condiciones - CLIC Inmobiliaria"
+        },
+        "publica": true,
+        "activa": false,
+        "orden": 91,
+        "createdAt": "2025-11-29T05:38:49.843Z",
+        "updatedAt": "2025-11-29T05:38:49.843Z"
+    },
+    {
+        "id": "ff8a5a29-cd18-4051-b2e6-f28a7b35964e",
+        "tenantId": "d43e30b1-61d0-46e5-a760-7595f78dd184",
+        "tipoPagina": "articulo_single",
+        "variante": "default",
+        "titulo": "Plantilla: Articulo Single",
+        "slug": "_template_articulo_single",
+        "descripcion": "Articulo Single - P\u00c3\u00a1gina del sitio web",
+        "contenido": {},
+        "meta": {
+            "title": "Plantilla: Articulo Single",
+            "description": "Articulo Single - CLIC Inmobiliaria"
+        },
+        "publica": true,
+        "activa": false,
+        "orden": 100,
+        "createdAt": "2025-11-29T05:38:49.843Z",
+        "updatedAt": "2025-11-29T05:38:49.843Z"
+    },
+    {
+        "id": "97ce93e3-5cd0-4618-8d77-df1e42433d74",
+        "tenantId": "d43e30b1-61d0-46e5-a760-7595f78dd184",
+        "tipoPagina": "landing_proyecto",
+        "variante": "default",
+        "titulo": "Plantilla: Landing Proyecto",
+        "slug": "_template_landing_proyecto",
+        "descripcion": "Landing Proyecto - P\u00c3\u00a1gina del sitio web",
+        "contenido": {},
+        "meta": {
+            "title": "Plantilla: Landing Proyecto",
+            "description": "Landing Proyecto - CLIC Inmobiliaria"
+        },
+        "publica": true,
+        "activa": false,
+        "orden": 100,
+        "createdAt": "2025-11-29T05:38:49.843Z",
+        "updatedAt": "2025-11-29T05:38:49.843Z"
+    },
+    {
+        "id": "0b142d02-a7d5-4603-bd30-649687a0c4e2",
+        "tenantId": "d43e30b1-61d0-46e5-a760-7595f78dd184",
+        "tipoPagina": "testimonio_single",
+        "variante": "default",
+        "titulo": "Plantilla: Testimonio Single",
+        "slug": "_template_testimonio_single",
+        "descripcion": "Testimonio Single - P\u00c3\u00a1gina del sitio web",
+        "contenido": {},
+        "meta": {
+            "title": "Plantilla: Testimonio Single",
+            "description": "Testimonio Single - CLIC Inmobiliaria"
+        },
+        "publica": true,
+        "activa": false,
+        "orden": 100,
+        "createdAt": "2025-11-29T05:38:49.843Z",
+        "updatedAt": "2025-11-29T05:38:49.843Z"
+    },
+    {
+        "id": "e83d6fef-ff4c-4d12-ab06-99357feced6a",
+        "tenantId": "d43e30b1-61d0-46e5-a760-7595f78dd184",
+        "tipoPagina": "asesor_single",
+        "variante": "default",
+        "titulo": "Plantilla: Asesor Individual",
+        "slug": "_template_asesor_single",
+        "descripcion": "Asesor Individual - P\u00c3\u00a1gina del sitio web",
+        "contenido": {},
+        "meta": {
+            "title": "Plantilla: Asesor Individual",
+            "description": "Asesor Individual - CLIC Inmobiliaria"
+        },
+        "publica": true,
+        "activa": true,
+        "orden": 100,
+        "createdAt": "2025-11-29T05:38:49.843Z",
+        "updatedAt": "2025-11-29T05:38:49.843Z"
+    },
+    {
+        "id": "e2c0d317-5f3d-4d95-b13a-6f4dd4dfcd0c",
+        "tenantId": "d43e30b1-61d0-46e5-a760-7595f78dd184",
+        "tipoPagina": "single_property",
+        "variante": "default",
+        "titulo": "Plantilla: Propiedad Individual",
+        "slug": "_template_single_property",
+        "descripcion": "Propiedad Individual - P\u00c3\u00a1gina del sitio web",
+        "contenido": {},
+        "meta": {
+            "title": "Plantilla: Propiedad Individual",
+            "description": "Propiedad Individual - CLIC Inmobiliaria"
+        },
+        "publica": true,
+        "activa": true,
+        "orden": 100,
+        "createdAt": "2025-11-29T05:38:49.843Z",
+        "updatedAt": "2025-11-29T05:38:49.843Z"
+    }
+]
