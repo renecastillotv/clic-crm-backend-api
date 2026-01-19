@@ -12,5 +12,7 @@
       "source": "/(.*)",
       "destination": "/api"
     }
-  ]
+  ],
+  "installCommand": "npm install",
+  "buildCommand": ""
 }
