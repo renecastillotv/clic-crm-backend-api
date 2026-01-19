@@ -9,15 +9,52 @@ if (import.meta.env.DEV) {
   console.log('🔧 API_BASE_URL configurado:', API_BASE_URL);
 }
 
+// Tipo para la API global de Clerk
+declare global {
+  interface Window {
+    Clerk?: {
+      session?: {
+        getToken: () => Promise<string | null>;
+      };
+    };
+  }
+}
+
+/**
+ * Obtiene el token de autenticación de Clerk
+ * Si se pasa un token explícitamente, lo usa.
+ * Si no, intenta obtenerlo del objeto global de Clerk.
+ */
+async function getAuthToken(providedToken?: string | null): Promise<string | null> {
+  // Si ya tenemos un token válido, usarlo
+  if (providedToken && typeof providedToken === 'string' && providedToken.trim().length > 0) {
+    return providedToken;
+  }
+
+  // Intentar obtener token del objeto global de Clerk
+  try {
+    if (window.Clerk?.session?.getToken) {
+      const token = await window.Clerk.session.getToken();
+      return token;
+    }
+  } catch (error) {
+    if (import.meta.env.DEV) {
+      console.warn('⚠️ No se pudo obtener token de Clerk:', error);
+    }
+  }
+
+  return null;
+}
+
 /**
  * Helper para hacer fetch con mejor manejo de errores
  * @param url - URL relativa o absoluta
  * @param options - Opciones de fetch
- * @param token - Token de autenticación de Clerk (opcional)
+ * @param token - Token de autenticación de Clerk (opcional, se obtiene automáticamente si no se provee)
  */
-async function apiFetch(url: string, options: RequestInit = {}, token?: string | null) {
+export async function apiFetch(url: string, options: RequestInit = {}, token?: string | null) {
   const fullUrl = url.startsWith('http') ? url : `${API_BASE_URL}${url.startsWith('/') ? url : `/${url}`}`;
-  
+
   if (import.meta.env.DEV) {
     console.log(`🌐 Fetching: ${options.method || 'GET'} ${fullUrl}`);
   }
@@ -27,17 +64,17 @@ async function apiFetch(url: string, options: RequestInit = {}, token?: string |
     ...options.headers,
   };
 
-  // Agregar token de autenticación si se proporciona
-  // IMPORTANTE: Solo agregar si token es una cadena no vacía
-  if (token && typeof token === 'string' && token.trim().length > 0) {
-    headers['Authorization'] = `Bearer ${token}`;
+  // Obtener token de autenticación (del parámetro o automáticamente de Clerk)
+  const authToken = await getAuthToken(token);
+
+  if (authToken) {
+    headers['Authorization'] = `Bearer ${authToken}`;
     if (import.meta.env.DEV) {
       console.log('🔑 Token incluido en la petición');
     }
   } else {
     if (import.meta.env.DEV) {
-      console.warn('⚠️ No se proporcionó token de autenticación para la petición a:', fullUrl);
-      console.warn('⚠️ Token recibido:', token);
+      console.warn('⚠️ No hay token de autenticación disponible para la petición a:', fullUrl);
     }
   }
 
@@ -284,6 +321,7 @@ export interface CampoConfig {
 }
 
 export interface CatalogoComponente {
+  id: string;  // UUID del componente en el catálogo
   tipo: string;
   nombre: string;
   descripcion: string | null;
@@ -944,10 +982,10 @@ export async function unassignRoleFromUser(
   tenantId?: string | null,
   token?: string | null
 ): Promise<void> {
-  const url = new URL(`${API_BASE_URL}/admin/users/${userId}/roles/${roleId}`, window.location.origin);
-  if (tenantId) url.searchParams.append('tenantId', tenantId);
-  
-  await apiFetch(url.pathname + url.search, {
+  let path = `/admin/users/${userId}/roles/${roleId}`;
+  if (tenantId) path += `?tenantId=${encodeURIComponent(tenantId)}`;
+
+  await apiFetch(path, {
     method: 'DELETE',
   }, token);
 }
@@ -1503,30 +1541,70 @@ export async function deleteSolicitud(tenantId: string, solicitudId: string): Pr
 
 // ==================== CRM PROPUESTAS API ====================
 
+export type EstadoPropuesta =
+  | 'borrador'
+  | 'enviada'
+  | 'vista'
+  | 'aceptada'
+  | 'rechazada'
+  | 'expirada';
+
+export interface PropuestaPropiedadResumen {
+  id: string;
+  propiedad_id: string;
+  titulo: string;
+  codigo?: string;
+  precio?: number;
+  moneda?: string;
+  imagen_principal?: string;
+  tipo?: string;
+  operacion?: string;
+  ciudad?: string;
+  habitaciones?: number;
+  banos?: number;
+  m2_construccion?: number;
+  orden: number;
+  notas?: string;
+  precio_especial?: number;
+}
+
 export interface Propuesta {
   id: string;
   tenant_id: string;
   titulo: string;
-  descripcion: string | null;
-  estado: string;
-  solicitud_id: string | null;
-  solicitud_titulo: string | null;
-  contacto_id: string | null;
-  contacto_nombre: string | null;
-  contacto_apellido: string | null;
-  contacto_email: string | null;
-  monto_total: number | null;
-  moneda: string;
-  fecha_validez: string | null;
-  url_publica: string | null;
-  propiedades: Array<{
+  descripcion?: string | null;
+  estado: EstadoPropuesta;
+  solicitud_id?: string | null;
+  solicitud_titulo?: string | null;
+  contacto_id?: string | null;
+  contacto?: {
     id: string;
-    titulo: string;
-    precio: number;
-    imagen: string | null;
-  }>;
-  notas_internas: string | null;
-  created_by: string | null;
+    nombre: string;
+    apellido?: string;
+    email?: string;
+  };
+  // Compatibilidad con vista anterior
+  contacto_nombre?: string | null;
+  contacto_apellido?: string | null;
+  contacto_email?: string | null;
+  propiedad_id?: string | null; // Mantener por compatibilidad
+  propiedades?: PropuestaPropiedadResumen[]; // Nuevo: array de propiedades
+  propiedades_count?: number; // Conteo rápido para listados
+  usuario_creador_id?: string | null;
+  precio_propuesto?: number | null;
+  moneda: string;
+  comision_porcentaje?: number | null;
+  comision_monto?: number | null;
+  condiciones?: string | null;
+  notas_internas?: string | null;
+  url_publica?: string | null;
+  fecha_expiracion?: string | null;
+  fecha_enviada?: string | null;
+  fecha_vista?: string | null;
+  fecha_respuesta?: string | null;
+  veces_vista?: number;
+  datos_extra?: Record<string, any>;
+  activo?: boolean;
   created_at: string;
   updated_at: string;
 }
@@ -1576,36 +1654,20 @@ export async function getPropuesta(tenantId: string, propuestaId: string): Promi
  * Crea una nueva propuesta
  */
 export async function createPropuesta(tenantId: string, data: Partial<Propuesta>): Promise<Propuesta> {
-  const response = await fetch(`${API_BASE_URL}/tenants/${tenantId}/propuestas`, {
+  return apiFetch(`/tenants/${tenantId}/propuestas`, {
     method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify(data),
   });
-
-  if (!response.ok) {
-    const error = await response.json();
-    throw new Error(error.message || 'Error al crear propuesta');
-  }
-
-  return response.json();
 }
 
 /**
  * Actualiza una propuesta
  */
 export async function updatePropuesta(tenantId: string, propuestaId: string, data: Partial<Propuesta>): Promise<Propuesta> {
-  const response = await fetch(`${API_BASE_URL}/tenants/${tenantId}/propuestas/${propuestaId}`, {
+  return apiFetch(`/tenants/${tenantId}/propuestas/${propuestaId}`, {
     method: 'PUT',
-    headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify(data),
   });
-
-  if (!response.ok) {
-    const error = await response.json();
-    throw new Error(error.message || 'Error al actualizar propuesta');
-  }
-
-  return response.json();
 }
 
 /**
@@ -1638,6 +1700,99 @@ export async function deletePropuesta(tenantId: string, propuestaId: string): Pr
     const error = await response.json();
     throw new Error(error.message || 'Error al eliminar propuesta');
   }
+}
+
+/**
+ * Obtiene las propiedades de una propuesta
+ */
+export async function getPropiedadesDePropuesta(tenantId: string, propuestaId: string): Promise<PropuestaPropiedadResumen[]> {
+  const response = await fetch(`${API_BASE_URL}/tenants/${tenantId}/propuestas/${propuestaId}/propiedades`);
+  if (!response.ok) {
+    throw new Error('Error al obtener propiedades de la propuesta');
+  }
+  return response.json();
+}
+
+/**
+ * Sincroniza las propiedades de una propuesta (reemplaza todas)
+ */
+export async function sincronizarPropiedadesPropuesta(
+  tenantId: string,
+  propuestaId: string,
+  propiedadIds: string[]
+): Promise<PropuestaPropiedadResumen[]> {
+  const response = await fetch(`${API_BASE_URL}/tenants/${tenantId}/propuestas/${propuestaId}/propiedades`, {
+    method: 'PUT',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ propiedad_ids: propiedadIds }),
+  });
+
+  if (!response.ok) {
+    const error = await response.json();
+    throw new Error(error.message || 'Error al sincronizar propiedades');
+  }
+
+  return response.json();
+}
+
+/**
+ * Agrega una propiedad a una propuesta
+ */
+export async function agregarPropiedadAPropuesta(
+  tenantId: string,
+  propuestaId: string,
+  propiedadId: string,
+  notas?: string,
+  precioEspecial?: number
+): Promise<PropuestaPropiedadResumen[]> {
+  const response = await fetch(`${API_BASE_URL}/tenants/${tenantId}/propuestas/${propuestaId}/propiedades`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ propiedad_id: propiedadId, notas, precio_especial: precioEspecial }),
+  });
+
+  if (!response.ok) {
+    const error = await response.json();
+    throw new Error(error.message || 'Error al agregar propiedad');
+  }
+
+  return response.json();
+}
+
+/**
+ * Elimina una propiedad de una propuesta
+ */
+export async function eliminarPropiedadDePropuesta(
+  tenantId: string,
+  propuestaId: string,
+  propiedadId: string
+): Promise<PropuestaPropiedadResumen[]> {
+  const response = await fetch(`${API_BASE_URL}/tenants/${tenantId}/propuestas/${propuestaId}/propiedades/${propiedadId}`, {
+    method: 'DELETE',
+  });
+
+  if (!response.ok) {
+    const error = await response.json();
+    throw new Error(error.message || 'Error al eliminar propiedad de la propuesta');
+  }
+
+  return response.json();
+}
+
+/**
+ * Regenera la URL pública de una propuesta
+ */
+export async function regenerarUrlPublicaPropuesta(tenantId: string, propuestaId: string): Promise<Propuesta> {
+  const response = await fetch(`${API_BASE_URL}/tenants/${tenantId}/propuestas/${propuestaId}/regenerar-url`, {
+    method: 'POST',
+  });
+
+  if (!response.ok) {
+    const error = await response.json();
+    throw new Error(error.message || 'Error al regenerar URL');
+  }
+
+  return response.json();
 }
 
 // ==================== CRM ACTIVIDADES/SEGUIMIENTO API ====================
@@ -1962,6 +2117,12 @@ export interface Propiedad {
   agente_apellido?: string;
   propietario_nombre?: string;
   propietario_apellido?: string;
+  // Campos de comisión
+  comision?: string | number | null;
+  comision_nota?: string | null;
+  // Red Global
+  red_global?: boolean;
+  tenant_nombre?: string;
 }
 
 export interface PropiedadesResponse {
@@ -1986,6 +2147,7 @@ export interface PropiedadFiltros {
   destacada?: boolean;
   busqueda?: string;
   agente_id?: string;
+  include_red_global?: boolean;
   page?: number;
   limit?: number;
 }
@@ -2002,26 +2164,30 @@ export interface PropiedadesStats {
 /**
  * Obtiene las propiedades de un tenant
  */
-export async function getPropiedadesCrm(tenantId: string, filtros?: PropiedadFiltros): Promise<PropiedadesResponse> {
-  const url = new URL(`${API_BASE_URL}/tenants/${tenantId}/propiedades`, window.location.origin);
+export async function getPropiedadesCrm(tenantId: string, filtros?: PropiedadFiltros, token?: string | null): Promise<PropiedadesResponse> {
+  const params = new URLSearchParams();
 
-  if (filtros?.tipo) url.searchParams.append('tipo', filtros.tipo);
-  if (filtros?.operacion) url.searchParams.append('operacion', filtros.operacion);
-  if (filtros?.estado_propiedad) url.searchParams.append('estado_propiedad', filtros.estado_propiedad);
-  if (filtros?.ciudad) url.searchParams.append('ciudad', filtros.ciudad);
-  if (filtros?.precio_min !== undefined) url.searchParams.append('precio_min', String(filtros.precio_min));
-  if (filtros?.precio_max !== undefined) url.searchParams.append('precio_max', String(filtros.precio_max));
-  if (filtros?.recamaras_min !== undefined) url.searchParams.append('recamaras_min', String(filtros.recamaras_min));
-  if (filtros?.banos_min !== undefined) url.searchParams.append('banos_min', String(filtros.banos_min));
-  if (filtros?.m2_min !== undefined) url.searchParams.append('m2_min', String(filtros.m2_min));
-  if (filtros?.m2_max !== undefined) url.searchParams.append('m2_max', String(filtros.m2_max));
-  if (filtros?.destacada !== undefined) url.searchParams.append('destacada', String(filtros.destacada));
-  if (filtros?.busqueda) url.searchParams.append('busqueda', filtros.busqueda);
-  if (filtros?.agente_id) url.searchParams.append('agente_id', filtros.agente_id);
-  if (filtros?.page) url.searchParams.append('page', String(filtros.page));
-  if (filtros?.limit) url.searchParams.append('limit', String(filtros.limit));
+  if (filtros?.tipo) params.append('tipo', filtros.tipo);
+  if (filtros?.operacion) params.append('operacion', filtros.operacion);
+  if (filtros?.estado_propiedad) params.append('estado_propiedad', filtros.estado_propiedad);
+  if (filtros?.ciudad) params.append('ciudad', filtros.ciudad);
+  if (filtros?.precio_min !== undefined) params.append('precio_min', String(filtros.precio_min));
+  if (filtros?.precio_max !== undefined) params.append('precio_max', String(filtros.precio_max));
+  if (filtros?.recamaras_min !== undefined) params.append('recamaras_min', String(filtros.recamaras_min));
+  if (filtros?.banos_min !== undefined) params.append('banos_min', String(filtros.banos_min));
+  if (filtros?.m2_min !== undefined) params.append('m2_min', String(filtros.m2_min));
+  if (filtros?.m2_max !== undefined) params.append('m2_max', String(filtros.m2_max));
+  if (filtros?.destacada !== undefined) params.append('destacada', String(filtros.destacada));
+  if (filtros?.busqueda) params.append('busqueda', filtros.busqueda);
+  if (filtros?.agente_id) params.append('agente_id', filtros.agente_id);
+  if (filtros?.include_red_global) params.append('include_red_global', String(filtros.include_red_global));
+  if (filtros?.page) params.append('page', String(filtros.page));
+  if (filtros?.limit) params.append('limit', String(filtros.limit));
 
-  const response = await fetch(url.toString());
+  const queryString = params.toString();
+  const url = `/tenants/${tenantId}/propiedades${queryString ? `?${queryString}` : ''}`;
+
+  const response = await apiFetch(url, {}, token);
   if (!response.ok) {
     throw new Error('Error al obtener propiedades');
   }
@@ -2031,8 +2197,8 @@ export async function getPropiedadesCrm(tenantId: string, filtros?: PropiedadFil
 /**
  * Obtiene una propiedad por ID
  */
-export async function getPropiedadCrm(tenantId: string, propiedadId: string): Promise<Propiedad> {
-  const response = await fetch(`${API_BASE_URL}/tenants/${tenantId}/propiedades/${propiedadId}`);
+export async function getPropiedadCrm(tenantId: string, propiedadId: string, token?: string | null): Promise<Propiedad> {
+  const response = await apiFetch(`/tenants/${tenantId}/propiedades/${propiedadId}`, {}, token);
   if (!response.ok) {
     throw new Error('Error al obtener propiedad');
   }
@@ -2042,8 +2208,8 @@ export async function getPropiedadCrm(tenantId: string, propiedadId: string): Pr
 /**
  * Obtiene estadísticas de propiedades
  */
-export async function getPropiedadesStats(tenantId: string): Promise<PropiedadesStats> {
-  const response = await fetch(`${API_BASE_URL}/tenants/${tenantId}/propiedades/stats`);
+export async function getPropiedadesStats(tenantId: string, token?: string | null): Promise<PropiedadesStats> {
+  const response = await apiFetch(`/tenants/${tenantId}/propiedades/stats`, {}, token);
   if (!response.ok) {
     throw new Error('Error al obtener estadísticas');
   }
@@ -2053,12 +2219,11 @@ export async function getPropiedadesStats(tenantId: string): Promise<Propiedades
 /**
  * Crea una nueva propiedad
  */
-export async function createPropiedadCrm(tenantId: string, data: Partial<Propiedad>): Promise<Propiedad> {
-  const response = await fetch(`${API_BASE_URL}/tenants/${tenantId}/propiedades`, {
+export async function createPropiedadCrm(tenantId: string, data: Partial<Propiedad>, token?: string | null): Promise<Propiedad> {
+  const response = await apiFetch(`/tenants/${tenantId}/propiedades`, {
     method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify(data),
-  });
+  }, token);
 
   if (!response.ok) {
     const error = await response.json();
@@ -2071,12 +2236,11 @@ export async function createPropiedadCrm(tenantId: string, data: Partial<Propied
 /**
  * Actualiza una propiedad
  */
-export async function updatePropiedadCrm(tenantId: string, propiedadId: string, data: Partial<Propiedad>): Promise<Propiedad> {
-  const response = await fetch(`${API_BASE_URL}/tenants/${tenantId}/propiedades/${propiedadId}`, {
+export async function updatePropiedadCrm(tenantId: string, propiedadId: string, data: Partial<Propiedad>, token?: string | null): Promise<Propiedad> {
+  const response = await apiFetch(`/tenants/${tenantId}/propiedades/${propiedadId}`, {
     method: 'PUT',
-    headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify(data),
-  });
+  }, token);
 
   if (!response.ok) {
     const error = await response.json();
@@ -2089,15 +2253,97 @@ export async function updatePropiedadCrm(tenantId: string, propiedadId: string, 
 /**
  * Elimina una propiedad
  */
-export async function deletePropiedadCrm(tenantId: string, propiedadId: string): Promise<void> {
-  const response = await fetch(`${API_BASE_URL}/tenants/${tenantId}/propiedades/${propiedadId}`, {
+export async function deletePropiedadCrm(tenantId: string, propiedadId: string, token?: string | null): Promise<void> {
+  const response = await apiFetch(`/tenants/${tenantId}/propiedades/${propiedadId}`, {
     method: 'DELETE',
-  });
+  }, token);
 
   if (!response.ok) {
     const error = await response.json();
     throw new Error(error.message || 'Error al eliminar propiedad');
   }
+}
+
+// ============================================
+// UNIDADES DE PROYECTO
+// ============================================
+
+export interface UnidadProyecto {
+  id: string;
+  propiedad_id: string;
+  tenant_id: string;
+  codigo: string;
+  tipologia_id?: string;
+  tipologia_nombre?: string;
+  habitaciones?: number;
+  banos?: number;
+  m2?: number;
+  precio?: number;
+  moneda?: string;
+  torre?: string;
+  piso?: string;
+  nivel?: string;
+  estado: 'disponible' | 'reservada' | 'bloqueada' | 'vendida';
+  fecha_reserva?: Date;
+  fecha_venta?: Date;
+  reservado_por?: string;
+  vendido_a?: string;
+  notas?: string;
+  orden?: number;
+  created_at?: Date;
+  updated_at?: Date;
+}
+
+/**
+ * Obtiene las unidades de un proyecto (propiedad)
+ */
+export async function getUnidadesProyecto(
+  tenantId: string,
+  propiedadId: string,
+  token?: string | null
+): Promise<UnidadProyecto[]> {
+  const response = await apiFetch(
+    `/tenants/${tenantId}/propiedades/${propiedadId}/unidades`,
+    {},
+    token
+  );
+  if (!response.ok) {
+    // Si no tiene unidades, retornar array vacío
+    if (response.status === 404) {
+      return [];
+    }
+    throw new Error('Error al obtener unidades del proyecto');
+  }
+  return response.json();
+}
+
+/**
+ * Regenera los slugs de una propiedad
+ * ADVERTENCIA: Puede afectar SEO si la propiedad está publicada
+ */
+export async function regeneratePropiedadSlugs(
+  tenantId: string,
+  propiedadId: string,
+  options?: {
+    forceRegenerate?: boolean;
+    nuevoTitulo?: string;
+  },
+  token?: string | null
+): Promise<{
+  success: boolean;
+  slug: string;
+  slug_traducciones: Record<string, string>;
+  warning?: string;
+}> {
+  const response = await apiFetch(
+    `/tenants/${tenantId}/propiedades/${propiedadId}/regenerate-slugs`,
+    {
+      method: 'POST',
+      body: JSON.stringify(options || {}),
+    },
+    token
+  );
+  return response.json();
 }
 
 // ==================== CRM METAS API (GAMIFICACIÓN) ====================
@@ -2759,7 +3005,7 @@ export async function uploadComponentImage(
     headers['Authorization'] = `Bearer ${token}`;
   }
 
-  const response = await fetch(`${API_URL}/tenants/${tenantId}/upload/image`, {
+  const response = await fetch(`${API_BASE_URL}/tenants/${tenantId}/upload/image`, {
     method: 'POST',
     headers,
     body: formData,
@@ -2907,7 +3153,7 @@ export interface CategoriaAmenidad {
 export async function getCategoriasAmenidades(tenantId?: string, token?: string | null): Promise<string[]> {
   const url = tenantId
     ? `/tenants/${tenantId}/amenidades/categorias`
-    : '/catalogo/amenidades/categorias';
+    : '/catalogos/amenidades/categorias';
   const response = await apiFetch(url, {}, token);
   const data = await response.json();
   // Si el API devuelve objetos, extraer solo los códigos/nombres
@@ -2916,6 +3162,46 @@ export async function getCategoriasAmenidades(tenantId?: string, token?: string 
     return categorias.map((c: CategoriaAmenidad) => c.codigo || c.nombre);
   }
   return categorias;
+}
+
+/**
+ * Obtiene las amenidades agrupadas por categoría
+ * @param incluirInactivas - Si incluir amenidades inactivas
+ * @param tenantId - ID del tenant para obtener amenidades del tenant
+ * @param token - Token de autenticación
+ */
+export async function getAmenidadesPorCategoria(
+  incluirInactivas = false,
+  tenantId?: string,
+  token?: string | null
+): Promise<Record<string, Amenidad[]>> {
+  // Obtener amenidades del tenant si se proporciona tenantId
+  let amenidades: Amenidad[] = [];
+
+  if (tenantId) {
+    let url = `/tenants/${tenantId}/amenidades`;
+    if (incluirInactivas) url += '?incluirInactivas=true';
+    const response = await apiFetch(url, {}, token);
+    const data = await response.json();
+    amenidades = data.amenidades || data || [];
+  } else {
+    // Amenidades del catálogo global
+    const response = await apiFetch('/catalogos/amenidades', {}, token);
+    const data = await response.json();
+    amenidades = data.amenidades || data || [];
+  }
+
+  // Agrupar por categoría
+  const porCategoria: Record<string, Amenidad[]> = {};
+  for (const amenidad of amenidades) {
+    const categoria = amenidad.categoria || 'General';
+    if (!porCategoria[categoria]) {
+      porCategoria[categoria] = [];
+    }
+    porCategoria[categoria].push(amenidad);
+  }
+
+  return porCategoria;
 }
 
 // ==================== PLANTILLAS DE PÁGINA ====================
@@ -3127,8 +3413,10 @@ export interface Venta {
   nombre_negocio: string | null;
   descripcion: string | null;
   propiedad_id: string | null;
+  unidad_id: string | null;
   contacto_id: string | null;
   usuario_cerrador_id: string | null;
+  captador_id: string | null;
   estado_venta_id: string | null;
   valor_cierre: number | string | null;
   moneda: string;
@@ -3136,21 +3424,41 @@ export interface Venta {
   monto_comision: number | string | null;
   fecha_cierre: string | null;
   vendedor_externo_tipo: string | null;
+  vendedor_externo_id: string | null;
   vendedor_externo_nombre: string | null;
   vendedor_externo_contacto: string | null;
   referidor_nombre: string | null;
   referidor_id: string | null;
+  referidor_contacto_id: string | null;
   notas: string | null;
+  solicitud_id: string | null;
   completada: boolean;
   cancelada: boolean;
   tenant_id: string;
   created_at: string;
   updated_at: string;
-  // Relaciones expandidas
+  // Relaciones expandidas (objetos anidados)
   propiedad?: Propiedad | null;
   contacto?: Contacto | null;
   usuario_cerrador?: UsuarioTenant | null;
   estado_venta?: EstadoVenta | null;
+  // Campos planos del API (alternativa a objetos anidados)
+  propiedad_nombre?: string | null;
+  propiedad_imagen?: string | null;
+  propiedad_codigo?: string | null;
+  contacto_nombre?: string | null;
+  contacto_apellido?: string | null;
+  contacto_email?: string | null;
+  usuario_cerrador_nombre?: string | null;
+  usuario_cerrador_apellido?: string | null;
+  usuario_cerrador_email?: string | null;
+  estado_nombre?: string | null;
+  estado_color?: string | null;
+  numero_venta?: number | string | null;
+  es_propiedad_externa?: boolean;
+  nombre_propiedad_externa?: string | null;
+  codigo_propiedad_externa?: string | null;
+  fecha_cancelacion?: string | null;
 }
 
 /**
@@ -3205,7 +3513,8 @@ export async function getVentas(tenantId: string, filtros?: VentaFiltros, token?
   const url = `/tenants/${tenantId}/ventas${queryString ? `?${queryString}` : ''}`;
   const response = await apiFetch(url, {}, token);
   const data = await response.json();
-  return data.ventas || data || [];
+  // La API devuelve { data: [], pagination: {} }
+  return data.data || data.ventas || (Array.isArray(data) ? data : []);
 }
 
 /**
@@ -3265,22 +3574,46 @@ export interface Comision {
   monto: number | null;
   moneda: string;
   estado: string;
+  monto_pagado: number | null;
   fecha_pago: string | null;
   notas: string | null;
   created_at: string;
   updated_at: string;
+  // Campos de distribución
+  tipo_participante?: string | null;
+  split_porcentaje_vendedor?: number | null;
+  split_porcentaje_owner?: number | null;
+  datos_extra?: Record<string, any> | null;
+  monto_habilitado?: number | null;
+  escenario?: string | null;
+  es_override?: boolean | null;
+  snapshot_distribucion?: Record<string, any> | null;
+  // Campos adicionales de participantes externos
+  contacto_externo_id?: string | null;
+  nombre_display?: string | null;  // Nombre calculado por el backend
+  tenant_nombre?: string | null;
   // Relaciones
   usuario?: UsuarioTenant | null;
   venta?: Venta | null;
+  contacto?: {
+    id: string;
+    nombre: string;
+    apellido?: string;
+  } | null;
 }
 
 /**
  * Obtiene las comisiones de una venta
  * @param tenantId - ID del tenant
- * @param ventaId - ID de la venta
+ * @param filtrosOrVentaId - ID de la venta (string) o filtros con ventaId ({ ventaId: string })
  * @param token - Token de autenticación opcional
  */
-export async function getComisiones(tenantId: string, ventaId: string, token?: string | null): Promise<Comision[]> {
+export async function getComisiones(
+  tenantId: string,
+  filtrosOrVentaId: string | { ventaId: string },
+  token?: string | null
+): Promise<Comision[]> {
+  const ventaId = typeof filtrosOrVentaId === 'string' ? filtrosOrVentaId : filtrosOrVentaId.ventaId;
   const response = await apiFetch(`/tenants/${tenantId}/ventas/${ventaId}/comisiones`, {}, token);
   const data = await response.json();
   return data.comisiones || data || [];
@@ -3337,6 +3670,202 @@ export async function getVenta(tenantId: string, ventaId: string, token?: string
   return data.venta || data;
 }
 
+/**
+ * Recalcula las comisiones de una venta
+ * Elimina las comisiones existentes y crea nuevas basadas en los participantes actuales
+ * @param tenantId - ID del tenant
+ * @param ventaId - ID de la venta
+ * @param token - Token de autenticación opcional
+ */
+export async function recalcularComisionesVenta(
+  tenantId: string,
+  ventaId: string,
+  token?: string | null
+): Promise<{ success: boolean; message: string; comisiones: any[] }> {
+  const response = await apiFetch(`/tenants/${tenantId}/ventas/${ventaId}/recalcular-comisiones`, {
+    method: 'POST',
+  }, token);
+  return response.json();
+}
+
+// ==================== COMISIONES AGREGADAS (NUEVO ENDPOINT OPTIMIZADO) ====================
+
+/**
+ * Filtros para obtener comisiones agregadas
+ */
+export interface ComisionesFiltros {
+  usuario_id?: string;
+  rol?: 'vendedor' | 'captador' | 'referidor' | 'owner' | 'vendedor_externo';
+  estado?: 'pendiente' | 'parcial' | 'pagado';
+  fecha_inicio?: string;
+  fecha_fin?: string;
+  include_empresa?: boolean;
+  limit?: number;
+  offset?: number;
+}
+
+/**
+ * Comisión con datos completos de venta y usuario
+ */
+export interface ComisionCompleta {
+  id: string;
+  venta_id: string;
+  usuario_id: string | null;
+  contacto_externo_id: string | null;
+  // Montos
+  monto: number;
+  monto_pagado: number;
+  monto_habilitado: number;
+  pendiente: number;
+  moneda: string;
+  porcentaje: number;
+  estado: string;
+  // Rol y tipo
+  rol: string;
+  porcentaje_split: number;
+  es_empresa: boolean;
+  es_externo: boolean;
+  nombre_display: string;
+  // Datos de venta
+  venta: {
+    id: string;
+    nombre: string;
+    valor: number;
+    estado: string;
+    fecha: string;
+    moneda: string;
+    monto_comision: number;
+    monto_cobrado: number;
+    porcentaje_cobrado: number;
+    estado_cobro: string;
+  };
+  // Datos de usuario
+  usuario: {
+    id: string;
+    nombre: string;
+    apellido: string;
+    email: string;
+    avatar: string | null;
+  } | null;
+  // Fechas
+  created_at: string;
+  fecha_pago: string | null;
+}
+
+/**
+ * Respuesta del endpoint de comisiones
+ */
+export interface ComisionesResponse {
+  comisiones: ComisionCompleta[];
+  pagination: {
+    total: number;
+    limit: number;
+    offset: number;
+    hasMore: boolean;
+  };
+}
+
+/**
+ * Resumen de comisiones
+ */
+export interface ComisionesResumen {
+  montos: {
+    total_proyectado: number;
+    total_cobrado: number; // Total cobrado del cliente
+    total_habilitado: number;
+    total_pagado: number;
+    pendiente_cobro: number;
+    por_cobrar_futuro: number;
+  };
+  estados: {
+    total: number;
+    pagadas: number;
+    parciales: number;
+    pendientes: number;
+  };
+  roles: {
+    vendedor: number;
+    captador: number;
+    referidor: number;
+    empresa: number;
+    externo: number;
+  };
+}
+
+/**
+ * Obtiene todas las comisiones del tenant con filtros opcionales
+ * Endpoint optimizado que trae datos de venta y usuario en una sola query
+ * @param tenantId - ID del tenant
+ * @param filtros - Filtros opcionales
+ * @param token - Token de autenticación opcional
+ */
+export async function getComisionesAgregadas(
+  tenantId: string,
+  filtros: ComisionesFiltros = {},
+  token?: string | null
+): Promise<ComisionesResponse> {
+  const params = new URLSearchParams();
+
+  if (filtros.usuario_id) params.append('usuario_id', filtros.usuario_id);
+  if (filtros.rol) params.append('rol', filtros.rol);
+  if (filtros.estado) params.append('estado', filtros.estado);
+  if (filtros.fecha_inicio) params.append('fecha_inicio', filtros.fecha_inicio);
+  if (filtros.fecha_fin) params.append('fecha_fin', filtros.fecha_fin);
+  if (filtros.include_empresa !== undefined) params.append('include_empresa', String(filtros.include_empresa));
+  if (filtros.limit) params.append('limit', String(filtros.limit));
+  if (filtros.offset) params.append('offset', String(filtros.offset));
+
+  const queryString = params.toString();
+  const url = `/tenants/${tenantId}/comisiones${queryString ? `?${queryString}` : ''}`;
+
+  const response = await apiFetch(url, {}, token);
+  return response.json();
+}
+
+/**
+ * Obtiene el resumen de comisiones (totales agregados)
+ * @param tenantId - ID del tenant
+ * @param filtros - Filtros opcionales (mismo que getComisionesAgregadas)
+ * @param token - Token de autenticación opcional
+ */
+export async function getComisionesResumen(
+  tenantId: string,
+  filtros: Omit<ComisionesFiltros, 'limit' | 'offset'> = {},
+  token?: string | null
+): Promise<ComisionesResumen> {
+  const params = new URLSearchParams();
+
+  if (filtros.usuario_id) params.append('usuario_id', filtros.usuario_id);
+  if (filtros.rol) params.append('rol', filtros.rol);
+  if (filtros.estado) params.append('estado', filtros.estado);
+  if (filtros.include_empresa !== undefined) params.append('include_empresa', String(filtros.include_empresa));
+
+  const queryString = params.toString();
+  const url = `/tenants/${tenantId}/comisiones/resumen${queryString ? `?${queryString}` : ''}`;
+
+  const response = await apiFetch(url, {}, token);
+  return response.json();
+}
+
+/**
+ * Obtiene las comisiones del usuario actual
+ * @param tenantId - ID del tenant
+ * @param usuarioId - ID del usuario
+ * @param token - Token de autenticación opcional
+ */
+export async function getMisComisiones(
+  tenantId: string,
+  usuarioId: string,
+  token?: string | null
+): Promise<{
+  comisiones: ComisionCompleta[];
+  resumen_por_rol: Record<string, { cantidad: number; monto: number; pagado: number }>;
+  totales: { proyectado: number; pagado: number; pendiente: number };
+}> {
+  const response = await apiFetch(`/tenants/${tenantId}/comisiones/mis-comisiones?mi_usuario_id=${usuarioId}`, {}, token);
+  return response.json();
+}
+
 // ==================== PAGOS DE COMISIONES ====================
 
 /**
@@ -3344,14 +3873,22 @@ export async function getVenta(tenantId: string, ventaId: string, token?: string
  */
 export interface PagoComision {
   id: string;
+  tenant_id?: string;
   comision_id: string;
   venta_id: string;
   monto: number;
   moneda: string;
+  tipo_pago?: string | null;
+  tipo_movimiento?: 'cobro' | 'pago' | null; // cobro = entrada, pago = salida a participante
   fecha_pago: string | null;
   metodo_pago: string | null;
   referencia: string | null;
   notas: string | null;
+  recibo_url?: string | null;
+  registrado_por_id?: string | null;
+  distribucion?: Record<string, any> | null;
+  fecha_registro?: string;
+  participante_nombre?: string | null;
   created_at: string;
   updated_at: string;
 }
@@ -3392,7 +3929,28 @@ export async function createPagoComision(
 // ==================== EXPEDIENTE DE VENTAS ====================
 
 /**
- * Representa un requerimiento de expediente
+ * Representa un requerimiento de expediente (configuración del tenant)
+ */
+export interface RequerimientoExpedienteConfig {
+  id: string;
+  tenant_id: string;
+  titulo: string;
+  descripcion: string | null;
+  instrucciones: string | null;
+  categoria: 'cierre_venta' | 'cierre_alquiler' | 'cierre_renta';
+  tipo: string | null;
+  requiere_documento: boolean;
+  es_obligatorio: boolean;
+  orden_visualizacion: number;
+  tipos_archivo_permitidos: string[];
+  tamaño_maximo_archivo: number;
+  activo: boolean;
+  created_at: string;
+  updated_at: string;
+}
+
+/**
+ * Representa un requerimiento de expediente (legacy - para compatibilidad)
  */
 export interface RequerimientoExpediente {
   id: string;
@@ -3404,6 +3962,20 @@ export interface RequerimientoExpediente {
   orden: number;
   tipo_operacion: string | null;
   activo: boolean;
+}
+
+/**
+ * Obtiene todos los requerimientos de expediente del tenant
+ * @param tenantId - ID del tenant
+ * @param categoria - Filtrar por categoría (opcional)
+ */
+export async function getRequerimientosExpedienteTenant(
+  tenantId: string,
+  categoria?: 'cierre_venta' | 'cierre_alquiler' | 'cierre_renta'
+): Promise<RequerimientoExpedienteConfig[]> {
+  const params = categoria ? `?categoria=${categoria}` : '';
+  const response = await apiFetch(`/tenants/${tenantId}/expediente-requerimientos${params}`);
+  return response.json();
 }
 
 /**
@@ -3493,6 +4065,8 @@ export interface CategoriaContenido {
   icono: string | null;
   orden: number;
   activo: boolean;
+  traducciones?: Record<string, { nombre?: string; descripcion?: string }>;
+  slug_traducciones?: Record<string, string>;
 }
 
 /**
@@ -4147,20 +4721,112 @@ export async function deleteSeoStat(tenantId: string, statId: string, token?: st
   }, token);
 }
 
+// ==================== CATÁLOGOS Y UBICACIONES ====================
+
+/**
+ * Representa un item de catálogo
+ */
+export interface CatalogoItem {
+  id: string;
+  tipo: string;
+  codigo: string;
+  nombre: string;
+  nombre_plural?: string;
+  descripcion?: string;
+  icono?: string;
+  color?: string;
+  orden: number;
+  activo: boolean;
+  origen: 'global' | 'tenant';
+}
+
+/**
+ * Representa una ubicación geográfica
+ */
+export interface Ubicacion {
+  id: string;
+  nombre: string;
+  slug: string;
+  tipo: 'pais' | 'provincia' | 'ciudad' | 'sector';
+  parent_id?: string;
+  activo: boolean;
+  destacado: boolean;
+  nivel: number;
+  path_completo?: string;
+}
+
+/**
+ * Obtiene los items de un tipo de catálogo para el tenant
+ * @param tenantId - ID del tenant
+ * @param tipo - Tipo de catálogo (ej: 'tipos_propiedad', 'operaciones')
+ * @param token - Token de autenticación opcional
+ */
+export async function getCatalogoTenant(tenantId: string, tipo: string, token?: string | null): Promise<CatalogoItem[]> {
+  const response = await apiFetch(`/tenants/${tenantId}/catalogos/${tipo}`, {}, token);
+  const data = await response.json();
+  return data.items || data || [];
+}
+
+/**
+ * Obtiene las ubicaciones disponibles
+ * @param filtros - Filtros opcionales (tipo, parent_id, activo, search)
+ * @param token - Token de autenticación opcional
+ */
+export async function getUbicaciones(filtros?: { tipo?: string; parent_id?: string; activo?: boolean; search?: string }, token?: string | null): Promise<Ubicacion[]> {
+  let url = '/ubicaciones';
+  if (filtros) {
+    const params: string[] = [];
+    if (filtros.tipo) params.push(`tipo=${filtros.tipo}`);
+    if (filtros.parent_id) params.push(`parent_id=${filtros.parent_id}`);
+    if (filtros.activo !== undefined) params.push(`activo=${filtros.activo}`);
+    if (filtros.search) params.push(`search=${encodeURIComponent(filtros.search)}`);
+    if (params.length > 0) url += `?${params.join('&')}`;
+  }
+  const response = await apiFetch(url, {}, token);
+  const data = await response.json();
+  return data.ubicaciones || data || [];
+}
+
+/**
+ * Obtiene el árbol de ubicaciones
+ * @param opciones - Opciones (maxNivel, soloDestacados, soloMenu)
+ * @param token - Token de autenticación opcional
+ */
+export async function getArbolUbicaciones(opciones?: { maxNivel?: number; soloDestacados?: boolean; soloMenu?: boolean }, token?: string | null): Promise<Ubicacion[]> {
+  let url = '/ubicaciones/arbol';
+  if (opciones) {
+    const params: string[] = [];
+    if (opciones.maxNivel) params.push(`maxNivel=${opciones.maxNivel}`);
+    if (opciones.soloDestacados) params.push(`soloDestacados=true`);
+    if (opciones.soloMenu) params.push(`soloMenu=true`);
+    if (params.length > 0) url += `?${params.join('&')}`;
+  }
+  const response = await apiFetch(url, {}, token);
+  const data = await response.json();
+  return data.arbol || data || [];
+}
+
 // ==================== CONTENIDO - RELACIONES ====================
 
 /**
  * Representa una relación entre contenidos
+ * Nota: La API devuelve snake_case, pero aquí usamos camelCase para el frontend
  */
 export interface ContenidoRelacion {
   id: string;
-  tenant_id: string;
-  contenido_tipo: string;
-  contenido_id: string;
-  relacionado_tipo: string;
-  relacionado_id: string;
+  tenantId: string;
+  tipoOrigen: string;
+  idOrigen: string;
+  tipoDestino: string;
+  idDestino: string;
+  descripcion?: string;
   orden: number;
-  created_at: string;
+  activa: boolean;
+  createdAt: string;
+  updatedAt?: string;
+  direccion?: 'origen' | 'destino'; // Indica si el contenido consultado es origen o destino en esta relación
+  nombreOrigen?: string; // Título/nombre del contenido origen (desde el backend)
+  nombreDestino?: string; // Título/nombre del contenido destino (desde el backend)
 }
 
 /**
@@ -4172,19 +4838,66 @@ export interface ContenidoRelacion {
  */
 export async function getRelacionesContenido(
   tenantId: string,
-  contenidoTipo?: string,
+  filtros?: {
+    tipo?: string;
+    tipoOrigen?: string;
+    idOrigen?: string;
+    tipoDestino?: string;
+    idDestino?: string;
+    bidireccional?: boolean; // Si es true, busca donde el contenido sea origen O destino
+    contenidoId?: string;    // ID del contenido para búsqueda bidireccional
+    contenidoTipo?: string;  // Tipo del contenido para búsqueda bidireccional
+  } | string,
   contenidoId?: string,
   token?: string | null
 ): Promise<ContenidoRelacion[]> {
   let url = `/tenants/${tenantId}/contenido/relaciones`;
   const params: string[] = [];
-  if (contenidoTipo) params.push(`tipo=${contenidoTipo}`);
-  if (contenidoId) params.push(`id=${contenidoId}`);
+
+  // Soportar tanto el formato antiguo (string) como el nuevo (objeto)
+  if (typeof filtros === 'string') {
+    // Formato antiguo: tipo como string
+    params.push(`tipo=${filtros}`);
+    if (contenidoId) params.push(`id_origen=${contenidoId}`);
+  } else if (filtros && typeof filtros === 'object') {
+    // Modo bidireccional
+    if (filtros.bidireccional && filtros.contenidoId && filtros.contenidoTipo) {
+      params.push('bidireccional=true');
+      params.push(`contenido_id=${filtros.contenidoId}`);
+      params.push(`contenido_tipo=${filtros.contenidoTipo}`);
+    } else {
+      // Formato tradicional unidireccional
+      if (filtros.tipo) params.push(`tipo=${filtros.tipo}`);
+      if (filtros.tipoOrigen) params.push(`tipo_origen=${filtros.tipoOrigen}`);
+      if (filtros.idOrigen) params.push(`id_origen=${filtros.idOrigen}`);
+      if (filtros.tipoDestino) params.push(`tipo_destino=${filtros.tipoDestino}`);
+      if (filtros.idDestino) params.push(`id_destino=${filtros.idDestino}`);
+    }
+  }
+
   if (params.length > 0) url += `?${params.join('&')}`;
 
   const response = await apiFetch(url, {}, token);
   const data = await response.json();
-  return data.relaciones || data || [];
+  const rawRelaciones = data.relaciones || data || [];
+
+  // Mapear de snake_case a camelCase
+  return rawRelaciones.map((rel: any) => ({
+    id: rel.id,
+    tenantId: rel.tenant_id,
+    tipoOrigen: rel.tipo_origen,
+    idOrigen: rel.id_origen,
+    tipoDestino: rel.tipo_destino,
+    idDestino: rel.id_destino,
+    descripcion: rel.descripcion,
+    orden: rel.orden,
+    activa: rel.activa,
+    createdAt: rel.created_at,
+    updatedAt: rel.updated_at,
+    direccion: rel.direccion, // 'origen' o 'destino'
+    nombreOrigen: rel.nombre_origen, // título del contenido origen
+    nombreDestino: rel.nombre_destino, // título del contenido destino
+  }));
 }
 
 /**
@@ -4203,7 +4916,22 @@ export async function createRelacionContenido(
     body: JSON.stringify(relacion),
   }, token);
   const data = await response.json();
-  return data.relacion || data;
+  const rel = data.relacion || data;
+
+  // Mapear de snake_case a camelCase
+  return {
+    id: rel.id,
+    tenantId: rel.tenant_id,
+    tipoOrigen: rel.tipo_origen,
+    idOrigen: rel.id_origen,
+    tipoDestino: rel.tipo_destino,
+    idDestino: rel.id_destino,
+    descripcion: rel.descripcion,
+    orden: rel.orden,
+    activa: rel.activa,
+    createdAt: rel.created_at,
+    updatedAt: rel.updated_at,
+  };
 }
 
 /**
@@ -4608,6 +5336,113 @@ export async function rejectJoinRequest(
   token?: string | null
 ): Promise<void> {
   await apiFetch(`/tenants/${tenantId}/join-requests/${requestId}/reject`, {
+    method: 'POST',
+    body: JSON.stringify({ notas }),
+  }, token);
+}
+
+// ==========================================
+// Upgrade Requests (Solicitudes de Upgrade CLIC Connect)
+// ==========================================
+
+/**
+ * Interfaz para usuario que hace la solicitud
+ */
+export interface UpgradeRequestUsuario {
+  nombre: string | null;
+  apellido: string | null;
+  email: string;
+}
+
+/**
+ * Interfaz para usuario que revisó la solicitud
+ */
+export interface UpgradeRequestRevisor {
+  nombre: string | null;
+  apellido: string | null;
+  email: string;
+}
+
+/**
+ * Interfaz para solicitudes de upgrade de CLIC Connect
+ */
+export interface UpgradeRequest {
+  id: string;
+  tenantId: string;
+  usuarioId: string;
+  tipoSolicitud: 'create_new_tenant' | 'return_to_tenant';
+  razon: string;
+  nombreTenantPropuesto: string | null;
+  planPropuesto: string | null;
+  tamanoEquipoEstimado: number | null;
+  tenantOriginalId: string | null;
+  propiedadesAMigrar: number;
+  propiedadesPublicadas: number;
+  propiedadesCaptacion: number;
+  propiedadesRechazadas: number;
+  tarifaSetup: number;
+  tarifaSetupPagada: boolean;
+  estado: 'pending' | 'approved' | 'rejected';
+  revisadoPor: string | null;
+  revisadoAt: string | null;
+  notasRevision: string | null;
+  createdAt: string;
+  updatedAt: string;
+  usuario?: UpgradeRequestUsuario;
+  revisor?: UpgradeRequestRevisor | null;
+}
+
+/**
+ * Obtiene las solicitudes de upgrade de CLIC Connect
+ * @param tenantId - ID del tenant
+ * @param estado - Filtro por estado (opcional)
+ * @param token - Token de autenticación opcional
+ */
+export async function getUpgradeRequests(
+  tenantId: string,
+  estado?: string,
+  token?: string | null
+): Promise<UpgradeRequest[]> {
+  let url = `/tenants/${tenantId}/upgrade-requests`;
+  if (estado) url += `?estado=${estado}`;
+  const response = await apiFetch(url, {}, token);
+  const data = await response.json();
+  return data.solicitudes || data || [];
+}
+
+/**
+ * Aprueba una solicitud de upgrade de CLIC Connect
+ * @param tenantId - ID del tenant
+ * @param requestId - ID de la solicitud
+ * @param notas - Notas de aprobación (opcional)
+ * @param token - Token de autenticación opcional
+ */
+export async function approveUpgradeRequest(
+  tenantId: string,
+  requestId: string,
+  notas?: string,
+  token?: string | null
+): Promise<void> {
+  await apiFetch(`/tenants/${tenantId}/upgrade-requests/${requestId}/approve`, {
+    method: 'POST',
+    body: JSON.stringify({ notas }),
+  }, token);
+}
+
+/**
+ * Rechaza una solicitud de upgrade de CLIC Connect
+ * @param tenantId - ID del tenant
+ * @param requestId - ID de la solicitud
+ * @param notas - Notas de rechazo (opcional)
+ * @param token - Token de autenticación opcional
+ */
+export async function rejectUpgradeRequest(
+  tenantId: string,
+  requestId: string,
+  notas?: string,
+  token?: string | null
+): Promise<void> {
+  await apiFetch(`/tenants/${tenantId}/upgrade-requests/${requestId}/reject`, {
     method: 'POST',
     body: JSON.stringify({ notas }),
   }, token);
@@ -5142,6 +5977,25 @@ export async function getAmenidadesTenant(
 }
 
 /**
+ * Crea una nueva amenidad para el tenant
+ * @param tenantId - ID del tenant
+ * @param amenidad - Datos de la amenidad
+ * @param token - Token de autenticación opcional
+ */
+export async function createAmenidadTenant(
+  tenantId: string,
+  amenidad: Omit<Amenidad, 'id'>,
+  token?: string | null
+): Promise<Amenidad> {
+  const response = await apiFetch(`/tenants/${tenantId}/amenidades`, {
+    method: 'POST',
+    body: JSON.stringify(amenidad),
+  }, token);
+  const data = await response.json();
+  return data.amenidad || data;
+}
+
+/**
  * Actualiza una amenidad del tenant
  * @param tenantId - ID del tenant
  * @param amenidadId - ID de la amenidad
@@ -5176,5 +6030,913 @@ export async function deleteAmenidadTenant(
   await apiFetch(`/tenants/${tenantId}/amenidades/${amenidadId}`, {
     method: 'DELETE',
   }, token);
+}
+
+// ==================== Configuración del Tenant ====================
+
+export interface TenantConfiguracion {
+  id: string;
+  nombre: string;
+  slug: string;
+  dominio_personalizado: string | null;
+  logo_url: string | null;
+  favicon_url: string | null;
+  email_contacto: string | null;
+  telefono_contacto: string | null;
+  configuracion: Record<string, any> | null;
+  plan: string | null;
+  activo: boolean;
+  created_at: string;
+  updated_at: string;
+}
+
+/**
+ * Obtiene la configuración general del tenant
+ * @param tenantId - ID del tenant
+ * @param token - Token de autenticación opcional
+ */
+export async function getTenantConfiguracion(
+  tenantId: string,
+  token?: string | null
+): Promise<TenantConfiguracion> {
+  const response = await apiFetch(`/tenants/${tenantId}/configuracion`, {}, token);
+  return response.json();
+}
+
+// ==================== Configuración de Comisiones ====================
+
+export interface TenantComisionConfig {
+  red_global_comision_default: string | null;
+  connect_comision_default: string | null;
+}
+
+export async function getTenantComisionConfig(
+  tenantId: string,
+  token?: string | null
+): Promise<TenantComisionConfig> {
+  const response = await apiFetch(`/tenants/${tenantId}/comision-config`, {}, token);
+  const data = await response.json();
+  return {
+    red_global_comision_default: data.red_global_comision_default || null,
+    connect_comision_default: data.connect_comision_default || null
+  };
+}
+
+// ==================== UNIVERSITY ====================
+
+export interface UniversityCurso {
+  id: string;
+  tenant_id: string;
+  titulo: string;
+  descripcion?: string;
+  imagen_portada?: string;
+  nivel: string;
+  duracion_estimada_minutos: number;
+  estado: 'borrador' | 'publicado' | 'archivado';
+  es_pago: boolean;
+  precio?: number;
+  moneda: string;
+  orden: number;
+  metadata?: Record<string, any>;
+  fecha_publicacion?: string;
+  created_at: string;
+  updated_at: string;
+  // Campos agregados (del servicio backend)
+  secciones_count?: number;
+  videos_count?: number;
+  total_secciones?: number;
+  total_videos?: number;
+  certificados?: UniversityCertificado[];
+}
+
+export interface UniversitySeccion {
+  id: string;
+  curso_id: string;
+  titulo: string;
+  descripcion?: string;
+  orden: number;
+  es_pago_adicional: boolean;
+  precio_seccion?: number;
+  activo: boolean;
+  created_at: string;
+  updated_at: string;
+  videos?: UniversityVideo[];
+}
+
+export interface UniversityVideo {
+  id: string;
+  seccion_id: string;
+  titulo: string;
+  descripcion?: string;
+  url_video: string;
+  proveedor: string;
+  video_id?: string;
+  duracion_segundos: number;
+  thumbnail?: string;
+  orden: number;
+  es_preview: boolean;
+  es_pago_adicional: boolean;
+  precio_video?: number;
+  recursos_adjuntos?: any[];
+  activo: boolean;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface UniversityCertificado {
+  id: string;
+  tenant_id: string;
+  nombre: string;
+  descripcion?: string;
+  imagen_template?: string;
+  campos_personalizados?: Record<string, any>;
+  activo: boolean;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface UniversityStats {
+  total_cursos: number;
+  cursos_publicados: number;
+  total_secciones: number;
+  total_videos: number;
+  total_certificados: number;
+  total_inscripciones: number;
+  certificados_emitidos: number;
+}
+
+// Cursos
+export async function getUniversityCursos(
+  tenantId: string,
+  token?: string | null,
+  params?: { estado?: string; limit?: number; offset?: number }
+): Promise<UniversityCurso[]> {
+  const queryParams = new URLSearchParams();
+  if (params?.estado) queryParams.append('estado', params.estado);
+  if (params?.limit) queryParams.append('limit', params.limit.toString());
+  if (params?.offset) queryParams.append('offset', params.offset.toString());
+
+  const queryString = queryParams.toString();
+  const url = `/tenants/${tenantId}/university/cursos${queryString ? `?${queryString}` : ''}`;
+  const response = await apiFetch(url, {}, token);
+  const data = await response.json();
+  return data.cursos || [];
+}
+
+export async function getUniversityCurso(
+  tenantId: string,
+  cursoId: string,
+  token?: string | null,
+  detalle: boolean = false
+): Promise<UniversityCurso & { secciones?: UniversitySeccion[] }> {
+  const url = `/tenants/${tenantId}/university/cursos/${cursoId}${detalle ? '?detalle=true' : ''}`;
+  const response = await apiFetch(url, {}, token);
+  return response.json();
+}
+
+export async function createUniversityCurso(
+  tenantId: string,
+  data: Partial<UniversityCurso>,
+  token?: string | null
+): Promise<UniversityCurso> {
+  const response = await apiFetch(`/tenants/${tenantId}/university/cursos`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(data),
+  }, token);
+  return response.json();
+}
+
+export async function updateUniversityCurso(
+  tenantId: string,
+  cursoId: string,
+  data: Partial<UniversityCurso>,
+  token?: string | null
+): Promise<UniversityCurso> {
+  const response = await apiFetch(`/tenants/${tenantId}/university/cursos/${cursoId}`, {
+    method: 'PUT',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(data),
+  }, token);
+  return response.json();
+}
+
+export async function deleteUniversityCurso(
+  tenantId: string,
+  cursoId: string,
+  token?: string | null
+): Promise<void> {
+  await apiFetch(`/tenants/${tenantId}/university/cursos/${cursoId}`, {
+    method: 'DELETE',
+  }, token);
+}
+
+// Secciones
+export async function getUniversitySecciones(
+  tenantId: string,
+  cursoId: string,
+  token?: string | null
+): Promise<UniversitySeccion[]> {
+  const response = await apiFetch(`/tenants/${tenantId}/university/cursos/${cursoId}/secciones`, {}, token);
+  return response.json();
+}
+
+export async function createUniversitySeccion(
+  tenantId: string,
+  cursoId: string,
+  data: Partial<UniversitySeccion>,
+  token?: string | null
+): Promise<UniversitySeccion> {
+  const response = await apiFetch(`/tenants/${tenantId}/university/cursos/${cursoId}/secciones`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(data),
+  }, token);
+  return response.json();
+}
+
+export async function updateUniversitySeccion(
+  tenantId: string,
+  seccionId: string,
+  data: Partial<UniversitySeccion>,
+  token?: string | null
+): Promise<UniversitySeccion> {
+  const response = await apiFetch(`/tenants/${tenantId}/university/secciones/${seccionId}`, {
+    method: 'PUT',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(data),
+  }, token);
+  return response.json();
+}
+
+export async function deleteUniversitySeccion(
+  tenantId: string,
+  seccionId: string,
+  token?: string | null
+): Promise<void> {
+  await apiFetch(`/tenants/${tenantId}/university/secciones/${seccionId}`, {
+    method: 'DELETE',
+  }, token);
+}
+
+export async function reorderUniversitySecciones(
+  tenantId: string,
+  cursoId: string,
+  ordenIds: string[],
+  token?: string | null
+): Promise<void> {
+  await apiFetch(`/tenants/${tenantId}/university/cursos/${cursoId}/secciones/reorder`, {
+    method: 'PUT',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ ordenIds }),
+  }, token);
+}
+
+// Videos
+export async function getUniversityVideos(
+  tenantId: string,
+  seccionId: string,
+  token?: string | null
+): Promise<UniversityVideo[]> {
+  const response = await apiFetch(`/tenants/${tenantId}/university/secciones/${seccionId}/videos`, {}, token);
+  return response.json();
+}
+
+export async function createUniversityVideo(
+  tenantId: string,
+  seccionId: string,
+  data: Partial<UniversityVideo>,
+  token?: string | null
+): Promise<UniversityVideo> {
+  const response = await apiFetch(`/tenants/${tenantId}/university/secciones/${seccionId}/videos`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(data),
+  }, token);
+  return response.json();
+}
+
+export async function updateUniversityVideo(
+  tenantId: string,
+  videoId: string,
+  data: Partial<UniversityVideo>,
+  token?: string | null
+): Promise<UniversityVideo> {
+  const response = await apiFetch(`/tenants/${tenantId}/university/videos/${videoId}`, {
+    method: 'PUT',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(data),
+  }, token);
+  return response.json();
+}
+
+export async function deleteUniversityVideo(
+  tenantId: string,
+  videoId: string,
+  token?: string | null
+): Promise<void> {
+  await apiFetch(`/tenants/${tenantId}/university/videos/${videoId}`, {
+    method: 'DELETE',
+  }, token);
+}
+
+export async function reorderUniversityVideos(
+  tenantId: string,
+  seccionId: string,
+  ordenIds: string[],
+  token?: string | null
+): Promise<void> {
+  await apiFetch(`/tenants/${tenantId}/university/secciones/${seccionId}/videos/reorder`, {
+    method: 'PUT',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ ordenIds }),
+  }, token);
+}
+
+// Certificados
+export async function getUniversityCertificados(
+  tenantId: string,
+  token?: string | null
+): Promise<UniversityCertificado[]> {
+  const response = await apiFetch(`/tenants/${tenantId}/university/certificados`, {}, token);
+  return response.json();
+}
+
+export async function getUniversityCertificadoById(
+  tenantId: string,
+  certificadoId: string,
+  token?: string | null
+): Promise<UniversityCertificado | null> {
+  const response = await apiFetch(`/tenants/${tenantId}/university/certificados/${certificadoId}`, {}, token);
+  return response.json();
+}
+
+export async function createUniversityCertificado(
+  tenantId: string,
+  data: Partial<UniversityCertificado>,
+  token?: string | null
+): Promise<UniversityCertificado> {
+  const response = await apiFetch(`/tenants/${tenantId}/university/certificados`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(data),
+  }, token);
+  return response.json();
+}
+
+export async function updateUniversityCertificado(
+  tenantId: string,
+  certificadoId: string,
+  data: Partial<UniversityCertificado>,
+  token?: string | null
+): Promise<UniversityCertificado> {
+  const response = await apiFetch(`/tenants/${tenantId}/university/certificados/${certificadoId}`, {
+    method: 'PUT',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(data),
+  }, token);
+  return response.json();
+}
+
+export async function deleteUniversityCertificado(
+  tenantId: string,
+  certificadoId: string,
+  token?: string | null
+): Promise<void> {
+  await apiFetch(`/tenants/${tenantId}/university/certificados/${certificadoId}`, {
+    method: 'DELETE',
+  }, token);
+}
+
+// Curso-Certificado
+export async function asignarCertificadoACurso(
+  tenantId: string,
+  cursoId: string,
+  certificadoId: string,
+  porcentajeRequerido: number = 100,
+  requiereExamen: boolean = false,
+  token?: string | null
+): Promise<void> {
+  await apiFetch(`/tenants/${tenantId}/university/cursos/${cursoId}/certificados/${certificadoId}`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ porcentaje_requerido: porcentajeRequerido, requiere_examen: requiereExamen }),
+  }, token);
+}
+
+export async function removerCertificadoDeCurso(
+  tenantId: string,
+  cursoId: string,
+  certificadoId: string,
+  token?: string | null
+): Promise<void> {
+  await apiFetch(`/tenants/${tenantId}/university/cursos/${cursoId}/certificados/${certificadoId}`, {
+    method: 'DELETE',
+  }, token);
+}
+
+// Certificados Emitidos
+export interface CertificadoEmitido {
+  id: string;
+  inscripcion_id: string;
+  certificado_id: string;
+  codigo_verificacion: string;
+  url_pdf?: string;
+  fecha_emision: string;
+  datos_certificado: Record<string, any>;
+  created_at: string;
+  nombre_usuario?: string;
+  email_usuario?: string;
+  nombre_curso?: string;
+  nombre_certificado?: string;
+  imagen_template?: string;
+  nombre_empresa?: string;
+}
+
+export async function getCertificadosEmitidos(
+  tenantId: string,
+  options: { limit?: number; offset?: number } = {},
+  token?: string | null
+): Promise<{ certificados: CertificadoEmitido[]; total: number }> {
+  const params = new URLSearchParams();
+  if (options.limit) params.set('limit', options.limit.toString());
+  if (options.offset) params.set('offset', options.offset.toString());
+
+  const queryStr = params.toString() ? `?${params.toString()}` : '';
+  const response = await apiFetch(`/tenants/${tenantId}/university/certificados-emitidos${queryStr}`, {}, token);
+  return response.json();
+}
+
+export async function getCertificadosEmitidosByUsuario(
+  tenantId: string,
+  usuarioId: string,
+  token?: string | null
+): Promise<CertificadoEmitido[]> {
+  const response = await apiFetch(`/tenants/${tenantId}/university/certificados-emitidos/usuario/${usuarioId}`, {}, token);
+  return response.json();
+}
+
+export async function emitirCertificadoManual(
+  tenantId: string,
+  data: {
+    curso_id: string;
+    certificado_id: string;
+    email: string;
+    nombre: string;
+    usuario_id?: string;
+  },
+  token?: string | null
+): Promise<CertificadoEmitido> {
+  const response = await apiFetch(`/tenants/${tenantId}/university/certificados-emitidos/manual`, {
+    method: 'POST',
+    body: JSON.stringify(data),
+  }, token);
+  return response.json();
+}
+
+export async function verificarCertificado(
+  tenantId: string,
+  codigo: string,
+  token?: string | null
+): Promise<CertificadoEmitido | null> {
+  try {
+    const response = await apiFetch(`/tenants/${tenantId}/university/verificar/${codigo}`, {}, token);
+    return response.json();
+  } catch (error) {
+    return null;
+  }
+}
+
+// Stats
+export async function getUniversityStats(
+  tenantId: string,
+  token?: string | null
+): Promise<UniversityStats> {
+  const response = await apiFetch(`/tenants/${tenantId}/university/stats`, {}, token);
+  const data = await response.json();
+  // Mapear campos de camelCase a snake_case para consistencia con frontend
+  return {
+    total_cursos: data.totalCursos || 0,
+    cursos_publicados: data.cursosPublicados || 0,
+    total_secciones: data.totalSecciones || 0,
+    total_videos: data.totalVideos || 0,
+    total_certificados: data.totalCertificadosEmitidos || 0,
+    total_inscripciones: data.totalInscripciones || 0,
+    certificados_emitidos: data.totalCertificadosEmitidos || 0,
+  };
+}
+
+// ==================== ACCESO POR ROL (ADMIN) ====================
+
+export interface AccesoRolCurso {
+  id: string;
+  curso_id: string;
+  rol_id: string;
+  rol_nombre?: string;
+  rol_codigo?: string;
+  seccion_limite_id?: string;
+  seccion_limite_titulo?: string;
+  seccion_limite_orden?: number;
+}
+
+export async function getAccesoRolesCurso(
+  tenantId: string,
+  cursoId: string,
+  token?: string | null
+): Promise<AccesoRolCurso[]> {
+  const response = await apiFetch(`/tenants/${tenantId}/university/cursos/${cursoId}/acceso-roles`, {}, token);
+  return response.json();
+}
+
+export async function setAccesoRolCurso(
+  tenantId: string,
+  cursoId: string,
+  data: { rol_id: string; seccion_limite_id?: string | null },
+  token?: string | null
+): Promise<AccesoRolCurso> {
+  const response = await apiFetch(`/tenants/${tenantId}/university/cursos/${cursoId}/acceso-roles`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(data),
+  }, token);
+  return response.json();
+}
+
+export async function removeAccesoRolCurso(
+  tenantId: string,
+  cursoId: string,
+  rolId: string,
+  token?: string | null
+): Promise<void> {
+  await apiFetch(`/tenants/${tenantId}/university/cursos/${cursoId}/acceso-roles/${rolId}`, {
+    method: 'DELETE',
+  }, token);
+}
+
+// ==================== MI ENTRENAMIENTO ====================
+
+export interface CursoDisponible {
+  id: string;
+  titulo: string;
+  descripcion?: string;
+  imagen_portada?: string;
+  nivel: 'principiante' | 'intermedio' | 'avanzado';
+  duracion_estimada_minutos: number;
+  estado: string;
+  es_pago: boolean;
+  precio?: number;
+  total_secciones: number;
+  total_videos: number;
+  secciones_accesibles: number;
+  progreso_porcentaje: number;
+  tiene_certificado: boolean;
+  inscripcion_id?: string;
+}
+
+export interface VideoConProgreso {
+  id: string;
+  titulo: string;
+  descripcion?: string;
+  url_video: string;
+  proveedor: string;
+  video_id?: string;
+  duracion_segundos: number;
+  thumbnail?: string;
+  orden: number;
+  es_preview: boolean;
+  recursos_adjuntos: any[];
+  segundos_vistos: number;
+  porcentaje_completado: number;
+  completado: boolean;
+}
+
+export interface SeccionConAcceso {
+  id: string;
+  titulo: string;
+  descripcion?: string;
+  orden: number;
+  total_videos: number;
+  tiene_acceso: boolean;
+  videos: VideoConProgreso[];
+}
+
+export interface CursoConAcceso {
+  id: string;
+  titulo: string;
+  descripcion?: string;
+  imagen_portada?: string;
+  nivel: string;
+  duracion_estimada_minutos: number;
+  total_secciones: number;
+  total_videos: number;
+  secciones_accesibles: number;
+  progreso_porcentaje: number;
+  inscripcion_id?: string;
+  secciones: SeccionConAcceso[];
+  certificados_disponibles: { id: string; nombre: string; porcentaje_requerido: number }[];
+  certificados_obtenidos: { id: string; nombre: string; codigo_verificacion: string; fecha_emision: Date }[];
+}
+
+export interface ProgresoResult {
+  progreso_video: any;
+  progreso_curso: number;
+  certificado_emitido?: any;
+}
+
+export interface MiCertificado {
+  id: string;
+  codigo_verificacion: string;
+  fecha_emision: string;
+  nombre_certificado: string;
+  imagen_template?: string;
+  nombre_curso: string;
+  fecha_completado?: string;
+  url_pdf?: string;
+}
+
+// Obtener cursos disponibles para el usuario
+export async function getMiEntrenamientoCursos(
+  tenantId: string,
+  token?: string | null
+): Promise<CursoDisponible[]> {
+  console.log('[API] getMiEntrenamientoCursos called', { tenantId, hasToken: !!token });
+  const response = await apiFetch(`/tenants/${tenantId}/mi-entrenamiento/cursos`, {}, token);
+  const data = await response.json();
+  console.log('[API] getMiEntrenamientoCursos response', data);
+  return data;
+}
+
+// Obtener detalle de un curso con secciones y progreso
+export async function getMiEntrenamientoCurso(
+  tenantId: string,
+  cursoId: string,
+  token?: string | null
+): Promise<CursoConAcceso> {
+  const response = await apiFetch(`/tenants/${tenantId}/mi-entrenamiento/cursos/${cursoId}`, {}, token);
+  return response.json();
+}
+
+// Registrar progreso de video
+export async function registrarProgresoVideo(
+  tenantId: string,
+  data: {
+    inscripcion_id: string;
+    video_id: string;
+    segundos_vistos: number;
+    porcentaje_completado: number;
+  },
+  token?: string | null
+): Promise<ProgresoResult> {
+  const response = await apiFetch(`/tenants/${tenantId}/mi-entrenamiento/progreso`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(data),
+  }, token);
+  return response.json();
+}
+
+// Obtener certificados del usuario
+export async function getMisCertificados(
+  tenantId: string,
+  token?: string | null
+): Promise<MiCertificado[]> {
+  const response = await apiFetch(`/tenants/${tenantId}/mi-entrenamiento/mis-certificados`, {}, token);
+  return response.json();
+}
+
+// ============================================
+// PLANTILLAS DE COMISIÓN
+// ============================================
+
+// Interfaces para plantillas de comisión
+export interface DistribucionEscenario {
+  captador: number;
+  vendedor: number;
+  empresa: number;
+}
+
+export interface DistribucionesTipoPropiedad {
+  solo_capta: DistribucionEscenario;
+  solo_vende: DistribucionEscenario;
+  capta_y_vende: DistribucionEscenario;
+}
+
+export interface FeePrevio {
+  rol: string;
+  porcentaje: number;
+  descripcion: string;
+  aplica_a?: string[];
+}
+
+export interface DistribucionEmpresaItem {
+  rol: string;
+  tipo: 'porcentaje' | 'fijo';
+  valor: number;
+  moneda?: string;
+  descripcion: string;
+}
+
+export interface PlantillaComisionConfig {
+  distribuciones: {
+    propiedad_lista: DistribucionesTipoPropiedad;
+    proyecto: DistribucionesTipoPropiedad;
+  };
+  fees_previos: FeePrevio[];
+  distribucion_empresa?: DistribucionEmpresaItem[];
+  roles_aplicables: string[];
+  es_personal: boolean;
+  usuario_id?: string;
+  fee_referidor?: {
+    tipo: 'porcentaje' | 'fijo';
+    valor: number;
+    descripcion: string;
+  };
+}
+
+export interface PlantillaComision {
+  id: string;
+  tenant_id: string | null;
+  tipo: string;
+  codigo: string;
+  nombre: string;
+  descripcion: string | null;
+  icono: string | null;
+  color: string | null;
+  orden: number;
+  activo: boolean;
+  es_default: boolean;
+  config: PlantillaComisionConfig;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface DistribucionEmpresaConfig {
+  distribuciones: DistribucionEmpresaItem[];
+  nota?: string;
+}
+
+export interface CalculoComisionResult {
+  montoOriginal: number;
+  feesPrevios: { rol: string; monto: number; porcentaje: number }[];
+  montoBaseDistribucion: number;
+  distribucion: {
+    captador: { porcentaje: number; monto: number };
+    vendedor: { porcentaje: number; monto: number };
+    empresa: { porcentaje: number; monto: number };
+  };
+  snapshot: PlantillaComisionConfig;
+}
+
+// Obtener todas las plantillas de comisión
+export async function getPlantillasComision(
+  tenantId: string,
+  token?: string | null
+): Promise<PlantillaComision[]> {
+  const response = await apiFetch(`/tenants/${tenantId}/finanzas/plantillas-comision`, {}, token);
+  return response.json();
+}
+
+// Obtener una plantilla específica
+export async function getPlantillaComision(
+  tenantId: string,
+  plantillaId: string,
+  token?: string | null
+): Promise<PlantillaComision> {
+  const response = await apiFetch(`/tenants/${tenantId}/finanzas/plantillas-comision/${plantillaId}`, {}, token);
+  return response.json();
+}
+
+// Crear plantilla de comisión
+export async function createPlantillaComision(
+  tenantId: string,
+  data: {
+    codigo: string;
+    nombre: string;
+    descripcion?: string;
+    icono?: string;
+    color?: string;
+    config: PlantillaComisionConfig;
+  },
+  token?: string | null
+): Promise<PlantillaComision> {
+  const response = await apiFetch(`/tenants/${tenantId}/finanzas/plantillas-comision`, {
+    method: 'POST',
+    body: JSON.stringify(data),
+  }, token);
+  return response.json();
+}
+
+// Actualizar plantilla de comisión
+export async function updatePlantillaComision(
+  tenantId: string,
+  plantillaId: string,
+  data: Partial<{
+    nombre: string;
+    descripcion: string;
+    icono: string;
+    color: string;
+    activo: boolean;
+    config: PlantillaComisionConfig;
+  }>,
+  token?: string | null
+): Promise<PlantillaComision> {
+  const response = await apiFetch(`/tenants/${tenantId}/finanzas/plantillas-comision/${plantillaId}`, {
+    method: 'PUT',
+    body: JSON.stringify(data),
+  }, token);
+  return response.json();
+}
+
+// Eliminar plantilla de comisión
+export async function deletePlantillaComision(
+  tenantId: string,
+  plantillaId: string,
+  token?: string | null
+): Promise<{ success: boolean; message: string }> {
+  const response = await apiFetch(`/tenants/${tenantId}/finanzas/plantillas-comision/${plantillaId}`, {
+    method: 'DELETE',
+  }, token);
+  return response.json();
+}
+
+// Crear plantilla personalizada para un usuario
+export async function createPlantillaPersonalizada(
+  tenantId: string,
+  data: {
+    usuarioId: string;
+    nombreUsuario: string;
+    config: PlantillaComisionConfig;
+  },
+  token?: string | null
+): Promise<PlantillaComision> {
+  const response = await apiFetch(`/tenants/${tenantId}/finanzas/plantillas-comision/personalizada`, {
+    method: 'POST',
+    body: JSON.stringify(data),
+  }, token);
+  return response.json();
+}
+
+// Obtener distribución interna de empresa
+export async function getDistribucionEmpresa(
+  tenantId: string,
+  token?: string | null
+): Promise<DistribucionEmpresaConfig> {
+  const response = await apiFetch(`/tenants/${tenantId}/finanzas/distribucion-empresa`, {}, token);
+  return response.json();
+}
+
+// Actualizar distribución interna de empresa
+export async function updateDistribucionEmpresa(
+  tenantId: string,
+  distribuciones: DistribucionEmpresaItem[],
+  token?: string | null
+): Promise<DistribucionEmpresaConfig> {
+  const response = await apiFetch(`/tenants/${tenantId}/finanzas/distribucion-empresa`, {
+    method: 'PUT',
+    body: JSON.stringify({ distribuciones }),
+  }, token);
+  return response.json();
+}
+
+// Asignar plantilla a un perfil de asesor
+export async function asignarPlantillaAPerfil(
+  tenantId: string,
+  perfilId: string,
+  plantillaId: string,
+  token?: string | null
+): Promise<{ success: boolean; message: string }> {
+  const response = await apiFetch(`/tenants/${tenantId}/finanzas/perfiles/${perfilId}/plantilla`, {
+    method: 'PUT',
+    body: JSON.stringify({ plantillaId }),
+  }, token);
+  return response.json();
+}
+
+// Obtener plantilla de un perfil
+export async function getPlantillaDePerfil(
+  tenantId: string,
+  perfilId: string,
+  token?: string | null
+): Promise<PlantillaComision> {
+  const response = await apiFetch(`/tenants/${tenantId}/finanzas/perfiles/${perfilId}/plantilla`, {}, token);
+  return response.json();
+}
+
+// Calcular distribución de comisión
+export async function calcularDistribucionComision(
+  tenantId: string,
+  data: {
+    montoComision: number;
+    tipoPropiedad: 'propiedad_lista' | 'proyecto';
+    escenario: 'solo_capta' | 'solo_vende' | 'capta_y_vende';
+    plantillaId: string;
+  },
+  token?: string | null
+): Promise<CalculoComisionResult> {
+  const response = await apiFetch(`/tenants/${tenantId}/finanzas/calcular-comision`, {
+    method: 'POST',
+    body: JSON.stringify(data),
+  }, token);
+  return response.json();
 }
 

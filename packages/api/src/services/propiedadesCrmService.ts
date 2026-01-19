@@ -4,6 +4,7 @@
 
 import { query } from '../utils/db.js';
 import { generateMultiLanguageSlugs, translatePropertyContent, generateShortDescription } from './translationService.js';
+import { syncTagsForProperty } from './tagsSyncService.js';
 
 /**
  * Busca el perfil_asesor_id basado en el usuario_id (captador)
@@ -27,6 +28,7 @@ export interface Propiedad {
   tenant_id: string;
   titulo: string;
   codigo?: string;
+  codigo_publico?: number; // Código secuencial automático para uso externo (1001, 1002, etc.)
   descripcion?: string;
   tipo: 'casa' | 'departamento' | 'terreno' | 'oficina' | 'local' | 'bodega';
   operacion: 'venta' | 'renta' | 'traspaso';
@@ -124,6 +126,7 @@ export interface PropiedadFiltros {
   destacada?: boolean;
   busqueda?: string;
   agente_id?: string;
+  include_red_global?: boolean;
   page?: number;
   limit?: number;
 }
@@ -147,12 +150,16 @@ export async function getPropiedades(
     tipo, operacion, estado_propiedad, ciudad,
     precio_min, precio_max, habitaciones_min, banos_min,
     m2_min, m2_max, destacada, busqueda, agente_id,
+    include_red_global,
     page = 1, limit = 24
   } = filtros;
 
   const offset = (page - 1) * limit;
 
-  let whereClause = 'p.tenant_id = $1 AND p.activo = true';
+  // Si include_red_global es true, incluir propiedades del tenant O propiedades marcadas como red_global
+  let whereClause = include_red_global
+    ? '(p.tenant_id = $1 OR p.red_global = true) AND p.activo = true'
+    : 'p.tenant_id = $1 AND p.activo = true';
   const params: any[] = [tenantId];
   let paramIndex = 2;
 
@@ -229,17 +236,34 @@ export async function getPropiedades(
   }
 
   if (busqueda) {
-    whereClause += ` AND (
-      p.titulo ILIKE $${paramIndex} OR
-      p.codigo ILIKE $${paramIndex} OR
-      p.descripcion ILIKE $${paramIndex} OR
-      p.ciudad ILIKE $${paramIndex} OR
-      p.provincia ILIKE $${paramIndex} OR
-      p.sector ILIKE $${paramIndex} OR
-      p.direccion ILIKE $${paramIndex}
-    )`;
-    params.push(`%${busqueda}%`);
-    paramIndex++;
+    // Si la búsqueda es solo números, también buscar en codigo_publico
+    const isNumeric = /^\d+$/.test(busqueda.trim());
+    if (isNumeric) {
+      whereClause += ` AND (
+        p.titulo ILIKE $${paramIndex} OR
+        p.codigo ILIKE $${paramIndex} OR
+        p.descripcion ILIKE $${paramIndex} OR
+        p.ciudad ILIKE $${paramIndex} OR
+        p.provincia ILIKE $${paramIndex} OR
+        p.sector ILIKE $${paramIndex} OR
+        p.direccion ILIKE $${paramIndex} OR
+        p.codigo_publico = $${paramIndex + 1}
+      )`;
+      params.push(`%${busqueda}%`, parseInt(busqueda.trim()));
+      paramIndex += 2;
+    } else {
+      whereClause += ` AND (
+        p.titulo ILIKE $${paramIndex} OR
+        p.codigo ILIKE $${paramIndex} OR
+        p.descripcion ILIKE $${paramIndex} OR
+        p.ciudad ILIKE $${paramIndex} OR
+        p.provincia ILIKE $${paramIndex} OR
+        p.sector ILIKE $${paramIndex} OR
+        p.direccion ILIKE $${paramIndex}
+      )`;
+      params.push(`%${busqueda}%`);
+      paramIndex++;
+    }
   }
 
   // Contar total
@@ -250,7 +274,7 @@ export async function getPropiedades(
   // Obtener datos paginados
   const dataSql = `
     SELECT
-      p.id, p.tenant_id, p.titulo, p.codigo, p.descripcion,
+      p.id, p.tenant_id, p.titulo, p.codigo, p.codigo_publico, p.descripcion,
       p.tipo, p.operacion, p.precio, p.precio_anterior, p.moneda,
       p.precio_venta, p.precio_alquiler, p.maintenance,
       p.pais, p.provincia, p.ciudad, p.sector, p.direccion,
@@ -269,16 +293,20 @@ export async function getPropiedades(
       p.documentos, p.tipologias, p.planes_pago, p.etapas, p.beneficios, p.garantias,
       p.captador_id, p.cocaptadores_ids, p.desarrollador_id, p.correo_reporte, p.publicada,
       p.share_commission, p.slug_traducciones, p.traducciones,
-      p.red_global, p.red_global_comision, p.red_afiliados, p.connect, p.portales, p.nombre_privado,
-      p.comision, p.comision_nota,
+      p.red_global, p.red_global_comision, p.red_afiliados, p.red_afiliados_terminos, p.red_afiliados_comision,
+      p.connect, p.connect_terminos, p.connect_comision, p.portales, p.nombre_privado,
+      p.comision, p.comision_nota, p.disponibilidad_config,
       p.activo, p.created_at, p.updated_at,
       u.nombre as agente_nombre, u.apellido as agente_apellido,
       c.nombre as propietario_nombre, c.apellido as propietario_apellido,
-      cap.nombre as captador_nombre, cap.apellido as captador_apellido, cap.avatar_url as captador_avatar
+      cap.nombre as captador_nombre, cap.apellido as captador_apellido, cap.avatar_url as captador_avatar,
+      cap.email as captador_email, cap.telefono as captador_telefono,
+      t.nombre as tenant_nombre, t.info_negocio as tenant_info_negocio
     FROM propiedades p
     LEFT JOIN usuarios u ON p.agente_id = u.id
     LEFT JOIN contactos c ON p.propietario_id = c.id
     LEFT JOIN usuarios cap ON p.captador_id = cap.id
+    LEFT JOIN tenants t ON p.tenant_id = t.id
     WHERE ${whereClause}
     ORDER BY p.destacada DESC, p.created_at DESC
     LIMIT $${paramIndex} OFFSET $${paramIndex + 1}
@@ -306,6 +334,8 @@ export async function getPropiedades(
     traducciones: typeof row.traducciones === 'string' ? JSON.parse(row.traducciones) : (row.traducciones || {}),
     portales: typeof row.portales === 'string' ? JSON.parse(row.portales) : (row.portales || {}),
     etiquetas: typeof row.etiquetas === 'string' ? JSON.parse(row.etiquetas) : (row.etiquetas || []),
+    tenant_info_negocio: typeof row.tenant_info_negocio === 'string' ? JSON.parse(row.tenant_info_negocio) : (row.tenant_info_negocio || {}),
+    disponibilidad_config: typeof row.disponibilidad_config === 'string' ? JSON.parse(row.disponibilidad_config) : row.disponibilidad_config,
   }));
 
   return {
@@ -326,7 +356,7 @@ export async function getPropiedadById(
 ): Promise<Propiedad | null> {
   const sql = `
     SELECT
-      p.id, p.tenant_id, p.titulo, p.codigo, p.descripcion,
+      p.id, p.tenant_id, p.titulo, p.codigo, p.codigo_publico, p.descripcion,
       p.tipo, p.operacion, p.precio, p.precio_anterior, p.moneda,
       p.precio_venta, p.precio_alquiler, p.maintenance,
       p.pais, p.provincia, p.ciudad, p.sector, p.direccion,
@@ -345,16 +375,23 @@ export async function getPropiedadById(
       p.documentos, p.tipologias, p.planes_pago, p.etapas, p.beneficios, p.garantias,
       p.captador_id, p.cocaptadores_ids, p.desarrollador_id, p.correo_reporte, p.publicada,
       p.share_commission, p.slug_traducciones, p.traducciones,
-      p.red_global, p.red_global_comision, p.red_afiliados, p.connect, p.portales, p.nombre_privado,
-      p.comision, p.comision_nota,
+      p.red_global, p.red_global_comision, p.red_afiliados, p.red_afiliados_terminos, p.red_afiliados_comision,
+      p.connect, p.connect_terminos, p.connect_comision, p.portales, p.nombre_privado,
+      p.comision, p.comision_nota, p.disponibilidad_config,
       p.activo, p.created_at, p.updated_at,
       u.nombre as agente_nombre, u.apellido as agente_apellido,
       c.nombre as propietario_nombre, c.apellido as propietario_apellido,
-      cap.nombre as captador_nombre, cap.apellido as captador_apellido, cap.avatar_url as captador_avatar
+      cap.nombre as captador_nombre, cap.apellido as captador_apellido, cap.avatar_url as captador_avatar,
+      cap.email as captador_email, cap.telefono as captador_telefono,
+      -- Datos del desarrollador (si es proyecto y tiene desarrollador_id vinculado)
+      dev.nombre as desarrollador_nombre, dev.apellido as desarrollador_apellido,
+      dev.email as desarrollador_email, dev.telefono as desarrollador_telefono,
+      dev.empresa as desarrollador_empresa
     FROM propiedades p
     LEFT JOIN usuarios u ON p.agente_id = u.id
     LEFT JOIN contactos c ON p.propietario_id = c.id
     LEFT JOIN usuarios cap ON p.captador_id = cap.id
+    LEFT JOIN contactos dev ON p.desarrollador_id = dev.id
     WHERE p.id = $1 AND p.tenant_id = $2
   `;
 
@@ -628,7 +665,14 @@ export async function createPropiedad(
   
   console.log('✅ createPropiedad - imagenes parseadas:', parsed.imagenes?.length || 0);
   console.log('✅ createPropiedad - documentos parseados:', parsed.documentos?.length || 0);
-  
+
+  // Sincronizar tags automáticamente (en background, no bloquea)
+  syncTagsForProperty(parsed.id, tenantId).then(result => {
+    console.log(`🏷️ Tags sincronizados para propiedad ${parsed.id}: ${result.tags_asignados} tags`);
+  }).catch(err => {
+    console.error(`⚠️ Error sincronizando tags para propiedad ${parsed.id}:`, err);
+  });
+
   return parsed;
 }
 
@@ -681,7 +725,8 @@ export async function updatePropiedad(
     // Campos adicionales
     'share_commission', 'slug_traducciones', 'traducciones',
     // Portales y Redes
-    'red_global', 'red_global_comision', 'red_afiliados', 'connect', 'portales',
+    'red_global', 'red_global_comision', 'red_afiliados', 'red_afiliados_terminos', 'red_afiliados_comision',
+    'connect', 'connect_terminos', 'connect_comision', 'portales',
     // Nombre privado
     'nombre_privado',
     // Comisión
@@ -725,32 +770,14 @@ export async function updatePropiedad(
   `;
   params.push(propiedadId, tenantId);
 
-  console.log('💾 updatePropiedad - Actualizando propiedad:', propiedadId);
-  console.log('💾 updatePropiedad - Campos a actualizar:', updates.length);
-  console.log('💾 updatePropiedad - Updates:', updates);
-  console.log('💾 updatePropiedad - PRECIOS RECIBIDOS:', {
-    precio: data.precio,
-    precio_venta: data.precio_venta,
-    precio_alquiler: data.precio_alquiler,
-    maintenance: data.maintenance,
-    descripcion: data.descripcion?.substring(0, 50)
-  });
-  console.log('💾 updatePropiedad - imagen_principal:', data.imagen_principal);
-  console.log('💾 updatePropiedad - imagenes:', data.imagenes);
-  console.log('💾 updatePropiedad - documentos:', data.documentos);
-  
   const result = await query(sql, params);
   if (!result.rows[0]) {
-    console.log('⚠️ updatePropiedad - No se encontró la propiedad');
     return null;
   }
 
   // Parsear campos JSONB que pueden venir como strings
   const row = result.rows[0];
-  console.log('✅ updatePropiedad - Propiedad actualizada');
-  console.log('✅ updatePropiedad - imagen_principal retornada:', row.imagen_principal);
-  console.log('✅ updatePropiedad - imagenes retornadas (tipo):', typeof row.imagenes, Array.isArray(row.imagenes));
-  
+
   const parsed = {
     ...row,
     amenidades: typeof row.amenidades === 'string' ? JSON.parse(row.amenidades) : (row.amenidades || []),
@@ -766,10 +793,14 @@ export async function updatePropiedad(
     garantias: typeof row.garantias === 'string' ? JSON.parse(row.garantias) : (row.garantias || []),
     cocaptadores_ids: typeof row.cocaptadores_ids === 'string' ? JSON.parse(row.cocaptadores_ids) : (row.cocaptadores_ids || []),
   };
-  
-  console.log('✅ updatePropiedad - imagenes parseadas:', parsed.imagenes?.length || 0);
-  console.log('✅ updatePropiedad - documentos parseados:', parsed.documentos?.length || 0);
-  
+
+  // Sincronizar tags automáticamente (en background, no bloquea)
+  syncTagsForProperty(propiedadId, tenantId).then(result => {
+    console.log(`🏷️ Tags sincronizados para propiedad ${propiedadId}: ${result.tags_asignados} tags`);
+  }).catch(err => {
+    console.error(`⚠️ Error sincronizando tags para propiedad ${propiedadId}:`, err);
+  });
+
   return parsed;
 }
 
