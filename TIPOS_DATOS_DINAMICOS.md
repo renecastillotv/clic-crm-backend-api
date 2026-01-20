@@ -161,3 +161,4 @@ Cuando haya datos reales, solo se actualiza `dynamicDataService.ts`:
 
 
 
+

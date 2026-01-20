@@ -57,7 +57,7 @@ export async function down(knex: Knex): Promise<void> {
 
   // 2. Eliminar índice único de codigo
   await knex.schema.alterTable('tipos_pagina', (table) => {
-    table.dropUnique('codigo', 'tipos_pagina_codigo_unique');
+    table.dropUnique(['codigo'], 'tipos_pagina_codigo_unique');
   });
 
   // 3. Eliminar primary key de id

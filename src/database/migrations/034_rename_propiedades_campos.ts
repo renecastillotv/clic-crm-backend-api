@@ -149,21 +149,21 @@ export async function up(knex: Knex): Promise<void> {
   
   const existingIndexes = indexInfo.rows.map((row: any) => row.indexname);
 
-  if (!existingIndexes.some(idx => idx.includes('provincia'))) {
+  if (!existingIndexes.some((idx: string) => idx.includes('provincia'))) {
     await knex.schema.alterTable('propiedades', (table) => {
       table.index('provincia', 'idx_propiedades_provincia');
     });
     console.log('✅ Creado índice: idx_propiedades_provincia');
   }
 
-  if (!existingIndexes.some(idx => idx.includes('sector'))) {
+  if (!existingIndexes.some((idx: string) => idx.includes('sector'))) {
     await knex.schema.alterTable('propiedades', (table) => {
       table.index('sector', 'idx_propiedades_sector');
     });
     console.log('✅ Creado índice: idx_propiedades_sector');
   }
 
-  if (!existingIndexes.some(idx => idx.includes('location'))) {
+  if (!existingIndexes.some((idx: string) => idx.includes('location'))) {
     await knex.schema.alterTable('propiedades', (table) => {
       table.index(['provincia', 'ciudad', 'sector'], 'idx_propiedades_location');
     });
@@ -221,6 +221,7 @@ export async function down(knex: Knex): Promise<void> {
 
   console.log('✅ Migración 034: Revertida');
 }
+
 
 
 

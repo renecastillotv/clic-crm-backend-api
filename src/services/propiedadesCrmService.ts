@@ -71,8 +71,10 @@ export interface Propiedad {
   estado_propiedad: 'disponible' | 'reservada' | 'vendida' | 'rentada' | 'inactiva';
   destacada: boolean;
   exclusiva: boolean;
+  is_project?: boolean;
   etiquetas: string[]; // Códigos de etiquetas del catálogo
   agente_id?: string;
+  perfil_asesor_id?: string;
   propietario_id?: string;
   slug?: string;
   notas?: string;
@@ -103,6 +105,8 @@ export interface Propiedad {
   // Publicación
   publicada?: boolean;
   activo: boolean;
+  short_description?: string;
+  traducciones?: Record<string, any>;
   created_at: string;
   updated_at: string;
   // Campos JOIN

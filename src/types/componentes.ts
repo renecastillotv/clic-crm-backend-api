@@ -41,15 +41,27 @@ export interface DynamicDataConfig {
   // SINGLES: property_single, video_single, article_single/articulo_single, testimonial_single/testimonio_single, faq_single, agent_single/asesor_single
   // CATEGORÍAS: categorias_videos, categorias_articulos, categorias_testimonios
   // OTROS: stats/estadisticas, carrusel_propiedades/carrusel, texto_suelto/texto
-  dataType?: 
+  dataType?:
     // Listas
-    | 'properties' | 'videos' | 'articles' | 'articulos' | 'testimonials' | 'faqs' | 'agents' | 'asesores'
+    | 'properties' | 'propiedades' | 'lista_propiedades'
+    | 'videos' | 'lista_videos'
+    | 'articles' | 'articulos' | 'lista_articulos' | 'blog'
+    | 'testimonials' | 'lista_testimonios'
+    | 'faqs' | 'lista_faqs'
+    | 'agents' | 'asesores' | 'lista_asesores'
     | 'ubicaciones' | 'locations' | 'popular_locations'
     // Singles (requieren id en filters)
-    | 'property_single' | 'video_single' | 'article_single' | 'articulo_single' 
-    | 'testimonial_single' | 'testimonio_single' | 'faq_single' | 'agent_single' | 'asesor_single'
-    // Categorías
+    | 'property_single' | 'propiedad_single'
+    | 'video_single'
+    | 'article_single' | 'articulo_single'
+    | 'testimonial_single' | 'testimonio_single'
+    | 'faq_single'
+    | 'agent_single' | 'asesor_single'
+    // Categorías (lista de categorías)
     | 'categorias_videos' | 'categorias_articulos' | 'categorias_testimonios'
+    | 'videos_por_categoria' | 'articulos_por_categoria' | 'testimonios_por_categoria'
+    // Contenido filtrado por categoría
+    | 'categoria_videos' | 'categoria_articulos' | 'categoria_testimonios'
     // Otros
     | 'stats' | 'estadisticas' | 'carrusel_propiedades' | 'carrusel' | 'texto_suelto' | 'texto'
     | 'custom';

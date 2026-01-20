@@ -616,6 +616,7 @@ export interface Moneda {
   formato: string;
   orden: number;
   activo: boolean;
+  esDefault?: boolean;
 }
 
 export interface TenantMoneda {

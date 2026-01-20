@@ -3,7 +3,7 @@ import dotenv from 'dotenv';
 
 dotenv.config();
 
-// Configuración del pool de conexiones
+// Configuración del pool de conexiones - OPTIMIZADO PARA ESCALABILIDAD
 const poolConfig: PoolConfig = {
   connectionString: process.env.DATABASE_URL,
   ssl: process.env.DATABASE_URL?.includes('localhost') || process.env.DATABASE_URL?.includes('127.0.0.1')
@@ -11,9 +11,11 @@ const poolConfig: PoolConfig = {
     : {
         rejectUnauthorized: false,
       },
-  max: 20, // Máximo de conexiones en el pool
+  max: 50, // Máximo de conexiones en el pool (aumentado de 20 a 50 para soportar más usuarios)
+  min: 5, // Mínimo de conexiones siempre abiertas
   idleTimeoutMillis: 30000, // Tiempo de espera antes de cerrar conexiones inactivas
-  connectionTimeoutMillis: 10000, // Tiempo de espera para obtener una conexión del pool (aumentado a 10s)
+  connectionTimeoutMillis: 10000, // Tiempo de espera para obtener una conexión del pool
+  allowExitOnIdle: false, // Mantener el pool activo aunque esté idle
 };
 
 // Crear el pool de conexiones

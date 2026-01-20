@@ -30,9 +30,9 @@ export const CONTENT_PREFIX_MAPPING: Record<string, {
   tipoSingle: string;
 }> = {
   'testimonios': {
-    tipoDirectorio: 'testimonios',
+    tipoDirectorio: 'testimonios_listado',
     tipoCategoria: 'categoria_testimonios',
-    tipoSingle: 'testimonio_single',
+    tipoSingle: 'testimonios_single',
   },
   'videos': {
     tipoDirectorio: 'videos_listado',
@@ -40,14 +40,14 @@ export const CONTENT_PREFIX_MAPPING: Record<string, {
     tipoSingle: 'videos_single',
   },
   'articulos': {
-    tipoDirectorio: 'directorio_articulos',
+    tipoDirectorio: 'articulos_listado',
     tipoCategoria: 'articulos_categoria',
-    tipoSingle: 'single_articulo',
+    tipoSingle: 'articulos_single',
   },
   'blog': {
-    tipoDirectorio: 'directorio_articulos',
+    tipoDirectorio: 'articulos_listado',
     tipoCategoria: 'articulos_categoria',
-    tipoSingle: 'single_articulo',
+    tipoSingle: 'articulos_single',
   },
   'asesores': {
     tipoDirectorio: 'listado_asesores',
@@ -60,9 +60,9 @@ export const CONTENT_PREFIX_MAPPING: Record<string, {
     tipoSingle: 'single_proyecto',
   },
   'propiedades': {
-    tipoDirectorio: 'listados_propiedades',
+    tipoDirectorio: 'propiedades_listado',
     tipoCategoria: 'categoria_propiedades',
-    tipoSingle: 'single_property',
+    tipoSingle: 'propiedades_single',
   },
   'favoritos': {
     tipoDirectorio: 'favoritos',
@@ -188,12 +188,12 @@ export async function validatePageType(tipoPagina: string): Promise<boolean> {
 
 /**
  * Obtiene el tipo de página normalizado
+ * Nota: Ya no convertimos entre propiedades_listado y listados_propiedades
+ * porque la BD tiene propiedades_listado como tipo canónico
  */
 export function normalizePageType(tipoPagina: string): string {
-  // Normalizar alias comunes
-  if (tipoPagina === 'propiedades_listado' || tipoPagina === 'listado_propiedades') {
-    return STANDARD_PAGE_TYPES.LISTADOS_PROPIEDADES;
-  }
+  // Por ahora, retornamos el tipo tal cual
+  // La normalización se puede agregar si hay casos específicos que lo requieran
   return tipoPagina;
 }
 
@@ -203,6 +203,7 @@ export function normalizePageType(tipoPagina: string): string {
 export function normalizeDynamicDataType(dataType: string): string {
   return DYNAMIC_DATA_TYPE_MAPPING[dataType] || dataType;
 }
+
 
 
 

@@ -1,129 +1,97 @@
 /**
- * Migración 107: Crear tablas de equipos y oficinas
+ * Script para ejecutar la migración 114: Sistema de Disponibilidad para Proyectos
  */
 
-import knex from 'knex';
+import pg from 'pg';
+const { Pool } = pg;
 
-const db = knex({
-  client: 'pg',
-  connection: process.env.DATABASE_URL || 'postgresql://neondb_owner:npg_5jRsErZYmJv1@ep-fancy-lab-a4hmvk6f-pooler.us-east-1.aws.neon.tech/neondb?sslmode=require'
-});
+const DATABASE_URL = 'postgresql://neondb_owner:npg_5jRsErZYmJv1@ep-fancy-lab-a4hmvk6f-pooler.us-east-1.aws.neon.tech/neondb?sslmode=require';
 
-async function migrate() {
+const pool = new Pool({ connectionString: DATABASE_URL });
+
+async function runMigration() {
+  const client = await pool.connect();
+
   try {
-    // Crear tabla de oficinas/franquicias
-    console.log('Creando tabla oficinas...');
-    const existeOficinas = await db.schema.hasTable('oficinas');
-    if (!existeOficinas) {
-      await db.schema.createTable('oficinas', (table) => {
-        table.uuid('id').primary().defaultTo(db.raw('gen_random_uuid()'));
-        table.uuid('tenant_id').notNullable().references('id').inTable('tenants').onDelete('CASCADE');
-        table.string('nombre', 255).notNullable();
-        table.string('codigo', 50);
-        table.text('direccion');
-        table.string('ciudad', 100);
-        table.string('provincia', 100);
-        table.string('pais', 100);
-        table.string('codigo_postal', 20);
-        table.string('telefono', 50);
-        table.string('email', 255);
-        table.text('zona_trabajo');
-        table.uuid('administrador_id').references('id').inTable('usuarios').onDelete('SET NULL');
-        table.boolean('activo').defaultTo(true);
-        table.timestamp('created_at').defaultTo(db.fn.now());
-        table.timestamp('updated_at').defaultTo(db.fn.now());
+    console.log('🔍 Verificando si existe la columna disponibilidad_config...');
 
-        table.index('tenant_id');
-        table.index('administrador_id');
-        table.index('activo');
-      });
-      console.log('✅ Tabla oficinas creada');
+    const checkColumn = await client.query(`
+      SELECT column_name
+      FROM information_schema.columns
+      WHERE table_name = 'propiedades' AND column_name = 'disponibilidad_config'
+    `);
+
+    if (checkColumn.rows.length === 0) {
+      console.log('📦 Agregando columna disponibilidad_config a propiedades...');
+      await client.query(`
+        ALTER TABLE propiedades
+        ADD COLUMN disponibilidad_config JSONB
+      `);
+      console.log('✅ Columna disponibilidad_config agregada');
     } else {
-      console.log('ℹ️ Tabla oficinas ya existe');
+      console.log('✅ La columna disponibilidad_config ya existe');
     }
 
-    // Crear tabla de equipos
-    console.log('Creando tabla equipos...');
-    const existeEquipos = await db.schema.hasTable('equipos');
-    if (!existeEquipos) {
-      await db.schema.createTable('equipos', (table) => {
-        table.uuid('id').primary().defaultTo(db.raw('gen_random_uuid()'));
-        table.uuid('tenant_id').notNullable().references('id').inTable('tenants').onDelete('CASCADE');
-        table.string('nombre', 255).notNullable();
-        table.text('descripcion');
-        table.string('color', 20);
-        table.uuid('lider_id').references('id').inTable('usuarios').onDelete('SET NULL');
-        table.uuid('asistente_id').references('id').inTable('usuarios').onDelete('SET NULL');
-        table.uuid('oficina_id').references('id').inTable('oficinas').onDelete('SET NULL');
-        table.boolean('activo').defaultTo(true);
-        table.timestamp('created_at').defaultTo(db.fn.now());
-        table.timestamp('updated_at').defaultTo(db.fn.now());
+    // Verificar tabla unidades_proyecto
+    console.log('🔍 Verificando si existe la tabla unidades_proyecto...');
+    const checkTable = await client.query(`
+      SELECT table_name
+      FROM information_schema.tables
+      WHERE table_name = 'unidades_proyecto'
+    `);
 
-        table.index('tenant_id');
-        table.index('lider_id');
-        table.index('asistente_id');
-        table.index('oficina_id');
-        table.index('activo');
-      });
-      console.log('✅ Tabla equipos creada');
+    if (checkTable.rows.length === 0) {
+      console.log('📦 Creando tabla unidades_proyecto...');
+      await client.query(`
+        CREATE TABLE unidades_proyecto (
+          id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+          propiedad_id UUID NOT NULL REFERENCES propiedades(id) ON DELETE CASCADE,
+          tenant_id UUID NOT NULL REFERENCES tenants(id) ON DELETE CASCADE,
+          codigo VARCHAR(50) NOT NULL,
+          tipologia_id VARCHAR(100),
+          tipologia_nombre VARCHAR(255),
+          habitaciones INTEGER,
+          banos INTEGER,
+          m2 DECIMAL(10, 2),
+          precio DECIMAL(15, 2),
+          moneda VARCHAR(10) DEFAULT 'USD',
+          torre VARCHAR(100),
+          piso VARCHAR(50),
+          nivel VARCHAR(50),
+          estado VARCHAR(50) DEFAULT 'disponible',
+          fecha_reserva TIMESTAMP,
+          fecha_venta TIMESTAMP,
+          reservado_por UUID,
+          vendido_a UUID,
+          notas TEXT,
+          orden INTEGER DEFAULT 0,
+          created_at TIMESTAMP DEFAULT NOW(),
+          updated_at TIMESTAMP DEFAULT NOW()
+        )
+      `);
+      console.log('✅ Tabla unidades_proyecto creada');
+
+      // Crear índices
+      console.log('📦 Creando índices...');
+      await client.query(`CREATE INDEX idx_unidades_propiedad ON unidades_proyecto(propiedad_id)`);
+      await client.query(`CREATE INDEX idx_unidades_tenant ON unidades_proyecto(tenant_id)`);
+      await client.query(`CREATE INDEX idx_unidades_estado ON unidades_proyecto(estado)`);
+      await client.query(`CREATE INDEX idx_unidades_propiedad_codigo ON unidades_proyecto(propiedad_id, codigo)`);
+      await client.query(`CREATE UNIQUE INDEX idx_unidades_codigo_unico ON unidades_proyecto(propiedad_id, codigo)`);
+      console.log('✅ Índices creados');
     } else {
-      console.log('ℹ️ Tabla equipos ya existe');
+      console.log('✅ La tabla unidades_proyecto ya existe');
     }
 
-    // Crear tabla de miembros de equipo
-    console.log('Creando tabla equipos_miembros...');
-    const existeMiembros = await db.schema.hasTable('equipos_miembros');
-    if (!existeMiembros) {
-      await db.schema.createTable('equipos_miembros', (table) => {
-        table.uuid('id').primary().defaultTo(db.raw('gen_random_uuid()'));
-        table.uuid('equipo_id').notNullable().references('id').inTable('equipos').onDelete('CASCADE');
-        table.uuid('usuario_id').notNullable().references('id').inTable('usuarios').onDelete('CASCADE');
-        table.string('rol', 50).defaultTo('miembro');
-        table.date('fecha_ingreso').defaultTo(db.fn.now());
-        table.boolean('activo').defaultTo(true);
-        table.timestamp('created_at').defaultTo(db.fn.now());
-
-        table.unique(['equipo_id', 'usuario_id']);
-        table.index('equipo_id');
-        table.index('usuario_id');
-      });
-      console.log('✅ Tabla equipos_miembros creada');
-    } else {
-      console.log('ℹ️ Tabla equipos_miembros ya existe');
-    }
-
-    // Añadir columna oficina_id a usuarios si no existe
-    console.log('Verificando columna oficina_id en usuarios...');
-    const tieneOficinaId = await db.schema.hasColumn('usuarios', 'oficina_id');
-    if (!tieneOficinaId) {
-      await db.schema.alterTable('usuarios', (table) => {
-        table.uuid('oficina_id').references('id').inTable('oficinas').onDelete('SET NULL');
-      });
-      console.log('✅ Columna oficina_id agregada a usuarios');
-    } else {
-      console.log('ℹ️ Columna oficina_id ya existe en usuarios');
-    }
-
-    // Añadir columna equipo_id a usuarios si no existe
-    console.log('Verificando columna equipo_id en usuarios...');
-    const tieneEquipoId = await db.schema.hasColumn('usuarios', 'equipo_id');
-    if (!tieneEquipoId) {
-      await db.schema.alterTable('usuarios', (table) => {
-        table.uuid('equipo_id').references('id').inTable('equipos').onDelete('SET NULL');
-      });
-      console.log('✅ Columna equipo_id agregada a usuarios');
-    } else {
-      console.log('ℹ️ Columna equipo_id ya existe en usuarios');
-    }
-
-    console.log('\n✅ Migración 107 completada exitosamente');
+    console.log('✅ Migración 114 completada exitosamente');
 
   } catch (error) {
     console.error('❌ Error en migración:', error);
     throw error;
   } finally {
-    await db.destroy();
+    client.release();
+    await pool.end();
   }
 }
 
-migrate().catch(console.error);
+runMigration().catch(console.error);

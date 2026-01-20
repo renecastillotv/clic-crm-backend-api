@@ -25,61 +25,82 @@ export interface ComponenteWebResponse {
 /**
  * Obtiene todos los componentes activos de un tenant
  * Ordenados y listos para renderizar
- * 
+ *
+ * NUEVO ESQUEMA:
+ * - componentes_web usa: componente_catalogo_id (FK a catalogo_componentes.id)
+ * - componentes_web usa: tipo_pagina_id (FK a tipos_pagina.id)
+ * - El "tipo" se obtiene de catalogo_componentes.tipo
+ * - El "tipo de página" se obtiene de tipos_pagina.codigo
+ *
  * @param soloPredeterminados - Si es true, solo devuelve un componente por tipo (el predeterminado)
  *                               Si es false, devuelve todos los componentes (útil para el CRM)
+ * @param tipoPaginaCodigo - Código del tipo de página (ej: "homepage", "propiedades_single")
  */
 export async function getComponentesByTenant(
   tenantId: string,
-  paginaId?: string,
+  tipoPaginaCodigo?: string,
   soloPredeterminados: boolean = true
 ): Promise<ComponenteWebResponse[]> {
   try {
     let sql: string;
     const params: any[] = [tenantId];
-    
+
+    // Obtener el tipo_pagina_id si se proporciona código
+    let tipoPaginaId: string | null = null;
+    if (tipoPaginaCodigo) {
+      const tpResult = await query(
+        `SELECT id FROM tipos_pagina WHERE codigo = $1`,
+        [tipoPaginaCodigo]
+      );
+      if (tpResult.rows.length > 0) {
+        tipoPaginaId = tpResult.rows[0].id;
+      }
+      console.log(`🔍 Buscando componentes para tipo_pagina: ${tipoPaginaCodigo} (ID: ${tipoPaginaId})`);
+    }
+
     if (soloPredeterminados) {
       // Solo componentes predeterminados (para el frontend web)
+      // Para cada tipo de componente, obtener solo uno (el de la página o el global)
       sql = `
         WITH ranked_components AS (
-          SELECT 
-            id,
-            tipo,
-            variante,
-            datos,
-            activo,
-            orden,
-            pagina_id as "paginaId",
-            predeterminado,
-            created_at,
+          SELECT
+            cw.id,
+            cc.tipo,
+            COALESCE(cw.nombre, cc.nombre) as variante,
+            cw.datos,
+            cw.activo,
+            cw.orden,
+            cw.tipo_pagina_id as "tipoPaginaId",
+            tp.codigo as "tipoPaginaCodigo",
+            cw.nombre,
+            cw.created_at,
             ROW_NUMBER() OVER (
-              PARTITION BY tipo 
-              ORDER BY 
-                CASE WHEN pagina_id IS NOT NULL THEN 0 ELSE 1 END,
-                CASE WHEN predeterminado = true THEN 0 ELSE 1 END,
-                orden ASC, 
-                created_at ASC
+              PARTITION BY cc.tipo
+              ORDER BY
+                CASE WHEN cw.tipo_pagina_id IS NOT NULL THEN 0 ELSE 1 END,
+                cw.orden ASC,
+                cw.created_at ASC
             ) as rn
-          FROM componentes_web
-          WHERE tenant_id = $1 
-            AND activo = true
+          FROM componentes_web cw
+          LEFT JOIN catalogo_componentes cc ON cw.componente_catalogo_id = cc.id
+          LEFT JOIN tipos_pagina tp ON cw.tipo_pagina_id = tp.id
+          WHERE cw.tenant_id = $1
+            AND cw.activo = true
       `;
-      
-      // Si se especifica una página, filtrar por página o componentes globales (pagina_id IS NULL)
-      if (paginaId) {
-        // Excluir property_list global de páginas que no sean listado (homepage, propiedades, etc)
-        // Solo incluir property_list si es específico de la página o si la página lo requiere
+
+      // Filtrar por tipo de página
+      if (tipoPaginaId) {
+        // Componentes de esta página específica O componentes globales (header/footer)
         sql += ` AND (
-          pagina_id = $2::uuid 
-          OR (pagina_id IS NULL AND tipo != 'property_list')
+          cw.tipo_pagina_id = $2::uuid
+          OR (cw.tipo_pagina_id IS NULL AND cc.tipo IN ('header', 'footer'))
         )`;
-        params.push(paginaId);
-        console.log(`🔍 [Frontend] Filtrando por paginaId: ${paginaId} (excluyendo property_list global)`);
+        params.push(tipoPaginaId);
       } else {
-        // Si no se especifica página, solo componentes globales
-        sql += ` AND pagina_id IS NULL`;
+        // Solo componentes globales (sin tipo_pagina)
+        sql += ` AND cw.tipo_pagina_id IS NULL`;
       }
-      
+
       sql += `
         )
         SELECT
@@ -89,8 +110,9 @@ export async function getComponentesByTenant(
           datos,
           activo,
           orden,
-          "paginaId",
-          predeterminado
+          "tipoPaginaId",
+          "tipoPaginaCodigo",
+          nombre
         FROM ranked_components
         WHERE rn = 1
         ORDER BY
@@ -99,88 +121,63 @@ export async function getComponentesByTenant(
       `;
     } else {
       // Todos los componentes (para el CRM)
-      // IMPORTANTE: NO filtrar por activo aquí, para que el CRM pueda ver todos (activos e inactivos)
-      
-      // Primero hacer una consulta de diagnóstico para ver TODOS los componentes
-      const diagnosticQuery = `SELECT id, tipo, pagina_id, activo, tenant_id FROM componentes_web WHERE tenant_id = $1`;
-      const diagnostic = await query(diagnosticQuery, [tenantId]);
-      console.log(`🔍 DIAGNÓSTICO: Total componentes en BD para tenant ${tenantId}: ${diagnostic.rows.length}`);
-      diagnostic.rows.forEach((row: any, idx: number) => {
-        console.log(`  [${idx}] ID: ${row.id}, tipo: ${row.tipo}, pagina_id: ${row.pagina_id}, activo: ${row.activo}`);
-      });
-      
       sql = `
-        SELECT 
-          id,
-          tipo,
-          variante,
-          datos,
-          activo,
-          orden,
-          pagina_id as "paginaId",
-          predeterminado
-        FROM componentes_web
-        WHERE tenant_id = $1
+        SELECT
+          cw.id,
+          cc.tipo,
+          COALESCE(cw.nombre, cc.nombre) as variante,
+          cw.datos,
+          cw.activo,
+          cw.orden,
+          cw.tipo_pagina_id as "tipoPaginaId",
+          tp.codigo as "tipoPaginaCodigo",
+          cw.nombre,
+          cw.created_at
+        FROM componentes_web cw
+        LEFT JOIN catalogo_componentes cc ON cw.componente_catalogo_id = cc.id
+        LEFT JOIN tipos_pagina tp ON cw.tipo_pagina_id = tp.id
+        WHERE cw.tenant_id = $1
       `;
-      
-      // Si se especifica una página, filtrar por página o componentes globales (pagina_id IS NULL)
-      if (paginaId) {
-        // Usar comparación de texto para evitar problemas de tipo UUID
-        sql += ` AND (pagina_id::text = $2::text OR pagina_id IS NULL)`;
-        params.push(paginaId);
-        console.log(`🔍 Filtrando por paginaId: ${paginaId} (tipo: ${typeof paginaId})`);
-        console.log(`🔍 SQL completo: ${sql}`);
-        console.log(`🔍 Parámetros: ${JSON.stringify(params)}`);
+
+      // Filtrar por tipo de página si se especifica
+      if (tipoPaginaId) {
+        // Componentes de esta página O globales (header/footer)
+        sql += ` AND (cw.tipo_pagina_id = $2::uuid OR cw.tipo_pagina_id IS NULL)`;
+        params.push(tipoPaginaId);
       }
-      // Si no se especifica paginaId y todos=true, devolver TODOS los componentes (no filtrar)
-      // Si todos=false, este bloque no se ejecuta (soloPredeterminados ya filtró arriba)
-      
-      sql += ` ORDER BY orden ASC, created_at ASC`;
+
+      sql += ` ORDER BY cw.orden ASC, cw.created_at ASC`;
     }
-    
-    console.log(`📝 SQL Query: ${sql}`);
-    console.log(`📝 Parámetros:`, params);
-    
+
+    console.log(`📝 SQL Query ejecutando...`);
+
     const result = await query(sql, params);
-    
-    console.log(`📊 Resultado de la consulta: ${result.rows.length} filas`);
-    if (result.rows.length > 0) {
-      console.log(`📋 Primer componente:`, {
-        id: result.rows[0].id,
-        tipo: result.rows[0].tipo,
-        paginaId: result.rows[0].paginaId,
-        activo: result.rows[0].activo
-      });
-    }
+
+    console.log(`📊 Resultado: ${result.rows.length} componentes encontrados`);
 
     return result.rows.map((row: any) => {
       const datosRaw = typeof row.datos === 'string' ? JSON.parse(row.datos) : row.datos;
-      
-      // Los datos deben estar en formato estructurado (static_data, dynamic_data, styles, toggles)
-      // Si no lo están, es un error de configuración
-      if (!datosRaw.static_data) {
-        console.warn(`⚠️ Componente ${row.id} (${row.tipo}) no tiene formato estructurado. Se espera static_data.`);
-      }
-      
+
       // Validar y normalizar datos
       let datosNormalizados: ComponenteDataEstructurado;
       try {
         datosNormalizados = validateAndNormalizeComponentData(datosRaw);
       } catch (error: any) {
         console.warn(`⚠️ Componente ${row.id} (${row.tipo}) tiene datos inválidos:`, error.message);
-        // Si la validación falla, usar datos raw pero mostrar warning
         datosNormalizados = datosRaw;
       }
 
       return {
         id: row.id,
         tipo: row.tipo,
-        variante: row.variante,
+        variante: row.variante || 'default',
         datos: datosNormalizados,
         activo: row.activo,
         orden: row.orden,
-        paginaId: row.paginaId || undefined,
-        predeterminado: row.predeterminado || false,
+        paginaId: row.tipoPaginaId || undefined,
+        predeterminado: false, // Ya no usamos este campo
+        scope: row.tipoPaginaId ? 'page_type' as const : 'tenant' as const,
+        nombre: row.nombre,
       };
     });
   } catch (error: any) {
@@ -241,12 +238,59 @@ export async function getTemaByTenant(tenantId: string): Promise<Record<string, 
 
 /**
  * Crea o actualiza un componente
- * Si se marca como predeterminado, desmarca los otros del mismo tipo
+ *
+ * NUEVO ESQUEMA:
+ * - componentes_web tiene: componente_catalogo_id (FK a catalogo_componentes)
+ * - componentes_web tiene: tipo_pagina_id (FK a tipos_pagina)
+ * - NO tiene: tipo, variante, predeterminado, scope, tipo_pagina, pagina_id, es_activo
+ *
+ * El frontend envía: tipo (string como "hero"), variante, tipo_pagina (string como "homepage")
+ * Este servicio convierte a: componente_catalogo_id (UUID), tipo_pagina_id (UUID)
  */
 // Función helper para validar UUID
 function isValidUUID(uuid: string): boolean {
   const uuidRegex = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
   return uuidRegex.test(uuid);
+}
+
+// Cache para tipos de página (no cambian frecuentemente)
+const tiposPaginaCache: Map<string, string> = new Map();
+
+async function getTipoPaginaId(codigoTipoPagina: string): Promise<string | null> {
+  if (!codigoTipoPagina) return null;
+
+  // Buscar en cache
+  if (tiposPaginaCache.has(codigoTipoPagina)) {
+    return tiposPaginaCache.get(codigoTipoPagina)!;
+  }
+
+  // Buscar en BD
+  const result = await query(
+    `SELECT id FROM tipos_pagina WHERE codigo = $1`,
+    [codigoTipoPagina]
+  );
+
+  if (result.rows.length > 0) {
+    tiposPaginaCache.set(codigoTipoPagina, result.rows[0].id);
+    return result.rows[0].id;
+  }
+
+  return null;
+}
+
+async function getComponenteCatalogoId(tipo: string): Promise<string | null> {
+  // El tipo puede ser el código del componente (ej: "hero", "header")
+  // Buscamos por tipo en el catálogo
+  const result = await query(
+    `SELECT id FROM catalogo_componentes WHERE tipo = $1 LIMIT 1`,
+    [tipo]
+  );
+
+  if (result.rows.length > 0) {
+    return result.rows[0].id;
+  }
+
+  return null;
 }
 
 export async function saveComponente(
@@ -255,14 +299,15 @@ export async function saveComponente(
     id?: string;
     tipo: string;
     variante: string;
-    datos: ComponenteDataEstructurado; // Formato estructurado obligatorio
+    datos: ComponenteDataEstructurado;
     activo?: boolean;
     orden?: number;
     paginaId?: string | null;
     predeterminado?: boolean;
-    scope?: 'tenant' | 'page_type' | 'page'; // Nuevo: scope del componente
-    nombre?: string | null; // Nuevo: nombre identificador
-    tipoPagina?: string | null; // Nuevo: tipo de página para scope='page_type'
+    scope?: 'tenant' | 'page_type' | 'page';
+    nombre?: string | null;
+    tipoPagina?: string | null;
+    tipo_pagina?: string | null; // Alias usado por frontend
   }
 ): Promise<ComponenteWebResponse> {
   try {
@@ -271,184 +316,187 @@ export async function saveComponente(
     const datosJson = JSON.stringify(datosValidados);
     const activo = componente.activo !== undefined ? componente.activo : true;
     const orden = componente.orden !== undefined ? componente.orden : 0;
-    const predeterminado = componente.predeterminado === true;
-    // Si tiene paginaId y no tiene scope, asumir scope='page'
-    const scope = componente.scope || (componente.paginaId ? 'page' : 'tenant');
     const nombre = componente.nombre || null;
-    const tipoPagina = componente.tipoPagina || null;
+
+    // Obtener el código del tipo de página (puede venir como tipoPagina o tipo_pagina)
+    const tipoPaginaCodigo = componente.tipoPagina || componente.tipo_pagina || null;
 
     // Validar que si viene un ID, sea un UUID válido
-    // Si no es válido, tratarlo como componente nuevo (no incluir ID)
     const tieneIdValido = componente.id && isValidUUID(componente.id);
     const componenteId = tieneIdValido ? componente.id : undefined;
 
-    // Si se marca como predeterminado, desmarcar otros del mismo tipo
-    if (predeterminado) {
-      await query(
-        `UPDATE componentes_web 
-         SET predeterminado = false 
-         WHERE tenant_id = $1 AND tipo = $2 AND id != COALESCE($3, '00000000-0000-0000-0000-000000000000'::uuid)`,
-        [tenantId, componente.tipo, componenteId || null]
-      );
+    // Convertir tipo (string) a componente_catalogo_id (UUID)
+    const componenteCatalogoId = await getComponenteCatalogoId(componente.tipo);
+    if (!componenteCatalogoId) {
+      throw new Error(`Tipo de componente "${componente.tipo}" no encontrado en el catálogo`);
     }
+
+    // Convertir tipo_pagina (string como "homepage") a tipo_pagina_id (UUID)
+    // Header y Footer son globales (no tienen tipo_pagina)
+    let tipoPaginaId: string | null = null;
+    if (tipoPaginaCodigo && componente.tipo !== 'header' && componente.tipo !== 'footer') {
+      tipoPaginaId = await getTipoPaginaId(tipoPaginaCodigo);
+      if (!tipoPaginaId && tipoPaginaCodigo !== 'custom') {
+        console.warn(`⚠️ Tipo de página "${tipoPaginaCodigo}" no encontrado, creando componente global`);
+      }
+    }
+
+    console.log(`🔄 Conversión: tipo="${componente.tipo}" → catalogo_id=${componenteCatalogoId}, tipoPagina="${tipoPaginaCodigo}" → tipo_pagina_id=${tipoPaginaId}`);
 
     if (componenteId) {
       // Actualizar componente existente
       const sql = `
         UPDATE componentes_web
         SET
-          tipo = $1,
-          variante = $2,
-          datos = $3,
-          activo = $4,
-          orden = $5,
-          pagina_id = $6,
-          predeterminado = $7,
-          scope = $8,
-          nombre = COALESCE($9, nombre),
-          tipo_pagina = $10,
+          componente_catalogo_id = $1,
+          datos = $2,
+          activo = $3,
+          orden = $4,
+          tipo_pagina_id = $5,
+          nombre = COALESCE($6, nombre),
           updated_at = NOW()
-        WHERE id = $11 AND tenant_id = $12
+        WHERE id = $7 AND tenant_id = $8
         RETURNING
-          id,
-          tipo,
-          variante,
-          datos,
-          activo,
-          orden,
-          pagina_id as "paginaId",
-          predeterminado,
-          scope,
-          nombre,
-          tipo_pagina as "tipoPagina"
+          cw.id,
+          cc.tipo,
+          COALESCE(cw.nombre, cc.nombre) as variante,
+          cw.datos,
+          cw.activo,
+          cw.orden,
+          cw.tipo_pagina_id as "tipoPaginaId",
+          cw.nombre
+        FROM componentes_web cw
+        LEFT JOIN catalogo_componentes cc ON cw.componente_catalogo_id = cc.id
+        WHERE cw.id = $7 AND cw.tenant_id = $8
       `;
 
-      const paginaIdValue = componente.paginaId ? componente.paginaId : null;
-      console.log(`💾 Actualizando componente ${componenteId} - paginaId: ${paginaIdValue}, scope: ${scope}, tipoPagina: ${tipoPagina}`);
+      console.log(`💾 Actualizando componente ${componenteId}`);
 
-      const result = await query(sql, [
-        componente.tipo,
-        componente.variante,
+      // Hacer UPDATE y luego SELECT por separado
+      await query(`
+        UPDATE componentes_web
+        SET
+          componente_catalogo_id = $1,
+          datos = $2,
+          activo = $3,
+          orden = $4,
+          tipo_pagina_id = $5,
+          nombre = COALESCE($6, nombre),
+          updated_at = NOW()
+        WHERE id = $7 AND tenant_id = $8
+      `, [
+        componenteCatalogoId,
         datosJson,
         activo,
         orden,
-        paginaIdValue,
-        predeterminado,
-        scope,
+        tipoPaginaId,
         nombre,
-        tipoPagina,
         componenteId,
         tenantId,
       ]);
 
-      console.log(`✅ Componente actualizado - paginaId: ${result.rows[0].paginaId}, scope: ${result.rows[0].scope}`);
+      const selectResult = await query(`
+        SELECT
+          cw.id,
+          cc.tipo,
+          COALESCE(cw.nombre, cc.nombre) as variante,
+          cw.datos,
+          cw.activo,
+          cw.orden,
+          cw.tipo_pagina_id as "tipoPaginaId",
+          cw.nombre,
+          tp.codigo as "tipoPaginaCodigo"
+        FROM componentes_web cw
+        LEFT JOIN catalogo_componentes cc ON cw.componente_catalogo_id = cc.id
+        LEFT JOIN tipos_pagina tp ON cw.tipo_pagina_id = tp.id
+        WHERE cw.id = $1 AND cw.tenant_id = $2
+      `, [componenteId, tenantId]);
 
-      if (result.rows.length === 0) {
+      if (selectResult.rows.length === 0) {
         throw new Error('Componente no encontrado o no pertenece al tenant');
       }
 
+      const row = selectResult.rows[0];
+      console.log(`✅ Componente actualizado - ID: ${row.id}`);
+
       return {
-        id: result.rows[0].id,
-        tipo: result.rows[0].tipo,
-        variante: result.rows[0].variante,
-        datos: typeof result.rows[0].datos === 'string'
-          ? JSON.parse(result.rows[0].datos)
-          : result.rows[0].datos,
-        activo: result.rows[0].activo,
-        orden: result.rows[0].orden,
-        paginaId: result.rows[0].paginaId || undefined,
-        predeterminado: result.rows[0].predeterminado || false,
-        scope: result.rows[0].scope,
-        nombre: result.rows[0].nombre,
+        id: row.id,
+        tipo: row.tipo,
+        variante: row.variante || 'default',
+        datos: typeof row.datos === 'string'
+          ? JSON.parse(row.datos)
+          : row.datos,
+        activo: row.activo,
+        orden: row.orden,
+        paginaId: row.tipoPaginaId || undefined,
+        predeterminado: false,
+        scope: row.tipoPaginaId ? 'page_type' : 'tenant',
+        nombre: row.nombre,
       };
     } else {
-      // Si es nuevo y no hay predeterminado del mismo tipo, marcarlo como predeterminado
-      const checkPredeterminado = await query(
-        `SELECT COUNT(*) as count 
-         FROM componentes_web 
-         WHERE tenant_id = $1 AND tipo = $2 AND predeterminado = true AND activo = true
-         AND (pagina_id = $3 OR (pagina_id IS NULL AND $3 IS NULL))`,
-        [tenantId, componente.tipo, componente.paginaId || null]
-      );
-      
-      const esPredeterminado = predeterminado || checkPredeterminado.rows[0].count === '0';
-
-      console.log(`📝 Creando nuevo componente - tipo: ${componente.tipo}, paginaId: ${componente.paginaId}, scope: ${scope}, activo: ${activo}`);
+      console.log(`📝 Creando nuevo componente - tipo: ${componente.tipo}, tipoPagina: ${tipoPaginaCodigo}`);
 
       // Crear nuevo componente
-      const paginaIdValue = componente.paginaId ? componente.paginaId : null;
-      console.log(`💾 Insertando componente - paginaId: ${paginaIdValue}, scope: ${scope}`);
-
       const sql = `
         INSERT INTO componentes_web (
           tenant_id,
-          tipo,
-          variante,
+          componente_catalogo_id,
           datos,
           activo,
           orden,
-          pagina_id,
-          predeterminado,
-          scope,
-          nombre,
-          tipo_pagina,
-          es_activo
+          tipo_pagina_id,
+          nombre
         )
-        VALUES ($1, $2, $3, $4, $5, $6, $7::uuid, $8, $9, $10, $11, true)
-        RETURNING
-          id,
-          tipo,
-          variante,
-          datos,
-          activo,
-          orden,
-          pagina_id as "paginaId",
-          predeterminado,
-          scope,
-          nombre,
-          tipo_pagina as "tipoPagina"
+        VALUES ($1, $2, $3, $4, $5, $6, $7)
+        RETURNING id
       `;
 
-      const result = await query(sql, [
+      const insertResult = await query(sql, [
         tenantId,
-        componente.tipo,
-        componente.variante,
+        componenteCatalogoId,
         datosJson,
         activo,
         orden,
-        paginaIdValue,
-        esPredeterminado,
-        scope,
+        tipoPaginaId,
         nombre,
-        tipoPagina,
       ]);
 
-      console.log(`✅ Componente insertado - ID: ${result.rows[0].id}, paginaId: ${result.rows[0].paginaId}, scope: ${result.rows[0].scope}`);
+      const newId = insertResult.rows[0].id;
+      console.log(`✅ Componente insertado - ID: ${newId}`);
 
-      // Si se marcó como predeterminado, desmarcar otros del mismo tipo y página
-      if (esPredeterminado) {
-        await query(
-          `UPDATE componentes_web 
-           SET predeterminado = false 
-           WHERE tenant_id = $1 AND tipo = $2 AND id != $3
-           AND (pagina_id = $4 OR (pagina_id IS NULL AND $4 IS NULL))`,
-          [tenantId, componente.tipo, result.rows[0].id, componente.paginaId || null]
-        );
-      }
+      // Obtener datos completos del componente
+      const selectResult = await query(`
+        SELECT
+          cw.id,
+          cc.tipo,
+          COALESCE(cw.nombre, cc.nombre) as variante,
+          cw.datos,
+          cw.activo,
+          cw.orden,
+          cw.tipo_pagina_id as "tipoPaginaId",
+          cw.nombre,
+          tp.codigo as "tipoPaginaCodigo"
+        FROM componentes_web cw
+        LEFT JOIN catalogo_componentes cc ON cw.componente_catalogo_id = cc.id
+        LEFT JOIN tipos_pagina tp ON cw.tipo_pagina_id = tp.id
+        WHERE cw.id = $1
+      `, [newId]);
+
+      const row = selectResult.rows[0];
 
       const saved = {
-        id: result.rows[0].id,
-        tipo: result.rows[0].tipo,
-        variante: result.rows[0].variante,
-        datos: typeof result.rows[0].datos === 'string'
-          ? JSON.parse(result.rows[0].datos)
-          : result.rows[0].datos,
-        activo: result.rows[0].activo,
-        orden: result.rows[0].orden,
-        paginaId: result.rows[0].paginaId || undefined,
-        predeterminado: result.rows[0].predeterminado || false,
-        scope: result.rows[0].scope,
-        nombre: result.rows[0].nombre,
+        id: row.id,
+        tipo: row.tipo,
+        variante: row.variante || 'default',
+        datos: typeof row.datos === 'string'
+          ? JSON.parse(row.datos)
+          : row.datos,
+        activo: row.activo,
+        orden: row.orden,
+        paginaId: row.tipoPaginaId || undefined,
+        predeterminado: false,
+        scope: row.tipoPaginaId ? 'page_type' as const : 'tenant' as const,
+        nombre: row.nombre,
       };
 
       console.log(`📤 Retornando componente guardado:`, saved);

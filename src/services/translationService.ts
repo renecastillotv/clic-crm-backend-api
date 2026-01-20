@@ -69,7 +69,7 @@ export async function translateWithGoogle(
       throw new Error(`Google Translate API error: ${response.statusText}`);
     }
 
-    const data = await response.json();
+    const data = await response.json() as any;
 
     if (!data.data?.translations?.[0]?.translatedText) {
       throw new Error('No translation returned from Google Translate');
@@ -403,7 +403,7 @@ Responde SOLO con la descripción corta, sin comillas ni explicaciones.`
       });
 
       if (response.ok) {
-        const data = await response.json();
+        const data = await response.json() as any;
         const shortDesc = data.choices?.[0]?.message?.content?.trim();
         if (shortDesc) {
           console.log('✨ Short description generada con OpenAI');

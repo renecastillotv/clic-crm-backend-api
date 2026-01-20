@@ -7,6 +7,7 @@
 import { Router, Request, Response } from 'express';
 import {
   getCatalogoComponentes,
+  getComponenteCatalogoPorTipo,
   getSeccionesTenant,
   getSeccionesPorTipo,
   getSeccionesActivas,
@@ -41,6 +42,24 @@ router.get('/catalogo', async (req: Request, res: Response) => {
     res.json(catalogo);
   } catch (error: any) {
     console.error('Error al obtener catálogo:', error);
+    res.status(500).json({ error: error.message });
+  }
+});
+
+/**
+ * GET /api/secciones/catalogo/:tipo
+ * Obtiene un componente del catálogo por tipo con su schema_config (campos_config)
+ */
+router.get('/catalogo/:tipo', async (req: Request, res: Response) => {
+  try {
+    const { tipo } = req.params;
+    const componente = await getComponenteCatalogoPorTipo(tipo);
+    if (!componente) {
+      return res.status(404).json({ error: 'Componente no encontrado' });
+    }
+    res.json(componente);
+  } catch (error: any) {
+    console.error('Error al obtener componente del catálogo:', error);
     res.status(500).json({ error: error.message });
   }
 });
