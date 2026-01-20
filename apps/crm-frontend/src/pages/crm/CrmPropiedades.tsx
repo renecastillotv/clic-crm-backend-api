@@ -555,6 +555,7 @@ export default function CrmPropiedades() {
                 </div>
 
                 <div className="card-body">
+                  {/* Fila 1: Tipo + Código */}
                   <div className="card-top-row">
                     <span className="tipo-badge">{renderCategoryIcon(tipo.iconName, 14)} {tipo.label}</span>
                     {(propiedad as any).codigo_publico && (
@@ -562,50 +563,54 @@ export default function CrmPropiedades() {
                     )}
                   </div>
 
+                  {/* Fila 2: Título */}
                   <h3 className="card-title">{propiedad.titulo}</h3>
 
+                  {/* Fila 3: Ubicación */}
                   <div className="card-location">
                     {[propiedad.sector, propiedad.ciudad].filter(Boolean).join(', ') || 'Sin ubicación'}
                   </div>
 
-                  <div className="card-price">
-                    {/* Si tiene ambos precios, mostrar los dos */}
-                    {propiedad.precio_venta && propiedad.precio_alquiler ? (
-                      <>
-                        <div>{formatMoney(propiedad.precio_venta, propiedad.moneda)}</div>
-                        <div className="price-secondary">
-                          {formatMoney(propiedad.precio_alquiler, propiedad.moneda)}<span className="price-suffix">/mes</span>
-                        </div>
-                      </>
-                    ) : (
-                      <>
-                        {formatMoney(propiedad.precio_venta || propiedad.precio_alquiler || propiedad.precio, propiedad.moneda)}
-                        {(propiedad.operacion === 'renta' || (!propiedad.precio_venta && propiedad.precio_alquiler)) && (
-                          <span className="price-suffix">/mes</span>
-                        )}
-                      </>
-                    )}
-                  </div>
-
-                  <div className="card-features">
-                    {propiedad.habitaciones != null && (
-                      <span className="feature"><Bed size={14} /> {propiedad.habitaciones}</span>
-                    )}
-                    {propiedad.banos != null && (
-                      <span className="feature"><Bath size={14} /> {propiedad.banos}</span>
-                    )}
-                    {propiedad.estacionamientos != null && (
-                      <span className="feature"><Car size={14} /> {propiedad.estacionamientos}</span>
-                    )}
-                    {propiedad.m2_construccion != null && (
-                      <span className="feature"><Maximize size={14} /> {propiedad.m2_construccion.toLocaleString()} m²</span>
-                    )}
+                  {/* Fila 4: Precio + Features en línea */}
+                  <div className="card-price-features">
+                    <div className="card-price">
+                      {propiedad.precio_venta && propiedad.precio_alquiler ? (
+                        <>
+                          <span>{formatMoney(propiedad.precio_venta, propiedad.moneda)}</span>
+                          <span className="price-divider">|</span>
+                          <span className="price-rent">
+                            {formatMoney(propiedad.precio_alquiler, propiedad.moneda)}<span className="price-suffix">/mes</span>
+                          </span>
+                        </>
+                      ) : (
+                        <>
+                          {formatMoney(propiedad.precio_venta || propiedad.precio_alquiler || propiedad.precio, propiedad.moneda)}
+                          {(propiedad.operacion === 'renta' || (!propiedad.precio_venta && propiedad.precio_alquiler)) && (
+                            <span className="price-suffix">/mes</span>
+                          )}
+                        </>
+                      )}
+                    </div>
+                    <div className="card-features">
+                      {propiedad.habitaciones != null && (
+                        <span className="feature"><Bed size={13} /> {propiedad.habitaciones}</span>
+                      )}
+                      {propiedad.banos != null && (
+                        <span className="feature"><Bath size={13} /> {propiedad.banos}</span>
+                      )}
+                      {propiedad.estacionamientos != null && (
+                        <span className="feature"><Car size={13} /> {propiedad.estacionamientos}</span>
+                      )}
+                      {propiedad.m2_construccion != null && (
+                        <span className="feature"><Maximize size={13} /> {propiedad.m2_construccion.toLocaleString()}</span>
+                      )}
+                    </div>
                   </div>
                 </div>
 
+                {/* Footer compacto con captador y acciones */}
                 <div className="card-footer">
-                  {/* Avatar del captador */}
-                  {(propiedad.captador_nombre || propiedad.captador_apellido) && (
+                  {(propiedad.captador_nombre || propiedad.captador_apellido) ? (
                     <div
                       className="captador-avatar"
                       title={`${propiedad.captador_nombre || ''} ${propiedad.captador_apellido || ''}`.trim()}
@@ -619,21 +624,21 @@ export default function CrmPropiedades() {
                         </span>
                       )}
                     </div>
-                  )}
+                  ) : <div />}
                   <div className="card-actions">
                     <button
                       className="action-btn"
                       onClick={(e) => { e.stopPropagation(); navigate(`/crm/${tenantSlug}/propiedades/${propiedad.id}/editar`); }}
                       title="Editar"
                     >
-                      <Pencil size={16} />
+                      <Pencil size={15} />
                     </button>
                     <button
                       className="action-btn danger"
                       onClick={(e) => { e.stopPropagation(); setDeleteConfirm(propiedad.id); }}
                       title="Eliminar"
                     >
-                      <Trash2 size={16} />
+                      <Trash2 size={15} />
                     </button>
                   </div>
                 </div>
@@ -1276,14 +1281,14 @@ const styles = `
   }
 
   .card-body {
-    padding: 12px;
+    padding: 10px 12px;
   }
 
   .card-top-row {
     display: flex;
     justify-content: space-between;
     align-items: center;
-    margin-bottom: 8px;
+    margin-bottom: 6px;
   }
 
   .codigo-ref {
@@ -1334,11 +1339,11 @@ const styles = `
   }
 
   .card-title {
-    margin: 0 0 4px 0;
-    font-size: 1rem;
+    margin: 0 0 2px 0;
+    font-size: 0.95rem;
     font-weight: 600;
     color: #0f172a;
-    line-height: 1.3;
+    line-height: 1.25;
     display: -webkit-box;
     -webkit-line-clamp: 2;
     -webkit-box-orient: vertical;
@@ -1375,15 +1380,38 @@ const styles = `
     margin-bottom: 2px;
   }
 
+  .card-price-features {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    gap: 8px;
+    margin-top: 8px;
+  }
+
   .card-price {
-    font-size: 1.1rem;
+    font-size: 1rem;
     font-weight: 700;
     color: #16a34a;
-    margin: 8px 0;
+    display: flex;
+    align-items: baseline;
+    flex-wrap: wrap;
+    gap: 4px;
+  }
+
+  .price-divider {
+    color: #cbd5e1;
+    font-weight: 400;
+    margin: 0 2px;
+  }
+
+  .price-rent {
+    font-size: 0.85rem;
+    font-weight: 600;
+    color: #0ea5e9;
   }
 
   .price-suffix {
-    font-size: 0.8rem;
+    font-size: 0.7rem;
     font-weight: 500;
     color: #64748b;
     margin-left: 2px;
@@ -1396,34 +1424,25 @@ const styles = `
     margin-left: 2px;
   }
 
-  .price-secondary {
-    font-size: 0.9rem;
-    color: #64748b;
-    margin-top: 2px;
-  }
-
-  .price-secondary-sm {
-    font-size: 0.75rem;
-    color: #64748b;
-  }
-
   .card-location {
-    font-size: 0.85rem;
+    font-size: 0.8rem;
     color: #64748b;
-    margin-bottom: 12px;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
   }
 
   .card-features {
     display: flex;
-    gap: 12px;
-    flex-wrap: wrap;
+    gap: 8px;
+    flex-shrink: 0;
   }
 
   .feature {
     display: flex;
     align-items: center;
-    gap: 4px;
-    font-size: 0.8rem;
+    gap: 3px;
+    font-size: 0.75rem;
     color: #64748b;
   }
 
@@ -1432,7 +1451,7 @@ const styles = `
     justify-content: space-between;
     align-items: center;
     gap: 8px;
-    padding: 10px 12px;
+    padding: 8px 12px;
     border-top: 1px solid #f1f5f9;
   }
 
