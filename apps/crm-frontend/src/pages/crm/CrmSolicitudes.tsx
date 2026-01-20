@@ -275,17 +275,17 @@ export default function CrmSolicitudes() {
               className={`view-btn ${vistaKanban ? 'active' : ''}`}
               onClick={() => setVistaKanban(true)}
             >
-              <LayoutGrid className="w-3.5 h-3.5" />
+              <LayoutGrid className="w-4 h-4" />
             </button>
             <button
               className={`view-btn ${!vistaKanban ? 'active' : ''}`}
               onClick={() => setVistaKanban(false)}
             >
-              <List className="w-3.5 h-3.5" />
+              <List className="w-4 h-4" />
             </button>
           </div>
           <button className="btn-primary btn-sm" onClick={() => setShowCreateModal(true)}>
-            <Plus className="w-3.5 h-3.5" />
+            <Plus className="w-4 h-4" />
             Nueva Solicitud
           </button>
         </div>

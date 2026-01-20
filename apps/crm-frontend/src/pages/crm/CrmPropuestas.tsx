@@ -724,7 +724,7 @@ const styles = `
     height: 32px;
     border: none;
     background: #f1f5f9;
-    border-radius: 6px;
+    border-radius: 8px;
     color: #64748b;
     cursor: pointer;
     transition: all 0.15s;
