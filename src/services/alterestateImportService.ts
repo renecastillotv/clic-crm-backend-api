@@ -324,6 +324,55 @@ export async function fetchPropertyByCid(apiKey: string, cid: number): Promise<A
 }
 
 /**
+ * Merge inteligente: solo usa el valor del detalle si no es null/undefined
+ * Esto evita sobreescribir valores válidos del listado con nulls del detalle
+ *
+ * IMPORTANTE: Para proyectos en Alterestate, el LISTADO tiene los datos correctos
+ * (precio, habitaciones, etc.) mientras que el DETALLE tiene todo en null.
+ * Además, is_project_v2 puede ser incorrecto en el detalle.
+ */
+function smartMerge(summary: any, detail: any): any {
+  const result = { ...summary };
+
+  // Campos críticos donde SIEMPRE preferimos el valor del listado si existe
+  // Estos campos pueden venir incorrectos o null en el detalle de proyectos
+  const summaryPriorityFields = [
+    'sale_price', 'rent_price', 'furnished_price', 'rental_price',
+    'price', 'price_from', 'min_price', 'max_price',
+    'room', 'bathroom', 'half_bathrooms', 'parkinglot',
+    'property_area', 'terrain_area',
+    'room_min', 'room_max', 'bathroom_min', 'bathroom_max',
+    'parkinglot_min', 'parkinglot_max',
+    'property_area_min', 'property_area_max',
+    'is_project_v2'  // El listado tiene el flag correcto
+  ];
+
+  for (const key of Object.keys(detail)) {
+    const detailValue = detail[key];
+    const summaryValue = summary?.[key];
+
+    // Para campos de prioridad, mantener el valor del summary si existe y no es null
+    if (summaryPriorityFields.includes(key)) {
+      if (summaryValue !== null && summaryValue !== undefined) {
+        // Mantener el valor del summary
+        continue;
+      }
+    }
+
+    // Para otros campos, solo usar el valor del detalle si no es null/undefined
+    if (detailValue !== null && detailValue !== undefined) {
+      if (Array.isArray(detailValue) && detailValue.length === 0 && result[key]?.length > 0) {
+        // Mantener array del summary si el del detail está vacío
+        continue;
+      }
+      result[key] = detailValue;
+    }
+  }
+
+  return result;
+}
+
+/**
  * Obtiene el detalle completo de una propiedad
  */
 export async function fetchPropertyDetail(
@@ -366,15 +415,16 @@ export async function fetchPropertyDetail(
     }
   });
 
-  // Combinar datos de summary y detail, priorizando detail para campos de imágenes
+  // IMPORTANTE: Usar smartMerge para no sobreescribir valores válidos del listado con nulls
+  // El detalle de Alterestate para proyectos trae muchos campos en null que sí vienen en el listado
+  const merged = smartMerge(summaryData || {}, detail);
+
+  // Asegurar que photos se tome correctamente (priorizar detalle si existe)
   const detailAny = detail as any;
-  return {
-    ...summaryData,
-    ...detail,
-    // Asegurar que photos se tome del detalle si existe
-    photos: detailAny.photos || detailAny.images || detailAny.gallery || summaryData?.photos,
-    gallery_image: detailAny.gallery_image || summaryData?.gallery_image,
-  };
+  merged.photos = detailAny.photos || detailAny.images || detailAny.gallery || summaryData?.photos;
+  merged.gallery_image = detailAny.gallery_image || summaryData?.gallery_image;
+
+  return merged as AlterestateProperty;
 }
 
 // ============================================================================
