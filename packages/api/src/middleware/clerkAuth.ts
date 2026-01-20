@@ -53,7 +53,12 @@ export async function requireAuth(
     // Verificar token con Clerk
     const payload = await verifyToken(token, {
       secretKey: process.env.CLERK_SECRET_KEY!,
-      authorizedParties: ['http://localhost:3000', 'http://localhost:3002', 'http://localhost:4321'],
+      authorizedParties: [
+        'http://localhost:3000',
+        'http://localhost:3002',
+        'http://localhost:4321',
+        'https://clic-crm-frontend.vercel.app',
+      ],
     });
     console.log('🔐 Token válido para usuario:', payload.sub);
 
@@ -91,7 +96,12 @@ export async function optionalAuth(
 
       const payload = await verifyToken(token, {
         secretKey: process.env.CLERK_SECRET_KEY!,
-        authorizedParties: ['http://localhost:3000', 'http://localhost:3002', 'http://localhost:4321'],
+        authorizedParties: [
+          'http://localhost:3000',
+          'http://localhost:3002',
+          'http://localhost:4321',
+          'https://clic-crm-frontend.vercel.app',
+        ],
       });
 
       req.auth = {
