@@ -2079,6 +2079,8 @@ export interface Propiedad {
   tipo: TipoPropiedad;
   operacion: OperacionPropiedad;
   precio?: number;
+  precio_venta?: number;
+  precio_alquiler?: number;
   precio_anterior?: number;
   moneda: string;
   pais?: string;

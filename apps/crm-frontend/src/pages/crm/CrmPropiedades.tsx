@@ -569,8 +569,22 @@ export default function CrmPropiedades() {
                   </div>
 
                   <div className="card-price">
-                    {formatMoney(propiedad.precio, propiedad.moneda)}
-                    {propiedad.operacion === 'renta' && <span className="price-suffix">/mes</span>}
+                    {/* Si tiene ambos precios, mostrar los dos */}
+                    {propiedad.precio_venta && propiedad.precio_alquiler ? (
+                      <>
+                        <div>{formatMoney(propiedad.precio_venta, propiedad.moneda)}</div>
+                        <div className="price-secondary">
+                          {formatMoney(propiedad.precio_alquiler, propiedad.moneda)}<span className="price-suffix">/mes</span>
+                        </div>
+                      </>
+                    ) : (
+                      <>
+                        {formatMoney(propiedad.precio_venta || propiedad.precio_alquiler || propiedad.precio, propiedad.moneda)}
+                        {(propiedad.operacion === 'renta' || (!propiedad.precio_venta && propiedad.precio_alquiler)) && (
+                          <span className="price-suffix">/mes</span>
+                        )}
+                      </>
+                    )}
                   </div>
 
                   <div className="card-features">
@@ -678,8 +692,21 @@ export default function CrmPropiedades() {
                     </td>
                     <td><span className="tipo-cell">{renderCategoryIcon(tipo.iconName, 14)} {tipo.label}</span></td>
                     <td className="price-cell">
-                      {formatMoney(propiedad.precio, propiedad.moneda)}
-                      {propiedad.operacion === 'renta' && <span className="price-suffix-sm">/mes</span>}
+                      {propiedad.precio_venta && propiedad.precio_alquiler ? (
+                        <>
+                          <div>{formatMoney(propiedad.precio_venta, propiedad.moneda)}</div>
+                          <div className="price-secondary-sm">
+                            {formatMoney(propiedad.precio_alquiler, propiedad.moneda)}<span className="price-suffix-sm">/mes</span>
+                          </div>
+                        </>
+                      ) : (
+                        <>
+                          {formatMoney(propiedad.precio_venta || propiedad.precio_alquiler || propiedad.precio, propiedad.moneda)}
+                          {(propiedad.operacion === 'renta' || (!propiedad.precio_venta && propiedad.precio_alquiler)) && (
+                            <span className="price-suffix-sm">/mes</span>
+                          )}
+                        </>
+                      )}
                     </td>
                     <td className="location-cell">{[propiedad.sector, propiedad.ciudad].filter(Boolean).join(', ') || '-'}</td>
                     <td>
@@ -1367,6 +1394,17 @@ const styles = `
     font-weight: 400;
     color: #64748b;
     margin-left: 2px;
+  }
+
+  .price-secondary {
+    font-size: 0.9rem;
+    color: #64748b;
+    margin-top: 2px;
+  }
+
+  .price-secondary-sm {
+    font-size: 0.75rem;
+    color: #64748b;
   }
 
   .card-location {
