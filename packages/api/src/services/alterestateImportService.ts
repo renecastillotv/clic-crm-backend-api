@@ -620,18 +620,18 @@ export function transformProperty(
   }
 
   // Para proyectos, pueden usar price_from, min_price o price en lugar de sale_price
+  // También pueden tener rangos en project_values (del endpoint de detalle)
+  const pv = (property as any).project_values || {};
+
   let precioVenta = property.sale_price || null;
-  let precioMin = property.min_price || property.price_from || null;
-  let precioMax = property.max_price || null;
+  let precioMin = pv.min_sale || property.min_price || property.price_from || null;
+  let precioMax = pv.max_sale || property.max_price || null;
 
   if (property.is_project_v2) {
-    // Debug: mostrar TODOS los campos numéricos del proyecto
-    console.log(`  💰 Proyecto "${property.name}" - campos numéricos:`);
-    Object.entries(property).forEach(([key, value]) => {
-      if (typeof value === 'number' && value !== 0) {
-        console.log(`    ${key}: ${value}`);
-      }
-    });
+    // Debug: mostrar project_values si existe
+    if (Object.keys(pv).length > 0) {
+      console.log(`  💰 Proyecto "${property.name}" - project_values:`, pv);
+    }
 
     // Los proyectos suelen tener "precio desde" en lugar de sale_price
     if (!precioVenta) {
@@ -645,14 +645,15 @@ export function transformProperty(
   }
 
   // Mapear rangos de características para proyectos
-  const habMin = property.room_min || property.rooms_min || null;
-  const habMax = property.room_max || property.rooms_max || null;
-  const banosMin = property.bathroom_min || property.bathrooms_min || null;
-  const banosMax = property.bathroom_max || property.bathrooms_max || null;
-  const parqueosMin = property.parkinglot_min || property.parking_min || null;
-  const parqueosMax = property.parkinglot_max || property.parking_max || null;
-  const m2Min = property.property_area_min || property.area_min || null;
-  const m2Max = property.property_area_max || property.area_max || null;
+  // Prioridad: project_values (detalle) > campos top-level > null
+  const habMin = pv.min_room || property.room_min || property.rooms_min || null;
+  const habMax = pv.max_room || property.room_max || property.rooms_max || null;
+  const banosMin = pv.min_bathroom || property.bathroom_min || property.bathrooms_min || null;
+  const banosMax = pv.max_bathroom || property.bathroom_max || property.bathrooms_max || null;
+  const parqueosMin = pv.min_parkinglot || property.parkinglot_min || property.parking_min || null;
+  const parqueosMax = pv.max_parkinglot || property.parkinglot_max || property.parking_max || null;
+  const m2Min = pv.min_property_area || property.property_area_min || property.area_min || null;
+  const m2Max = pv.max_property_area || property.property_area_max || property.area_max || null;
 
   // Extraer nombre del agente del primer agente en la lista
   let agenteName = null;
@@ -728,7 +729,7 @@ export function transformProperty(
     precio_alquiler: precioAlquiler,
     precio_min: precioMin,
     precio_max: precioMax,
-    moneda: property.currency_sale || property.currency_rent || property.currency_furnished || 'USD',
+    moneda: pv.currency_min_sale || property.currency_sale || property.currency_rent || property.currency_furnished || 'USD',
     maintenance: property.maintenance_fee || null,
 
     // Características físicas
@@ -1019,8 +1020,98 @@ export async function importProperties(
 }
 
 /**
- * Sincroniza propiedades (actualiza existentes, crea nuevas)
+ * Procesa un lote de propiedades en paralelo con límite de concurrencia
  */
+async function processPropertyBatch(
+  properties: AlterestateProperty[],
+  apiKey: string,
+  tenantId: string,
+  result: SyncResult
+): Promise<void> {
+  const CONCURRENCY = 5; // Procesar 5 propiedades en paralelo
+
+  for (let i = 0; i < properties.length; i += CONCURRENCY) {
+    const batch = properties.slice(i, i + CONCURRENCY);
+    console.log(`\n📦 Processing batch ${Math.floor(i / CONCURRENCY) + 1} (${batch.length} properties)...`);
+
+    await Promise.all(batch.map(async (property) => {
+      try {
+        const externalId = property.cid?.toString();
+        const existingId = await propertyExists(tenantId, externalId);
+
+        // Obtener detalle completo para tener todas las fotos y project_values
+        let fullProperty = property;
+        if (property.slug) {
+          try {
+            fullProperty = await fetchPropertyDetail(apiKey, property.slug, property);
+          } catch (e) {
+            console.log(`  ⚠️ ${property.name}: using summary (detail fetch failed)`);
+          }
+        }
+
+        const propertyData = transformProperty(fullProperty, tenantId);
+
+        // Buscar agente
+        if (fullProperty.agents && fullProperty.agents.length > 0) {
+          const agentId = await findOrCreateAgent(tenantId, fullProperty.agents[0]);
+          if (agentId) {
+            propertyData.agente_id = agentId;
+          }
+        }
+
+        if (!existingId) {
+          // Crear nueva
+          const columns = Object.keys(propertyData);
+          const values = Object.values(propertyData);
+          const placeholders = columns.map((_, idx) => `$${idx + 1}`);
+
+          const insertSql = `
+            INSERT INTO propiedades (${columns.join(', ')})
+            VALUES (${placeholders.join(', ')})
+            RETURNING id
+          `;
+
+          await query(insertSql, values);
+          result.created++;
+          result.changes.push({ cid: property.cid, action: 'created' });
+          console.log(`  ✨ Created: ${property.name}`);
+
+        } else {
+          // Actualizar existente
+          const updateColumns = Object.keys(propertyData)
+            .filter(col => col !== 'tenant_id')
+            .map((col, idx) => `${col} = $${idx + 1}`);
+
+          const updateValues = Object.entries(propertyData)
+            .filter(([col]) => col !== 'tenant_id')
+            .map(([, val]) => val);
+
+          updateValues.push(existingId);
+
+          const updateSql = `
+            UPDATE propiedades
+            SET ${updateColumns.join(', ')}, updated_at = NOW()
+            WHERE id = $${updateValues.length}
+          `;
+
+          await query(updateSql, updateValues);
+          result.updated++;
+          result.changes.push({ cid: property.cid, action: 'updated' });
+          console.log(`  🔄 Updated: ${property.name}`);
+        }
+
+      } catch (error: any) {
+        result.failed++;
+        result.errors.push({
+          cid: property.cid,
+          error: error.message,
+        });
+        console.log(`  ❌ Failed: ${property.name} - ${error.message}`);
+      }
+    }));
+  }
+}
+
 export async function syncProperties(
   tenantId: string,
   apiKey: string,
@@ -1028,7 +1119,7 @@ export async function syncProperties(
     limit?: number;
   } = {}
 ): Promise<SyncResult> {
-  const { limit = 10 } = options;
+  const { limit = 100 } = options; // Aumentado el límite por defecto
 
   const result: SyncResult = {
     created: 0,
@@ -1042,93 +1133,9 @@ export async function syncProperties(
   const allProperties = await fetchAllProperties(apiKey);
   const properties = allProperties.slice(0, limit);
 
-  console.log(`🔄 Starting sync of ${properties.length} properties...`);
+  console.log(`🔄 Starting parallel sync of ${properties.length} properties (concurrency: 5)...`);
 
-  for (const property of properties) {
-    console.log(`\n🔄 Syncing: ${property.name} (CID: ${property.cid})`);
-
-    try {
-      const externalId = property.cid?.toString();
-      const existingId = await propertyExists(tenantId, externalId);
-
-      // SIEMPRE obtener detalle completo para tener todas las fotos
-      let fullProperty = property;
-      if (property.slug) {
-        try {
-          console.log(`📸 Fetching full detail for photos: ${property.slug}`);
-          fullProperty = await fetchPropertyDetail(apiKey, property.slug, property);
-
-          // Debug: mostrar cuántas fotos se encontraron
-          const photoCount = fullProperty.photos?.length || 0;
-          const galleryCount = Array.isArray(fullProperty.gallery_image)
-            ? fullProperty.gallery_image.length
-            : (fullProperty.gallery_image ? 1 : 0);
-          console.log(`  📷 Photos found: ${photoCount} from photos[], ${galleryCount} from gallery_image`);
-        } catch (e) {
-          console.log(`⚠️ Could not fetch detail, using summary`);
-        }
-      }
-
-      const propertyData = transformProperty(fullProperty, tenantId);
-
-      // Buscar agente
-      if (fullProperty.agents && fullProperty.agents.length > 0) {
-        const agentId = await findOrCreateAgent(tenantId, fullProperty.agents[0]);
-        if (agentId) {
-          propertyData.agente_id = agentId;
-        }
-      }
-
-      if (!existingId) {
-        // Crear nueva
-        const columns = Object.keys(propertyData);
-        const values = Object.values(propertyData);
-        const placeholders = columns.map((_, i) => `$${i + 1}`);
-
-        const insertSql = `
-          INSERT INTO propiedades (${columns.join(', ')})
-          VALUES (${placeholders.join(', ')})
-          RETURNING id
-        `;
-
-        await query(insertSql, values);
-        result.created++;
-        result.changes.push({ cid: property.cid, action: 'created' });
-        console.log(`✨ Created: ${property.name}`);
-
-      } else {
-        // Actualizar existente
-        const updateColumns = Object.keys(propertyData)
-          .filter(col => col !== 'tenant_id') // No actualizar tenant_id
-          .map((col, i) => `${col} = $${i + 1}`);
-
-        const updateValues = Object.entries(propertyData)
-          .filter(([col]) => col !== 'tenant_id')
-          .map(([, val]) => val);
-
-        updateValues.push(existingId); // Para el WHERE
-
-        const updateSql = `
-          UPDATE propiedades
-          SET ${updateColumns.join(', ')}, updated_at = NOW()
-          WHERE id = $${updateValues.length}
-        `;
-
-        await query(updateSql, updateValues);
-        result.updated++;
-        result.changes.push({ cid: property.cid, action: 'updated' });
-        console.log(`🔄 Updated: ${property.name}`);
-      }
-
-    } catch (error: any) {
-      result.failed++;
-      result.errors.push({
-        cid: property.cid,
-        error: error.message,
-      });
-      console.log(`❌ Failed: ${property.name} - ${error.message}`);
-    }
-  }
+  await processPropertyBatch(properties, apiKey, tenantId, result);
 
   console.log(`\n📊 Sync completed: ${result.created} created, ${result.updated} updated, ${result.failed} failed`);
 
