@@ -406,7 +406,8 @@ export default function CrmLayout() {
       try {
         const token = await getToken();
         const info = await getInfoNegocio(tenantActual.id, token);
-        setIsotipoUrl(info.isotipo_url || null);
+        // El API puede devolver isotipo o isotipo_url dependiendo de cómo se guardó
+        setIsotipoUrl((info as any).isotipo || info.isotipo_url || null);
       } catch (err) {
         console.error('Error cargando isotipo:', err);
       }
