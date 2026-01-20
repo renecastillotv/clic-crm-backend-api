@@ -441,10 +441,10 @@ export default function CrmLayout() {
     setConfigOpen(menu === 'config' ? !configOpen : false);
   };
 
-  // Limpiar pageHeader cuando cambia la ruta
-  useEffect(() => {
-    setPageHeader(null);
-  }, [location.pathname]);
+  // Nota: NO limpiar pageHeader automáticamente aquí.
+  // Cada página es responsable de configurar su propio header mediante setPageHeader().
+  // Limpiar automáticamente causa race conditions donde el header se limpia DESPUÉS
+  // de que la nueva página ya lo configuró.
 
   // Cerrar menú de usuario al hacer clic fuera
   useEffect(() => {
