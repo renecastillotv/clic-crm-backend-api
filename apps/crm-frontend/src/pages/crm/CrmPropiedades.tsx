@@ -49,6 +49,7 @@ import {
   DoorOpen,
   Hotel,
   ParkingCircle,
+  Download,
   type LucideIcon,
 } from 'lucide-react';
 
@@ -135,10 +136,20 @@ export default function CrmPropiedades() {
       title: 'Propiedades',
       subtitle: 'Gestiona tu inventario de propiedades',
       actions: (
-        <button className="btn-primary" onClick={() => navigate(`/crm/${tenantSlug}/propiedades/nuevo`)}>
-          <Plus size={16} />
-          Nueva Propiedad
-        </button>
+        <div style={{ display: 'flex', gap: '8px' }}>
+          <button
+            className="btn-secondary"
+            onClick={() => navigate(`/crm/${tenantSlug}/propiedades/importar`)}
+            style={{ display: 'flex', alignItems: 'center', gap: '6px' }}
+          >
+            <Download size={16} />
+            Importar
+          </button>
+          <button className="btn-primary" onClick={() => navigate(`/crm/${tenantSlug}/propiedades/nueva`)}>
+            <Plus size={16} />
+            Nueva Propiedad
+          </button>
+        </div>
       ),
     });
   }, [setPageHeader]);
@@ -273,7 +284,7 @@ export default function CrmPropiedades() {
     if (propiedad) {
       navigate(`/crm/${tenantSlug}/propiedades/${propiedad.id}`);
     } else {
-      navigate(`/crm/${tenantSlug}/propiedades/nuevo`);
+      navigate(`/crm/${tenantSlug}/propiedades/nueva`);
     }
   };
 
@@ -511,7 +522,9 @@ export default function CrmPropiedades() {
           {propiedades.map((propiedad) => {
             const estado = ESTADOS[propiedad.estado_propiedad] || ESTADOS.disponible;
             const tipo = getTipoPropiedad(propiedad.tipo);
-            const operacion = getOperacion(propiedad.operacion);
+            // Mostrar estado solo si no es 'disponible' y no coincide con el filtro actual
+            const mostrarEstado = propiedad.estado_propiedad !== 'disponible' &&
+                                  propiedad.estado_propiedad !== estadoFiltro;
             return (
               <div
                 key={propiedad.id}
@@ -526,54 +539,52 @@ export default function CrmPropiedades() {
                       <Home size={48} />
                     </div>
                   )}
+                  {/* Badge destacada - sutil, escala de grises */}
                   {propiedad.destacada && (
-                    <span className="badge-destacada"><Star size={14} /> Destacada</span>
+                    <span className="badge-destacada">Destacada</span>
                   )}
-                  <span
-                    className="badge-operacion"
-                    style={{ color: operacion.color, backgroundColor: operacion.bgColor }}
-                  >
-                    {operacion.label}
-                  </span>
-                </div>
-
-                <div className="card-body">
-                  <div className="card-header">
-                    <span className="tipo-badge">{renderCategoryIcon(tipo.iconName, 14)} {tipo.label}</span>
+                  {/* Badge estado - solo si no es disponible y no coincide con filtro */}
+                  {mostrarEstado && (
                     <span
-                      className="estado-badge"
+                      className="badge-estado"
                       style={{ color: estado.color, backgroundColor: estado.bgColor }}
                     >
                       {estado.label}
                     </span>
+                  )}
+                </div>
+
+                <div className="card-body">
+                  <div className="card-top-row">
+                    <span className="tipo-badge">{renderCategoryIcon(tipo.iconName, 14)} {tipo.label}</span>
+                    {(propiedad as any).codigo_publico && (
+                      <span className="codigo-ref">#{(propiedad as any).codigo_publico}</span>
+                    )}
                   </div>
 
                   <h3 className="card-title">{propiedad.titulo}</h3>
-                  {(propiedad as any).nombre_privado && (
-                    <span className="card-nombre-privado">{(propiedad as any).nombre_privado}</span>
-                  )}
-                  {propiedad.codigo && <span className="card-codigo">Ref: {propiedad.codigo}</span>}
+
+                  <div className="card-location">
+                    {[propiedad.sector, propiedad.ciudad].filter(Boolean).join(', ') || 'Sin ubicación'}
+                  </div>
 
                   <div className="card-price">
                     {formatMoney(propiedad.precio, propiedad.moneda)}
-                  </div>
-
-                  <div className="card-location">
-                    {[propiedad.sector, propiedad.zona, propiedad.ciudad].filter(Boolean).join(', ') || 'Sin ubicación'}
+                    {propiedad.operacion === 'renta' && <span className="price-suffix">/mes</span>}
                   </div>
 
                   <div className="card-features">
-                    {propiedad.habitaciones && (
+                    {propiedad.habitaciones != null && (
                       <span className="feature"><Bed size={14} /> {propiedad.habitaciones}</span>
                     )}
-                    {propiedad.banos && (
+                    {propiedad.banos != null && (
                       <span className="feature"><Bath size={14} /> {propiedad.banos}</span>
                     )}
-                    {propiedad.estacionamientos && (
+                    {propiedad.estacionamientos != null && (
                       <span className="feature"><Car size={14} /> {propiedad.estacionamientos}</span>
                     )}
-                    {propiedad.m2_construccion && (
-                      <span className="feature"><Maximize size={14} /> {propiedad.m2_construccion} m²</span>
+                    {propiedad.m2_construccion != null && (
+                      <span className="feature"><Maximize size={14} /> {propiedad.m2_construccion.toLocaleString()} m²</span>
                     )}
                   </div>
                 </div>
@@ -583,7 +594,7 @@ export default function CrmPropiedades() {
                   {(propiedad.captador_nombre || propiedad.captador_apellido) && (
                     <div
                       className="captador-avatar"
-                      title={`Captador: ${propiedad.captador_nombre || ''} ${propiedad.captador_apellido || ''}`.trim()}
+                      title={`${propiedad.captador_nombre || ''} ${propiedad.captador_apellido || ''}`.trim()}
                     >
                       {propiedad.captador_avatar ? (
                         <img src={propiedad.captador_avatar} alt="" />
@@ -623,19 +634,18 @@ export default function CrmPropiedades() {
               <tr>
                 <th>Propiedad</th>
                 <th>Tipo</th>
-                <th>Operación</th>
                 <th>Precio</th>
                 <th>Ubicación</th>
-                <th>Estado</th>
                 <th>Captador</th>
-                <th>Acciones</th>
+                <th></th>
               </tr>
             </thead>
             <tbody>
               {propiedades.map((propiedad) => {
                 const estado = ESTADOS[propiedad.estado_propiedad] || ESTADOS.disponible;
                 const tipo = getTipoPropiedad(propiedad.tipo);
-                const operacion = getOperacion(propiedad.operacion);
+                const mostrarEstado = propiedad.estado_propiedad !== 'disponible' &&
+                                      propiedad.estado_propiedad !== estadoFiltro;
                 return (
                   <tr key={propiedad.id} onClick={() => navigate(`/crm/${tenantSlug}/propiedades/${propiedad.id}`)}>
                     <td>
@@ -649,28 +659,29 @@ export default function CrmPropiedades() {
                         </div>
                         <div>
                           <div className="list-title">
-                            {propiedad.destacada && <span className="star-icon"><Star size={14} /></span>}
+                            {propiedad.destacada && <span className="destacada-dot" title="Destacada" />}
                             {propiedad.titulo}
+                            {mostrarEstado && (
+                              <span
+                                className="estado-inline"
+                                style={{ color: estado.color, backgroundColor: estado.bgColor }}
+                              >
+                                {estado.label}
+                              </span>
+                            )}
                           </div>
-                          {(propiedad as any).nombre_privado && (
-                            <span className="list-nombre-privado">{(propiedad as any).nombre_privado}</span>
+                          {(propiedad as any).codigo_publico && (
+                            <span className="list-codigo">#{(propiedad as any).codigo_publico}</span>
                           )}
-                          {propiedad.codigo && <span className="list-codigo">Ref: {propiedad.codigo}</span>}
                         </div>
                       </div>
                     </td>
                     <td><span className="tipo-cell">{renderCategoryIcon(tipo.iconName, 14)} {tipo.label}</span></td>
-                    <td style={{ color: operacion.color, fontWeight: 500 }}>{operacion.label}</td>
-                    <td className="price-cell">{formatMoney(propiedad.precio, propiedad.moneda)}</td>
-                    <td>{[propiedad.sector, propiedad.zona, propiedad.ciudad].filter(Boolean).join(', ') || '-'}</td>
-                    <td>
-                      <span
-                        className="estado-badge-sm"
-                        style={{ color: estado.color, backgroundColor: estado.bgColor }}
-                      >
-                        {estado.label}
-                      </span>
+                    <td className="price-cell">
+                      {formatMoney(propiedad.precio, propiedad.moneda)}
+                      {propiedad.operacion === 'renta' && <span className="price-suffix-sm">/mes</span>}
                     </td>
+                    <td className="location-cell">{[propiedad.sector, propiedad.ciudad].filter(Boolean).join(', ') || '-'}</td>
                     <td>
                       {(propiedad.captador_nombre || propiedad.captador_apellido) ? (
                         <div className="captador-cell">
@@ -684,9 +695,6 @@ export default function CrmPropiedades() {
                               </span>
                             )}
                           </div>
-                          <span className="captador-name">
-                            {propiedad.captador_nombre} {propiedad.captador_apellido?.[0]}.
-                          </span>
                         </div>
                       ) : (
                         <span className="no-captador">-</span>
@@ -713,6 +721,34 @@ export default function CrmPropiedades() {
               })}
             </tbody>
           </table>
+        </div>
+      )}
+
+      {/* Paginación */}
+      {total > 24 && (
+        <div className="pagination">
+          <button
+            className="pagination-btn"
+            onClick={() => setPage(p => Math.max(1, p - 1))}
+            disabled={page === 1}
+          >
+            Anterior
+          </button>
+          <div className="pagination-center">
+            <span className="pagination-range">
+              {((page - 1) * 24) + 1}-{Math.min(page * 24, total)} de {total}
+            </span>
+            <span className="pagination-pages">
+              Página {page} de {Math.ceil(total / 24)}
+            </span>
+          </div>
+          <button
+            className="pagination-btn"
+            onClick={() => setPage(p => p + 1)}
+            disabled={page >= Math.ceil(total / 24)}
+          >
+            Siguiente
+          </button>
         </div>
       )}
 
@@ -1144,8 +1180,8 @@ const styles = `
   /* Propiedades Grid */
   .propiedades-grid {
     display: grid;
-    grid-template-columns: repeat(auto-fill, minmax(320px, 1fr));
-    gap: 20px;
+    grid-template-columns: repeat(auto-fill, minmax(260px, 1fr));
+    gap: 16px;
   }
 
   .propiedad-card {
@@ -1164,7 +1200,7 @@ const styles = `
 
   .card-image {
     position: relative;
-    height: 180px;
+    height: 150px;
     background: #f1f5f9;
   }
 
@@ -1192,30 +1228,41 @@ const styles = `
     position: absolute;
     top: 12px;
     left: 12px;
-    background: #fbbf24;
-    color: #78350f;
+    background: rgba(255, 255, 255, 0.95);
+    color: #374151;
     padding: 4px 10px;
-    border-radius: 6px;
-    font-size: 0.75rem;
-    font-weight: 600;
-    display: flex;
-    align-items: center;
-    gap: 4px;
+    border-radius: 4px;
+    font-size: 0.7rem;
+    font-weight: 500;
+    letter-spacing: 0.02em;
+    box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
   }
 
-  .badge-operacion {
+  .badge-estado {
     position: absolute;
     top: 12px;
     right: 12px;
-    padding: 6px 14px;
-    border-radius: 20px;
-    font-size: 0.75rem;
-    font-weight: 600;
-    backdrop-filter: blur(8px);
+    padding: 4px 10px;
+    border-radius: 4px;
+    font-size: 0.7rem;
+    font-weight: 500;
   }
 
   .card-body {
-    padding: 16px;
+    padding: 12px;
+  }
+
+  .card-top-row {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 8px;
+  }
+
+  .codigo-ref {
+    font-size: 0.7rem;
+    color: #94a3b8;
+    font-weight: 500;
   }
 
   .card-header {
@@ -1271,6 +1318,22 @@ const styles = `
     overflow: hidden;
   }
 
+  .card-codigos {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    flex-wrap: wrap;
+  }
+
+  .card-codigo-publico {
+    font-size: 0.8rem;
+    font-weight: 600;
+    color: #3b82f6;
+    background: #eff6ff;
+    padding: 2px 8px;
+    border-radius: 4px;
+  }
+
   .card-codigo {
     font-size: 0.75rem;
     color: #94a3b8;
@@ -1286,10 +1349,24 @@ const styles = `
   }
 
   .card-price {
-    font-size: 1.25rem;
+    font-size: 1.1rem;
     font-weight: 700;
     color: #16a34a;
-    margin: 10px 0;
+    margin: 8px 0;
+  }
+
+  .price-suffix {
+    font-size: 0.8rem;
+    font-weight: 500;
+    color: #64748b;
+    margin-left: 2px;
+  }
+
+  .price-suffix-sm {
+    font-size: 0.7rem;
+    font-weight: 400;
+    color: #64748b;
+    margin-left: 2px;
   }
 
   .card-location {
@@ -1317,7 +1394,7 @@ const styles = `
     justify-content: space-between;
     align-items: center;
     gap: 8px;
-    padding: 12px 16px;
+    padding: 10px 12px;
     border-top: 1px solid #f1f5f9;
   }
 
@@ -1455,12 +1532,44 @@ const styles = `
     gap: 6px;
   }
 
+  .destacada-dot {
+    width: 6px;
+    height: 6px;
+    border-radius: 50%;
+    background: #94a3b8;
+    flex-shrink: 0;
+  }
+
+  .estado-inline {
+    font-size: 0.65rem;
+    padding: 2px 6px;
+    border-radius: 3px;
+    font-weight: 500;
+    margin-left: 4px;
+  }
+
   .star-icon {
     color: #fbbf24;
   }
 
+  .list-codigos {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    margin-top: 2px;
+  }
+
+  .list-codigo-publico {
+    font-size: 0.75rem;
+    font-weight: 600;
+    color: #3b82f6;
+    background: #eff6ff;
+    padding: 1px 6px;
+    border-radius: 3px;
+  }
+
   .list-codigo {
-    font-size: 0.8rem;
+    font-size: 0.75rem;
     color: #94a3b8;
   }
 
@@ -1527,6 +1636,60 @@ const styles = `
   .list-actions {
     display: flex;
     gap: 6px;
+  }
+
+  /* Paginación */
+  .pagination {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 12px;
+    margin-top: 24px;
+    padding: 16px 24px;
+    background: white;
+    border: 1px solid #e2e8f0;
+    border-radius: 10px;
+  }
+
+  .pagination-btn {
+    padding: 10px 18px;
+    background: #2563eb;
+    border: none;
+    border-radius: 6px;
+    font-size: 0.875rem;
+    font-weight: 500;
+    color: white;
+    cursor: pointer;
+    transition: all 0.15s;
+  }
+
+  .pagination-btn:hover:not(:disabled) {
+    background: #1d4ed8;
+  }
+
+  .pagination-btn:disabled {
+    background: #e2e8f0;
+    color: #94a3b8;
+    cursor: not-allowed;
+  }
+
+  .pagination-center {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 2px;
+    min-width: 140px;
+  }
+
+  .pagination-range {
+    font-size: 0.95rem;
+    font-weight: 600;
+    color: #0f172a;
+  }
+
+  .pagination-pages {
+    font-size: 0.75rem;
+    color: #64748b;
   }
 
   /* Empty state */

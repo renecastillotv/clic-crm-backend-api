@@ -251,8 +251,8 @@ export default function TagSelector({
           background: white;
           border: 1px solid #e2e8f0;
           border-radius: 8px;
-          box-shadow: 0 10px 25px rgba(0, 0, 0, 0.1);
-          z-index: 100;
+          box-shadow: 0 10px 25px rgba(0, 0, 0, 0.15);
+          z-index: 9999;
           max-height: 280px;
           overflow: hidden;
           display: flex;

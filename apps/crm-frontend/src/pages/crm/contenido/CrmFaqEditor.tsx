@@ -125,7 +125,7 @@ export default function CrmFaqEditor() {
           idioma: faq.idioma,
           pregunta: faq.pregunta,
           respuesta: faq.respuesta,
-          categoriaId: faq.categoriaId || '',
+          categoriaId: faq.categoria_id || faq.categoriaId || '',
           contexto: faq.contexto || '',
           publicado: faq.publicado,
           destacada: faq.destacada,
@@ -164,11 +164,25 @@ export default function CrmFaqEditor() {
       setSaving(true);
       setError(null);
 
-      // Limpiar traducciones vacías
+      // Helper para verificar si un HTML de ReactQuill tiene contenido real
+      const tieneContenidoReal = (html: string | undefined): boolean => {
+        if (!html) return false;
+        // Remover tags HTML y espacios para ver si hay texto real
+        const textoLimpio = html.replace(/<[^>]*>/g, '').replace(/&nbsp;/g, ' ').trim();
+        return textoLimpio.length > 0;
+      };
+
+      // Limpiar traducciones vacías (verificar contenido real, no solo tags HTML vacíos)
       const traduccionesLimpias: Traducciones = {};
       Object.entries(traducciones).forEach(([idioma, contenido]) => {
-        if (contenido.pregunta || contenido.respuesta) {
-          traduccionesLimpias[idioma] = contenido;
+        const tienePregunta = contenido.pregunta && contenido.pregunta.trim().length > 0;
+        const tieneRespuesta = tieneContenidoReal(contenido.respuesta);
+        if (tienePregunta || tieneRespuesta) {
+          // Solo incluir campos con contenido real
+          traduccionesLimpias[idioma] = {
+            ...(tienePregunta ? { pregunta: contenido.pregunta } : {}),
+            ...(tieneRespuesta ? { respuesta: contenido.respuesta } : {}),
+          };
         }
       });
 
@@ -248,6 +262,7 @@ export default function CrmFaqEditor() {
           border: 1px solid #e2e8f0;
           border-radius: 12px;
           padding: 20px;
+          overflow: visible;
         }
 
         .editor-section h4 {

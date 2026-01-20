@@ -13,8 +13,48 @@ import { useCatalogos } from '../../contexts/CatalogosContext';
 import { usePageHeader } from '../../layouts/CrmLayout';
 import {
   Settings, Home, Image as ImageIcon, Building2, FileText, Share2,
-  Bed, Bath, ShowerHead, Car, Maximize, DollarSign, BarChart3, Calendar
+  Bed, Bath, ShowerHead, Car, Maximize, DollarSign, BarChart3, Calendar,
+  Star, Award, TrendingDown, Sparkles, Zap, Tag, Heart, Eye, Clock,
+  Flame, Gift, Shield, Crown, Target, Bookmark, Flag, Bell, AlertCircle,
+  CheckCircle, XCircle, Info, HelpCircle, type LucideIcon
 } from 'lucide-react';
+
+// Mapeo de iconos para etiquetas personalizadas
+const ICONOS_ETIQUETAS_MAP: Record<string, LucideIcon> = {
+  Star,
+  Award,
+  TrendingDown,
+  ArrowDown: TrendingDown,
+  Sparkles,
+  Zap,
+  Tag,
+  Heart,
+  Eye,
+  Clock,
+  Flame,
+  Gift,
+  Shield,
+  Crown,
+  Target,
+  Bookmark,
+  Flag,
+  Bell,
+  AlertCircle,
+  CheckCircle,
+  XCircle,
+  Info,
+  HelpCircle,
+};
+
+// Función para renderizar icono de etiqueta
+const renderEtiquetaIcon = (iconName: string | undefined, size: number = 14) => {
+  if (!iconName) return null;
+  const IconComponent = ICONOS_ETIQUETAS_MAP[iconName];
+  if (IconComponent) {
+    return <IconComponent size={size} />;
+  }
+  return null;
+};
 import ImageUploader, { type PendingImage } from '../../components/ImageUploader';
 import RichTextEditor from '../../components/RichTextEditor';
 import NumberToggle from '../../components/NumberToggle';
@@ -30,6 +70,7 @@ import UserPickerModal from '../../components/UserPickerModal';
 import DatePicker from '../../components/DatePicker';
 import ContactPicker from '../../components/ContactPicker';
 import UbicacionCompleta from '../../components/UbicacionCompleta';
+import DisponibilidadSection from '../../components/DisponibilidadSection';
 import {
   getUsuariosTenant,
   getContactos,
@@ -41,13 +82,17 @@ import {
   getTenantFeatures,
   getTenantComisionConfig,
   getTenantMonedas,
+  createRelacionContenido,
+  getRelacionesContenido,
+  deleteRelacionContenido,
   type UsuarioTenant,
   type Contacto,
   type Amenidad,
   type Operacion,
   type CategoriaPropiedad,
   type FeatureWithTenantStatus,
-  type Moneda
+  type Moneda,
+  type ContenidoRelacion
 } from '../../services/api';
 import {
   getPropiedadCrm,
@@ -232,6 +277,9 @@ export default function CrmPropiedadEditar() {
   const [showFaqsModal, setShowFaqsModal] = useState(false);
   const [showVideosModal, setShowVideosModal] = useState(false);
   const [showArticulosModal, setShowArticulosModal] = useState(false);
+  const [showTestimoniosModal, setShowTestimoniosModal] = useState(false);
+  const [relacionesContenido, setRelacionesContenido] = useState<any[]>([]);
+  const [loadingRelaciones, setLoadingRelaciones] = useState(false);
   const [showDocumentoModal, setShowDocumentoModal] = useState(false);
   const [showCaptadorModal, setShowCaptadorModal] = useState(false);
   const [showCocaptadoresModal, setShowCocaptadoresModal] = useState(false);
@@ -378,8 +426,13 @@ export default function CrmPropiedadEditar() {
     // Portales y Redes
     red_global: true,
     red_global_comision: '',
+    share_commission: null as number | null,
     red_afiliados: true,
+    red_afiliados_terminos: '',
+    red_afiliados_comision: null as number | null,
     connect: true,
+    connect_terminos: '',
+    connect_comision: null as number | null,
     portales: {
       mercadolibre: true,
       easybroker: true,
@@ -575,8 +628,13 @@ export default function CrmPropiedadEditar() {
           // Portales y Redes - default true si no está definido
           red_global: (propiedadData as any).red_global !== undefined ? (propiedadData as any).red_global : true,
           red_global_comision: (propiedadData as any).red_global_comision || '',
+          share_commission: (propiedadData as any).share_commission || null,
           red_afiliados: (propiedadData as any).red_afiliados !== undefined ? (propiedadData as any).red_afiliados : true,
+          red_afiliados_terminos: (propiedadData as any).red_afiliados_terminos || '',
+          red_afiliados_comision: (propiedadData as any).red_afiliados_comision || null,
           connect: (propiedadData as any).connect !== undefined ? (propiedadData as any).connect : true,
+          connect_terminos: (propiedadData as any).connect_terminos || '',
+          connect_comision: (propiedadData as any).connect_comision || null,
           portales: (propiedadData as any).portales || { mercadolibre: true, easybroker: true, corotos: true },
         });
 
@@ -630,6 +688,19 @@ export default function CrmPropiedadEditar() {
         console.log('📄 Documentos existentes cargados:', existingDocs.length);
         console.log('📄 Documentos en form.documentos:', existingDocs);
         console.log('📄 Documentos en pendingDocuments (como uploaded):', existingPendingDocs.length);
+
+        // Cargar relaciones de contenido
+        try {
+          const relaciones = await getRelacionesContenido(tenantActual.id, {
+            tipoOrigen: 'propiedad',
+            idOrigen: propiedadId,
+          });
+          if (!isCancelled) {
+            setRelacionesContenido(relaciones);
+          }
+        } catch (relError) {
+          console.error('Error cargando relaciones de contenido:', relError);
+        }
 
         // Marcar como cargado para evitar recargas posteriores (con la key combinada)
         loadedKeyRef.current = loadKey;
@@ -704,7 +775,8 @@ export default function CrmPropiedadEditar() {
       try {
         setLoadingAmenidades(true);
         // Pasar tenantId para obtener amenidades globales + las personalizadas del tenant
-        const amenidadesPorCategoria = await getAmenidadesPorCategoria(true, tenantActual.id);
+        // Solo mostrar amenidades activas (las inactivas requieren aprobación del admin)
+        const amenidadesPorCategoria = await getAmenidadesPorCategoria(false, tenantActual.id);
         setAmenidadesCatalogo(amenidadesPorCategoria);
       } catch (err: any) {
         console.error('Error cargando amenidades:', err);
@@ -1008,16 +1080,6 @@ export default function CrmPropiedadEditar() {
     console.log('🚀 currentForm.titulo:', currentForm.titulo);
     console.log('🚀 pendingDocuments.length:', pendingDocuments.length);
     console.log('🚀 currentForm.documentos.length:', currentForm.documentos?.length || 0);
-
-    // DEBUG CRÍTICO: Estado completo de precios
-    console.log('💰💰💰 ESTADO DEL FORM (desde formRef) - PRECIOS 💰💰💰');
-    console.log('💰 currentForm.precio_venta:', currentForm.precio_venta, '(tipo:', typeof currentForm.precio_venta, ')');
-    console.log('💰 currentForm.precio_alquiler:', currentForm.precio_alquiler, '(tipo:', typeof currentForm.precio_alquiler, ')');
-    console.log('💰 currentForm.maintenance:', currentForm.maintenance, '(tipo:', typeof currentForm.maintenance, ')');
-    console.log('💰 currentForm.moneda:', currentForm.moneda);
-    console.log('💰 currentForm.operacion:', currentForm.operacion);
-    console.log('💰 currentForm.descripcion (primeros 100 chars):', currentForm.descripcion?.substring(0, 100));
-    console.log('💰💰💰💰💰💰💰💰💰💰💰💰💰💰💰💰💰💰');
 
     if (!tenantActual?.id || !currentForm.titulo.trim()) {
       console.error('❌ Validación fallida: título o tenant faltante');
@@ -1388,8 +1450,14 @@ export default function CrmPropiedadEditar() {
 
         // Portales y Redes
         red_global: currentForm.red_global,
+        red_global_comision: currentForm.red_global_comision || null,
+        share_commission: currentForm.share_commission,
         red_afiliados: currentForm.red_afiliados,
+        red_afiliados_terminos: currentForm.red_afiliados_terminos || null,
+        red_afiliados_comision: currentForm.red_afiliados_comision,
         connect: currentForm.connect,
+        connect_terminos: currentForm.connect_terminos || null,
+        connect_comision: currentForm.connect_comision,
         portales: currentForm.portales,
       };
 
@@ -1620,8 +1688,10 @@ export default function CrmPropiedadEditar() {
         }));
       }
 
-      // Recargar el catálogo de amenidades para incluir la nueva
-      const amenidadesPorCategoria = await getAmenidadesPorCategoria(true, tenantActual.id);
+      // Recargar el catálogo de amenidades (sin incluir inactivas)
+      // La nueva amenidad ya fue agregada al formulario localmente, pero no aparecerá
+      // en el catálogo hasta que el admin la apruebe
+      const amenidadesPorCategoria = await getAmenidadesPorCategoria(false, tenantActual.id);
       setAmenidadesCatalogo(amenidadesPorCategoria);
     } catch (err: any) {
       console.error('Error al crear amenidad:', err);
@@ -2141,7 +2211,14 @@ export default function CrmPropiedadEditar() {
         {activeTab === 'basica' && (
           <div className="tab-content">
             <div className="form-section">
-              <h3 className="section-title">Información Principal</h3>
+              <h3 className="section-title">
+                Información Principal
+                {isEditing && (propiedad as any)?.codigo_publico && (
+                  <span className="codigo-publico-badge" title="Código único para compartir con clientes">
+                    #{(propiedad as any).codigo_publico}
+                  </span>
+                )}
+              </h3>
               <div className="form-grid">
                 <div className="form-group full-width">
                   <label htmlFor="titulo">Título de la Propiedad *</label>
@@ -2174,8 +2251,9 @@ export default function CrmPropiedadEditar() {
                     type="text"
                     value={form.codigo}
                     onChange={(e) => setForm(prev => ({ ...prev, codigo: e.target.value }))}
-                    placeholder="Ej: PRO-001"
+                    placeholder="Ej: RC-2025 (para uso interno)"
                   />
+                  <small className="form-hint">Referencia interna para identificar la propiedad</small>
                 </div>
 
                 <div className="form-group">
@@ -2365,42 +2443,96 @@ export default function CrmPropiedadEditar() {
                   </select>
                 </div>
 
-                {/* Comisión */}
-                <div className="form-group" style={{ position: 'relative' }}>
-                  <label htmlFor="comision">Comisión %</label>
-                  <div style={{ position: 'relative' }}>
+                {/* Comisión del Agente - Recuadro destacado */}
+                <div style={{
+                  gridColumn: 'span 3',
+                  background: 'linear-gradient(135deg, rgba(16, 185, 129, 0.08) 0%, rgba(16, 185, 129, 0.03) 100%)',
+                  border: '2px solid rgba(16, 185, 129, 0.3)',
+                  borderRadius: '12px',
+                  padding: '14px 18px',
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: '16px'
+                }}>
+                  {/* Icono y título */}
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '12px', flexShrink: 0 }}>
+                    <div style={{
+                      width: '48px',
+                      height: '48px',
+                      borderRadius: '12px',
+                      background: 'linear-gradient(135deg, #10b981 0%, #059669 100%)',
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'center',
+                      color: 'white',
+                      boxShadow: '0 4px 12px rgba(16, 185, 129, 0.3)'
+                    }}>
+                      <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+                        <line x1="12" y1="1" x2="12" y2="23"></line>
+                        <path d="M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6"></path>
+                      </svg>
+                    </div>
+                    <div>
+                      <div style={{ fontSize: '1.1rem', fontWeight: 800, color: '#047857', letterSpacing: '-0.02em' }}>COMISIÓN</div>
+                      <div style={{ fontSize: '0.8rem', color: '#059669', fontWeight: 500 }}>del Agente</div>
+                    </div>
+                  </div>
+
+                  {/* Separador vertical */}
+                  <div style={{ width: '2px', height: '48px', background: 'rgba(16, 185, 129, 0.2)', borderRadius: '1px' }}></div>
+
+                  {/* Campo Porcentaje */}
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: '4px', flexShrink: 0 }}>
+                    <label htmlFor="comision" style={{ color: '#047857', fontSize: '0.9rem', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.5px' }}>Porcentaje %</label>
                     <input
                       id="comision"
-                      type="number"
-                      step="0.5"
-                      min="0"
-                      max="100"
+                      type="text"
+                      inputMode="decimal"
                       value={form.comision}
-                      onChange={(e) => setForm(prev => ({ ...prev, comision: e.target.value }))}
-                      placeholder="3.5"
-                      style={{ paddingRight: '30px' }}
+                      onChange={(e) => {
+                        // Solo permitir números y punto decimal
+                        const value = e.target.value.replace(/[^0-9.]/g, '');
+                        // Evitar múltiples puntos
+                        const parts = value.split('.');
+                        const sanitized = parts.length > 2 ? parts[0] + '.' + parts.slice(1).join('') : value;
+                        setForm(prev => ({ ...prev, comision: sanitized }));
+                      }}
+                      placeholder="5.00"
+                      style={{
+                        width: '100px',
+                        height: '48px',
+                        textAlign: 'center',
+                        borderColor: 'rgba(16, 185, 129, 0.5)',
+                        borderWidth: '2px',
+                        background: 'white',
+                        fontSize: '1.25rem',
+                        fontWeight: 700,
+                        color: '#047857',
+                        borderRadius: '10px'
+                      }}
                     />
-                    <span style={{
-                      position: 'absolute',
-                      right: '12px',
-                      top: '50%',
-                      transform: 'translateY(-50%)',
-                      color: '#64748b',
-                      fontWeight: 500,
-                      pointerEvents: 'none'
-                    }}>%</span>
                   </div>
-                </div>
 
-                <div className="form-group">
-                  <label htmlFor="comision_nota">Nota de Comisión</label>
-                  <input
-                    id="comision_nota"
-                    type="text"
-                    value={form.comision_nota}
-                    onChange={(e) => setForm(prev => ({ ...prev, comision_nota: e.target.value }))}
-                    placeholder="Ej: Incluye gastos de cierre"
-                  />
+                  {/* Campo Nota */}
+                  <div style={{ flex: 1, display: 'flex', flexDirection: 'column', gap: '4px' }}>
+                    <label htmlFor="comision_nota" style={{ color: '#047857', fontSize: '0.9rem', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.5px' }}>Nota</label>
+                    <input
+                      id="comision_nota"
+                      type="text"
+                      value={form.comision_nota}
+                      onChange={(e) => setForm(prev => ({ ...prev, comision_nota: e.target.value }))}
+                      placeholder="Ej: + Impuestos, gastos de cierre..."
+                      style={{
+                        height: '48px',
+                        borderColor: 'rgba(16, 185, 129, 0.5)',
+                        borderWidth: '2px',
+                        background: 'white',
+                        fontSize: '1.1rem',
+                        fontWeight: 500,
+                        borderRadius: '10px'
+                      }}
+                    />
+                  </div>
                 </div>
               </div>
             </div>
@@ -2833,6 +2965,9 @@ export default function CrmPropiedadEditar() {
                       const banos = tipologias
                         .map(t => t.banos ? parseInt(t.banos) : null)
                         .filter((b): b is number => b !== null && !isNaN(b) && b > 0);
+                      const parqueos = tipologias
+                        .map(t => t.estacionamiento ? parseInt(t.estacionamiento) : null)
+                        .filter((p): p is number => p !== null && !isNaN(p) && p > 0);
 
                       const formatPrice = (num: number) =>
                         new Intl.NumberFormat('es-DO', { style: 'currency', currency: form.moneda || 'USD', maximumFractionDigits: 0 }).format(num);
@@ -2848,48 +2983,47 @@ export default function CrmPropiedadEditar() {
                       return (
                         <div style={{
                           marginTop: '16px',
-                          padding: '16px',
+                          padding: '12px 16px',
                           background: 'linear-gradient(135deg, #f0fdf4, #ecfdf5)',
                           border: '1px solid #86efac',
                           borderRadius: '10px',
-                          display: 'grid',
-                          gridTemplateColumns: 'repeat(auto-fit, minmax(150px, 1fr))',
-                          gap: '12px'
+                          display: 'flex',
+                          flexWrap: 'wrap',
+                          alignItems: 'center',
+                          gap: '8px 16px'
                         }}>
-                          <div style={{ fontSize: '0.75rem', color: '#166534', gridColumn: '1 / -1', fontWeight: 600, marginBottom: '4px', display: 'flex', alignItems: 'center', gap: '6px' }}>
-                            <BarChart3 size={14} /> Rangos calculados del proyecto:
+                          <div style={{ fontSize: '0.75rem', color: '#166534', fontWeight: 600, display: 'flex', alignItems: 'center', gap: '6px' }}>
+                            <BarChart3 size={14} /> Rangos:
                           </div>
                           {precios.length > 0 && (
-                            <div style={{ textAlign: 'center' }}>
-                              <div style={{ fontSize: '0.7rem', color: '#64748b', textTransform: 'uppercase' }}>Precio</div>
-                              <div style={{ fontSize: '0.9rem', fontWeight: 600, color: '#166534' }}>
-                                {showRange(precios, formatPrice)}
-                              </div>
-                            </div>
+                            <span style={{ fontSize: '0.85rem', display: 'flex', alignItems: 'center', gap: '4px' }}>
+                              <span style={{ color: '#64748b' }}>Precio:</span>
+                              <span style={{ fontWeight: 600, color: '#166534' }}>{showRange(precios, formatPrice)}</span>
+                            </span>
                           )}
                           {m2s.length > 0 && (
-                            <div style={{ textAlign: 'center' }}>
-                              <div style={{ fontSize: '0.7rem', color: '#64748b', textTransform: 'uppercase' }}>M²</div>
-                              <div style={{ fontSize: '0.9rem', fontWeight: 600, color: '#1e293b' }}>
-                                {showRange(m2s)} m²
-                              </div>
-                            </div>
+                            <span style={{ fontSize: '0.85rem', display: 'flex', alignItems: 'center', gap: '4px' }}>
+                              <span style={{ color: '#64748b' }}>M²:</span>
+                              <span style={{ fontWeight: 600, color: '#1e293b' }}>{showRange(m2s)}</span>
+                            </span>
                           )}
                           {habs.length > 0 && (
-                            <div style={{ textAlign: 'center' }}>
-                              <div style={{ fontSize: '0.7rem', color: '#64748b', textTransform: 'uppercase' }}>Habitaciones</div>
-                              <div style={{ fontSize: '0.9rem', fontWeight: 600, color: '#1e293b' }}>
-                                {showRange(habs)}
-                              </div>
-                            </div>
+                            <span style={{ fontSize: '0.85rem', display: 'flex', alignItems: 'center', gap: '4px' }}>
+                              <span style={{ color: '#64748b' }}>Habs:</span>
+                              <span style={{ fontWeight: 600, color: '#1e293b' }}>{showRange(habs)}</span>
+                            </span>
                           )}
                           {banos.length > 0 && (
-                            <div style={{ textAlign: 'center' }}>
-                              <div style={{ fontSize: '0.7rem', color: '#64748b', textTransform: 'uppercase' }}>Baños</div>
-                              <div style={{ fontSize: '0.9rem', fontWeight: 600, color: '#1e293b' }}>
-                                {showRange(banos)}
-                              </div>
-                            </div>
+                            <span style={{ fontSize: '0.85rem', display: 'flex', alignItems: 'center', gap: '4px' }}>
+                              <span style={{ color: '#64748b' }}>Baños:</span>
+                              <span style={{ fontWeight: 600, color: '#1e293b' }}>{showRange(banos)}</span>
+                            </span>
+                          )}
+                          {parqueos.length > 0 && (
+                            <span style={{ fontSize: '0.85rem', display: 'flex', alignItems: 'center', gap: '4px' }}>
+                              <span style={{ color: '#64748b' }}>Parqueos:</span>
+                              <span style={{ fontWeight: 600, color: '#1e293b' }}>{showRange(parqueos)}</span>
+                            </span>
                           )}
                         </div>
                       );
@@ -3201,6 +3335,28 @@ export default function CrmPropiedadEditar() {
                 </div>
               </div>
             </div>
+
+            {/* Sección de Disponibilidad */}
+            {propiedadId && propiedadId !== 'nuevo' && (
+              <div className="form-section">
+                <h3 className="section-title">Disponibilidad de Unidades</h3>
+                <p className="form-hint" style={{ marginBottom: '16px' }}>
+                  Configura cómo mostrar la disponibilidad de unidades del proyecto
+                </p>
+                <DisponibilidadSection
+                  propiedadId={propiedadId}
+                  tipologias={form.tipologias.map(t => ({
+                    id: t.id || `tip-${form.tipologias.indexOf(t)}`,
+                    nombre: t.nombre,
+                    habitaciones: t.habitaciones ? parseInt(t.habitaciones) : undefined,
+                    banos: t.banos ? parseInt(t.banos) : undefined,
+                    m2: t.m2 ? parseFloat(t.m2) : undefined,
+                    precio: t.precio ? parseFloat(t.precio.replace(/[^0-9.]/g, '')) : undefined,
+                    estacionamiento: t.estacionamiento ? parseInt(t.estacionamiento) : undefined
+                  }))}
+                />
+              </div>
+            )}
           </div>
         )}
 
@@ -3303,9 +3459,9 @@ export default function CrmPropiedadEditar() {
               <h3 className="section-title">Relacionar con Contenido</h3>
               <div className="form-group full-width">
                 <p className="form-hint" style={{ marginBottom: '20px' }}>
-                  Relaciona esta propiedad con FAQs, Videos y Artículos para mejorar la experiencia del usuario
+                  Relaciona esta propiedad con FAQs, Videos, Artículos y Testimonios para mejorar la experiencia del usuario
                 </p>
-                <div className="form-grid" style={{ gridTemplateColumns: 'repeat(3, 1fr)', gap: '16px' }}>
+                <div className="form-grid" style={{ gridTemplateColumns: 'repeat(4, 1fr)', gap: '16px' }}>
                   <button
                     type="button"
                     className="btn-secondary"
@@ -3374,11 +3530,11 @@ export default function CrmPropiedadEditar() {
                     type="button"
                     className="btn-secondary"
                     onClick={() => setShowArticulosModal(true)}
-                    style={{ 
-                      padding: '20px', 
-                      display: 'flex', 
-                      flexDirection: 'column', 
-                      alignItems: 'center', 
+                    style={{
+                      padding: '20px',
+                      display: 'flex',
+                      flexDirection: 'column',
+                      alignItems: 'center',
                       gap: '12px',
                       border: '2px solid #e2e8f0',
                       borderRadius: '12px',
@@ -3401,7 +3557,144 @@ export default function CrmPropiedadEditar() {
                       Buscar o crear artículos relacionados
                     </span>
                   </button>
+
+                  <button
+                    type="button"
+                    className="btn-secondary"
+                    onClick={() => setShowTestimoniosModal(true)}
+                    style={{
+                      padding: '20px',
+                      display: 'flex',
+                      flexDirection: 'column',
+                      alignItems: 'center',
+                      gap: '12px',
+                      border: '2px solid #e2e8f0',
+                      borderRadius: '12px',
+                      background: '#f8fafc',
+                      transition: 'all 0.2s',
+                      cursor: 'pointer'
+                    }}
+                    onMouseEnter={(e) => {
+                      e.currentTarget.style.borderColor = '#6366f1';
+                      e.currentTarget.style.background = '#f0f4ff';
+                    }}
+                    onMouseLeave={(e) => {
+                      e.currentTarget.style.borderColor = '#e2e8f0';
+                      e.currentTarget.style.background = '#f8fafc';
+                    }}
+                  >
+                    <span style={{ fontSize: '2rem' }}>💬</span>
+                    <span style={{ fontWeight: 600, fontSize: '1rem', color: '#1e293b' }}>Relacionar con Testimonios</span>
+                    <span style={{ fontSize: '0.875rem', color: '#64748b', textAlign: 'center' }}>
+                      Buscar o crear testimonios relacionados
+                    </span>
+                  </button>
                 </div>
+
+                {/* Mostrar relaciones existentes */}
+                {relacionesContenido.length > 0 && (
+                  <div style={{ marginTop: '24px' }}>
+                    <h4 style={{ fontSize: '0.95rem', fontWeight: 600, color: '#374151', marginBottom: '12px' }}>
+                      Contenido Relacionado ({relacionesContenido.length})
+                    </h4>
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+                      {relacionesContenido.map((relacion) => {
+                        const tipoConfig: Record<string, { icon: string; label: string; color: string }> = {
+                          faq: { icon: '❓', label: 'FAQ', color: '#f59e0b' },
+                          video: { icon: '🎥', label: 'Video', color: '#8b5cf6' },
+                          articulo: { icon: '📄', label: 'Artículo', color: '#ec4899' },
+                          testimonio: { icon: '💬', label: 'Testimonio', color: '#10b981' },
+                        };
+                        const config = tipoConfig[relacion.tipoDestino] || { icon: '📎', label: relacion.tipoDestino, color: '#6b7280' };
+
+                        return (
+                          <div
+                            key={relacion.id}
+                            style={{
+                              display: 'flex',
+                              alignItems: 'center',
+                              gap: '12px',
+                              padding: '12px 16px',
+                              background: '#f8fafc',
+                              borderRadius: '8px',
+                              border: '1px solid #e2e8f0',
+                            }}
+                          >
+                            <div
+                              style={{
+                                width: '36px',
+                                height: '36px',
+                                borderRadius: '8px',
+                                background: config.color,
+                                display: 'flex',
+                                alignItems: 'center',
+                                justifyContent: 'center',
+                                fontSize: '1.2rem',
+                                flexShrink: 0,
+                              }}
+                            >
+                              {config.icon}
+                            </div>
+                            <div style={{ flex: 1, minWidth: 0 }}>
+                              <span
+                                style={{
+                                  display: 'inline-block',
+                                  fontSize: '0.7rem',
+                                  fontWeight: 600,
+                                  color: config.color,
+                                  background: `${config.color}20`,
+                                  padding: '2px 6px',
+                                  borderRadius: '4px',
+                                  marginBottom: '4px',
+                                }}
+                              >
+                                {config.label}
+                              </span>
+                              <p style={{ margin: 0, fontSize: '0.9rem', fontWeight: 500, color: '#1e293b', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+                                {relacion.nombreDestino || 'Sin título'}
+                              </p>
+                            </div>
+                            <button
+                              type="button"
+                              onClick={async () => {
+                                if (!tenantActual?.id || !propiedadId) return;
+                                try {
+                                  await deleteRelacionContenido(tenantActual.id, relacion.id);
+                                  // Recargar relaciones
+                                  const nuevasRelaciones = await getRelacionesContenido(tenantActual.id, {
+                                    tipoOrigen: 'propiedad',
+                                    idOrigen: propiedadId,
+                                  });
+                                  setRelacionesContenido(nuevasRelaciones);
+                                } catch (error) {
+                                  console.error('Error al eliminar relación:', error);
+                                }
+                              }}
+                              style={{
+                                background: 'none',
+                                border: 'none',
+                                color: '#dc2626',
+                                cursor: 'pointer',
+                                padding: '6px',
+                                borderRadius: '6px',
+                                display: 'flex',
+                                alignItems: 'center',
+                                justifyContent: 'center',
+                                transition: 'all 0.2s',
+                              }}
+                              title="Eliminar relación"
+                            >
+                              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                                <polyline points="3 6 5 6 21 6"></polyline>
+                                <path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path>
+                              </svg>
+                            </button>
+                          </div>
+                        );
+                      })}
+                    </div>
+                  </div>
+                )}
               </div>
             </div>
           </div>
@@ -3532,7 +3825,7 @@ export default function CrmPropiedadEditar() {
                                 }));
                               }}
                             >
-                              {etiqueta.icono && <span className="etiqueta-icono">{etiqueta.icono}</span>}
+                              {etiqueta.icono && <span className="etiqueta-icono">{renderEtiquetaIcon(etiqueta.icono)}</span>}
                               {etiqueta.nombre}
                             </button>
                           );
@@ -4285,58 +4578,69 @@ export default function CrmPropiedadEditar() {
             <div className="form-section">
               <h3 className="section-title">Redes de Distribución</h3>
 
-              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(320px, 1fr))', gap: '20px', marginTop: '20px' }}>
+              {/* Grid responsive para las redes */}
+              <div style={{
+                display: 'grid',
+                gridTemplateColumns: hasConnectFeature ? 'repeat(3, 1fr)' : 'repeat(2, 1fr)',
+                gap: '16px',
+                marginTop: '20px'
+              }}>
 
                 {/* Card RED GLOBAL - Verde */}
                 <div style={{
                   background: form.red_global ? 'linear-gradient(135deg, #ecfdf5 0%, #d1fae5 100%)' : '#f8fafc',
                   border: form.red_global ? '2px solid #10b981' : '2px solid #e2e8f0',
-                  borderRadius: '16px',
-                  padding: '20px',
-                  transition: 'all 0.3s ease'
+                  borderRadius: '12px',
+                  padding: '16px',
+                  transition: 'all 0.3s ease',
+                  display: 'flex',
+                  flexDirection: 'column'
                 }}>
-                  <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '12px' }}>
-                    <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+                  {/* Header con toggle */}
+                  <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
                       <div style={{
-                        width: '40px',
-                        height: '40px',
-                        borderRadius: '10px',
+                        width: '36px',
+                        height: '36px',
+                        borderRadius: '8px',
                         background: form.red_global ? '#10b981' : '#94a3b8',
                         display: 'flex',
                         alignItems: 'center',
                         justifyContent: 'center',
-                        transition: 'all 0.3s ease'
+                        transition: 'all 0.3s ease',
+                        flexShrink: 0
                       }}>
-                        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="white" strokeWidth="2">
+                        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="white" strokeWidth="2">
                           <circle cx="12" cy="12" r="10"/>
                           <path d="M2 12h20M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1 4-10z"/>
                         </svg>
                       </div>
                       <div>
-                        <h4 style={{ margin: 0, fontSize: '1rem', fontWeight: 700, color: form.red_global ? '#065f46' : '#374151' }}>Red Global</h4>
-                        <span style={{ fontSize: '0.8rem', color: form.red_global ? '#047857' : '#6b7280' }}>Todas las inmobiliarias CLIC</span>
+                        <h4 style={{ margin: 0, fontSize: '0.9rem', fontWeight: 700, color: form.red_global ? '#065f46' : '#374151' }}>Red Global</h4>
+                        <span style={{ fontSize: '0.75rem', color: form.red_global ? '#047857' : '#6b7280' }}>Inmobiliarias CLIC</span>
                       </div>
                     </div>
                     <button
                       type="button"
                       onClick={() => setForm(prev => ({ ...prev, red_global: !prev.red_global }))}
                       style={{
-                        width: '52px',
-                        height: '28px',
-                        borderRadius: '14px',
+                        width: '44px',
+                        height: '24px',
+                        borderRadius: '12px',
                         border: 'none',
                         background: form.red_global ? '#10b981' : '#d1d5db',
                         cursor: 'pointer',
                         position: 'relative',
-                        transition: 'all 0.3s ease'
+                        transition: 'all 0.3s ease',
+                        flexShrink: 0
                       }}
                     >
                       <span style={{
                         position: 'absolute',
-                        top: '3px',
-                        left: form.red_global ? '27px' : '3px',
-                        width: '22px',
-                        height: '22px',
+                        top: '2px',
+                        left: form.red_global ? '22px' : '2px',
+                        width: '20px',
+                        height: '20px',
                         borderRadius: '50%',
                         background: 'white',
                         boxShadow: '0 2px 4px rgba(0,0,0,0.2)',
@@ -4345,82 +4649,116 @@ export default function CrmPropiedadEditar() {
                     </button>
                   </div>
 
+                  {/* Campos expandibles */}
                   {form.red_global && (
-                    <div style={{ marginTop: '16px', paddingTop: '16px', borderTop: '1px solid #a7f3d0' }}>
-                      <label style={{ display: 'block', fontSize: '0.8rem', fontWeight: 600, color: '#065f46', marginBottom: '8px' }}>
-                        Términos de comisión
-                      </label>
-                      <textarea
-                        value={form.red_global_comision}
-                        onChange={(e) => setForm(prev => ({ ...prev, red_global_comision: e.target.value }))}
-                        placeholder="Ej: Comisión 50/50 con asesor externo..."
-                        style={{
-                          width: '100%',
-                          minHeight: '60px',
-                          padding: '10px 12px',
-                          border: '1px solid #a7f3d0',
-                          borderRadius: '8px',
-                          fontSize: '0.85rem',
-                          resize: 'vertical',
-                          fontFamily: 'inherit',
-                          background: 'white'
-                        }}
-                      />
+                    <div style={{ marginTop: '12px', paddingTop: '12px', borderTop: '1px solid #a7f3d0' }}>
+                      <div style={{ marginBottom: '10px' }}>
+                        <label style={{ display: 'block', fontSize: '0.75rem', fontWeight: 600, color: '#065f46', marginBottom: '4px' }}>
+                          Términos
+                        </label>
+                        <textarea
+                          value={form.red_global_comision}
+                          onChange={(e) => setForm(prev => ({ ...prev, red_global_comision: e.target.value }))}
+                          placeholder="Ej: 50/50 con asesor..."
+                          rows={2}
+                          style={{
+                            width: '100%',
+                            padding: '8px 10px',
+                            border: '1px solid #a7f3d0',
+                            borderRadius: '6px',
+                            fontSize: '0.8rem',
+                            resize: 'vertical',
+                            fontFamily: 'inherit',
+                            background: 'white'
+                          }}
+                        />
+                      </div>
+                      <div>
+                        <label style={{ display: 'block', fontSize: '0.75rem', fontWeight: 600, color: '#065f46', marginBottom: '4px' }}>
+                          % Comisión
+                        </label>
+                        <div style={{ position: 'relative' }}>
+                          <input
+                            type="number"
+                            min="0"
+                            max="100"
+                            step="0.5"
+                            value={form.share_commission ?? ''}
+                            onChange={(e) => setForm(prev => ({ ...prev, share_commission: e.target.value ? parseFloat(e.target.value) : null }))}
+                            placeholder="50"
+                            style={{
+                              width: '100%',
+                              padding: '8px 30px 8px 10px',
+                              border: '1px solid #a7f3d0',
+                              borderRadius: '6px',
+                              fontSize: '0.85rem',
+                              fontWeight: 600,
+                              background: 'white'
+                            }}
+                          />
+                          <span style={{ position: 'absolute', right: '10px', top: '50%', transform: 'translateY(-50%)', color: '#065f46', fontWeight: 600, fontSize: '0.85rem' }}>%</span>
+                        </div>
+                      </div>
                     </div>
                   )}
                 </div>
 
-                {/* Card RED AFILIADOS - Morado */}
+                {/* Card RED AFILIADOS - Morado (solo toggle, estándar 50/50) */}
                 <div style={{
                   background: form.red_afiliados ? 'linear-gradient(135deg, #f5f3ff 0%, #ede9fe 100%)' : '#f8fafc',
                   border: form.red_afiliados ? '2px solid #8b5cf6' : '2px solid #e2e8f0',
-                  borderRadius: '16px',
-                  padding: '20px',
-                  transition: 'all 0.3s ease'
+                  borderRadius: '12px',
+                  padding: '16px',
+                  transition: 'all 0.3s ease',
+                  display: 'flex',
+                  flexDirection: 'column'
                 }}>
+                  {/* Header con toggle */}
                   <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-                    <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
                       <div style={{
-                        width: '40px',
-                        height: '40px',
-                        borderRadius: '10px',
+                        width: '36px',
+                        height: '36px',
+                        borderRadius: '8px',
                         background: form.red_afiliados ? '#8b5cf6' : '#94a3b8',
                         display: 'flex',
                         alignItems: 'center',
                         justifyContent: 'center',
-                        transition: 'all 0.3s ease'
+                        transition: 'all 0.3s ease',
+                        flexShrink: 0
                       }}>
-                        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="white" strokeWidth="2">
+                        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="white" strokeWidth="2">
                           <path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/>
                           <circle cx="9" cy="7" r="4"/>
                           <path d="M23 21v-2a4 4 0 0 0-3-3.87M16 3.13a4 4 0 0 1 0 7.75"/>
                         </svg>
                       </div>
                       <div>
-                        <h4 style={{ margin: 0, fontSize: '1rem', fontWeight: 700, color: form.red_afiliados ? '#5b21b6' : '#374151' }}>Red de Afiliados</h4>
-                        <span style={{ fontSize: '0.8rem', color: form.red_afiliados ? '#7c3aed' : '#6b7280' }}>Partners de tu inmobiliaria</span>
+                        <h4 style={{ margin: 0, fontSize: '0.9rem', fontWeight: 700, color: form.red_afiliados ? '#5b21b6' : '#374151' }}>Red Afiliados</h4>
+                        <span style={{ fontSize: '0.75rem', color: form.red_afiliados ? '#7c3aed' : '#6b7280' }}>50/50 estándar</span>
                       </div>
                     </div>
                     <button
                       type="button"
                       onClick={() => setForm(prev => ({ ...prev, red_afiliados: !prev.red_afiliados }))}
                       style={{
-                        width: '52px',
-                        height: '28px',
-                        borderRadius: '14px',
+                        width: '44px',
+                        height: '24px',
+                        borderRadius: '12px',
                         border: 'none',
                         background: form.red_afiliados ? '#8b5cf6' : '#d1d5db',
                         cursor: 'pointer',
                         position: 'relative',
-                        transition: 'all 0.3s ease'
+                        transition: 'all 0.3s ease',
+                        flexShrink: 0
                       }}
                     >
                       <span style={{
                         position: 'absolute',
-                        top: '3px',
-                        left: form.red_afiliados ? '27px' : '3px',
-                        width: '22px',
-                        height: '22px',
+                        top: '2px',
+                        left: form.red_afiliados ? '22px' : '2px',
+                        width: '20px',
+                        height: '20px',
                         borderRadius: '50%',
                         background: 'white',
                         boxShadow: '0 2px 4px rgba(0,0,0,0.2)',
@@ -4428,6 +4766,26 @@ export default function CrmPropiedadEditar() {
                       }} />
                     </button>
                   </div>
+
+                  {/* Indicador visual cuando está activo */}
+                  {form.red_afiliados && (
+                    <div style={{
+                      marginTop: '12px',
+                      paddingTop: '12px',
+                      borderTop: '1px solid #c4b5fd',
+                      display: 'flex',
+                      alignItems: 'center',
+                      gap: '6px'
+                    }}>
+                      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#7c3aed" strokeWidth="2">
+                        <path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"/>
+                        <polyline points="22 4 12 14.01 9 11.01"/>
+                      </svg>
+                      <span style={{ fontSize: '0.75rem', color: '#7c3aed', fontWeight: 500 }}>
+                        Comisión automática 50/50
+                      </span>
+                    </div>
+                  )}
                 </div>
 
                 {/* Card CONNECT - Azul */}
@@ -4435,51 +4793,56 @@ export default function CrmPropiedadEditar() {
                   <div style={{
                     background: form.connect ? 'linear-gradient(135deg, #eff6ff 0%, #dbeafe 100%)' : '#f8fafc',
                     border: form.connect ? '2px solid #3b82f6' : '2px solid #e2e8f0',
-                    borderRadius: '16px',
-                    padding: '20px',
-                    transition: 'all 0.3s ease'
+                    borderRadius: '12px',
+                    padding: '16px',
+                    transition: 'all 0.3s ease',
+                    display: 'flex',
+                    flexDirection: 'column'
                   }}>
-                    <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: form.connect && tenantComisionDefaults.connect_comision_default ? '12px' : '0' }}>
-                      <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+                    {/* Header con toggle */}
+                    <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
                         <div style={{
-                          width: '40px',
-                          height: '40px',
-                          borderRadius: '10px',
+                          width: '36px',
+                          height: '36px',
+                          borderRadius: '8px',
                           background: form.connect ? '#3b82f6' : '#94a3b8',
                           display: 'flex',
                           alignItems: 'center',
                           justifyContent: 'center',
-                          transition: 'all 0.3s ease'
+                          transition: 'all 0.3s ease',
+                          flexShrink: 0
                         }}>
-                          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="white" strokeWidth="2">
+                          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="white" strokeWidth="2">
                             <path d="M15 3h4a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2h-4M10 17l5-5-5-5M13.8 12H3"/>
                           </svg>
                         </div>
                         <div>
-                          <h4 style={{ margin: 0, fontSize: '1rem', fontWeight: 700, color: form.connect ? '#1e40af' : '#374151' }}>CLIC Connect</h4>
-                          <span style={{ fontSize: '0.8rem', color: form.connect ? '#2563eb' : '#6b7280' }}>Asesores independientes</span>
+                          <h4 style={{ margin: 0, fontSize: '0.9rem', fontWeight: 700, color: form.connect ? '#1e40af' : '#374151' }}>CLIC Connect</h4>
+                          <span style={{ fontSize: '0.75rem', color: form.connect ? '#2563eb' : '#6b7280' }}>Asesores externos</span>
                         </div>
                       </div>
                       <button
                         type="button"
                         onClick={() => setForm(prev => ({ ...prev, connect: !prev.connect }))}
                         style={{
-                          width: '52px',
-                          height: '28px',
-                          borderRadius: '14px',
+                          width: '44px',
+                          height: '24px',
+                          borderRadius: '12px',
                           border: 'none',
                           background: form.connect ? '#3b82f6' : '#d1d5db',
                           cursor: 'pointer',
                           position: 'relative',
-                          transition: 'all 0.3s ease'
+                          transition: 'all 0.3s ease',
+                          flexShrink: 0
                         }}
                       >
                         <span style={{
                           position: 'absolute',
-                          top: '3px',
-                          left: form.connect ? '27px' : '3px',
-                          width: '22px',
-                          height: '22px',
+                          top: '2px',
+                          left: form.connect ? '22px' : '2px',
+                          width: '20px',
+                          height: '20px',
                           borderRadius: '50%',
                           background: 'white',
                           boxShadow: '0 2px 4px rgba(0,0,0,0.2)',
@@ -4488,19 +4851,55 @@ export default function CrmPropiedadEditar() {
                       </button>
                     </div>
 
-                    {form.connect && tenantComisionDefaults.connect_comision_default && (
-                      <div style={{
-                        marginTop: '12px',
-                        padding: '12px',
-                        background: 'rgba(59, 130, 246, 0.1)',
-                        borderRadius: '8px',
-                        borderLeft: '3px solid #3b82f6'
-                      }}>
-                        <div style={{ display: 'flex', alignItems: 'flex-start', gap: '8px' }}>
-                          <span style={{ fontSize: '14px' }}>💰</span>
-                          <p style={{ margin: 0, fontSize: '0.8rem', color: '#1e40af', lineHeight: '1.4' }}>
-                            {tenantComisionDefaults.connect_comision_default}
-                          </p>
+                    {/* Campos expandibles */}
+                    {form.connect && (
+                      <div style={{ marginTop: '12px', paddingTop: '12px', borderTop: '1px solid #93c5fd' }}>
+                        <div style={{ marginBottom: '10px' }}>
+                          <label style={{ display: 'block', fontSize: '0.75rem', fontWeight: 600, color: '#1e40af', marginBottom: '4px' }}>
+                            Términos
+                          </label>
+                          <textarea
+                            value={form.connect_terminos}
+                            onChange={(e) => setForm(prev => ({ ...prev, connect_terminos: e.target.value }))}
+                            placeholder="Ej: 50/50 con asesor..."
+                            rows={2}
+                            style={{
+                              width: '100%',
+                              padding: '8px 10px',
+                              border: '1px solid #93c5fd',
+                              borderRadius: '6px',
+                              fontSize: '0.8rem',
+                              resize: 'vertical',
+                              fontFamily: 'inherit',
+                              background: 'white'
+                            }}
+                          />
+                        </div>
+                        <div>
+                          <label style={{ display: 'block', fontSize: '0.75rem', fontWeight: 600, color: '#1e40af', marginBottom: '4px' }}>
+                            % Comisión
+                          </label>
+                          <div style={{ position: 'relative' }}>
+                            <input
+                              type="number"
+                              min="0"
+                              max="100"
+                              step="0.5"
+                              value={form.connect_comision ?? ''}
+                              onChange={(e) => setForm(prev => ({ ...prev, connect_comision: e.target.value ? parseFloat(e.target.value) : null }))}
+                              placeholder="50"
+                              style={{
+                                width: '100%',
+                                padding: '8px 30px 8px 10px',
+                                border: '1px solid #93c5fd',
+                                borderRadius: '6px',
+                                fontSize: '0.85rem',
+                                fontWeight: 600,
+                                background: 'white'
+                              }}
+                            />
+                            <span style={{ position: 'absolute', right: '10px', top: '50%', transform: 'translateY(-50%)', color: '#1e40af', fontWeight: 600, fontSize: '0.85rem' }}>%</span>
+                          </div>
                         </div>
                       </div>
                     )}
@@ -4630,45 +5029,120 @@ export default function CrmPropiedadEditar() {
       <ContentRelationModal
         isOpen={showFaqsModal}
         onClose={() => setShowFaqsModal(false)}
-        onSelect={(item) => {
-          console.log('FAQ seleccionado:', item);
-          // TODO: Guardar relación con la propiedad
+        onSelect={async (item) => {
+          if (!propiedadId || !tenantActual?.id) return;
+          try {
+            await createRelacionContenido(tenantActual.id, {
+              tipo_origen: 'propiedad',
+              id_origen: propiedadId,
+              tipo_destino: 'faq',
+              id_destino: item.id,
+            });
+            // Recargar relaciones
+            const relaciones = await getRelacionesContenido(tenantActual.id, {
+              tipoOrigen: 'propiedad',
+              idOrigen: propiedadId,
+            });
+            setRelacionesContenido(relaciones);
+          } catch (error) {
+            console.error('Error al crear relación con FAQ:', error);
+          }
         }}
         contentType="faqs"
         tenantId={tenantActual?.id || ''}
+        excludeIds={relacionesContenido.filter(r => r.tipo_destino === 'faq').map(r => r.id_destino)}
         onCreateNew={() => {
-          // TODO: Navegar a creación de FAQ
-          console.log('Crear nueva FAQ');
+          navigate(`/crm/contenido/faqs/nuevo`);
         }}
       />
 
       <ContentRelationModal
         isOpen={showVideosModal}
         onClose={() => setShowVideosModal(false)}
-        onSelect={(item) => {
-          console.log('Video seleccionado:', item);
-          // TODO: Guardar relación con la propiedad
+        onSelect={async (item) => {
+          if (!propiedadId || !tenantActual?.id) return;
+          try {
+            await createRelacionContenido(tenantActual.id, {
+              tipo_origen: 'propiedad',
+              id_origen: propiedadId,
+              tipo_destino: 'video',
+              id_destino: item.id,
+            });
+            // Recargar relaciones
+            const relaciones = await getRelacionesContenido(tenantActual.id, {
+              tipoOrigen: 'propiedad',
+              idOrigen: propiedadId,
+            });
+            setRelacionesContenido(relaciones);
+          } catch (error) {
+            console.error('Error al crear relación con Video:', error);
+          }
         }}
         contentType="videos"
         tenantId={tenantActual?.id || ''}
+        excludeIds={relacionesContenido.filter(r => r.tipo_destino === 'video').map(r => r.id_destino)}
         onCreateNew={() => {
-          // TODO: Navegar a creación de Video
-          console.log('Crear nuevo video');
+          navigate(`/crm/contenido/videos/nuevo`);
         }}
       />
 
       <ContentRelationModal
         isOpen={showArticulosModal}
         onClose={() => setShowArticulosModal(false)}
-        onSelect={(item) => {
-          console.log('Artículo seleccionado:', item);
-          // TODO: Guardar relación con la propiedad
+        onSelect={async (item) => {
+          if (!propiedadId || !tenantActual?.id) return;
+          try {
+            await createRelacionContenido(tenantActual.id, {
+              tipo_origen: 'propiedad',
+              id_origen: propiedadId,
+              tipo_destino: 'articulo',
+              id_destino: item.id,
+            });
+            // Recargar relaciones
+            const relaciones = await getRelacionesContenido(tenantActual.id, {
+              tipoOrigen: 'propiedad',
+              idOrigen: propiedadId,
+            });
+            setRelacionesContenido(relaciones);
+          } catch (error) {
+            console.error('Error al crear relación con Artículo:', error);
+          }
         }}
         contentType="articulos"
         tenantId={tenantActual?.id || ''}
+        excludeIds={relacionesContenido.filter(r => r.tipo_destino === 'articulo').map(r => r.id_destino)}
         onCreateNew={() => {
-          // TODO: Navegar a creación de Artículo
-          console.log('Crear nuevo artículo');
+          navigate(`/crm/contenido/articulos/nuevo`);
+        }}
+      />
+
+      <ContentRelationModal
+        isOpen={showTestimoniosModal}
+        onClose={() => setShowTestimoniosModal(false)}
+        onSelect={async (item) => {
+          if (!propiedadId || !tenantActual?.id) return;
+          try {
+            await createRelacionContenido(tenantActual.id, {
+              tipo_origen: 'propiedad',
+              id_origen: propiedadId,
+              tipo_destino: 'testimonio',
+              id_destino: item.id,
+            });
+            // Recargar relaciones
+            const relaciones = await getRelacionesContenido(tenantActual.id, {
+              tipoOrigen: 'propiedad',
+              idOrigen: propiedadId,
+            });
+            setRelacionesContenido(relaciones);
+          } catch (error) {
+            console.error('Error al crear relación con Testimonio:', error);
+          }
+        }}
+        contentType="testimonios"
+        tenantId={tenantActual?.id || ''}
+        excludeIds={relacionesContenido.filter(r => r.tipo_destino === 'testimonio').map(r => r.id_destino)}
+        onCreateNew={() => {
+          navigate(`/crm/contenido/testimonios/nuevo`);
         }}
       />
 
@@ -4743,11 +5217,11 @@ export default function CrmPropiedadEditar() {
 
         .tabs-header {
           display: flex;
-          gap: 4px;
+          gap: 3px;
           background: #f8fafc;
-          border-radius: 12px;
-          padding: 6px;
-          margin-bottom: 40px;
+          border-radius: 10px;
+          padding: 4px;
+          margin-bottom: 24px;
           overflow-x: auto;
           box-shadow: 0 2px 8px rgba(0, 0, 0, 0.04);
         }
@@ -4755,18 +5229,23 @@ export default function CrmPropiedadEditar() {
         .tab-button {
           display: flex;
           align-items: center;
-          gap: 10px;
-          padding: 14px 24px;
+          gap: 6px;
+          padding: 10px 16px;
           background: transparent;
           border: none;
-          border-radius: 8px;
+          border-radius: 6px;
           color: #64748b;
           font-weight: 600;
-          font-size: 0.95rem;
+          font-size: 0.8rem;
           cursor: pointer;
           transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
           white-space: nowrap;
           position: relative;
+        }
+
+        .tab-button svg {
+          width: 16px;
+          height: 16px;
         }
 
         .tab-button:hover {
@@ -4781,12 +5260,8 @@ export default function CrmPropiedadEditar() {
           font-weight: 700;
         }
 
-        .tab-button svg {
-          flex-shrink: 0;
-        }
-
         .tab-content-wrapper {
-          min-height: 500px;
+          min-height: 400px;
         }
 
         .tab-content {
@@ -5041,23 +5516,23 @@ export default function CrmPropiedadEditar() {
         }
 
         .section-title {
-          font-size: 1.35rem;
+          font-size: 1.1rem;
           font-weight: 700;
           color: #0f172a;
-          margin: 0 0 24px 0;
-          padding-bottom: 16px;
+          margin: 0 0 16px 0;
+          padding-bottom: 10px;
           border-bottom: 2px solid #1e293b;
           letter-spacing: -0.02em;
         }
 
         .form-grid {
           display: grid;
-          grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
-          gap: 20px;
+          grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+          gap: 16px;
         }
 
         .form-grid-spaced {
-          gap: 24px;
+          gap: 16px;
           grid-template-columns: repeat(4, 1fr);
         }
 
@@ -5082,7 +5557,7 @@ export default function CrmPropiedadEditar() {
         .form-group {
           display: flex;
           flex-direction: column;
-          gap: 8px;
+          gap: 6px;
         }
 
         .form-group.full-width {
@@ -5092,18 +5567,18 @@ export default function CrmPropiedadEditar() {
         .form-group label {
           font-weight: 600;
           color: #1e293b;
-          font-size: 0.9rem;
+          font-size: 0.8rem;
           letter-spacing: -0.01em;
-          margin-bottom: 6px;
+          margin-bottom: 2px;
         }
 
         .form-group input,
         .form-group select,
         .form-group textarea {
-          padding: 14px 16px;
-          border: 2px solid #e2e8f0;
-          border-radius: 10px;
-          font-size: 0.95rem;
+          padding: 10px 12px;
+          border: 1.5px solid #e2e8f0;
+          border-radius: 8px;
+          font-size: 0.85rem;
           transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
           font-family: inherit;
           background: white;
@@ -5144,6 +5619,22 @@ export default function CrmPropiedadEditar() {
           font-size: 0.85rem;
           color: #64748b;
           margin-top: 4px;
+        }
+
+        /* Código Público Badge */
+        .codigo-publico-badge {
+          display: inline-flex;
+          align-items: center;
+          margin-left: 12px;
+          padding: 4px 10px;
+          font-size: 0.8rem;
+          font-weight: 600;
+          color: #1d4ed8;
+          background: linear-gradient(135deg, #eff6ff 0%, #dbeafe 100%);
+          border: 1px solid #3b82f6;
+          border-radius: 6px;
+          vertical-align: middle;
+          cursor: help;
         }
 
         .checkbox-label {

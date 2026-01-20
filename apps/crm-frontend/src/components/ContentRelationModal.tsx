@@ -1,13 +1,16 @@
 /**
- * ContentRelationModal - Modal para buscar y relacionar contenido (FAQs, Videos, Artículos)
+ * ContentRelationModal - Modal para buscar y relacionar contenido (FAQs, Videos, Articulos, Testimonios)
  */
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useMemo } from 'react';
+import { getFaqs, getVideos, getArticulos, getTestimonios } from '../services/api';
 
 interface ContentItem {
   id: string;
   titulo: string;
   descripcion?: string;
+  pregunta?: string; // Para FAQs
+  cliente_nombre?: string; // Para Testimonios
   [key: string]: any;
 }
 
@@ -15,9 +18,10 @@ interface ContentRelationModalProps {
   isOpen: boolean;
   onClose: () => void;
   onSelect: (item: ContentItem) => void;
-  contentType: 'faqs' | 'videos' | 'articulos';
+  contentType: 'faqs' | 'videos' | 'articulos' | 'testimonios';
   tenantId: string;
   onCreateNew?: () => void;
+  excludeIds?: string[]; // IDs a excluir (ya relacionados)
 }
 
 const Icons = {
@@ -41,14 +45,25 @@ const Icons = {
   ),
 };
 
-const CONTENT_TYPE_LABELS = {
+const CONTENT_TYPE_LABELS: Record<string, {
+  singular: string;
+  plural: string;
+  icon: string;
+  placeholder: string;
+  createLabel: string;
+  emptyMessage: string;
+  noResultsMessage: string;
+  color: string;
+}> = {
   faqs: {
     singular: 'FAQ',
     plural: 'FAQs',
     icon: '❓',
     placeholder: 'Buscar preguntas frecuentes...',
     createLabel: 'Crear Nueva FAQ',
-    emptyMessage: 'No se encontraron FAQs. Crea una nueva para relacionarla con esta propiedad.',
+    emptyMessage: 'No se encontraron FAQs.',
+    noResultsMessage: 'No hay FAQs que coincidan con la busqueda.',
+    color: '#f59e0b',
   },
   videos: {
     singular: 'Video',
@@ -56,15 +71,29 @@ const CONTENT_TYPE_LABELS = {
     icon: '🎥',
     placeholder: 'Buscar videos...',
     createLabel: 'Crear Nuevo Video',
-    emptyMessage: 'No se encontraron videos. Crea uno nuevo para relacionarlo con esta propiedad.',
+    emptyMessage: 'No se encontraron videos.',
+    noResultsMessage: 'No hay videos que coincidan con la busqueda.',
+    color: '#8b5cf6',
   },
   articulos: {
-    singular: 'Artículo',
-    plural: 'Artículos',
+    singular: 'Articulo',
+    plural: 'Articulos',
     icon: '📄',
-    placeholder: 'Buscar artículos...',
-    createLabel: 'Crear Nuevo Artículo',
-    emptyMessage: 'No se encontraron artículos. Crea uno nuevo para relacionarlo con esta propiedad.',
+    placeholder: 'Buscar articulos...',
+    createLabel: 'Crear Nuevo Articulo',
+    emptyMessage: 'No se encontraron articulos.',
+    noResultsMessage: 'No hay articulos que coincidan con la busqueda.',
+    color: '#ec4899',
+  },
+  testimonios: {
+    singular: 'Testimonio',
+    plural: 'Testimonios',
+    icon: '💬',
+    placeholder: 'Buscar testimonios...',
+    createLabel: 'Crear Nuevo Testimonio',
+    emptyMessage: 'No se encontraron testimonios.',
+    noResultsMessage: 'No hay testimonios que coincidan con la busqueda.',
+    color: '#10b981',
   },
 };
 
@@ -75,49 +104,97 @@ export default function ContentRelationModal({
   contentType,
   tenantId,
   onCreateNew,
+  excludeIds = [],
 }: ContentRelationModalProps) {
   const [searchQuery, setSearchQuery] = useState('');
   const [loading, setLoading] = useState(false);
-  const [results, setResults] = useState<ContentItem[]>([]);
+  const [allItems, setAllItems] = useState<ContentItem[]>([]);
   const [error, setError] = useState<string | null>(null);
 
-  const labels = CONTENT_TYPE_LABELS[contentType];
+  const labels = CONTENT_TYPE_LABELS[contentType] || CONTENT_TYPE_LABELS.faqs;
 
-  // Buscar contenido (simulado por ahora - se conectará a la API real)
+  // Cargar contenido al abrir el modal
   useEffect(() => {
     if (!isOpen || !tenantId) return;
 
-    const searchContent = async () => {
+    const loadContent = async () => {
       setLoading(true);
       setError(null);
 
       try {
-        // TODO: Conectar con la API real
-        // Por ahora simulamos una búsqueda
-        await new Promise(resolve => setTimeout(resolve, 500));
-        
-        // Simulación de resultados vacíos
-        setResults([]);
+        let data: any[] = [];
+
+        switch (contentType) {
+          case 'faqs':
+            data = await getFaqs(tenantId);
+            // Normalizar FAQs: usar 'pregunta' como 'titulo'
+            data = data.map(item => ({
+              ...item,
+              titulo: item.titulo || item.pregunta || 'Sin titulo',
+              descripcion: item.respuesta ? (item.respuesta.length > 100 ? item.respuesta.substring(0, 100) + '...' : item.respuesta) : '',
+            }));
+            break;
+          case 'videos':
+            data = await getVideos(tenantId);
+            data = data.map(item => ({
+              ...item,
+              titulo: item.titulo || 'Sin titulo',
+              descripcion: item.descripcion || '',
+            }));
+            break;
+          case 'articulos':
+            data = await getArticulos(tenantId);
+            data = data.map(item => ({
+              ...item,
+              titulo: item.titulo || 'Sin titulo',
+              descripcion: item.extracto || item.descripcion || '',
+            }));
+            break;
+          case 'testimonios':
+            data = await getTestimonios(tenantId);
+            // Normalizar Testimonios: usar 'cliente_nombre' como 'titulo'
+            data = data.map(item => ({
+              ...item,
+              titulo: item.cliente_nombre || item.titulo || 'Anonimo',
+              descripcion: item.testimonio ? (item.testimonio.length > 100 ? item.testimonio.substring(0, 100) + '...' : item.testimonio) : '',
+            }));
+            break;
+        }
+
+        setAllItems(data);
       } catch (err: any) {
-        setError(err.message || 'Error al buscar contenido');
-        setResults([]);
+        console.error('Error loading content:', err);
+        setError(err.message || 'Error al cargar contenido');
+        setAllItems([]);
       } finally {
         setLoading(false);
       }
     };
 
-    if (searchQuery.trim().length >= 2 || searchQuery.trim().length === 0) {
-      searchContent();
-    } else {
-      setResults([]);
+    loadContent();
+  }, [isOpen, tenantId, contentType]);
+
+  // Filtrar items por busqueda y excluir los ya relacionados
+  const filteredItems = useMemo(() => {
+    let items = allItems.filter(item => !excludeIds.includes(item.id));
+
+    if (searchQuery.trim()) {
+      const query = searchQuery.toLowerCase().trim();
+      items = items.filter(item =>
+        (item.titulo && item.titulo.toLowerCase().includes(query)) ||
+        (item.descripcion && item.descripcion.toLowerCase().includes(query)) ||
+        (item.pregunta && item.pregunta.toLowerCase().includes(query)) ||
+        (item.cliente_nombre && item.cliente_nombre.toLowerCase().includes(query))
+      );
     }
-  }, [searchQuery, isOpen, tenantId]);
+
+    return items;
+  }, [allItems, searchQuery, excludeIds]);
 
   // Reset al abrir/cerrar
   useEffect(() => {
     if (!isOpen) {
       setSearchQuery('');
-      setResults([]);
       setError(null);
     }
   }, [isOpen]);
@@ -155,7 +232,7 @@ export default function ContentRelationModal({
         </div>
 
         <div className="content-relation-modal-body">
-          {/* Barra de búsqueda */}
+          {/* Barra de busqueda */}
           <div className="search-container">
             <div className="search-input-wrapper">
               <Icons.search className="search-icon" />
@@ -179,25 +256,28 @@ export default function ContentRelationModal({
             </div>
           </div>
 
-          {/* Resultados o estado vacío */}
+          {/* Resultados o estado vacio */}
           {loading ? (
             <div className="empty-state">
               <div className="loading-spinner"></div>
-              <p>Buscando {labels.plural.toLowerCase()}...</p>
+              <p>Cargando {labels.plural.toLowerCase()}...</p>
             </div>
           ) : error ? (
             <div className="empty-state">
               <span style={{ fontSize: '3rem', marginBottom: '16px' }}>⚠️</span>
               <p style={{ color: '#dc2626' }}>{error}</p>
             </div>
-          ) : results.length > 0 ? (
+          ) : filteredItems.length > 0 ? (
             <div className="results-list">
-              {results.map((item) => (
+              {filteredItems.map((item) => (
                 <div
                   key={item.id}
                   className="result-item"
                   onClick={() => handleSelect(item)}
                 >
+                  <div className="result-icon" style={{ background: labels.color }}>
+                    {labels.icon}
+                  </div>
                   <div className="result-content">
                     <h4>{item.titulo}</h4>
                     {item.descripcion && (
@@ -217,7 +297,7 @@ export default function ContentRelationModal({
                 </div>
               ))}
             </div>
-          ) : (
+          ) : allItems.length === 0 ? (
             <div className="empty-state">
               <span style={{ fontSize: '3rem', marginBottom: '16px' }}>{labels.icon}</span>
               <p>{labels.emptyMessage}</p>
@@ -231,6 +311,11 @@ export default function ContentRelationModal({
                   {labels.createLabel}
                 </button>
               )}
+            </div>
+          ) : (
+            <div className="empty-state">
+              <span style={{ fontSize: '3rem', marginBottom: '16px' }}>🔍</span>
+              <p>{labels.noResultsMessage}</p>
             </div>
           )}
         </div>
@@ -407,7 +492,7 @@ export default function ContentRelationModal({
         .result-item {
           display: flex;
           align-items: center;
-          justify-content: space-between;
+          gap: 16px;
           padding: 16px;
           border: 2px solid #e2e8f0;
           border-radius: 12px;
@@ -423,8 +508,20 @@ export default function ContentRelationModal({
           box-shadow: 0 4px 12px rgba(99, 102, 241, 0.15);
         }
 
+        .result-icon {
+          width: 48px;
+          height: 48px;
+          border-radius: 12px;
+          display: flex;
+          align-items: center;
+          justify-content: center;
+          font-size: 1.5rem;
+          flex-shrink: 0;
+        }
+
         .result-content {
           flex: 1;
+          min-width: 0;
         }
 
         .result-content h4 {
@@ -432,6 +529,9 @@ export default function ContentRelationModal({
           font-size: 1rem;
           font-weight: 600;
           color: #1e293b;
+          white-space: nowrap;
+          overflow: hidden;
+          text-overflow: ellipsis;
         }
 
         .result-description {
@@ -455,7 +555,7 @@ export default function ContentRelationModal({
           font-size: 0.875rem;
           cursor: pointer;
           transition: all 0.2s;
-          margin-left: 16px;
+          flex-shrink: 0;
         }
 
         .select-btn:hover {
@@ -518,16 +618,3 @@ export default function ContentRelationModal({
     </div>
   );
 }
-
-
-
-
-
-
-
-
-
-
-
-
-

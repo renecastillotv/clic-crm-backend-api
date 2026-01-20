@@ -1,7 +1,8 @@
 .modal-overlay {
   position: fixed;
-  top: 0;
-  left: 0;
+  /* Ajustar para el área de trabajo (considerando sidebar y header) */
+  top: var(--header-height, 64px);
+  left: var(--sidebar-width, 220px);
   right: 0;
   bottom: 0;
   background: var(--premium-overlay, rgba(0, 0, 0, 0.5));
@@ -11,6 +12,20 @@
   z-index: 1000;
   padding: 1rem;
   animation: fadeIn 0.2s ease-out;
+}
+
+/* Para modales de pantalla completa (como login) sin sidebar/header */
+.modal-overlay.modal-fullscreen {
+  top: 0;
+  left: 0;
+}
+
+/* Responsive: cuando el sidebar está colapsado o en móvil */
+@media (max-width: 768px) {
+  .modal-overlay {
+    top: var(--header-height, 64px);
+    left: 0;
+  }
 }
 
 @keyframes fadeIn {

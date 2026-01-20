@@ -269,23 +269,23 @@ export default function CrmSolicitudes() {
         { label: 'Cerradas', value: cerradas, icon: <CheckCircle2 className="w-4 h-4" /> },
       ],
       actions: (
-        <div style={{ display: 'flex', gap: '12px', alignItems: 'center' }}>
+        <div style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
           <div className="view-toggle">
             <button
               className={`view-btn ${vistaKanban ? 'active' : ''}`}
               onClick={() => setVistaKanban(true)}
             >
-              <LayoutGrid className="w-4 h-4" />
+              <LayoutGrid className="w-3.5 h-3.5" />
             </button>
             <button
               className={`view-btn ${!vistaKanban ? 'active' : ''}`}
               onClick={() => setVistaKanban(false)}
             >
-              <List className="w-4 h-4" />
+              <List className="w-3.5 h-3.5" />
             </button>
           </div>
-          <button className="btn-primary" onClick={() => setShowCreateModal(true)}>
-            <Plus className="w-4 h-4" />
+          <button className="btn-primary btn-sm" onClick={() => setShowCreateModal(true)}>
+            <Plus className="w-3.5 h-3.5" />
             Nueva Solicitud
           </button>
         </div>
@@ -879,7 +879,7 @@ export default function CrmSolicitudes() {
       {/* Modal de cierre de solicitud */}
       {showCloseModal && (
         <div className="modal-overlay" onClick={resetCloseModal}>
-          <div className="modal-content modal-close" onClick={(e) => e.stopPropagation()}>
+          <div className="modal-content modal-close-solicitud" onClick={(e) => e.stopPropagation()}>
             <div className="modal-header">
               <h3>{closeModalStep === 'select' ? 'Cerrar Solicitud' :
                    closeModalData.etapa === 'perdido' ? 'Solicitud Perdida' : 'Descartar Solicitud'}</h3>
@@ -899,12 +899,14 @@ export default function CrmSolicitudes() {
                       <button
                         key={etapa.id}
                         className="close-option"
-                        style={{ '--option-color': etapa.color } as React.CSSProperties}
+                        style={{ '--option-color': etapa.color, '--option-bg': etapa.light } as React.CSSProperties}
                         onClick={() => handleSelectCloseEtapa(etapa.id)}
                         disabled={saving}
                       >
-                        <Icon className="w-6 h-6" />
-                        <span>{etapa.label}</span>
+                        <div className="close-option-icon">
+                          <Icon />
+                        </div>
+                        <span className="close-option-label">{etapa.label}</span>
                         {etapa.id !== 'ganado' && (
                           <span className="close-option-hint">+ detalles</span>
                         )}
@@ -1319,18 +1321,18 @@ const styles = `
   .view-toggle {
     display: flex;
     background: #f1f5f9;
-    border-radius: 8px;
-    padding: 4px;
+    border-radius: 6px;
+    padding: 3px;
   }
 
   .view-btn {
     display: flex;
     align-items: center;
     justify-content: center;
-    padding: 8px 12px;
+    padding: 5px 8px;
     background: none;
     border: none;
-    border-radius: 6px;
+    border-radius: 4px;
     color: #64748b;
     cursor: pointer;
     transition: all 0.15s;
@@ -1926,16 +1928,22 @@ const styles = `
   .btn-primary {
     display: flex;
     align-items: center;
-    gap: 8px;
-    padding: 10px 20px;
+    gap: 6px;
+    padding: 8px 14px;
     background: #2563eb;
     color: white;
     border: none;
-    border-radius: 8px;
-    font-size: 0.9rem;
+    border-radius: 6px;
+    font-size: 0.8rem;
     font-weight: 500;
     cursor: pointer;
     transition: background 0.2s;
+  }
+
+  .btn-primary.btn-sm {
+    padding: 6px 12px;
+    font-size: 0.75rem;
+    gap: 4px;
   }
 
   .btn-primary:hover {
@@ -2046,44 +2054,71 @@ const styles = `
     background: #e2e8f0;
   }
 
-  /* Close Modal */
-  .modal-close {
-    max-width: 360px;
+  /* Close Modal - Solicitudes */
+  .modal-close-solicitud {
+    max-width: 400px;
+    width: 95%;
+    background: white !important;
+    box-shadow: 0 20px 60px rgba(0,0,0,0.2);
   }
 
   .close-options {
     display: flex;
     flex-direction: column;
-    gap: 10px;
+    gap: 12px;
+    margin-bottom: 16px;
   }
 
   .close-option {
     display: flex;
     align-items: center;
-    gap: 12px;
-    padding: 16px;
+    gap: 14px;
+    padding: 14px 16px;
     background: #f8fafc;
-    border: 2px solid transparent;
+    border: 1px solid #e2e8f0;
     border-radius: 12px;
     cursor: pointer;
-    transition: all 0.15s;
-    color: var(--option-color);
+    transition: all 0.2s ease;
+    color: #1e293b;
+    width: 100%;
+    text-align: left;
   }
 
   .close-option:hover {
     background: white;
-    border-color: var(--option-color);
+    border-color: var(--option-color, #3b82f6);
+    box-shadow: 0 2px 8px rgba(0,0,0,0.08);
   }
 
-  .close-option span {
+  .close-option-icon {
+    width: 42px;
+    height: 42px;
+    min-width: 42px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    background: var(--option-bg, #f0fdf4);
+    border-radius: 10px;
+    flex-shrink: 0;
+  }
+
+  .close-option-icon svg {
+    width: 20px;
+    height: 20px;
+    color: var(--option-color, #22c55e);
+  }
+
+  .close-option-label {
     font-weight: 600;
-    font-size: 1rem;
+    font-size: 0.95rem;
+    color: var(--option-color, #1e293b);
+    flex: 1;
   }
 
   .close-option-hint {
-    font-size: 0.75rem;
+    font-size: 0.8rem;
     color: #94a3b8;
-    margin-left: auto;
+    font-weight: 400;
   }
 
   /* Close Details Step */

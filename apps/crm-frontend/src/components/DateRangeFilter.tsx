@@ -221,7 +221,7 @@ const DateRangeFilter: React.FC<DateRangeFilterProps> = ({
               borderRadius: '12px',
               padding: '16px',
               display: 'grid',
-              gridTemplateColumns: 'repeat(4, 1fr)',
+              gridTemplateColumns: 'repeat(auto-fit, minmax(140px, 1fr))',
               gap: '10px'
             }}>
               {presets.map((p) => (

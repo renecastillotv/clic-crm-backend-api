@@ -11,6 +11,7 @@ import { useParams, useNavigate, useSearchParams } from 'react-router-dom';
 import { useAuth } from '../../contexts/AuthContext';
 import { usePageHeader } from '../../layouts/CrmLayout';
 import * as LucideIcons from 'lucide-react';
+import '../../components/Modal.css';
 import {
   getArticulos,
   getVideos,
@@ -46,6 +47,7 @@ import {
 } from '../../services/api';
 import { contenidoStyles } from './contenido/sharedStyles';
 import { stripHtml } from './contenido/utils';
+import { useIdiomas } from '../../services/idiomas';
 
 type TabType = 'articulos' | 'videos' | 'faqs' | 'testimonios' | 'seo' | 'categorias' | 'relacionar';
 
@@ -72,12 +74,52 @@ const Icons = {
   categoria: <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z"/></svg>,
 };
 
-// Iconos populares para categorías
+// Iconos populares para categorías - Lista expandida con todas las categorías útiles
 const popularIcons = [
-  'Folder', 'FileText', 'Video', 'Image', 'Music', 'Film', 'BookOpen', 'Book',
-  'Tag', 'Tags', 'Star', 'Heart', 'ThumbsUp', 'MessageCircle', 'Mail', 'Phone',
-  'Calendar', 'Clock', 'MapPin', 'Globe', 'Link', 'Share2', 'Download', 'Upload',
-  'Search', 'Filter', 'Settings', 'User', 'Users', 'Home', 'Building', 'Briefcase',
+  // Documentos y archivos
+  'FileText', 'File', 'Files', 'Folder', 'FolderOpen', 'Archive', 'Paperclip', 'ClipboardList',
+  // Media
+  'Video', 'Image', 'Camera', 'Film', 'Music', 'Headphones', 'Mic', 'Play', 'Youtube',
+  // Lectura y educación
+  'BookOpen', 'Book', 'BookMarked', 'Library', 'GraduationCap', 'School', 'Lightbulb', 'Brain',
+  // Etiquetas y categorías
+  'Tag', 'Tags', 'Bookmark', 'Flag', 'Label', 'Hash', 'AtSign',
+  // Valoración y feedback
+  'Star', 'Heart', 'ThumbsUp', 'ThumbsDown', 'Award', 'Trophy', 'Medal', 'Crown',
+  // Comunicación
+  'MessageCircle', 'MessageSquare', 'Mail', 'Send', 'Phone', 'PhoneCall', 'Bell', 'Megaphone',
+  // Tiempo y calendario
+  'Calendar', 'CalendarDays', 'Clock', 'Timer', 'Hourglass', 'History', 'AlarmClock',
+  // Ubicación y navegación
+  'MapPin', 'Map', 'Compass', 'Navigation', 'Globe', 'Earth', 'Locate',
+  // Links y compartir
+  'Link', 'Link2', 'ExternalLink', 'Share', 'Share2', 'QrCode', 'Scan',
+  // Acciones
+  'Download', 'Upload', 'Save', 'Copy', 'Trash2', 'Edit', 'Pencil', 'Eraser',
+  // Búsqueda y filtros
+  'Search', 'Filter', 'SlidersHorizontal', 'Settings', 'Cog', 'Wrench', 'Tool',
+  // Usuarios y personas
+  'User', 'Users', 'UserPlus', 'UserCheck', 'Contact', 'BadgeCheck', 'CircleUser',
+  // Inmobiliario y propiedades
+  'Home', 'Building', 'Building2', 'Castle', 'Hotel', 'Warehouse', 'Store', 'Landmark',
+  'DoorOpen', 'Key', 'KeyRound', 'Bed', 'Bath', 'Sofa', 'Lamp', 'Tv',
+  // Trabajo y negocios
+  'Briefcase', 'Wallet', 'CreditCard', 'DollarSign', 'Coins', 'PiggyBank', 'Receipt', 'FileSpreadsheet',
+  'PieChart', 'BarChart', 'TrendingUp', 'TrendingDown', 'Activity', 'Target', 'Crosshair',
+  // Naturaleza y exterior
+  'Sun', 'Moon', 'Cloud', 'CloudSun', 'Umbrella', 'Tree', 'Flower', 'Mountain', 'Waves',
+  // Transporte
+  'Car', 'Plane', 'Ship', 'Train', 'Bike', 'Bus', 'Truck', 'Rocket',
+  // Tecnología
+  'Laptop', 'Monitor', 'Smartphone', 'Tablet', 'Wifi', 'Bluetooth', 'Cpu', 'HardDrive',
+  // Seguridad
+  'Shield', 'ShieldCheck', 'Lock', 'Unlock', 'Eye', 'EyeOff', 'Fingerprint',
+  // Estado y alertas
+  'CheckCircle', 'XCircle', 'AlertCircle', 'AlertTriangle', 'Info', 'HelpCircle', 'Ban',
+  // Otros útiles
+  'Gift', 'Cake', 'PartyPopper', 'Sparkles', 'Flame', 'Zap', 'Battery', 'Plug',
+  'Package', 'Box', 'Boxes', 'ShoppingCart', 'ShoppingBag', 'Percent',
+  'Palette', 'Brush', 'Scissors', 'Ruler', 'Calculator', 'Printer',
 ];
 
 export default function CrmContenido() {
@@ -87,6 +129,11 @@ export default function CrmContenido() {
   const { tenantActual } = useAuth();
   const { setPageHeader } = usePageHeader();
 
+  // Idiomas del tenant (para traducciones)
+  const { idiomas } = useIdiomas(tenantActual?.id);
+  // Filtrar idiomas secundarios (excluir español que es el idioma principal)
+  const idiomasSecundarios = idiomas.filter(i => i.code !== 'es' && i.activo);
+
   // Tab activo desde URL
   const tabParam = searchParams.get('tab') as TabType | null;
   const [activeTab, setActiveTab] = useState<TabType>(tabParam || 'articulos');
@@ -94,6 +141,7 @@ export default function CrmContenido() {
   // Estados generales
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [successMessage, setSuccessMessage] = useState<string | null>(null);
   const [busqueda, setBusqueda] = useState('');
   const [deleteConfirm, setDeleteConfirm] = useState<{ tipo: string; id: string } | null>(null);
 
@@ -111,6 +159,9 @@ export default function CrmContenido() {
   const [filtroPublicado, setFiltroPublicado] = useState<boolean | undefined>(undefined);
   const [filtroTipo, setFiltroTipo] = useState('');
 
+  // Vista de testimonios (cards o lista)
+  const [testimoniosViewMode, setTestimoniosViewMode] = useState<'cards' | 'list'>('cards');
+
   // Modal de categorías
   const [showCategoriaModal, setShowCategoriaModal] = useState(false);
   const [editingCategoria, setEditingCategoria] = useState<string | null>(null);
@@ -123,7 +174,11 @@ export default function CrmContenido() {
     color: '#667eea',
     orden: 0,
     activa: true,
+    // Traducciones
+    traducciones: {} as Record<string, { nombre?: string; descripcion?: string }>,
+    slugTraducciones: {} as Record<string, string>,
   });
+  const [showTraducciones, setShowTraducciones] = useState(false);
   const [showIconPicker, setShowIconPicker] = useState(false);
   const [iconSearch, setIconSearch] = useState('');
   const [saving, setSaving] = useState(false);
@@ -202,7 +257,7 @@ export default function CrmContenido() {
           title: 'SEO Stats',
           subtitle: 'Contenido enriquecido para SEO',
           action: (
-            <button onClick={() => navigate(`/crm/${tenantSlug}/contenido/seo/nuevo`)} className="btn-primary">
+            <button onClick={() => navigate(`/crm/${tenantSlug}/contenido/seo-stats/nuevo`)} className="btn-primary">
               <span className="icon">{Icons.plus}</span>
               Nuevo SEO Stat
             </button>
@@ -293,8 +348,8 @@ export default function CrmContenido() {
           break;
       }
 
-      // Siempre cargar categorías para filtros
-      if (activeTab !== 'categorias') {
+      // Cargar categorías para filtros (solo para tabs que las usan)
+      if (activeTab !== 'categorias' && activeTab !== 'relacionar') {
         const tipoCategoria = activeTab === 'seo' ? 'seo_stats' : activeTab === 'testimonios' ? 'testimonio' : activeTab.slice(0, -1);
         const cats = await getCategoriasContenido(tenantActual.id, tipoCategoria as any);
         setCategorias(cats);
@@ -340,12 +395,7 @@ export default function CrmContenido() {
       const propsResponse = await getPropiedadesCrm(tenantActual.id, {});
       setPropiedades(propsResponse.data || []);
     }
-
-    // Cargar relaciones existentes si hay contenido origen seleccionado
-    if (contenidoOrigenSeleccionado && tipoContenidoOrigen) {
-      const rels = await getRelacionesContenido(tenantActual.id, { tipoOrigen: tipoContenidoOrigen, idOrigen: contenidoOrigenSeleccionado.id });
-      setRelaciones(rels);
-    }
+    // NOTA: Las relaciones se cargan automáticamente via useEffect cuando se selecciona contenidoOrigenSeleccionado
   };
 
   // Cargar contenidos cuando cambia el tipo de origen
@@ -402,7 +452,12 @@ export default function CrmContenido() {
 
   const loadRelacionesOrigen = async () => {
     if (!tenantActual?.id || !contenidoOrigenSeleccionado || !tipoContenidoOrigen) return;
-    const rels = await getRelacionesContenido(tenantActual.id, { tipoOrigen: tipoContenidoOrigen, idOrigen: contenidoOrigenSeleccionado.id });
+    // Usar modo bidireccional para ver relaciones donde el contenido sea origen O destino
+    const rels = await getRelacionesContenido(tenantActual.id, {
+      bidireccional: true,
+      contenidoId: contenidoOrigenSeleccionado.id,
+      contenidoTipo: tipoContenidoOrigen
+    });
     setRelaciones(rels);
   };
 
@@ -475,7 +530,10 @@ export default function CrmContenido() {
       color: '#667eea',
       orden: 0,
       activa: true,
+      traducciones: {},
+      slugTraducciones: {},
     });
+    setShowTraducciones(false);
   };
 
   const generateSlug = (text: string) => {
@@ -489,9 +547,18 @@ export default function CrmContenido() {
     }
     try {
       setSaving(true);
+      // Preparar datos con snake_case para el API
       const data = {
-        ...categoriaForm,
         slug: categoriaForm.slug || generateSlug(categoriaForm.nombre),
+        tipo: categoriaForm.tipo,
+        nombre: categoriaForm.nombre,
+        descripcion: categoriaForm.descripcion,
+        icono: categoriaForm.icono,
+        color: categoriaForm.color,
+        orden: categoriaForm.orden,
+        activa: categoriaForm.activa,
+        traducciones: categoriaForm.traducciones,
+        slug_traducciones: categoriaForm.slugTraducciones,
       };
       if (editingCategoria) {
         await updateCategoriaContenido(tenantActual.id, editingCategoria, data);
@@ -517,7 +584,10 @@ export default function CrmContenido() {
       color: cat.color || '#667eea',
       orden: cat.orden,
       activa: cat.activa,
+      traducciones: cat.traducciones || {},
+      slugTraducciones: cat.slug_traducciones || {},
     });
+    setShowTraducciones(Object.keys(cat.traducciones || {}).length > 0 || Object.keys(cat.slug_traducciones || {}).length > 0);
     setEditingCategoria(cat.id);
     setShowCategoriaModal(true);
   };
@@ -537,6 +607,7 @@ export default function CrmContenido() {
       }
       try {
         setCreandoRelacion(true);
+        const cantidad = propiedadesSeleccionadas.length;
         for (const propId of propiedadesSeleccionadas) {
           await createRelacionContenido(tenantActual.id, {
             tipoOrigen: tipoContenidoOrigen,
@@ -551,7 +622,10 @@ export default function CrmContenido() {
         setPropiedadesSeleccionadas([]);
         setDescripcionRelacion('');
         setTipoContenidoDestino(null);
-        loadRelacionesOrigen();
+        await loadRelacionesOrigen();
+        // Mostrar mensaje de éxito
+        setSuccessMessage(`${cantidad} relación${cantidad > 1 ? 'es' : ''} creada${cantidad > 1 ? 's' : ''} exitosamente`);
+        setTimeout(() => setSuccessMessage(null), 4000);
       } catch (err: any) {
         setError(err.message || 'Error al crear relación');
       } finally {
@@ -565,6 +639,7 @@ export default function CrmContenido() {
       }
       try {
         setCreandoRelacion(true);
+        const nombreDestino = getContenidoNombre(contenidoDestinoSeleccionado);
         await createRelacionContenido(tenantActual.id, {
           tipoOrigen: tipoContenidoOrigen,
           idOrigen: contenidoOrigenSeleccionado.id,
@@ -578,7 +653,10 @@ export default function CrmContenido() {
         setDescripcionRelacion('');
         setTipoContenidoDestino(null);
         setShowDestinoModal(false);
-        loadRelacionesOrigen();
+        await loadRelacionesOrigen();
+        // Mostrar mensaje de éxito
+        setSuccessMessage(`Relación con "${nombreDestino}" creada exitosamente`);
+        setTimeout(() => setSuccessMessage(null), 4000);
       } catch (err: any) {
         setError(err.message || 'Error al crear relación');
       } finally {
@@ -602,6 +680,38 @@ export default function CrmContenido() {
     const IconComponent = (LucideIcons as any)[iconName];
     if (!IconComponent) return null;
     return <IconComponent size={size} />;
+  };
+
+  // Obtener nombre de contenido relacionado por tipo e ID
+  // NOTA: Este es un fallback - el nombre debería venir del backend (nombreOrigen/nombreDestino)
+  const getRelacionNombre = (tipo: string, id: string): string => {
+    // Fallback: solo mostrar ID truncado (sin repetir el tipo ya que hay etiqueta)
+    const fallbackId = id.slice(0, 8) + '...';
+    switch (tipo) {
+      case 'articulo':
+        const articulo = articulos.find(a => a.id === id);
+        return articulo?.titulo || fallbackId;
+      case 'video':
+        const video = videos.find(v => v.id === id);
+        return video?.titulo || fallbackId;
+      case 'faq':
+        const faq = faqs.find(f => f.id === id);
+        if (faq?.pregunta) {
+          return faq.pregunta.length > 40 ? faq.pregunta.slice(0, 40) + '...' : faq.pregunta;
+        }
+        return fallbackId;
+      case 'testimonio':
+        const testimonio = testimonios.find(t => t.id === id) as any;
+        return testimonio?.cliente_nombre || testimonio?.autor || fallbackId;
+      case 'seo_stat':
+        const seo = seoStats.find(s => s.id === id);
+        return seo?.titulo || fallbackId;
+      case 'propiedad':
+        const prop = propiedadesDestino.find(p => p.id === id);
+        return prop?.titulo || prop?.codigo_interno || fallbackId;
+      default:
+        return fallbackId;
+    }
   };
 
   // Render del listado según tab
@@ -656,12 +766,17 @@ export default function CrmContenido() {
               </tr>
             </thead>
             <tbody>
-              {articulos.map(art => (
+              {articulos.map(art => {
+                // Soportar tanto snake_case (API) como camelCase
+                const a = art as any;
+                const imagenPrincipal = a.imagenPrincipal || a.imagen_principal;
+                const categoriaId = a.categoriaId || a.categoria_id;
+                return (
                 <tr key={art.id}>
                   <td>
                     <div className="item-with-image">
-                      {art.imagenPrincipal ? (
-                        <img src={art.imagenPrincipal} alt={art.titulo} className="item-thumb" />
+                      {imagenPrincipal ? (
+                        <img src={imagenPrincipal} alt={art.titulo} className="item-thumb" />
                       ) : (
                         <div className="item-thumb-placeholder">{Icons.articulo}</div>
                       )}
@@ -671,7 +786,7 @@ export default function CrmContenido() {
                       </div>
                     </div>
                   </td>
-                  <td>{categorias.find(c => c.id === art.categoriaId)?.nombre || '-'}</td>
+                  <td>{categorias.find(c => c.id === categoriaId)?.nombre || '-'}</td>
                   <td>
                     <button
                       onClick={() => handleTogglePublicado('articulo', art.id, art.publicado)}
@@ -688,7 +803,8 @@ export default function CrmContenido() {
                     </div>
                   </td>
                 </tr>
-              ))}
+              );
+              })}
             </tbody>
           </table>
         </div>
@@ -718,12 +834,18 @@ export default function CrmContenido() {
               </tr>
             </thead>
             <tbody>
-              {videos.map(vid => (
+              {videos.map(vid => {
+                // Soportar tanto snake_case (API) como camelCase
+                const v = vid as any;
+                const thumbnail = v.thumbnail || v.thumbnail_url;
+                const categoriaId = v.categoriaId || v.categoria_id;
+                const tipoVideo = v.tipoVideo || v.tipo_video || v.plataforma || '-';
+                return (
                 <tr key={vid.id}>
                   <td>
                     <div className="item-with-image">
-                      {vid.thumbnail ? (
-                        <img src={vid.thumbnail} alt={vid.titulo} className="item-thumb" />
+                      {thumbnail ? (
+                        <img src={thumbnail} alt={vid.titulo} className="item-thumb" />
                       ) : (
                         <div className="item-thumb-placeholder">{Icons.video}</div>
                       )}
@@ -733,8 +855,8 @@ export default function CrmContenido() {
                       </div>
                     </div>
                   </td>
-                  <td>{categorias.find(c => c.id === vid.categoriaId)?.nombre || '-'}</td>
-                  <td>{vid.tipoVideo}</td>
+                  <td>{categorias.find(c => c.id === categoriaId)?.nombre || '-'}</td>
+                  <td>{tipoVideo}</td>
                   <td>
                     <button
                       onClick={() => handleTogglePublicado('video', vid.id, vid.publicado)}
@@ -751,7 +873,8 @@ export default function CrmContenido() {
                     </div>
                   </td>
                 </tr>
-              ))}
+              );
+              })}
             </tbody>
           </table>
         </div>
@@ -808,6 +931,28 @@ export default function CrmContenido() {
     </>
   );
 
+  // Helper para obtener iniciales
+  const getInitials = (nombre: string) => {
+    if (!nombre) return '?';
+    const parts = nombre.trim().split(' ').filter(Boolean);
+    if (parts.length >= 2) {
+      return (parts[0][0] + parts[parts.length - 1][0]).toUpperCase();
+    }
+    return parts[0].substring(0, 2).toUpperCase();
+  };
+
+  // Colores para avatares sin foto
+  const avatarColors = [
+    '#3B82F6', '#10B981', '#F59E0B', '#EF4444', '#8B5CF6',
+    '#EC4899', '#06B6D4', '#84CC16', '#F97316', '#6366F1'
+  ];
+
+  const getAvatarColor = (nombre: string) => {
+    if (!nombre) return avatarColors[0];
+    const index = nombre.charCodeAt(0) % avatarColors.length;
+    return avatarColors[index];
+  };
+
   const renderTestimoniosList = () => (
     <>
       {testimonios.length === 0 ? (
@@ -817,54 +962,353 @@ export default function CrmContenido() {
           <p>{busqueda ? 'No se encontraron testimonios' : 'Crea tu primer testimonio'}</p>
         </div>
       ) : (
-        <div className="table-container">
-          <table className="data-table">
-            <thead>
-              <tr>
-                <th>CLIENTE</th>
-                <th>CONTENIDO</th>
-                <th>RATING</th>
-                <th>ESTADO</th>
-                <th>ACCIONES</th>
-              </tr>
-            </thead>
-            <tbody>
-              {testimonios.map(test => (
-                <tr key={test.id}>
-                  <td>
-                    <div className="item-with-image">
-                      {test.clienteFoto ? (
-                        <img src={test.clienteFoto} alt={test.clienteNombre} className="item-thumb rounded" />
-                      ) : (
-                        <div className="item-thumb-placeholder rounded">{Icons.testimonio}</div>
-                      )}
-                      <div className="item-info">
-                        <div className="item-title">{test.clienteNombre}</div>
-                        {test.clienteCargo && <div className="item-excerpt">{test.clienteCargo}</div>}
+        <>
+          {testimoniosViewMode === 'cards' ? (
+            <div style={{
+              display: 'grid',
+              gridTemplateColumns: 'repeat(auto-fill, minmax(380px, 1fr))',
+              gap: '20px',
+              padding: '4px'
+            }}>
+              {testimonios.map(test => {
+                // Campos en snake_case del API
+                const t = test as any;
+                const clienteFoto = t.cliente_foto;
+                const clienteNombre = t.cliente_nombre || 'Cliente';
+                const clienteCargo = t.cliente_cargo;
+                const clienteEmpresa = t.cliente_empresa;
+                const titulo = t.titulo || '';
+                const rating = t.rating || 0;
+                const publicado = t.publicado;
+
+            return (
+              <div
+                key={test.id}
+                style={{
+                  background: 'white',
+                  borderRadius: '16px',
+                  padding: '24px',
+                  boxShadow: '0 1px 3px rgba(0,0,0,0.08), 0 4px 12px rgba(0,0,0,0.04)',
+                  border: '1px solid #f1f5f9',
+                  display: 'flex',
+                  flexDirection: 'column',
+                  gap: '16px',
+                  transition: 'all 0.2s ease',
+                  position: 'relative'
+                }}
+                onMouseEnter={(e) => {
+                  e.currentTarget.style.boxShadow = '0 4px 12px rgba(0,0,0,0.1), 0 8px 24px rgba(0,0,0,0.08)';
+                  e.currentTarget.style.transform = 'translateY(-2px)';
+                }}
+                onMouseLeave={(e) => {
+                  e.currentTarget.style.boxShadow = '0 1px 3px rgba(0,0,0,0.08), 0 4px 12px rgba(0,0,0,0.04)';
+                  e.currentTarget.style.transform = 'translateY(0)';
+                }}
+              >
+                {/* Quote icon decorativo */}
+                <div style={{
+                  position: 'absolute',
+                  top: '16px',
+                  right: '20px',
+                  fontSize: '48px',
+                  lineHeight: 1,
+                  color: '#e2e8f0',
+                  fontFamily: 'Georgia, serif',
+                  fontWeight: 'bold',
+                  opacity: 0.6
+                }}>"</div>
+
+                {/* Header: Avatar + Info del cliente */}
+                <div style={{ display: 'flex', alignItems: 'center', gap: '14px' }}>
+                  {clienteFoto ? (
+                    <img
+                      src={clienteFoto}
+                      alt={clienteNombre}
+                      style={{
+                        width: '56px',
+                        height: '56px',
+                        borderRadius: '50%',
+                        objectFit: 'cover',
+                        border: '3px solid #f1f5f9'
+                      }}
+                    />
+                  ) : (
+                    <div style={{
+                      width: '56px',
+                      height: '56px',
+                      borderRadius: '50%',
+                      background: `linear-gradient(135deg, ${getAvatarColor(clienteNombre)}, ${getAvatarColor(clienteNombre)}dd)`,
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'center',
+                      color: 'white',
+                      fontSize: '18px',
+                      fontWeight: '600',
+                      letterSpacing: '0.5px',
+                      border: '3px solid #f1f5f9'
+                    }}>
+                      {getInitials(clienteNombre)}
+                    </div>
+                  )}
+                  <div style={{ flex: 1, minWidth: 0 }}>
+                    <div style={{
+                      fontWeight: '600',
+                      fontSize: '15px',
+                      color: '#1e293b',
+                      marginBottom: '2px',
+                      overflow: 'hidden',
+                      textOverflow: 'ellipsis',
+                      whiteSpace: 'nowrap'
+                    }}>{clienteNombre}</div>
+                    {(clienteCargo || clienteEmpresa) && (
+                      <div style={{
+                        fontSize: '13px',
+                        color: '#64748b',
+                        overflow: 'hidden',
+                        textOverflow: 'ellipsis',
+                        whiteSpace: 'nowrap'
+                      }}>
+                        {[clienteCargo, clienteEmpresa].filter(Boolean).join(' · ')}
                       </div>
-                    </div>
-                  </td>
-                  <td><div className="item-excerpt">{stripHtml(test.contenido, 80)}</div></td>
-                  <td>{'⭐'.repeat(test.rating)}</td>
-                  <td>
+                    )}
+                  </div>
+                </div>
+
+                {/* Título si existe */}
+                {titulo && (
+                  <div style={{
+                    fontWeight: '600',
+                    fontSize: '15px',
+                    color: '#334155',
+                    lineHeight: '1.4'
+                  }}>{titulo}</div>
+                )}
+
+                {/* Contenido del testimonio */}
+                <div style={{
+                  fontSize: '14px',
+                  color: '#475569',
+                  lineHeight: '1.65',
+                  flex: 1,
+                  display: '-webkit-box',
+                  WebkitLineClamp: 4,
+                  WebkitBoxOrient: 'vertical',
+                  overflow: 'hidden'
+                }}>
+                  {stripHtml(test.contenido, 200)}
+                </div>
+
+                {/* Footer: Rating + Estado + Acciones */}
+                <div style={{
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'space-between',
+                  paddingTop: '12px',
+                  borderTop: '1px solid #f1f5f9'
+                }}>
+                  {/* Rating */}
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '2px' }}>
+                    {[1, 2, 3, 4, 5].map(star => (
+                      <span key={star} style={{
+                        color: star <= rating ? '#fbbf24' : '#e2e8f0',
+                        fontSize: '16px'
+                      }}>★</span>
+                    ))}
+                  </div>
+
+                  {/* Estado + Acciones */}
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
                     <button
-                      onClick={() => handleTogglePublicado('testimonio', test.id, test.publicado)}
-                      className={`status-btn ${test.publicado ? 'published' : 'draft'}`}
+                      onClick={() => handleTogglePublicado('testimonio', test.id, publicado)}
+                      style={{
+                        padding: '4px 10px',
+                        borderRadius: '6px',
+                        fontSize: '12px',
+                        fontWeight: '500',
+                        border: 'none',
+                        cursor: 'pointer',
+                        background: publicado ? 'linear-gradient(135deg, #10b981 0%, #059669 100%)' : '#fef3c7',
+                        color: publicado ? 'white' : '#92400e'
+                      }}
                     >
-                      {test.publicado ? 'Publicado' : 'Borrador'}
+                      {publicado ? 'Publicado' : 'Borrador'}
                     </button>
-                  </td>
-                  <td>
-                    <div className="row-actions">
-                      <button onClick={() => navigate(`/crm/${tenantSlug}/contenido/testimonios/${test.id}`)} className="action-btn">{Icons.edit}</button>
-                      <button onClick={() => setDeleteConfirm({ tipo: 'testimonio', id: test.id })} className="action-btn action-btn-danger">{Icons.trash}</button>
-                    </div>
-                  </td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        </div>
+                    <button
+                      onClick={() => navigate(`/crm/${tenantSlug}/contenido/testimonios/${test.id}`)}
+                      style={{
+                        padding: '6px',
+                        borderRadius: '6px',
+                        border: '1px solid #e2e8f0',
+                        background: 'white',
+                        cursor: 'pointer',
+                        display: 'flex',
+                        alignItems: 'center',
+                        justifyContent: 'center',
+                        color: '#64748b',
+                        transition: 'all 0.15s ease'
+                      }}
+                      onMouseEnter={(e) => {
+                        e.currentTarget.style.borderColor = '#3b82f6';
+                        e.currentTarget.style.color = '#3b82f6';
+                      }}
+                      onMouseLeave={(e) => {
+                        e.currentTarget.style.borderColor = '#e2e8f0';
+                        e.currentTarget.style.color = '#64748b';
+                      }}
+                    >
+                      {Icons.edit}
+                    </button>
+                    <button
+                      onClick={() => setDeleteConfirm({ tipo: 'testimonio', id: test.id })}
+                      style={{
+                        padding: '6px',
+                        borderRadius: '6px',
+                        border: '1px solid #e2e8f0',
+                        background: 'white',
+                        cursor: 'pointer',
+                        display: 'flex',
+                        alignItems: 'center',
+                        justifyContent: 'center',
+                        color: '#64748b',
+                        transition: 'all 0.15s ease'
+                      }}
+                      onMouseEnter={(e) => {
+                        e.currentTarget.style.borderColor = '#ef4444';
+                        e.currentTarget.style.color = '#ef4444';
+                      }}
+                      onMouseLeave={(e) => {
+                        e.currentTarget.style.borderColor = '#e2e8f0';
+                        e.currentTarget.style.color = '#64748b';
+                      }}
+                    >
+                      {Icons.trash}
+                    </button>
+                  </div>
+                </div>
+              </div>
+            );
+          })}
+            </div>
+          ) : (
+            /* Vista de Lista */
+            <div className="table-container">
+              <table className="data-table testimonios-table">
+                <thead>
+                  <tr>
+                    <th style={{ width: '18%' }}>CLIENTE</th>
+                    <th style={{ width: '16%' }}>TÍTULO</th>
+                    <th style={{ width: '32%' }}>CONTENIDO</th>
+                    <th style={{ width: '10%', textAlign: 'center' }}>RATING</th>
+                    <th style={{ width: '12%', textAlign: 'center' }}>ESTADO</th>
+                    <th style={{ width: '12%', textAlign: 'center' }}>ACCIONES</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {testimonios.map(test => {
+                    const t = test as any;
+                    const clienteFoto = t.cliente_foto;
+                    const clienteNombre = t.cliente_nombre || 'Cliente';
+                    const clienteCargo = t.cliente_cargo;
+                    const clienteEmpresa = t.cliente_empresa;
+                    const titulo = t.titulo || '';
+                    const rating = t.rating || 0;
+                    const publicado = t.publicado;
+
+                    return (
+                      <tr key={test.id}>
+                        <td>
+                          <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+                            {clienteFoto ? (
+                              <img
+                                src={clienteFoto}
+                                alt={clienteNombre}
+                                style={{
+                                  width: '36px',
+                                  height: '36px',
+                                  borderRadius: '50%',
+                                  objectFit: 'cover'
+                                }}
+                              />
+                            ) : (
+                              <div style={{
+                                width: '36px',
+                                height: '36px',
+                                borderRadius: '50%',
+                                background: `linear-gradient(135deg, ${getAvatarColor(clienteNombre)}, ${getAvatarColor(clienteNombre)}dd)`,
+                                display: 'flex',
+                                alignItems: 'center',
+                                justifyContent: 'center',
+                                color: 'white',
+                                fontSize: '13px',
+                                fontWeight: '600'
+                              }}>
+                                {getInitials(clienteNombre)}
+                              </div>
+                            )}
+                            <div>
+                              <div style={{ fontWeight: '500', color: '#1e293b' }}>{clienteNombre}</div>
+                              {(clienteCargo || clienteEmpresa) && (
+                                <div style={{ fontSize: '12px', color: '#64748b' }}>
+                                  {[clienteCargo, clienteEmpresa].filter(Boolean).join(' · ')}
+                                </div>
+                              )}
+                            </div>
+                          </div>
+                        </td>
+                        <td>{titulo || '-'}</td>
+                        <td style={{ maxWidth: '300px' }}>
+                          <div style={{
+                            overflow: 'hidden',
+                            textOverflow: 'ellipsis',
+                            whiteSpace: 'nowrap'
+                          }}>
+                            {stripHtml(test.contenido, 100)}
+                          </div>
+                        </td>
+                        <td style={{ textAlign: 'center' }}>
+                          <div style={{ display: 'flex', gap: '1px', justifyContent: 'center' }}>
+                            {[1, 2, 3, 4, 5].map(star => (
+                              <span key={star} style={{
+                                color: star <= rating ? '#fbbf24' : '#e2e8f0',
+                                fontSize: '14px'
+                              }}>★</span>
+                            ))}
+                          </div>
+                        </td>
+                        <td style={{ textAlign: 'center' }}>
+                          <button
+                            onClick={() => handleTogglePublicado('testimonio', test.id, publicado)}
+                            className={`status-btn ${publicado ? 'published' : 'draft'}`}
+                          >
+                            {publicado ? 'Publicado' : 'Borrador'}
+                          </button>
+                        </td>
+                        <td style={{ textAlign: 'center' }}>
+                          <div className="action-buttons">
+                            <button
+                              className="action-btn"
+                              onClick={() => navigate(`/crm/${tenantSlug}/contenido/testimonios/${test.id}`)}
+                              title="Editar"
+                            >
+                              {Icons.edit}
+                            </button>
+                            <button
+                              className="action-btn action-btn-danger"
+                              onClick={() => setDeleteConfirm({ tipo: 'testimonio', id: test.id })}
+                              title="Eliminar"
+                            >
+                              {Icons.trash}
+                            </button>
+                          </div>
+                        </td>
+                      </tr>
+                    );
+                  })}
+                </tbody>
+              </table>
+            </div>
+          )}
+        </>
       )}
     </>
   );
@@ -890,27 +1334,34 @@ export default function CrmContenido() {
               </tr>
             </thead>
             <tbody>
-              {seoStats.map(seo => (
-                <tr key={seo.id}>
-                  <td><div className="item-title">{seo.titulo}</div></td>
-                  <td>{seo.tipoAsociacion}</td>
-                  <td>{seo.asociacionNombre || '-'}</td>
-                  <td>
-                    <button
-                      onClick={() => handleTogglePublicado('seo', seo.id, seo.publicado)}
-                      className={`status-btn ${seo.publicado ? 'published' : 'draft'}`}
-                    >
-                      {seo.publicado ? 'Publicado' : 'Borrador'}
-                    </button>
-                  </td>
-                  <td>
-                    <div className="row-actions">
-                      <button onClick={() => navigate(`/crm/${tenantSlug}/contenido/seo/${seo.id}`)} className="action-btn">{Icons.edit}</button>
-                      <button onClick={() => setDeleteConfirm({ tipo: 'seo', id: seo.id })} className="action-btn action-btn-danger">{Icons.trash}</button>
-                    </div>
-                  </td>
-                </tr>
-              ))}
+              {seoStats.map(seo => {
+                // Soportar tanto snake_case (API) como camelCase
+                const s = seo as any;
+                const tipoAsociacion = s.tipoAsociacion || s.tipo_asociacion || '-';
+                const asociacionNombre = s.asociacionNombre || s.asociacion_nombre || '-';
+
+                return (
+                  <tr key={seo.id}>
+                    <td><div className="item-title">{seo.titulo}</div></td>
+                    <td>{tipoAsociacion}</td>
+                    <td>{asociacionNombre}</td>
+                    <td>
+                      <button
+                        onClick={() => handleTogglePublicado('seo', seo.id, seo.publicado)}
+                        className={`status-btn ${seo.publicado ? 'published' : 'draft'}`}
+                      >
+                        {seo.publicado ? 'Publicado' : 'Borrador'}
+                      </button>
+                    </td>
+                    <td>
+                      <div className="row-actions">
+                        <button onClick={() => navigate(`/crm/${tenantSlug}/contenido/seo-stats/${seo.id}`)} className="action-btn">{Icons.edit}</button>
+                        <button onClick={() => setDeleteConfirm({ tipo: 'seo', id: seo.id })} className="action-btn action-btn-danger">{Icons.trash}</button>
+                      </div>
+                    </td>
+                  </tr>
+                );
+              })}
             </tbody>
           </table>
         </div>
@@ -1081,7 +1532,7 @@ export default function CrmContenido() {
                         <div className="rel-content-name">{getContenidoNombre(c)}</div>
                         {c.publicado !== undefined && (
                           <span className={`rel-status ${c.publicado ? 'published' : 'draft'}`}>
-                            {c.publicado ? 'Pub' : 'Borr'}
+                            {c.publicado ? 'Publicado' : 'Borrador'}
                           </span>
                         )}
                       </div>
@@ -1103,28 +1554,95 @@ export default function CrmContenido() {
             </div>
           )}
 
-          {/* Relaciones existentes del origen seleccionado */}
-          {contenidoOrigenSeleccionado && relaciones.length > 0 && (
-            <div className="rel-existing-section">
-              <div className="rel-existing-header">
-                {Icons.link}
-                <span>Relaciones existentes ({relaciones.length})</span>
-              </div>
-              <div className="rel-existing-list-compact">
-                {relaciones.map(rel => (
-                  <div key={rel.id} className="rel-existing-row">
-                    <span className="rel-existing-badge">
-                      {TIPOS_DESTINO_BUTTONS.find(t => t.value === rel.tipoDestino)?.label || rel.tipoDestino}
-                    </span>
-                    <span className="rel-existing-id">{rel.idDestino.slice(0, 8)}...</span>
-                    <button onClick={() => handleEliminarRelacion(rel.id)} className="rel-delete-mini">
-                      {Icons.trash}
-                    </button>
+          {/* Relaciones existentes del origen seleccionado (bidireccional) */}
+          {contenidoOrigenSeleccionado && relaciones.length > 0 && (() => {
+            // Separar relaciones salientes (este contenido apunta a) y entrantes (este contenido es referenciado por)
+            const relacionesSalientes = relaciones.filter(r => r.direccion === 'origen');
+            const relacionesEntrantes = relaciones.filter(r => r.direccion === 'destino');
+
+            return (
+              <div className="rel-existing-section">
+                <div className="rel-existing-header">
+                  {Icons.link}
+                  <span>Relaciones ({relaciones.length})</span>
+                </div>
+
+                {/* Relaciones salientes - Este contenido apunta a */}
+                {relacionesSalientes.length > 0 && (
+                  <div className="rel-group">
+                    <div className="rel-group-title outgoing">
+                      <span className="rel-group-arrow">→</span>
+                      <span>Apunta a ({relacionesSalientes.length})</span>
+                    </div>
+                    <div className="rel-existing-list-compact">
+                      {relacionesSalientes.map(rel => {
+                        const tipoInfo = TIPOS_DESTINO_BUTTONS.find(t => t.value === rel.tipoDestino);
+                        // Usar nombreDestino del backend, fallback a getRelacionNombre si no existe
+                        const nombreRelacionado = rel.nombreDestino || getRelacionNombre(rel.tipoDestino, rel.idDestino);
+                        return (
+                          <div key={rel.id} className="rel-existing-row outgoing">
+                            <span
+                              className="rel-existing-badge"
+                              style={{ background: tipoInfo?.color || '#6366f1' }}
+                            >
+                              {tipoInfo?.label || rel.tipoDestino}
+                            </span>
+                            <span className="rel-existing-name" title={nombreRelacionado}>
+                              {nombreRelacionado}
+                            </span>
+                            <button
+                              onClick={() => handleEliminarRelacion(rel.id)}
+                              className="rel-delete-mini"
+                              title="Eliminar relación"
+                            >
+                              {Icons.trash}
+                            </button>
+                          </div>
+                        );
+                      })}
+                    </div>
                   </div>
-                ))}
+                )}
+
+                {/* Relaciones entrantes - Este contenido es referenciado por */}
+                {relacionesEntrantes.length > 0 && (
+                  <div className="rel-group">
+                    <div className="rel-group-title incoming">
+                      <span className="rel-group-arrow">←</span>
+                      <span>Referenciado por ({relacionesEntrantes.length})</span>
+                    </div>
+                    <div className="rel-existing-list-compact">
+                      {relacionesEntrantes.map(rel => {
+                        const tipoInfo = TIPOS_DESTINO_BUTTONS.find(t => t.value === rel.tipoOrigen);
+                        // Usar nombreOrigen del backend, fallback a getRelacionNombre si no existe
+                        const nombreRelacionado = rel.nombreOrigen || getRelacionNombre(rel.tipoOrigen, rel.idOrigen);
+                        return (
+                          <div key={rel.id} className="rel-existing-row incoming">
+                            <span
+                              className="rel-existing-badge"
+                              style={{ background: tipoInfo?.color || '#6366f1' }}
+                            >
+                              {tipoInfo?.label || rel.tipoOrigen}
+                            </span>
+                            <span className="rel-existing-name" title={nombreRelacionado}>
+                              {nombreRelacionado}
+                            </span>
+                            <button
+                              onClick={() => handleEliminarRelacion(rel.id)}
+                              className="rel-delete-mini"
+                              title="Eliminar relación"
+                            >
+                              {Icons.trash}
+                            </button>
+                          </div>
+                        );
+                      })}
+                    </div>
+                  </div>
+                )}
               </div>
-            </div>
-          )}
+            );
+          })()}
         </div>
 
         {/* COLUMNA 2: Destino */}
@@ -1306,6 +1824,54 @@ export default function CrmContenido() {
     <div className="page contenido-page">
       <style>{contenidoStyles}</style>
       <style>{`
+        /* Banners de mensajes */
+        .error-banner, .success-banner {
+          display: flex;
+          align-items: center;
+          justify-content: space-between;
+          padding: 14px 20px;
+          border-radius: 12px;
+          margin-bottom: 16px;
+          font-size: 0.9rem;
+          font-weight: 500;
+          animation: slideDown 0.3s ease-out;
+        }
+        @keyframes slideDown {
+          from { opacity: 0; transform: translateY(-10px); }
+          to { opacity: 1; transform: translateY(0); }
+        }
+        .error-banner {
+          background: linear-gradient(135deg, #fef2f2, #fee2e2);
+          border: 1px solid #fecaca;
+          color: #dc2626;
+        }
+        .success-banner {
+          background: linear-gradient(135deg, #f0fdf4, #dcfce7);
+          border: 1px solid #bbf7d0;
+          color: #16a34a;
+        }
+        .error-banner button, .success-banner button {
+          background: none;
+          border: none;
+          font-size: 1.2rem;
+          cursor: pointer;
+          padding: 4px 8px;
+          border-radius: 6px;
+          transition: background 0.2s;
+        }
+        .error-banner button {
+          color: #dc2626;
+        }
+        .error-banner button:hover {
+          background: rgba(220, 38, 38, 0.1);
+        }
+        .success-banner button {
+          color: #16a34a;
+        }
+        .success-banner button:hover {
+          background: rgba(22, 163, 74, 0.1);
+        }
+
         /* Tabs con personalidad */
         .contenido-tabs {
           display: flex;
@@ -1440,11 +2006,24 @@ export default function CrmContenido() {
         .rel-existing-section { margin-top: 16px; padding-top: 16px; border-top: 1px solid #e2e8f0; }
         .rel-existing-header { display: flex; align-items: center; gap: 8px; font-size: 0.875rem; font-weight: 600; color: #64748b; margin-bottom: 12px; }
         .rel-existing-header svg { width: 16px; height: 16px; }
-        .rel-existing-list-compact { display: flex; flex-direction: column; gap: 8px; max-height: 180px; overflow-y: auto; }
-        .rel-existing-row { display: flex; align-items: center; gap: 10px; padding: 10px 12px; background: #f8fafc; border-radius: 8px; }
-        .rel-existing-badge { background: #e0e7ff; color: #4338ca; padding: 3px 8px; border-radius: 6px; font-size: 0.6875rem; font-weight: 600; text-transform: uppercase; flex-shrink: 0; }
+
+        .rel-group { margin-bottom: 12px; }
+        .rel-group:last-child { margin-bottom: 0; }
+        .rel-group-title { display: flex; align-items: center; gap: 6px; font-size: 0.75rem; font-weight: 600; text-transform: uppercase; letter-spacing: 0.5px; padding: 6px 0; }
+        .rel-group-title.outgoing { color: #10b981; }
+        .rel-group-title.incoming { color: #8b5cf6; }
+        .rel-group-arrow { font-size: 1rem; font-weight: 700; }
+
+        .rel-existing-list-compact { display: flex; flex-direction: column; gap: 6px; max-height: 180px; overflow-y: auto; padding-left: 4px; }
+        .rel-existing-row { display: flex; align-items: center; gap: 10px; padding: 8px 12px; background: #f8fafc; border-radius: 8px; border: 1px solid #e2e8f0; transition: all 0.15s; }
+        .rel-existing-row:hover { background: #f1f5f9; border-color: #cbd5e1; }
+        .rel-existing-row.outgoing { border-left: 3px solid #10b981; }
+        .rel-existing-row.incoming { border-left: 3px solid #8b5cf6; }
+        .rel-existing-badge { color: white; padding: 4px 10px; border-radius: 6px; font-size: 0.6875rem; font-weight: 600; text-transform: uppercase; flex-shrink: 0; }
+        .rel-existing-name { flex: 1; font-size: 0.8125rem; color: #334155; font-weight: 500; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
         .rel-existing-id { flex: 1; font-size: 0.8125rem; color: #64748b; font-family: monospace; }
-        .rel-delete-mini { width: 28px; height: 28px; border: none; background: transparent; color: #ef4444; cursor: pointer; display: flex; align-items: center; justify-content: center; opacity: 0.6; transition: opacity 0.15s; border-radius: 6px; }
+        .rel-direction-indicator { font-size: 1rem; font-weight: 700; color: #3b82f6; width: 18px; text-align: center; flex-shrink: 0; }
+        .rel-delete-mini { width: 28px; height: 28px; border: none; background: transparent; color: #ef4444; cursor: pointer; display: flex; align-items: center; justify-content: center; opacity: 0.6; transition: all 0.15s; border-radius: 6px; }
         .rel-delete-mini:hover { opacity: 1; background: #fee2e2; }
         .rel-delete-mini svg { width: 16px; height: 16px; }
 
@@ -1472,12 +2051,265 @@ export default function CrmContenido() {
         .icon-picker-item { width: 48px; height: 48px; display: flex; align-items: center; justify-content: center; border-radius: 8px; cursor: pointer; border: 2px solid transparent; transition: all 0.15s; }
         .icon-picker-item:hover { background: #f1f5f9; border-color: #3b82f6; }
         .icon-picker-item.selected { background: #3b82f6; color: white; }
+
+        /* Modal Form para Categorías */
+        .modal-form { max-width: 540px; }
+        .modal-form.modal-categoria-amplio { max-width: 800px; }
+        .modal-form .modal-body { padding: 24px; }
+        .modal-form .grid-2 { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; margin-bottom: 16px; }
+        .modal-form .form-group { display: flex; flex-direction: column; gap: 6px; margin-bottom: 16px; }
+        .modal-form .form-group:last-child { margin-bottom: 0; }
+        .modal-form .form-group label { font-weight: 500; color: #374151; font-size: 0.875rem; }
+        .modal-form .form-group input,
+        .modal-form .form-group select,
+        .modal-form .form-group textarea {
+          padding: 10px 12px;
+          border: 1px solid #e2e8f0;
+          border-radius: 8px;
+          font-size: 0.9rem;
+          transition: border-color 0.15s, box-shadow 0.15s;
+        }
+        .modal-form .form-group input:focus,
+        .modal-form .form-group select:focus,
+        .modal-form .form-group textarea:focus {
+          outline: none;
+          border-color: #3b82f6;
+          box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.15);
+        }
+        .modal-form .checkbox-label { display: flex; align-items: center; gap: 8px; cursor: pointer; font-size: 0.9rem; color: #374151; }
+        .modal-form .checkbox-label input[type="checkbox"] { width: 18px; height: 18px; cursor: pointer; }
+        .modal-actions { display: flex; justify-content: flex-end; gap: 12px; padding: 16px 24px; border-top: 1px solid #e2e8f0; background: #f8fafc; border-radius: 0 0 14px 14px; }
+        .modal-actions .btn-cancel { padding: 10px 18px; background: white; border: 1px solid #e2e8f0; border-radius: 8px; color: #64748b; font-weight: 500; cursor: pointer; transition: all 0.15s; }
+        .modal-actions .btn-cancel:hover { background: #f1f5f9; border-color: #cbd5e1; }
+
+        /* Sección de categoría con banderas */
+        .categoria-seccion { background: #f8fafc; border-radius: 10px; padding: 16px; margin-bottom: 8px; }
+        .categoria-seccion-titulo { display: flex; align-items: center; gap: 8px; font-weight: 600; color: #1e293b; margin-bottom: 12px; font-size: 0.95rem; }
+        .categoria-seccion-titulo .flag-emoji { font-size: 1.2rem; }
+        .categoria-seccion .form-group { margin-bottom: 12px; }
+        .categoria-seccion .form-group:last-child { margin-bottom: 0; }
+        .traducciones-toggle:hover { color: #2563eb; }
+
+        /* Icon Picker mejorado */
+        .icon-picker-modal {
+          background: white;
+          border-radius: 12px;
+          width: 90%;
+          max-width: 600px;
+          max-height: 80vh;
+          display: flex;
+          flex-direction: column;
+          box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.25);
+        }
+        .icon-picker-header {
+          padding: 16px;
+          border-bottom: 1px solid #e2e8f0;
+        }
+        .icon-picker-grid {
+          display: grid;
+          grid-template-columns: repeat(auto-fill, minmax(52px, 1fr));
+          gap: 8px;
+          padding: 16px;
+          overflow-y: auto;
+          max-height: 400px;
+        }
+        .icon-picker-item {
+          width: 100%;
+          aspect-ratio: 1;
+          display: flex;
+          align-items: center;
+          justify-content: center;
+          border-radius: 8px;
+          cursor: pointer;
+          border: 2px solid transparent;
+          transition: all 0.15s;
+          background: #f8fafc;
+        }
+        .icon-picker-item:hover { background: #e2e8f0; border-color: #3b82f6; }
+        .icon-picker-item.selected { background: #3b82f6; color: white; border-color: #2563eb; }
+
+        /* ========== FILTERS BAR - Diseño mejorado ========== */
+        .filters-bar {
+          display: flex;
+          align-items: center;
+          gap: 16px;
+          padding: 16px 20px;
+          background: white;
+          border: 1px solid #e2e8f0;
+          border-radius: 12px;
+          margin-bottom: 20px;
+          flex-wrap: wrap;
+        }
+
+        .filters-bar .search-box {
+          flex: 1;
+          min-width: 280px;
+          display: flex;
+          align-items: center;
+          gap: 12px;
+          padding: 12px 16px;
+          background: linear-gradient(135deg, #f8fafc 0%, #f1f5f9 100%);
+          border: 2px solid #e2e8f0;
+          border-radius: 12px;
+          transition: all 0.2s ease;
+        }
+
+        .filters-bar .search-box:hover {
+          border-color: #cbd5e1;
+          background: #f8fafc;
+        }
+
+        .filters-bar .search-box:focus-within {
+          background: white;
+          border-color: #3b82f6;
+          box-shadow: none;
+        }
+
+        .filters-bar .search-box .search-icon {
+          color: #94a3b8;
+          flex-shrink: 0;
+          transition: color 0.2s;
+        }
+
+        .filters-bar .search-box:focus-within .search-icon {
+          color: #3b82f6;
+        }
+
+        .filters-bar .search-box input {
+          flex: 1;
+          border: none !important;
+          background: transparent !important;
+          outline: none !important;
+          box-shadow: none !important;
+          font-size: 0.9375rem;
+          color: #1e293b;
+          font-weight: 450;
+          -webkit-appearance: none;
+          appearance: none;
+        }
+
+        .filters-bar .search-box input:focus {
+          border: none !important;
+          outline: none !important;
+          box-shadow: none !important;
+          ring: none !important;
+        }
+
+        .filters-bar .search-box input::placeholder {
+          color: #94a3b8;
+          font-weight: 400;
+        }
+
+        /* Selectores mejorados */
+        .filters-bar .filters-right {
+          display: flex;
+          gap: 12px;
+          flex-wrap: wrap;
+        }
+
+        /* Toggle de vista */
+        .view-toggle {
+          display: flex;
+          background: #f1f5f9;
+          border-radius: 8px;
+          padding: 3px;
+          gap: 2px;
+        }
+        .view-toggle-btn {
+          padding: 8px 10px;
+          border-radius: 6px;
+          border: none;
+          cursor: pointer;
+          background: transparent;
+          color: #64748b;
+          display: flex;
+          align-items: center;
+          justify-content: center;
+          transition: all 0.15s ease;
+        }
+        .view-toggle-btn:hover {
+          color: #475569;
+          background: rgba(255,255,255,0.5);
+        }
+        .view-toggle-btn.active {
+          background: white;
+          color: #1e293b;
+          box-shadow: 0 1px 3px rgba(0,0,0,0.08);
+        }
+
+        /* Tabla de testimonios */
+        .testimonios-table {
+          table-layout: fixed;
+          width: 100%;
+        }
+
+        .filter-select {
+          appearance: none;
+          padding: 12px 40px 12px 16px;
+          background: white;
+          border: 2px solid #e2e8f0;
+          border-radius: 10px;
+          font-size: 0.875rem;
+          font-weight: 500;
+          color: #475569;
+          cursor: pointer;
+          transition: all 0.2s ease;
+          background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='20' height='20' viewBox='0 0 24 24' fill='none' stroke='%2364748b' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpolyline points='6 9 12 15 18 9'%3E%3C/polyline%3E%3C/svg%3E");
+          background-repeat: no-repeat;
+          background-position: right 12px center;
+          background-size: 18px;
+          min-width: 180px;
+        }
+
+        .filter-select:hover {
+          border-color: #cbd5e1;
+          background-color: #fafafa;
+          background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='20' height='20' viewBox='0 0 24 24' fill='none' stroke='%2364748b' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpolyline points='6 9 12 15 18 9'%3E%3C/polyline%3E%3C/svg%3E");
+        }
+
+        .filter-select:focus {
+          outline: none;
+          border-color: #3b82f6;
+          box-shadow: none;
+          background-color: white;
+          background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='20' height='20' viewBox='0 0 24 24' fill='none' stroke='%233b82f6' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpolyline points='6 9 12 15 18 9'%3E%3C/polyline%3E%3C/svg%3E");
+        }
+
+        .filter-select option {
+          padding: 12px;
+          font-size: 0.875rem;
+        }
+
+        /* Responsive filters */
+        @media (max-width: 768px) {
+          .filters-bar {
+            flex-direction: column;
+            align-items: stretch;
+          }
+          .filters-bar .search-box {
+            min-width: 100%;
+          }
+          .filters-bar .filters-right {
+            width: 100%;
+          }
+          .filter-select {
+            flex: 1;
+            min-width: 0;
+          }
+        }
       `}</style>
 
       {error && (
         <div className="error-banner">
           <span>{error}</span>
           <button onClick={() => setError(null)}>×</button>
+        </div>
+      )}
+
+      {successMessage && (
+        <div className="success-banner">
+          <span>{successMessage}</span>
+          <button onClick={() => setSuccessMessage(null)}>×</button>
         </div>
       )}
 
@@ -1536,7 +2368,40 @@ export default function CrmContenido() {
               onChange={(e) => setBusqueda(e.target.value)}
             />
           </div>
-          <div className="filters-right" style={{ display: 'flex', gap: '12px' }}>
+
+          {/* Toggle de vista para testimonios */}
+          {activeTab === 'testimonios' && (
+            <div className="view-toggle">
+              <button
+                onClick={() => setTestimoniosViewMode('cards')}
+                className={`view-toggle-btn ${testimoniosViewMode === 'cards' ? 'active' : ''}`}
+                title="Vista tarjetas"
+              >
+                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                  <rect x="3" y="3" width="7" height="7" rx="1"/>
+                  <rect x="14" y="3" width="7" height="7" rx="1"/>
+                  <rect x="3" y="14" width="7" height="7" rx="1"/>
+                  <rect x="14" y="14" width="7" height="7" rx="1"/>
+                </svg>
+              </button>
+              <button
+                onClick={() => setTestimoniosViewMode('list')}
+                className={`view-toggle-btn ${testimoniosViewMode === 'list' ? 'active' : ''}`}
+                title="Vista lista"
+              >
+                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                  <line x1="8" y1="6" x2="21" y2="6"/>
+                  <line x1="8" y1="12" x2="21" y2="12"/>
+                  <line x1="8" y1="18" x2="21" y2="18"/>
+                  <circle cx="4" cy="6" r="1.5" fill="currentColor"/>
+                  <circle cx="4" cy="12" r="1.5" fill="currentColor"/>
+                  <circle cx="4" cy="18" r="1.5" fill="currentColor"/>
+                </svg>
+              </button>
+            </div>
+          )}
+
+          <div className="filters-right">
             {activeTab !== 'seo' && categorias.length > 0 && (
               <select value={filtroCategoria} onChange={(e) => setFiltroCategoria(e.target.value)} className="filter-select">
                 <option value="">Todas las categorías</option>
@@ -1586,65 +2451,170 @@ export default function CrmContenido() {
       {/* Modal de Categoría */}
       {showCategoriaModal && (
         <div className="modal-overlay" onClick={() => setShowCategoriaModal(false)}>
-          <div className="modal-content modal-form" onClick={(e) => e.stopPropagation()}>
+          <div className="modal-content modal-form modal-categoria-amplio" onClick={(e) => e.stopPropagation()}>
             <div className="modal-header">
               <h3>{editingCategoria ? 'Editar Categoría' : 'Nueva Categoría'}</h3>
               <button onClick={() => setShowCategoriaModal(false)} className="btn-icon">{Icons.x}</button>
             </div>
             <form onSubmit={(e) => { e.preventDefault(); handleSaveCategoria(); }}>
-              <div className="modal-body">
-                <div className="grid-2">
-                  <div className="form-group">
-                    <label>Nombre *</label>
-                    <input
-                      type="text"
-                      value={categoriaForm.nombre}
-                      onChange={(e) => {
-                        setCategoriaForm({ ...categoriaForm, nombre: e.target.value });
-                        if (!editingCategoria) {
-                          setCategoriaForm(prev => ({ ...prev, slug: generateSlug(e.target.value) }));
-                        }
-                      }}
-                      required
-                    />
+              <div className="modal-body" style={{ maxHeight: '70vh', overflowY: 'auto' }}>
+                {/* Sección principal en español */}
+                <div className="categoria-seccion">
+                  <div className="categoria-seccion-titulo">
+                    <span className="flag-emoji">🇪🇸</span> Español (Principal)
+                  </div>
+                  <div className="grid-2">
+                    <div className="form-group">
+                      <label>Nombre *</label>
+                      <input
+                        type="text"
+                        value={categoriaForm.nombre}
+                        onChange={(e) => {
+                          setCategoriaForm({ ...categoriaForm, nombre: e.target.value });
+                          if (!editingCategoria) {
+                            setCategoriaForm(prev => ({ ...prev, slug: generateSlug(e.target.value) }));
+                          }
+                        }}
+                        required
+                      />
+                    </div>
+                    <div className="form-group">
+                      <label>Tipo *</label>
+                      <select value={categoriaForm.tipo} onChange={(e) => setCategoriaForm({ ...categoriaForm, tipo: e.target.value as any })}>
+                        {TIPOS_CONTENIDO.map(t => <option key={t.value} value={t.value}>{t.label}</option>)}
+                      </select>
+                    </div>
                   </div>
                   <div className="form-group">
-                    <label>Tipo *</label>
-                    <select value={categoriaForm.tipo} onChange={(e) => setCategoriaForm({ ...categoriaForm, tipo: e.target.value as any })}>
-                      {TIPOS_CONTENIDO.map(t => <option key={t.value} value={t.value}>{t.label}</option>)}
-                    </select>
-                  </div>
-                </div>
-                <div className="form-group">
-                  <label>Slug</label>
-                  <input type="text" value={categoriaForm.slug} onChange={(e) => setCategoriaForm({ ...categoriaForm, slug: e.target.value })} />
-                </div>
-                <div className="form-group">
-                  <label>Descripción</label>
-                  <textarea value={categoriaForm.descripcion} onChange={(e) => setCategoriaForm({ ...categoriaForm, descripcion: e.target.value })} rows={2} />
-                </div>
-                <div className="grid-2">
-                  <div className="form-group">
-                    <label>Icono</label>
-                    <button type="button" onClick={() => setShowIconPicker(true)} className="btn-secondary" style={{ width: '100%', justifyContent: 'center' }}>
-                      {categoriaForm.icono ? (
-                        <span style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                          {renderLucideIcon(categoriaForm.icono, 18)}
-                          {categoriaForm.icono}
-                        </span>
-                      ) : 'Seleccionar icono'}
-                    </button>
+                    <label>Slug</label>
+                    <input type="text" value={categoriaForm.slug} onChange={(e) => setCategoriaForm({ ...categoriaForm, slug: e.target.value })} />
                   </div>
                   <div className="form-group">
-                    <label>Color</label>
-                    <input type="color" value={categoriaForm.color} onChange={(e) => setCategoriaForm({ ...categoriaForm, color: e.target.value })} style={{ width: '100%', height: '40px' }} />
+                    <label>Descripción</label>
+                    <textarea value={categoriaForm.descripcion} onChange={(e) => setCategoriaForm({ ...categoriaForm, descripcion: e.target.value })} rows={2} />
                   </div>
                 </div>
-                <div className="form-group">
-                  <label className="checkbox-label">
-                    <input type="checkbox" checked={categoriaForm.activa} onChange={(e) => setCategoriaForm({ ...categoriaForm, activa: e.target.checked })} />
-                    Categoría activa
-                  </label>
+
+                {/* Toggle para traducciones */}
+                {idiomasSecundarios.length > 0 && (
+                <div
+                  className="traducciones-toggle"
+                  onClick={() => setShowTraducciones(!showTraducciones)}
+                  style={{
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: '8px',
+                    padding: '12px 0',
+                    cursor: 'pointer',
+                    borderTop: '1px solid #e2e8f0',
+                    marginTop: '16px',
+                    color: '#3b82f6',
+                    fontWeight: 500
+                  }}
+                >
+                  <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" style={{ transform: showTraducciones ? 'rotate(90deg)' : 'rotate(0deg)', transition: '0.2s' }}>
+                    <polyline points="9 18 15 12 9 6"/>
+                  </svg>
+                  <span>🌐 Traducciones ({idiomasSecundarios.map(i => i.labelNativo).join(' / ')})</span>
+                </div>
+                )}
+
+                {/* Sección de traducciones - Dinámico según idiomas del tenant */}
+                {showTraducciones && idiomasSecundarios.length > 0 && (
+                  <div className="traducciones-container" style={{ display: 'grid', gridTemplateColumns: idiomasSecundarios.length === 1 ? '1fr' : '1fr 1fr', gap: '20px', marginTop: '12px' }}>
+                    {idiomasSecundarios.map((idioma) => (
+                      <div key={idioma.code} className="categoria-seccion">
+                        <div className="categoria-seccion-titulo">
+                          <span className="flag-emoji">{idioma.flagEmoji}</span> {idioma.labelNativo}
+                        </div>
+                        <div className="form-group">
+                          <label>{idioma.code === 'en' ? 'Name' : idioma.code === 'pt' ? 'Nome' : idioma.code === 'fr' ? 'Nom' : 'Nombre'}</label>
+                          <input
+                            type="text"
+                            value={categoriaForm.traducciones?.[idioma.code]?.nombre || ''}
+                            onChange={(e) => {
+                              const newName = e.target.value;
+                              const code = idioma.code;
+                              setCategoriaForm(prev => ({
+                                ...prev,
+                                traducciones: {
+                                  ...prev.traducciones,
+                                  [code]: { ...prev.traducciones?.[code], nombre: newName }
+                                },
+                                slugTraducciones: {
+                                  ...prev.slugTraducciones,
+                                  [code]: !prev.slugTraducciones?.[code] || prev.slugTraducciones[code] === generateSlug(prev.traducciones?.[code]?.nombre || '')
+                                    ? generateSlug(newName)
+                                    : prev.slugTraducciones[code]
+                                }
+                              }));
+                            }}
+                            placeholder={`${idioma.code === 'en' ? 'Category name' : idioma.code === 'pt' ? 'Nome da categoria' : idioma.code === 'fr' ? 'Nom de catégorie' : 'Nombre'} (${idioma.labelNativo})`}
+                          />
+                        </div>
+                        <div className="form-group">
+                          <label>Slug ({idioma.code})</label>
+                          <input
+                            type="text"
+                            value={categoriaForm.slugTraducciones?.[idioma.code] || ''}
+                            onChange={(e) => {
+                              const code = idioma.code;
+                              setCategoriaForm(prev => ({
+                                ...prev,
+                                slugTraducciones: { ...prev.slugTraducciones, [code]: e.target.value }
+                              }));
+                            }}
+                            placeholder={`slug-${idioma.code}`}
+                          />
+                        </div>
+                        <div className="form-group">
+                          <label>{idioma.code === 'en' ? 'Description' : idioma.code === 'pt' ? 'Descrição' : idioma.code === 'fr' ? 'Description' : 'Descripcion'}</label>
+                          <textarea
+                            value={categoriaForm.traducciones?.[idioma.code]?.descripcion || ''}
+                            onChange={(e) => {
+                              const code = idioma.code;
+                              setCategoriaForm(prev => ({
+                                ...prev,
+                                traducciones: {
+                                  ...prev.traducciones,
+                                  [code]: { ...prev.traducciones?.[code], descripcion: e.target.value }
+                                }
+                              }));
+                            }}
+                            rows={2}
+                            placeholder={`${idioma.code === 'en' ? 'Description' : idioma.code === 'pt' ? 'Descrição' : idioma.code === 'fr' ? 'Description' : 'Descripcion'} (${idioma.labelNativo})`}
+                          />
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                )}
+
+                {/* Icono, Color y Estado */}
+                <div style={{ borderTop: '1px solid #e2e8f0', marginTop: '16px', paddingTop: '16px' }}>
+                  <div className="grid-2">
+                    <div className="form-group">
+                      <label>Icono</label>
+                      <button type="button" onClick={() => setShowIconPicker(true)} className="btn-secondary" style={{ width: '100%', justifyContent: 'center' }}>
+                        {categoriaForm.icono ? (
+                          <span style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                            {renderLucideIcon(categoriaForm.icono, 18)}
+                            {categoriaForm.icono}
+                          </span>
+                        ) : 'Seleccionar icono'}
+                      </button>
+                    </div>
+                    <div className="form-group">
+                      <label>Color</label>
+                      <input type="color" value={categoriaForm.color} onChange={(e) => setCategoriaForm({ ...categoriaForm, color: e.target.value })} style={{ width: '100%', height: '40px' }} />
+                    </div>
+                  </div>
+                  <div className="form-group">
+                    <label className="checkbox-label">
+                      <input type="checkbox" checked={categoriaForm.activa} onChange={(e) => setCategoriaForm({ ...categoriaForm, activa: e.target.checked })} />
+                      Categoría activa
+                    </label>
+                  </div>
                 </div>
               </div>
               <div className="modal-actions">
@@ -1692,11 +2662,18 @@ export default function CrmContenido() {
       {/* Modal de confirmación de eliminación */}
       {deleteConfirm && (
         <div className="modal-overlay" onClick={() => setDeleteConfirm(null)}>
-          <div className="modal-content" onClick={(e) => e.stopPropagation()}>
-            <h3>Eliminar {deleteConfirm.tipo}</h3>
-            <p>¿Estás seguro de que deseas eliminar este elemento? Esta acción no se puede deshacer.</p>
-            <div className="modal-actions">
-              <button onClick={() => setDeleteConfirm(null)} className="btn-cancel">Cancelar</button>
+          <div className="modal-content modal-small" onClick={(e) => e.stopPropagation()}>
+            <div className="modal-header">
+              <h3>Eliminar {deleteConfirm.tipo}</h3>
+              <button className="modal-close" onClick={() => setDeleteConfirm(null)}>&times;</button>
+            </div>
+            <div className="modal-body">
+              <p style={{ margin: 0, color: 'var(--premium-text-main, #111827)' }}>
+                ¿Estás seguro de que deseas eliminar este elemento? Esta acción no se puede deshacer.
+              </p>
+            </div>
+            <div className="modal-footer">
+              <button onClick={() => setDeleteConfirm(null)} className="btn-secondary">Cancelar</button>
               <button onClick={handleDelete} className="btn-danger">Eliminar</button>
             </div>
           </div>

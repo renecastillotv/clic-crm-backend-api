@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react';
+import { createPortal } from 'react-dom';
 import {
   Upload, Eye, CheckCircle2, Circle, RefreshCw, X, Download, FileText, Image, AlertCircle, Calendar
 } from 'lucide-react';
@@ -92,13 +93,14 @@ const CrmFinanzasVentaExpediente: React.FC<CrmFinanzasVentaExpedienteProps> = ({
         throw new Error(`Tipo de archivo no permitido. Use: ${requerimiento.tipos_archivo_permitidos.join(', ')}`);
       }
 
-      // Subir archivo
+      // Subir archivo usando la ruta de upload del tenant
       const formData = new FormData();
       formData.append('file', file);
+      formData.append('folder', `ventas/${ventaId}/expediente`);
 
       const token = await getToken();
       const uploadResponse = await fetch(
-        `${import.meta.env.VITE_API_BASE_URL || 'http://localhost:3001/api'}/upload/ventas/${tenantActual.id}/${ventaId}/expediente`,
+        `${import.meta.env.VITE_API_BASE_URL || 'http://localhost:3001/api'}/tenants/${tenantActual.id}/upload/file`,
         {
           method: 'POST',
           headers: {
@@ -116,10 +118,12 @@ const CrmFinanzasVentaExpediente: React.FC<CrmFinanzasVentaExpedienteProps> = ({
       const uploadData = await uploadResponse.json();
 
       // Guardar item en BD
+      // El endpoint devuelve { url, key, size } directamente
+      // El backend espera snake_case para los campos
       await upsertItemExpediente(tenantActual.id, ventaId, {
-        requerimientoId: requerimiento.id,
-        url_documento: uploadData.file.url,
-        ruta_documento: uploadData.file.key,
+        requerimiento_id: requerimiento.id,
+        url_documento: uploadData.url,
+        ruta_documento: uploadData.key,
         tipo_archivo: file.type,
         tamaño_archivo: file.size,
         nombre_documento: file.name,
@@ -136,23 +140,18 @@ const CrmFinanzasVentaExpediente: React.FC<CrmFinanzasVentaExpedienteProps> = ({
     }
   };
 
-  const downloadFile = async (url: string, fileName: string) => {
-    try {
-      setError(null);
-      const response = await fetch(url);
-      const blob = await response.blob();
-      const downloadUrl = window.URL.createObjectURL(blob);
-      const link = document.createElement('a');
-      link.href = downloadUrl;
-      link.download = fileName;
-      document.body.appendChild(link);
-      link.click();
-      document.body.removeChild(link);
-      window.URL.revokeObjectURL(downloadUrl);
-    } catch (error: any) {
-      console.error('❌ Error descargando archivo:', error);
-      setError('Error al descargar archivo: ' + error.message);
-    }
+  const downloadFile = (url: string, fileName: string) => {
+    if (!tenantActual?.id) return;
+
+    // Usar endpoint proxy del backend para evitar problemas de CORS con R2
+    const downloadUrl = `${import.meta.env.VITE_API_BASE_URL || 'http://localhost:3001/api'}/tenants/${tenantActual.id}/upload/download?url=${encodeURIComponent(url)}&filename=${encodeURIComponent(fileName)}`;
+
+    const link = document.createElement('a');
+    link.href = downloadUrl;
+    link.download = fileName;
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
   };
 
   const viewFile = (item: ItemExpediente, requerimiento: RequerimientoExpediente) => {
@@ -735,19 +734,39 @@ const CrmFinanzasVentaExpediente: React.FC<CrmFinanzasVentaExpedienteProps> = ({
         </div>
       )}
 
-      {/* Modal de visor de documentos */}
-      {viewerOpen && viewerFile && (
-        <div className="modal-overlay" onClick={closeViewer}>
-          <div 
-            className="modal-content modal-large" 
+      {/* Modal de visor de documentos - Usando Portal para renderizar fuera del contexto de stacking */}
+      {viewerOpen && viewerFile && createPortal(
+        <div
+          onClick={closeViewer}
+          style={{
+            position: 'fixed',
+            top: 0,
+            left: 0,
+            right: 0,
+            bottom: 0,
+            zIndex: 50000,
+            background: 'rgba(15, 23, 42, 0.75)',
+            backdropFilter: 'blur(12px)',
+            WebkitBackdropFilter: 'blur(12px)',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            padding: '32px'
+          }}
+        >
+          <div
             onClick={(e) => e.stopPropagation()}
-            style={{ 
-              maxWidth: '90vw', 
-              width: '100%',
-              height: '90vh',
-              maxHeight: '90vh',
+            style={{
+              width: 'calc(100vw - 48px)',
+              maxWidth: '1400px',
+              height: 'calc(100vh - 48px)',
+              maxHeight: '900px',
               display: 'flex',
-              flexDirection: 'column'
+              flexDirection: 'column',
+              background: 'white',
+              borderRadius: '16px',
+              boxShadow: '0 25px 50px -12px rgba(0, 0, 0, 0.25)',
+              overflow: 'hidden'
             }}
           >
             {/* Header del modal */}
@@ -1035,7 +1054,8 @@ const CrmFinanzasVentaExpediente: React.FC<CrmFinanzasVentaExpedienteProps> = ({
               </div>
             )}
           </div>
-        </div>
+        </div>,
+        document.body
       )}
     </div>
   );

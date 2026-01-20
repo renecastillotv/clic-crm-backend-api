@@ -23,6 +23,8 @@ interface ModalAplicarPagoProps {
   moneda: string;
   comisionId?: string;
   loading?: boolean;
+  titulo?: string;
+  descripcion?: string;
 }
 
 export default function ModalAplicarPago({
@@ -32,7 +34,9 @@ export default function ModalAplicarPago({
   montoAdeudado,
   montoPagado,
   moneda,
-  loading = false
+  loading = false,
+  titulo = 'Aplicar Pago',
+  descripcion
 }: ModalAplicarPagoProps) {
   const [tipoPago, setTipoPago] = useState<'parcial' | 'total'>('parcial');
   const [monto, setMonto] = useState('');
@@ -211,14 +215,14 @@ export default function ModalAplicarPago({
                 color: '#1e293b',
                 margin: 0
               }}>
-                Aplicar Pago
+                {titulo}
               </h2>
               <p style={{
                 fontSize: '0.875rem',
                 color: '#64748b',
                 margin: '4px 0 0 0'
               }}>
-                Monto pendiente: {formatCurrency(montoPendiente)}
+                {descripcion || `Monto pendiente: ${formatCurrency(montoPendiente)}`}
               </p>
             </div>
           </div>
@@ -713,7 +717,7 @@ export default function ModalAplicarPago({
             ) : (
               <>
                 <CheckCircle className="w-4 h-4" />
-                Aplicar Pago
+                {titulo}
               </>
             )}
           </button>

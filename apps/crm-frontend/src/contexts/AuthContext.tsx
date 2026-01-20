@@ -15,6 +15,9 @@ import { useUser, useAuth as useClerkAuth } from '@clerk/clerk-react';
 // VITE_API_URL ya incluye /api, por ejemplo: http://localhost:3001/api
 const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:3001/api';
 
+// Key para persistir el tenant seleccionado en localStorage
+const TENANT_STORAGE_KEY = 'clic_selected_tenant_id';
+
 // Tipos
 export interface Tenant {
   id: string;
@@ -127,9 +130,11 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   // Sincronizar usuario con backend cuando Clerk carga
   useEffect(() => {
     async function syncUser() {
+      console.log('🔄 syncUser - clerkLoaded:', clerkLoaded, 'isSignedIn:', isSignedIn);
       if (!clerkLoaded) return;
 
       if (!isSignedIn || !clerkUser) {
+        console.log('🔄 No hay sesión, limpiando estado');
         setUser(null);
         setTenantActual(null);
         setModulos([]);
@@ -141,7 +146,9 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         setIsLoading(true);
         setError(null);
 
+        console.log('🔄 Obteniendo token...');
         const token = await getTokenStable();
+        console.log('🔄 Token obtenido, llamando a /auth/sync...');
 
         // Sincronizar con backend
         const response = await fetch(`${API_URL}/auth/sync`, {
@@ -159,16 +166,27 @@ export function AuthProvider({ children }: { children: ReactNode }) {
           }),
         });
 
+        console.log('🔄 Respuesta de /auth/sync:', response.status);
         if (!response.ok) {
           throw new Error('Error al sincronizar usuario');
         }
 
         const userData = await response.json();
+        console.log('🔄 Usuario sincronizado:', userData?.email);
         setUser(userData);
 
-        // Establecer tenant por defecto
+        // Establecer tenant por defecto: primero buscar el persistido, si no el primero
         if (userData.tenants && userData.tenants.length > 0) {
-          setTenantActual(userData.tenants[0]);
+          const savedTenantId = localStorage.getItem(TENANT_STORAGE_KEY);
+          const savedTenant = savedTenantId
+            ? userData.tenants.find((t: Tenant) => t.id === savedTenantId)
+            : null;
+
+          const tenantToSet = savedTenant || userData.tenants[0];
+          setTenantActual(tenantToSet);
+
+          // Asegurar que el tenant está persistido
+          localStorage.setItem(TENANT_STORAGE_KEY, tenantToSet.id);
         }
       } catch (err: any) {
         console.error('Error sincronizando usuario:', err);
@@ -234,15 +252,27 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     setUser(null);
     setTenantActual(null);
     setModulos([]);
+    // Limpiar tenant persistido
+    localStorage.removeItem(TENANT_STORAGE_KEY);
   };
 
-  // Cambiar tenant
+  // Wrapper para setTenantActual que persiste en localStorage
+  const setTenantActualWithPersist = useCallback((tenant: Tenant | null) => {
+    setTenantActual(tenant);
+    if (tenant) {
+      localStorage.setItem(TENANT_STORAGE_KEY, tenant.id);
+    } else {
+      localStorage.removeItem(TENANT_STORAGE_KEY);
+    }
+  }, []);
+
+  // Cambiar tenant por slug
   const switchTenant = (tenantSlug: string) => {
     if (!user) return;
 
     const tenant = user.tenants.find((t) => t.slug === tenantSlug);
     if (tenant) {
-      setTenantActual(tenant);
+      setTenantActualWithPersist(tenant);
     }
   };
 
@@ -309,7 +339,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         isAuthenticated: !!user,
         error,
         tenantActual,
-        setTenantActual,
+        setTenantActual: setTenantActualWithPersist,
         modulos,
         loadingModulos,
         isPlatformAdmin,

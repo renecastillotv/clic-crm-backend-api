@@ -18,6 +18,7 @@ import CrmLayout from './layouts/CrmLayout';
 
 // Páginas públicas
 import SaasPage from './pages/SaasPage';
+import VerificarCertificado from './pages/VerificarCertificado';
 
 // Páginas de autenticación
 import LoginPage from './pages/auth/LoginPage';
@@ -40,12 +41,16 @@ import AdminRoles from './pages/admin/AdminRoles';
 // Páginas CRM
 import CrmDashboard from './pages/crm/CrmDashboard';
 import CrmPropiedades from './pages/crm/CrmPropiedades';
+import CrmPropiedadDetalle from './pages/crm/CrmPropiedadDetalle';
+import CrmPropiedadEditar from './pages/crm/CrmPropiedadEditar';
+import CrmImportaciones from './pages/crm/CrmImportaciones';
 import CrmClientes from './pages/crm/CrmClientes';
 import CrmContactos from './pages/crm/CrmContactos';
 import ContactoDetalle from './pages/crm/ContactoDetalle';
 import CrmSolicitudes from './pages/crm/CrmSolicitudes';
 import SolicitudDetalle from './pages/crm/SolicitudDetalle';
 import CrmPropuestas from './pages/crm/CrmPropuestas';
+import CrmPropuestaEditar from './pages/crm/CrmPropuestaEditar';
 import CrmActividades from './pages/crm/CrmActividades';
 import CrmMetas from './pages/crm/CrmMetas';
 import CrmEquipo from './pages/crm/CrmEquipo';
@@ -55,33 +60,63 @@ import { CrmWebPaginas, CrmWebSecciones, CrmWebSeccionEditar, CrmWebTema, CrmWeb
 // Páginas de Finanzas
 import CrmFinanzasVentas from './pages/crm/CrmFinanzasVentas';
 import CrmFinanzasVentaDetalle from './pages/crm/CrmFinanzasVentaDetalle';
+import CrmFinanzasComisiones from './pages/crm/CrmFinanzasComisiones';
 import CrmFinanzasFacturas from './pages/crm/CrmFinanzasFacturas';
 import CrmFinanzasConfiguracion from './pages/crm/CrmFinanzasConfiguracion';
 
-// Páginas de Mensajería
+// Páginas de Mensajería (con tabs integrados)
 import CrmMensajeria from './pages/crm/CrmMensajeria';
-import CrmMensajeriaWhatsapp from './pages/crm/CrmMensajeriaWhatsapp';
-import CrmMensajeriaInstagram from './pages/crm/CrmMensajeriaInstagram';
-import CrmMensajeriaFacebook from './pages/crm/CrmMensajeriaFacebook';
-import CrmMensajeriaCorreo from './pages/crm/CrmMensajeriaCorreo';
-import CrmMensajeriaChatVivo from './pages/crm/CrmMensajeriaChatVivo';
-import CrmMensajeriaConfiguracion from './pages/crm/CrmMensajeriaConfiguracion';
 
 // Páginas de Contenido y CLIC Connect
 import CrmContenido from './pages/crm/CrmContenido';
 import CrmClicConnect from './pages/crm/CrmClicConnect';
 import CrmClicConnectSolicitudes from './pages/crm/CrmClicConnectSolicitudes';
+import CrmClicConnectUpgradeRequests from './pages/crm/CrmClicConnectUpgradeRequests';
+
+// Páginas de University
+import CrmUniversity from './pages/crm/CrmUniversity';
+import CrmUniversityCursoEditar from './pages/crm/CrmUniversityCursoEditar';
+import CrmUniversityCertificados from './pages/crm/CrmUniversityCertificados';
+import CrmUniversityCertificadoEditar from './pages/crm/CrmUniversityCertificadoEditar';
+import CrmUniversityCertificadosEmitidos from './pages/crm/CrmUniversityCertificadosEmitidos';
+
+// Mi Entrenamiento (consumo de cursos por usuarios)
+import MiEntrenamiento from './pages/crm/MiEntrenamiento';
+import MiEntrenamientoCurso from './pages/crm/MiEntrenamientoCurso';
+
+// Editores de Contenido
+import CrmArticuloEditor from './pages/crm/contenido/CrmArticuloEditor';
+import CrmVideoEditor from './pages/crm/contenido/CrmVideoEditor';
+import CrmFaqEditor from './pages/crm/contenido/CrmFaqEditor';
+import CrmTestimonioEditor from './pages/crm/contenido/CrmTestimonioEditor';
+import CrmSeoStatEditor from './pages/crm/contenido/CrmSeoStatEditor';
+
+// Páginas de Sistema de Fases y Productividad
+import CrmSistemaFases from './pages/crm/CrmSistemaFases';
+import CrmSistemaFasesConfiguracion from './pages/crm/CrmSistemaFasesConfiguracion';
+import CrmProductividad from './pages/crm/CrmProductividad';
+import CrmProductividadConfiguracion from './pages/crm/CrmProductividadConfiguracion';
+
+// Páginas de Marketing
+import CrmMarketing from './pages/crm/CrmMarketing';
+import CrmMarketingApiConfig from './pages/crm/CrmMarketingApiConfig';
+import CrmMarketingBranding from './pages/crm/CrmMarketingBranding';
+import CrmMarketingImageConverter from './pages/crm/CrmMarketingImageConverter';
+import CrmMarketingFlyerGenerator from './pages/crm/CrmMarketingFlyerGenerator';
+import CrmMarketingStoriesCreator from './pages/crm/CrmMarketingStoriesCreator';
+import CrmMarketingTemplates from './pages/crm/CrmMarketingTemplates';
 
 // Páginas de Configuración adicionales
 import CrmUsuarios from './pages/crm/CrmUsuarios';
 import CrmUsuarioEditar from './pages/crm/CrmUsuarioEditar';
-import CrmRoles from './pages/crm/CrmRoles';
-import CrmRolEditar from './pages/crm/CrmRolEditar';
+import CrmInfoNegocio from './pages/crm/CrmInfoNegocio';
+import CrmEquiposConfig from './pages/crm/CrmEquiposConfig';
+import CrmOficinasConfig from './pages/crm/CrmOficinasConfig';
 import CrmCatalogosConfig from './pages/crm/CrmCatalogosConfig';
 import CrmCatalogoEditar from './pages/crm/CrmCatalogoEditar';
-import CrmOficinasConfig from './pages/crm/CrmOficinasConfig';
-import CrmEquiposConfig from './pages/crm/CrmEquiposConfig';
-import CrmInfoNegocio from './pages/crm/CrmInfoNegocio';
+import CrmAmenidadesConfig from './pages/crm/CrmAmenidadesConfig';
+import CrmFuentesLeadConfig from './pages/crm/CrmFuentesLeadConfig';
+import CrmExtensionesContactoConfig from './pages/crm/CrmExtensionesContactoConfig';
 
 import './App.css';
 
@@ -202,6 +237,8 @@ function AppRoutes() {
     <Routes>
       {/* ========== RUTAS PÚBLICAS ========== */}
       <Route path="/" element={<SaasPage />} />
+      <Route path="/verificar" element={<VerificarCertificado />} />
+      <Route path="/verificar/:codigo" element={<VerificarCertificado />} />
 
       {/* ========== AUTENTICACIÓN ========== */}
       <Route path="/login/*" element={<LoginPage />} />
@@ -254,58 +291,105 @@ function AppRoutes() {
         }
       >
         <Route index element={<CrmDashboard />} />
+
+        {/* Propiedades */}
         <Route path="propiedades" element={<CrmPropiedades />} />
+        <Route path="propiedades/nueva" element={<CrmPropiedadEditar />} />
+        <Route path="propiedades/importar" element={<CrmImportaciones />} />
+        <Route path="propiedades/:propiedadId" element={<CrmPropiedadDetalle />} />
+        <Route path="propiedades/:propiedadId/editar" element={<CrmPropiedadEditar />} />
+
+        {/* CRM Core */}
         <Route path="contactos" element={<CrmContactos />} />
         <Route path="contactos/:contactoId" element={<ContactoDetalle />} />
         <Route path="pipeline" element={<CrmSolicitudes />} />
         <Route path="pipeline/:solicitudId" element={<SolicitudDetalle />} />
         <Route path="propuestas" element={<CrmPropuestas />} />
+        <Route path="propuestas/nueva" element={<CrmPropuestaEditar />} />
+        <Route path="propuestas/:propuestaId" element={<CrmPropuestaEditar />} />
         <Route path="actividades" element={<CrmActividades />} />
         <Route path="metas" element={<CrmMetas />} />
         <Route path="clientes" element={<CrmClientes />} />
         <Route path="equipo" element={<CrmEquipo />} />
-        <Route path="configuracion" element={<CrmConfiguracion />} />
 
-        {/* Web Builder */}
+        {/* Contenido y CLIC Connect */}
+        <Route path="contenido" element={<CrmContenido />} />
+        <Route path="clic-connect" element={<CrmClicConnect />} />
+        <Route path="clic-connect/solicitudes" element={<CrmClicConnectSolicitudes />} />
+        <Route path="clic-connect/upgrade-requests" element={<CrmClicConnectUpgradeRequests />} />
+
+        {/* University */}
+        <Route path="university" element={<CrmUniversity />} />
+        <Route path="university/cursos/:cursoId" element={<CrmUniversityCursoEditar />} />
+        <Route path="university/certificados" element={<CrmUniversityCertificados />} />
+        <Route path="university/certificados/nuevo" element={<CrmUniversityCertificadoEditar />} />
+        <Route path="university/certificados/:certificadoId" element={<CrmUniversityCertificadoEditar />} />
+        <Route path="university/certificados-emitidos" element={<CrmUniversityCertificadosEmitidos />} />
+
+        {/* Mi Entrenamiento */}
+        <Route path="mi-entrenamiento" element={<MiEntrenamiento />} />
+        <Route path="mi-entrenamiento/curso/:cursoId" element={<MiEntrenamientoCurso />} />
+
+        {/* Finanzas */}
+        <Route path="finanzas/ventas" element={<CrmFinanzasVentas />} />
+        <Route path="finanzas/ventas/:ventaId" element={<CrmFinanzasVentaDetalle />} />
+        <Route path="finanzas/comisiones" element={<CrmFinanzasComisiones />} />
+        <Route path="finanzas/facturas" element={<CrmFinanzasFacturas />} />
+        <Route path="finanzas/configuracion" element={<CrmFinanzasConfiguracion />} />
+
+        {/* Mensajería (una sola página con tabs) */}
+        <Route path="mensajeria" element={<CrmMensajeria />} />
+
+        {/* Marketing Hub */}
+        <Route path="marketing" element={<CrmMarketing />} />
+        <Route path="marketing/branding" element={<CrmMarketingBranding />} />
+        <Route path="marketing/convertir-imagenes" element={<CrmMarketingImageConverter />} />
+        <Route path="marketing/flyers" element={<CrmMarketingFlyerGenerator />} />
+        <Route path="marketing/stories" element={<CrmMarketingStoriesCreator />} />
+        <Route path="marketing/plantillas" element={<CrmMarketingTemplates />} />
+        <Route path="marketing/configuracion-apis" element={<CrmMarketingApiConfig />} />
+
+        {/* Sistema de Fases y Productividad */}
+        <Route path="sistema-fases" element={<CrmSistemaFases />} />
+        <Route path="sistema-fases/configuracion" element={<CrmSistemaFasesConfiguracion />} />
+        <Route path="productividad" element={<CrmProductividad />} />
+        <Route path="productividad/configuracion" element={<CrmProductividadConfiguracion />} />
+
+        {/* Usuarios */}
+        <Route path="usuarios" element={<CrmUsuarios />} />
+        <Route path="usuarios/nuevo" element={<CrmUsuarioEditar />} />
+        <Route path="usuarios/:usuarioId" element={<CrmUsuarioEditar />} />
+
+        {/* Configuración (Web, Tema, General) */}
         <Route path="web/paginas" element={<CrmWebPaginas />} />
         <Route path="web/paginas/:paginaId" element={<CrmWebPaginaEditar />} />
         <Route path="web/paginas/nueva" element={<CrmWebPaginaEditar />} />
         <Route path="web/secciones" element={<CrmWebSecciones />} />
         <Route path="web/secciones/:tipoSeccion" element={<CrmWebSeccionEditar />} />
         <Route path="web/tema" element={<CrmWebTema />} />
+        <Route path="configuracion" element={<CrmConfiguracion />} />
 
-        {/* Finanzas */}
-        <Route path="finanzas/ventas" element={<CrmFinanzasVentas />} />
-        <Route path="finanzas/ventas/:ventaId" element={<CrmFinanzasVentaDetalle />} />
-        <Route path="finanzas/facturas" element={<CrmFinanzasFacturas />} />
-        <Route path="finanzas/configuracion" element={<CrmFinanzasConfiguracion />} />
+        {/* Configuración sub-páginas */}
+        <Route path="configuracion/negocio" element={<CrmInfoNegocio />} />
+        <Route path="configuracion/equipos" element={<CrmEquiposConfig />} />
+        <Route path="configuracion/oficinas" element={<CrmOficinasConfig />} />
+        <Route path="configuracion/personalizar" element={<CrmCatalogosConfig />} />
+        <Route path="configuracion/catalogos/:tipo" element={<CrmCatalogoEditar />} />
+        <Route path="configuracion/amenidades" element={<CrmAmenidadesConfig />} />
+        <Route path="configuracion/fuentes-lead" element={<CrmFuentesLeadConfig />} />
+        <Route path="configuracion/extensiones-contacto" element={<CrmExtensionesContactoConfig />} />
 
-        {/* Mensajería */}
-        <Route path="mensajeria" element={<CrmMensajeria />} />
-        <Route path="mensajeria/whatsapp" element={<CrmMensajeriaWhatsapp />} />
-        <Route path="mensajeria/instagram" element={<CrmMensajeriaInstagram />} />
-        <Route path="mensajeria/facebook" element={<CrmMensajeriaFacebook />} />
-        <Route path="mensajeria/correo" element={<CrmMensajeriaCorreo />} />
-        <Route path="mensajeria/chat-vivo" element={<CrmMensajeriaChatVivo />} />
-        <Route path="mensajeria/configuracion" element={<CrmMensajeriaConfiguracion />} />
-
-        {/* Contenido y CLIC Connect */}
-        <Route path="contenido" element={<CrmContenido />} />
-        <Route path="clic-connect" element={<CrmClicConnect />} />
-        <Route path="clic-connect/solicitudes" element={<CrmClicConnectSolicitudes />} />
-
-        {/* Configuración adicional */}
-        <Route path="usuarios" element={<CrmUsuarios />} />
-        <Route path="usuarios/nuevo" element={<CrmUsuarioEditar />} />
-        <Route path="usuarios/:usuarioId" element={<CrmUsuarioEditar />} />
-        <Route path="roles" element={<CrmRoles />} />
-        <Route path="roles/nuevo" element={<CrmRolEditar />} />
-        <Route path="roles/:rolId" element={<CrmRolEditar />} />
-        <Route path="catalogos" element={<CrmCatalogosConfig />} />
-        <Route path="catalogos/:tipo" element={<CrmCatalogoEditar />} />
-        <Route path="oficinas" element={<CrmOficinasConfig />} />
-        <Route path="equipos" element={<CrmEquiposConfig />} />
-        <Route path="info-negocio" element={<CrmInfoNegocio />} />
+        {/* Contenido editores */}
+        <Route path="contenido/articulos/nuevo" element={<CrmArticuloEditor />} />
+        <Route path="contenido/articulos/:id" element={<CrmArticuloEditor />} />
+        <Route path="contenido/videos/nuevo" element={<CrmVideoEditor />} />
+        <Route path="contenido/videos/:id" element={<CrmVideoEditor />} />
+        <Route path="contenido/faqs/nuevo" element={<CrmFaqEditor />} />
+        <Route path="contenido/faqs/:id" element={<CrmFaqEditor />} />
+        <Route path="contenido/testimonios/nuevo" element={<CrmTestimonioEditor />} />
+        <Route path="contenido/testimonios/:id" element={<CrmTestimonioEditor />} />
+        <Route path="contenido/seo-stats/nuevo" element={<CrmSeoStatEditor />} />
+        <Route path="contenido/seo-stats/:id" element={<CrmSeoStatEditor />} />
       </Route>
 
       {/* ========== REDIRECTS DE COMPATIBILIDAD ========== */}

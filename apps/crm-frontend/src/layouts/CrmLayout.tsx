@@ -4,8 +4,11 @@
 
 import { useState, useEffect, createContext, useContext, ReactNode } from 'react';
 import { Outlet, NavLink, useParams, useNavigate, useLocation } from 'react-router-dom';
-import { UserButton } from '@clerk/clerk-react';
+import { useClerk, useAuth as useClerkAuth } from '@clerk/clerk-react';
 import { useAuth } from '../contexts/AuthContext';
+import { CatalogosProvider } from '../contexts/CatalogosContext';
+import MiPerfil from '../components/MiPerfil';
+import { getInfoNegocio } from '../services/api';
 
 // ========== PAGE HEADER CONTEXT ==========
 interface PageHeaderStat {
@@ -128,7 +131,7 @@ const Icons = {
     </svg>
   ),
   chevronDown: (
-    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
       <polyline points="6 9 12 15 18 9"/>
     </svg>
   ),
@@ -258,6 +261,19 @@ const Icons = {
       <path d="M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1 4-10z"/>
     </svg>
   ),
+  university: (
+    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+      <path d="M22 10v6M2 10l10-5 10 5-10 5z"/>
+      <path d="M6 12v5c3 3 9 3 12 0v-5"/>
+    </svg>
+  ),
+  miEntrenamiento: (
+    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+      <path d="M4 19.5v-15A2.5 2.5 0 0 1 6.5 2H20v20H6.5a2.5 2.5 0 0 1 0-5H20"/>
+      <circle cx="12" cy="10" r="3"/>
+      <path d="m15.5 12.5-1 1"/>
+    </svg>
+  ),
   catalogos: (
     <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
       <path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20"/>
@@ -324,20 +340,54 @@ const Icons = {
       <rect x="3" y="14" width="7" height="7"/>
     </svg>
   ),
+  productividad: (
+    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+      <line x1="18" y1="20" x2="18" y2="10"/>
+      <line x1="12" y1="20" x2="12" y2="4"/>
+      <line x1="6" y1="20" x2="6" y2="14"/>
+    </svg>
+  ),
+  userProfile: (
+    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+      <path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/>
+      <circle cx="12" cy="7" r="4"/>
+    </svg>
+  ),
+  logout: (
+    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+      <path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/>
+      <polyline points="16 17 21 12 16 7"/>
+      <line x1="21" y1="12" x2="9" y2="12"/>
+    </svg>
+  ),
+  marketing: (
+    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+      <path d="M21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16z"/>
+      <polyline points="7.5 4.21 12 6.81 16.5 4.21"/>
+      <polyline points="7.5 19.79 7.5 14.6 3 12"/>
+      <polyline points="21 12 16.5 14.6 16.5 19.79"/>
+      <polyline points="3.27 6.96 12 12.01 20.73 6.96"/>
+      <line x1="12" y1="22.08" x2="12" y2="12"/>
+    </svg>
+  ),
 };
 
 export default function CrmLayout() {
   const { tenantSlug } = useParams<{ tenantSlug: string }>();
   const { user, tenantActual, switchTenant, isPlatformAdmin, tieneAcceso } = useAuth();
+  const { signOut } = useClerk();
+  const { getToken } = useClerkAuth();
   const navigate = useNavigate();
   const location = useLocation();
 
   const [crmOpen, setCrmOpen] = useState(false);
   const [finanzasOpen, setFinanzasOpen] = useState(false);
-  const [mensajeriaOpen, setMensajeriaOpen] = useState(false);
+  const [sistemaFasesOpen, setSistemaFasesOpen] = useState(false);
   const [configOpen, setConfigOpen] = useState(false);
   const [pageHeader, setPageHeader] = useState<PageHeaderInfo | null>(null);
   const [userMenuOpen, setUserMenuOpen] = useState(false);
+  const [perfilModalOpen, setPerfilModalOpen] = useState(false);
+  const [isotipoUrl, setIsotipoUrl] = useState<string | null>(null);
 
   // Sincronizar tenantActual con la URL cuando cambia el slug
   useEffect(() => {
@@ -349,7 +399,23 @@ export default function CrmLayout() {
     }
   }, [tenantSlug, user?.tenants, tenantActual?.slug, switchTenant]);
 
-  // Abrir automáticamente los submenús según la ruta
+  // Cargar isotipo del tenant
+  useEffect(() => {
+    const cargarIsotipo = async () => {
+      if (!tenantActual?.id) return;
+      try {
+        const token = await getToken();
+        const info = await getInfoNegocio(tenantActual.id, token);
+        // El campo puede ser isotipo o isotipo_url dependiendo del mapeo
+        setIsotipoUrl(info.isotipo || (info as any).isotipo_url || null);
+      } catch (err) {
+        console.error('Error cargando isotipo:', err);
+      }
+    };
+    cargarIsotipo();
+  }, [tenantActual?.id, getToken]);
+
+  // Abrir automáticamente los submenús según la ruta (y cerrar los demás)
   useEffect(() => {
     const isConfigRoute = location.pathname.includes('/web/') || location.pathname.includes('/configuracion');
     const isCrmRoute = location.pathname.includes('/contactos') ||
@@ -358,20 +424,22 @@ export default function CrmLayout() {
                        location.pathname.includes('/actividades') ||
                        location.pathname.includes('/metas');
     const isFinanzasRoute = location.pathname.includes('/finanzas');
-    const isMensajeriaRoute = location.pathname.includes('/mensajeria');
-    if (isConfigRoute) {
-      setConfigOpen(true);
-    }
-    if (isCrmRoute) {
-      setCrmOpen(true);
-    }
-    if (isFinanzasRoute) {
-      setFinanzasOpen(true);
-    }
-    if (isMensajeriaRoute) {
-      setMensajeriaOpen(true);
-    }
+    const isSistemaFasesRoute = location.pathname.includes('/sistema-fases') || location.pathname.includes('/productividad');
+
+    // Abrir solo el menú correspondiente a la ruta actual, cerrar los demás
+    setCrmOpen(isCrmRoute);
+    setFinanzasOpen(isFinanzasRoute);
+    setSistemaFasesOpen(isSistemaFasesRoute);
+    setConfigOpen(isConfigRoute);
   }, [location.pathname]);
+
+  // Función para manejar el toggle de submenús (cierra los demás al abrir uno)
+  const toggleSubmenu = (menu: 'crm' | 'finanzas' | 'sistemaFases' | 'config') => {
+    setCrmOpen(menu === 'crm' ? !crmOpen : false);
+    setFinanzasOpen(menu === 'finanzas' ? !finanzasOpen : false);
+    setSistemaFasesOpen(menu === 'sistemaFases' ? !sistemaFasesOpen : false);
+    setConfigOpen(menu === 'config' ? !configOpen : false);
+  };
 
   // Limpiar pageHeader cuando cambia la ruta
   useEffect(() => {
@@ -389,14 +457,6 @@ export default function CrmLayout() {
 
   const basePath = `/crm/${tenantSlug}`;
 
-  // Items del menú principal (sin submenú)
-  const mainMenuItems = [
-    { id: 'dashboard', path: '', label: 'Dashboard', icon: Icons.dashboard, end: true },
-    { id: 'propiedades', path: 'propiedades', label: 'Propiedades', icon: Icons.propiedades },
-    { id: 'contenido', path: 'contenido', label: 'Contenido', icon: Icons.contenido },
-    { id: 'clic-connect', path: 'clic-connect', label: 'CLIC Connect', icon: Icons.clicConnect },
-  ];
-
   // Sub-items de CRM
   const crmSubItems = [
     { id: 'contactos', path: 'contactos', label: 'Contactos', icon: Icons.clientes },
@@ -409,53 +469,41 @@ export default function CrmLayout() {
   // Sub-items de Finanzas
   const finanzasSubItems = [
     { id: 'finanzas-ventas', path: 'finanzas/ventas', label: 'Ventas', icon: Icons.ventas },
+    { id: 'finanzas-comisiones', path: 'finanzas/comisiones', label: 'Comisiones', icon: Icons.finanzas },
     { id: 'finanzas-facturas', path: 'finanzas/facturas', label: 'Mis Facturas', icon: Icons.facturas },
     { id: 'finanzas-config', path: 'finanzas/configuracion', label: 'Configuración', icon: Icons.finanzasConfig },
   ];
 
-  // Sub-items de Mensajería
-  const mensajeriaSubItems = [
-    { id: 'mensajeria-whatsapp', path: 'mensajeria/whatsapp', label: 'WhatsApp', icon: Icons.whatsapp },
-    { id: 'mensajeria-instagram', path: 'mensajeria/instagram', label: 'Instagram', icon: Icons.instagram },
-    { id: 'mensajeria-facebook', path: 'mensajeria/facebook', label: 'Facebook', icon: Icons.facebook },
-    { id: 'mensajeria-correo', path: 'mensajeria/correo', label: 'Correo', icon: Icons.email },
-    { id: 'mensajeria-chat', path: 'mensajeria/chat-vivo', label: 'Chat Vivo', icon: Icons.chatVivo },
-    { id: 'mensajeria-config', path: 'mensajeria/configuracion', label: 'Configuración', icon: Icons.configuracion },
+  // Sub-items de Sistema de Fases y Productividad
+  const sistemaFasesSubItems = [
+    { id: 'sistema-fases-dashboard', path: 'sistema-fases', label: 'Fases', icon: Icons.dashboard },
+    { id: 'productividad', path: 'productividad', label: 'Productividad', icon: Icons.productividad },
+    { id: 'sistema-fases-config', path: 'sistema-fases/configuracion', label: 'Config. Fases', icon: Icons.configuracion },
+    { id: 'productividad-config', path: 'productividad/configuracion', label: 'Config. Productividad', icon: Icons.configuracion },
   ];
 
-  // Sub-items de configuración
+  // Sub-items de configuración (Páginas Web, Tema, General)
   const configSubItems = [
     { id: 'web-paginas', path: 'web/paginas', label: 'Páginas Web', icon: Icons.paginas },
-    { id: 'web-secciones', path: 'web/secciones', label: 'Secciones Globales', icon: Icons.secciones },
     { id: 'web-tema', path: 'web/tema', label: 'Tema', icon: Icons.tema },
-    { id: 'usuarios', path: 'usuarios', label: 'Usuarios', icon: Icons.usuarios },
-    { id: 'roles', path: 'roles', label: 'Roles', icon: Icons.roles },
-    { id: 'catalogos', path: 'catalogos', label: 'Catálogos', icon: Icons.catalogos },
-    { id: 'oficinas', path: 'oficinas', label: 'Oficinas', icon: Icons.oficinas },
-    { id: 'equipos', path: 'equipos', label: 'Equipos', icon: Icons.equipos },
-    { id: 'info-negocio', path: 'info-negocio', label: 'Info Negocio', icon: Icons.infoNegocio },
     { id: 'configuracion', path: 'configuracion', label: 'General', icon: Icons.general },
   ];
 
   // Filtrar items según permisos
-  const visibleMainItems = mainMenuItems.filter(
-    (item) => item.id === 'dashboard' || tieneAcceso(item.id)
-  );
-
   const visibleCrmItems = crmSubItems.filter(
     (item) => tieneAcceso(item.id)
-  );
-
-  const visibleConfigItems = configSubItems.filter(
-    (item) => tieneAcceso(item.id) || item.id === 'configuracion'
   );
 
   const visibleFinanzasItems = finanzasSubItems.filter(
     (item) => tieneAcceso(item.id) || tieneAcceso('finanzas')
   );
 
-  const visibleMensajeriaItems = mensajeriaSubItems.filter(
-    (item) => tieneAcceso(item.id) || tieneAcceso('mensajeria')
+  const visibleSistemaFasesItems = sistemaFasesSubItems.filter(
+    (item) => tieneAcceso(item.id) || tieneAcceso('sistema-fases')
+  );
+
+  const visibleConfigItems = configSubItems.filter(
+    (item) => tieneAcceso(item.id) || item.id === 'configuracion'
   );
 
   const isCrmActive = location.pathname.includes('/contactos') ||
@@ -466,26 +514,25 @@ export default function CrmLayout() {
 
   const isFinanzasActive = location.pathname.includes('/finanzas');
 
-  const isMensajeriaActive = location.pathname.includes('/mensajeria');
+  const isSistemaFasesActive = location.pathname.includes('/sistema-fases') || location.pathname.includes('/productividad');
 
   const isConfigActive = location.pathname.includes('/web/') ||
-                         location.pathname.includes('/usuarios') ||
-                         location.pathname.includes('/roles') ||
-                         location.pathname.includes('/catalogos') ||
-                         location.pathname.includes('/oficinas') ||
-                         location.pathname.includes('/equipos') ||
-                         location.pathname.includes('/info-negocio') ||
                          location.pathname.endsWith('/configuracion');
 
   return (
+    <CatalogosProvider>
     <PageContext.Provider value={{ setPageHeader }}>
       <div className="crm-layout">
         {/* Sidebar */}
         <aside className="crm-sidebar">
           {/* Logo/Tenant */}
           <div className="sidebar-brand">
-            <div className="brand-logo">
-              {(tenantActual?.nombre || tenantSlug || 'T').charAt(0).toUpperCase()}
+            <div className={`brand-logo ${isotipoUrl ? 'has-image' : ''}`}>
+              {isotipoUrl ? (
+                <img src={isotipoUrl} alt={tenantActual?.nombre || 'Logo'} />
+              ) : (
+                (tenantActual?.nombre || tenantSlug || 'T').charAt(0).toUpperCase()
+              )}
             </div>
             <div className="brand-info">
               <span className="brand-name">{tenantActual?.nombre || tenantSlug}</span>
@@ -495,24 +542,24 @@ export default function CrmLayout() {
 
           {/* Navegación Principal */}
           <nav className="sidebar-nav">
+            {/* ==================== PRINCIPAL ==================== */}
             <div className="nav-section">
               <span className="nav-section-title">Principal</span>
-              {visibleMainItems.map((item) => (
-                <NavLink
-                  key={item.id}
-                  to={`${basePath}/${item.path}`}
-                  end={item.end}
-                  className={({ isActive }) => `nav-item ${isActive ? 'active' : ''}`}
-                >
-                  <span className="nav-icon">{item.icon}</span>
-                  <span className="nav-label">{item.label}</span>
-                </NavLink>
-              ))}
+
+              {/* Dashboard */}
+              <NavLink
+                to={`${basePath}/`}
+                end
+                className={({ isActive }) => `nav-item ${isActive ? 'active' : ''}`}
+              >
+                <span className="nav-icon">{Icons.dashboard}</span>
+                <span className="nav-label">Dashboard</span>
+              </NavLink>
 
               {/* CRM con submenú */}
               <button
                 className={`nav-item nav-expandable ${isCrmActive ? 'active' : ''}`}
-                onClick={() => setCrmOpen(!crmOpen)}
+                onClick={() => toggleSubmenu('crm')}
               >
                 <span className="nav-icon">{Icons.pipeline}</span>
                 <span className="nav-label">CRM</span>
@@ -534,10 +581,21 @@ export default function CrmLayout() {
                 ))}
               </div>
 
+              {/* Propiedades */}
+              {tieneAcceso('propiedades') && (
+                <NavLink
+                  to={`${basePath}/propiedades`}
+                  className={({ isActive }) => `nav-item ${isActive ? 'active' : ''}`}
+                >
+                  <span className="nav-icon">{Icons.propiedades}</span>
+                  <span className="nav-label">Propiedades</span>
+                </NavLink>
+              )}
+
               {/* Finanzas con submenú */}
               <button
                 className={`nav-item nav-expandable ${isFinanzasActive ? 'active' : ''}`}
-                onClick={() => setFinanzasOpen(!finanzasOpen)}
+                onClick={() => toggleSubmenu('finanzas')}
               >
                 <span className="nav-icon">{Icons.finanzas}</span>
                 <span className="nav-label">Finanzas</span>
@@ -559,20 +617,87 @@ export default function CrmLayout() {
                 ))}
               </div>
 
-              {/* Mensajería con submenú */}
-              <button
-                className={`nav-item nav-expandable ${isMensajeriaActive ? 'active' : ''}`}
-                onClick={() => setMensajeriaOpen(!mensajeriaOpen)}
+              {/* Mensajería */}
+              <NavLink
+                to={`${basePath}/mensajeria`}
+                className={({ isActive }) => `nav-item ${isActive ? 'active' : ''}`}
               >
                 <span className="nav-icon">{Icons.mensajeria}</span>
                 <span className="nav-label">Mensajería</span>
-                <span className={`nav-chevron ${mensajeriaOpen ? 'open' : ''}`}>
+              </NavLink>
+
+              {/* Marketing */}
+              <NavLink
+                to={`${basePath}/marketing`}
+                className={({ isActive }) => `nav-item ${isActive ? 'active' : ''}`}
+              >
+                <span className="nav-icon">{Icons.marketing}</span>
+                <span className="nav-label">Marketing</span>
+              </NavLink>
+            </div>
+
+            {/* ==================== FEATURES ==================== */}
+            <div className="nav-section">
+              <span className="nav-section-title">Features</span>
+
+              {/* Contenido */}
+              {tieneAcceso('contenido') && (
+                <NavLink
+                  to={`${basePath}/contenido`}
+                  className={({ isActive }) => `nav-item ${isActive ? 'active' : ''}`}
+                >
+                  <span className="nav-icon">{Icons.contenido}</span>
+                  <span className="nav-label">Contenido</span>
+                </NavLink>
+              )}
+
+              {/* CLIC Connect */}
+              {tieneAcceso('clic-connect') && (
+                <NavLink
+                  to={`${basePath}/clic-connect`}
+                  className={({ isActive }) => `nav-item ${isActive ? 'active' : ''}`}
+                >
+                  <span className="nav-icon">{Icons.clicConnect}</span>
+                  <span className="nav-label">CLIC Connect</span>
+                </NavLink>
+              )}
+
+              {/* University */}
+              {tieneAcceso('university') && (
+                <NavLink
+                  to={`${basePath}/university`}
+                  className={({ isActive }) => `nav-item ${isActive ? 'active' : ''}`}
+                >
+                  <span className="nav-icon">{Icons.university}</span>
+                  <span className="nav-label">University</span>
+                </NavLink>
+              )}
+
+              {/* Mi Entrenamiento */}
+              {tieneAcceso('mi-entrenamiento') && (
+                <NavLink
+                  to={`${basePath}/mi-entrenamiento`}
+                  className={({ isActive }) => `nav-item ${isActive ? 'active' : ''}`}
+                >
+                  <span className="nav-icon">{Icons.miEntrenamiento}</span>
+                  <span className="nav-label">Mi Entrenamiento</span>
+                </NavLink>
+              )}
+
+              {/* Rendimiento (Fases + Productividad) */}
+              <button
+                className={`nav-item nav-expandable ${isSistemaFasesActive ? 'active' : ''}`}
+                onClick={() => toggleSubmenu('sistemaFases')}
+              >
+                <span className="nav-icon">{Icons.fases}</span>
+                <span className="nav-label">Rendimiento</span>
+                <span className={`nav-chevron ${sistemaFasesOpen ? 'open' : ''}`}>
                   {Icons.chevronDown}
                 </span>
               </button>
 
-              <div className={`nav-submenu ${mensajeriaOpen ? 'open' : ''}`}>
-                {visibleMensajeriaItems.map((item) => (
+              <div className={`nav-submenu ${sistemaFasesOpen ? 'open' : ''}`}>
+                {visibleSistemaFasesItems.map((item) => (
                   <NavLink
                     key={item.id}
                     to={`${basePath}/${item.path}`}
@@ -585,12 +710,25 @@ export default function CrmLayout() {
               </div>
             </div>
 
-            {/* Configuración con submenú */}
+            {/* ==================== AJUSTES ==================== */}
             <div className="nav-section">
               <span className="nav-section-title">Ajustes</span>
+
+              {/* Usuarios */}
+              {tieneAcceso('usuarios') && (
+                <NavLink
+                  to={`${basePath}/usuarios`}
+                  className={({ isActive }) => `nav-item ${isActive ? 'active' : ''}`}
+                >
+                  <span className="nav-icon">{Icons.usuarios}</span>
+                  <span className="nav-label">Usuarios</span>
+                </NavLink>
+              )}
+
+              {/* Configuración con submenú */}
               <button
                 className={`nav-item nav-expandable ${isConfigActive ? 'active' : ''}`}
-                onClick={() => setConfigOpen(!configOpen)}
+                onClick={() => toggleSubmenu('config')}
               >
                 <span className="nav-icon">{Icons.configuracion}</span>
                 <span className="nav-label">Configuración</span>
@@ -614,32 +752,6 @@ export default function CrmLayout() {
             </div>
           </nav>
 
-          {/* Footer del Sidebar */}
-          <div className="sidebar-footer">
-            {/* Switch a Admin */}
-            {isPlatformAdmin && (
-              <button className="admin-btn" onClick={() => navigate('/admin')}>
-                {Icons.admin}
-                <span>Panel Admin</span>
-              </button>
-            )}
-
-            {/* Selector de Tenants */}
-            {user?.tenants && user.tenants.length > 1 && (
-              <div className="tenant-selector">
-                <select
-                  value={tenantSlug}
-                  onChange={(e) => navigate(`/crm/${e.target.value}`)}
-                >
-                  {user.tenants.map((tenant) => (
-                    <option key={tenant.id} value={tenant.slug}>
-                      {tenant.nombre}
-                    </option>
-                  ))}
-                </select>
-              </div>
-            )}
-          </div>
         </aside>
 
         {/* Main Content */}
@@ -682,7 +794,7 @@ export default function CrmLayout() {
                 </div>
               )}
 
-              {/* User Menu con dropdown */}
+              {/* User Menu con dropdown personalizado */}
               <div className="user-menu-wrapper">
                 <button
                   className="user-menu-trigger"
@@ -692,11 +804,36 @@ export default function CrmLayout() {
                   }}
                 >
                   <span className="user-name">{user?.nombre || user?.email?.split('@')[0]}</span>
-                  <UserButton afterSignOutUrl="/login" />
+                  <div className="user-avatar">
+                    {user?.avatarUrl ? (
+                      <img src={user.avatarUrl} alt={user?.nombre || 'Usuario'} />
+                    ) : (
+                      <span className="avatar-initials">
+                        {(user?.nombre?.[0] || user?.email?.[0] || 'U').toUpperCase()}
+                      </span>
+                    )}
+                  </div>
                 </button>
 
                 {userMenuOpen && (
                   <div className="user-dropdown" onClick={(e) => e.stopPropagation()}>
+                    <div className="dropdown-header">
+                      <div className="dropdown-user-info">
+                        <span className="dropdown-user-name">{user?.nombre} {user?.apellido}</span>
+                        <span className="dropdown-user-email">{user?.email}</span>
+                      </div>
+                    </div>
+                    <div className="dropdown-divider" />
+                    <button
+                      className="dropdown-item"
+                      onClick={() => {
+                        setPerfilModalOpen(true);
+                        setUserMenuOpen(false);
+                      }}
+                    >
+                      {Icons.userProfile}
+                      <span>Mi Perfil</span>
+                    </button>
                     <a
                       href={`http://localhost:4321/tenant/${tenantSlug}/`}
                       target="_blank"
@@ -706,6 +843,58 @@ export default function CrmLayout() {
                       {Icons.external}
                       <span>Ver sitio web</span>
                     </a>
+
+                    {/* Selector de Tenant */}
+                    {user?.tenants && user.tenants.length > 1 && (
+                      <>
+                        <div className="dropdown-divider" />
+                        <div className="dropdown-tenant-section">
+                          <span className="dropdown-section-label">Cambiar empresa</span>
+                          <select
+                            className="dropdown-tenant-select"
+                            value={tenantSlug}
+                            onChange={(e) => {
+                              navigate(`/crm/${e.target.value}`);
+                              setUserMenuOpen(false);
+                            }}
+                          >
+                            {user.tenants.map((tenant) => (
+                              <option key={tenant.id} value={tenant.slug}>
+                                {tenant.nombre}
+                              </option>
+                            ))}
+                          </select>
+                        </div>
+                      </>
+                    )}
+
+                    {/* Panel Admin */}
+                    {isPlatformAdmin && (
+                      <>
+                        <div className="dropdown-divider" />
+                        <button
+                          className="dropdown-item dropdown-item-admin"
+                          onClick={() => {
+                            navigate('/admin');
+                            setUserMenuOpen(false);
+                          }}
+                        >
+                          {Icons.admin}
+                          <span>Panel Admin</span>
+                        </button>
+                      </>
+                    )}
+
+                    <div className="dropdown-divider" />
+                    <button
+                      className="dropdown-item dropdown-item-danger"
+                      onClick={() => {
+                        signOut({ redirectUrl: '/login' });
+                      }}
+                    >
+                      {Icons.logout}
+                      <span>Cerrar sesion</span>
+                    </button>
                   </div>
                 )}
               </div>
@@ -718,10 +907,13 @@ export default function CrmLayout() {
           </main>
         </div>
 
+        {/* Modal de Mi Perfil */}
+        <MiPerfil isOpen={perfilModalOpen} onClose={() => setPerfilModalOpen(false)} />
+
         <style>{`
           /* ========== VARIABLES ========== */
           .crm-layout {
-            --sidebar-width: 260px;
+            --sidebar-width: 220px;
             --header-height: 64px;
             --primary: #2563eb;
             --primary-light: #3b82f6;
@@ -770,14 +962,14 @@ export default function CrmLayout() {
           .sidebar-brand {
             display: flex;
             align-items: center;
-            gap: 12px;
-            padding: 20px;
+            gap: 10px;
+            padding: 14px 16px;
             border-bottom: 1px solid var(--border);
           }
 
           .brand-logo {
-            width: 40px;
-            height: 40px;
+            width: 34px;
+            height: 34px;
             background: linear-gradient(135deg, var(--primary), var(--primary-light));
             border-radius: var(--radius);
             display: flex;
@@ -785,58 +977,74 @@ export default function CrmLayout() {
             justify-content: center;
             color: white;
             font-weight: 700;
-            font-size: 1.125rem;
+            font-size: 1rem;
+            flex-shrink: 0;
+            overflow: hidden;
+          }
+
+          .brand-logo.has-image {
+            background: transparent;
+          }
+
+          .brand-logo img {
+            width: 100%;
+            height: 100%;
+            object-fit: contain;
           }
 
           .brand-info {
             display: flex;
             flex-direction: column;
+            min-width: 0;
           }
 
           .brand-name {
             font-weight: 600;
-            font-size: 0.95rem;
+            font-size: 0.85rem;
             color: var(--text-primary);
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
           }
 
           .brand-type {
-            font-size: 0.75rem;
+            font-size: 0.7rem;
             color: var(--text-muted);
           }
 
           /* Navigation */
           .sidebar-nav {
             flex: 1;
-            padding: 16px 12px;
+            padding: 12px 10px;
             overflow-y: auto;
           }
 
           .nav-section {
-            margin-bottom: 24px;
+            margin-bottom: 16px;
           }
 
           .nav-section-title {
             display: block;
-            font-size: 0.7rem;
+            font-size: 0.625rem;
             font-weight: 600;
             text-transform: uppercase;
             letter-spacing: 0.05em;
             color: var(--text-muted);
-            padding: 0 12px;
-            margin-bottom: 8px;
+            padding: 0 10px;
+            margin-bottom: 6px;
           }
 
           .nav-item {
             display: flex;
             align-items: center;
-            gap: 12px;
-            padding: 10px 12px;
+            gap: 8px;
+            padding: 7px 10px;
             color: var(--text-secondary);
             text-decoration: none;
             border-radius: var(--radius);
-            margin-bottom: 2px;
+            margin-bottom: 1px;
             transition: all 0.15s ease;
-            font-size: 0.9rem;
+            font-size: 0.8125rem;
             font-weight: 500;
             border: none;
             background: none;
@@ -853,6 +1061,7 @@ export default function CrmLayout() {
           .nav-item.active {
             background: var(--primary-bg);
             color: var(--primary);
+            font-weight: 600;
           }
 
           .nav-icon {
@@ -860,6 +1069,13 @@ export default function CrmLayout() {
             align-items: center;
             justify-content: center;
             flex-shrink: 0;
+            width: 18px;
+            height: 18px;
+          }
+
+          .nav-icon svg {
+            width: 16px;
+            height: 16px;
           }
 
           .nav-label {
@@ -883,8 +1099,8 @@ export default function CrmLayout() {
 
           /* Submenu */
           .nav-submenu {
-            margin-left: 12px;
-            padding-left: 12px;
+            margin-left: 10px;
+            padding-left: 10px;
             border-left: 2px solid var(--border);
             overflow: hidden;
             max-height: 0;
@@ -896,20 +1112,20 @@ export default function CrmLayout() {
           .nav-submenu.open {
             max-height: 300px;
             opacity: 1;
-            margin-top: 4px;
+            margin-top: 3px;
           }
 
           .nav-subitem {
             display: flex;
             align-items: center;
-            gap: 10px;
-            padding: 8px 12px;
+            gap: 8px;
+            padding: 6px 10px;
             color: var(--text-secondary);
             text-decoration: none;
             border-radius: var(--radius);
-            margin-bottom: 2px;
+            margin-bottom: 1px;
             transition: all 0.15s ease;
-            font-size: 0.85rem;
+            font-size: 0.75rem;
             font-weight: 500;
           }
 
@@ -921,58 +1137,22 @@ export default function CrmLayout() {
           .nav-subitem.active {
             background: var(--primary-bg);
             color: var(--primary);
+            font-weight: 600;
           }
 
           .nav-subitem .nav-icon {
             opacity: 0.7;
+            width: 16px;
+            height: 16px;
+          }
+
+          .nav-subitem .nav-icon svg {
+            width: 14px;
+            height: 14px;
           }
 
           .nav-subitem.active .nav-icon {
             opacity: 1;
-          }
-
-          /* Sidebar Footer */
-          .sidebar-footer {
-            padding: 16px;
-            border-top: 1px solid var(--border);
-            display: flex;
-            flex-direction: column;
-            gap: 12px;
-          }
-
-          .admin-btn {
-            display: flex;
-            align-items: center;
-            gap: 10px;
-            padding: 10px 12px;
-            background: #fef2f2;
-            color: #dc2626;
-            border: 1px solid #fecaca;
-            border-radius: var(--radius);
-            cursor: pointer;
-            font-weight: 500;
-            font-size: 0.85rem;
-            transition: all 0.15s ease;
-          }
-
-          .admin-btn:hover {
-            background: #fee2e2;
-          }
-
-          .tenant-selector select {
-            width: 100%;
-            padding: 10px 12px;
-            background: var(--bg-main);
-            border: 1px solid var(--border);
-            border-radius: var(--radius);
-            color: var(--text-primary);
-            font-size: 0.85rem;
-            cursor: pointer;
-          }
-
-          .tenant-selector select:focus {
-            outline: none;
-            border-color: var(--primary);
           }
 
           /* ========== MAIN AREA ========== */
@@ -995,7 +1175,7 @@ export default function CrmLayout() {
             border-bottom: 1px solid var(--border);
             position: sticky;
             top: 0;
-            z-index: 50;
+            z-index: 1000;
           }
 
           .header-left {
@@ -1033,18 +1213,18 @@ export default function CrmLayout() {
           .header-title-section {
             display: flex;
             align-items: baseline;
-            gap: 12px;
+            gap: 10px;
           }
 
           .header-title {
             margin: 0;
-            font-size: 1.25rem;
+            font-size: 1.1rem;
             font-weight: 600;
             color: var(--text-primary);
           }
 
           .header-subtitle {
-            font-size: 0.875rem;
+            font-size: 0.8rem;
             color: var(--text-muted);
           }
 
@@ -1052,15 +1232,15 @@ export default function CrmLayout() {
           .header-stats {
             display: flex;
             align-items: center;
-            gap: 24px;
-            margin-left: 32px;
-            margin-right: 48px;
+            gap: 16px;
+            margin-left: 20px;
+            margin-right: 20px;
           }
 
           .header-stat-item {
             display: flex;
             align-items: center;
-            gap: 6px;
+            gap: 4px;
           }
 
           .header-stat-icon {
@@ -1070,20 +1250,20 @@ export default function CrmLayout() {
           }
 
           .header-stat-icon svg {
-            width: 16px;
-            height: 16px;
+            width: 14px;
+            height: 14px;
           }
 
           .header-stat-label {
-            font-size: 0.75rem;
+            font-size: 0.7rem;
             font-weight: 500;
             color: var(--text-muted);
             text-transform: uppercase;
-            letter-spacing: 0.03em;
+            letter-spacing: 0.02em;
           }
 
           .header-stat-value {
-            font-size: 1.125rem;
+            font-size: 0.95rem;
             font-weight: 700;
             color: var(--primary);
           }
@@ -1091,18 +1271,21 @@ export default function CrmLayout() {
           .header-right {
             display: flex;
             align-items: center;
-            gap: 16px;
+            gap: 10px;
+            position: relative;
+            z-index: 100;
           }
 
           .header-actions {
             display: flex;
             align-items: center;
-            gap: 12px;
+            gap: 8px;
           }
 
           /* User Menu */
           .user-menu-wrapper {
             position: relative;
+            z-index: 9999;
           }
 
           .user-menu-trigger {
@@ -1131,13 +1314,12 @@ export default function CrmLayout() {
             position: absolute;
             top: calc(100% + 8px);
             right: 0;
-            min-width: 180px;
+            min-width: 220px;
             background: var(--bg-card);
             border: 1px solid var(--border);
-            border-radius: var(--radius);
-            box-shadow: var(--shadow-md);
-            overflow: hidden;
-            z-index: 100;
+            border-radius: var(--radius-lg);
+            box-shadow: 0 10px 40px rgba(0, 0, 0, 0.15), 0 2px 10px rgba(0, 0, 0, 0.1);
+            z-index: 9999;
           }
 
           .dropdown-item {
@@ -1156,11 +1338,124 @@ export default function CrmLayout() {
             color: var(--text-primary);
           }
 
+          .dropdown-item-danger {
+            color: var(--error);
+          }
+
+          .dropdown-item-danger:hover {
+            background: #fef2f2;
+            color: var(--error);
+          }
+
+          .dropdown-header {
+            padding: 12px 16px;
+          }
+
+          .dropdown-user-info {
+            display: flex;
+            flex-direction: column;
+            gap: 2px;
+          }
+
+          .dropdown-user-name {
+            font-weight: 600;
+            font-size: 0.9rem;
+            color: var(--text-primary);
+          }
+
+          .dropdown-user-email {
+            font-size: 0.8rem;
+            color: var(--text-muted);
+          }
+
+          .dropdown-divider {
+            height: 1px;
+            background: var(--border);
+            margin: 4px 0;
+          }
+
+          /* Dropdown Tenant Section */
+          .dropdown-tenant-section {
+            padding: 8px 16px 12px;
+          }
+
+          .dropdown-section-label {
+            display: block;
+            font-size: 0.7rem;
+            font-weight: 600;
+            text-transform: uppercase;
+            letter-spacing: 0.05em;
+            color: var(--text-muted);
+            margin-bottom: 8px;
+          }
+
+          .dropdown-tenant-select {
+            width: 100%;
+            padding: 8px 10px;
+            background: var(--bg-main);
+            border: 1px solid var(--border);
+            border-radius: 6px;
+            color: var(--text-primary);
+            font-size: 0.8rem;
+            cursor: pointer;
+          }
+
+          .dropdown-tenant-select:focus {
+            outline: none;
+            border-color: var(--primary);
+          }
+
+          /* Admin dropdown item */
+          .dropdown-item-admin {
+            color: #dc2626;
+          }
+
+          .dropdown-item-admin:hover {
+            background: #fef2f2;
+            color: #dc2626;
+          }
+
+          /* User Avatar */
+          .user-avatar {
+            width: 32px;
+            height: 32px;
+            border-radius: 50%;
+            background: linear-gradient(135deg, var(--primary), var(--primary-light));
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            overflow: hidden;
+            flex-shrink: 0;
+          }
+
+          .user-avatar img {
+            width: 100%;
+            height: 100%;
+            object-fit: cover;
+          }
+
+          .avatar-initials {
+            color: white;
+            font-weight: 600;
+            font-size: 0.875rem;
+          }
+
+          button.dropdown-item {
+            width: 100%;
+            text-align: left;
+            border: none;
+            background: none;
+            cursor: pointer;
+          }
+
           /* Content */
           .crm-content {
             flex: 1;
             padding: 24px 32px;
             overflow-y: auto;
+            position: relative;
+            z-index: 1;
+            background: white;
           }
 
           /* ========== RESPONSIVE ========== */
@@ -1177,5 +1472,6 @@ export default function CrmLayout() {
         `}</style>
       </div>
     </PageContext.Provider>
+    </CatalogosProvider>
   );
 }

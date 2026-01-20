@@ -6,6 +6,48 @@
 import { useState } from 'react';
 import { Propiedad } from '../../../services/api';
 import { useCatalogos } from '../../../contexts/CatalogosContext';
+import {
+  Star, Award, TrendingDown, Sparkles, Zap, Tag, Heart, Eye, Clock,
+  Flame, Gift, Shield, Crown, Target, Bookmark, Flag, Bell, AlertCircle,
+  CheckCircle, XCircle, Info, HelpCircle, type LucideIcon
+} from 'lucide-react';
+
+// Mapeo de iconos para etiquetas personalizadas
+const ICONOS_ETIQUETAS_MAP: Record<string, LucideIcon> = {
+  Star,
+  Award,
+  TrendingDown,
+  ArrowDown: TrendingDown,
+  Sparkles,
+  Zap,
+  Tag,
+  Heart,
+  Eye,
+  Clock,
+  Flame,
+  Gift,
+  Shield,
+  Crown,
+  Target,
+  Bookmark,
+  Flag,
+  Bell,
+  AlertCircle,
+  CheckCircle,
+  XCircle,
+  Info,
+  HelpCircle,
+};
+
+// Función para renderizar icono de etiqueta
+const renderEtiquetaIcon = (iconName: string | undefined, size: number = 14) => {
+  if (!iconName) return null;
+  const IconComponent = ICONOS_ETIQUETAS_MAP[iconName];
+  if (IconComponent) {
+    return <IconComponent size={size} />;
+  }
+  return null;
+};
 
 interface Props {
   propiedad: Propiedad;
@@ -126,13 +168,79 @@ const OPERACIONES = {
   traspaso: { label: 'Traspaso', color: '#6236FF', bgColor: 'rgba(98, 54, 255, 0.12)' },
 };
 
+// Iconos SVG para tipos de propiedad (más profesionales)
+const TipoIcons = {
+  casa: (
+    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+      <path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/>
+      <polyline points="9 22 9 12 15 12 15 22"/>
+    </svg>
+  ),
+  departamento: (
+    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+      <rect x="4" y="2" width="16" height="20" rx="2" ry="2"/>
+      <path d="M9 22v-4h6v4"/>
+      <line x1="8" y1="6" x2="8" y2="6"/>
+      <line x1="12" y1="6" x2="12" y2="6"/>
+      <line x1="16" y1="6" x2="16" y2="6"/>
+      <line x1="8" y1="10" x2="8" y2="10"/>
+      <line x1="12" y1="10" x2="12" y2="10"/>
+      <line x1="16" y1="10" x2="16" y2="10"/>
+      <line x1="8" y1="14" x2="8" y2="14"/>
+      <line x1="12" y1="14" x2="12" y2="14"/>
+      <line x1="16" y1="14" x2="16" y2="14"/>
+    </svg>
+  ),
+  terreno: (
+    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+      <path d="M2 22L12 12l10 10"/>
+      <path d="M12 12V2"/>
+    </svg>
+  ),
+  oficina: (
+    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+      <path d="M3 21h18"/>
+      <path d="M5 21V7l8-4v18"/>
+      <path d="M19 21V11l-6-4"/>
+    </svg>
+  ),
+  local: (
+    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+      <path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/>
+      <rect x="9" y="13" width="6" height="9"/>
+    </svg>
+  ),
+  bodega: (
+    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+      <path d="M21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16z"/>
+      <polyline points="3.27 6.96 12 12.01 20.73 6.96"/>
+      <line x1="12" y1="22.08" x2="12" y2="12"/>
+    </svg>
+  ),
+};
+
+// Iconos SVG para badges especiales
+const BadgeIcons = {
+  star: (
+    <svg width="12" height="12" viewBox="0 0 24 24" fill="currentColor" stroke="currentColor" strokeWidth="1">
+      <polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"/>
+    </svg>
+  ),
+  lock: (
+    <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+      <rect x="3" y="11" width="18" height="11" rx="2" ry="2"/>
+      <path d="M7 11V7a5 5 0 0 1 10 0v4"/>
+    </svg>
+  ),
+};
+
 const TIPOS = {
-  casa: { label: 'Casa', icon: '🏠' },
-  departamento: { label: 'Departamento', icon: '🏢' },
-  terreno: { label: 'Terreno', icon: '🌳' },
-  oficina: { label: 'Oficina', icon: '🏛️' },
-  local: { label: 'Local Comercial', icon: '🏪' },
-  bodega: { label: 'Bodega', icon: '📦' },
+  casa: { label: 'Casa', icon: TipoIcons.casa },
+  departamento: { label: 'Departamento', icon: TipoIcons.departamento },
+  terreno: { label: 'Terreno', icon: TipoIcons.terreno },
+  oficina: { label: 'Oficina', icon: TipoIcons.oficina },
+  local: { label: 'Local Comercial', icon: TipoIcons.local },
+  bodega: { label: 'Bodega', icon: TipoIcons.bodega },
 };
 
 export default function PropiedadGeneral({ propiedad, onUpdate, onRefresh }: Props) {
@@ -141,9 +249,20 @@ export default function PropiedadGeneral({ propiedad, onUpdate, onRefresh }: Pro
   const { etiquetasPropiedad } = useCatalogos();
 
   // Obtener las etiquetas con sus datos del catálogo
+  // Filtramos etiquetas que contengan "destacada" o "exclusiva" para evitar duplicación
+  // ya que esos estados se muestran con badges dedicados
   const etiquetasConDatos = ((propiedad as any).etiquetas || [])
     .map((codigo: string) => etiquetasPropiedad.find(e => e.codigo === codigo))
-    .filter(Boolean);
+    .filter(Boolean)
+    .filter((etiqueta: any) => {
+      const nombre = (etiqueta.nombre || '').toLowerCase();
+      const codigo = (etiqueta.codigo || '').toLowerCase();
+      // Excluir etiquetas relacionadas con destacada/exclusiva
+      return !nombre.includes('destacada') &&
+             !nombre.includes('exclusiva') &&
+             !codigo.includes('destacada') &&
+             !codigo.includes('exclusiva');
+    });
 
   // Combinar imagen principal con galería
   const allImages = [
@@ -281,10 +400,10 @@ export default function PropiedadGeneral({ propiedad, onUpdate, onRefresh }: Pro
               {estado.label}
             </span>
             {propiedad.destacada && (
-              <span className="badge destacada-badge">⭐ Destacada</span>
+              <span className="badge destacada-badge">{BadgeIcons.star} Destacada</span>
             )}
             {propiedad.exclusiva && (
-              <span className="badge exclusiva-badge">🔒 Exclusiva</span>
+              <span className="badge exclusiva-badge">{BadgeIcons.lock} Exclusiva</span>
             )}
             {etiquetasConDatos.map((etiqueta: any) => (
               <span
@@ -295,7 +414,7 @@ export default function PropiedadGeneral({ propiedad, onUpdate, onRefresh }: Pro
                   backgroundColor: `${etiqueta.color || '#6366f1'}15`
                 }}
               >
-                {etiqueta.icono && <span className="badge-icon">{etiqueta.icono}</span>}
+                {etiqueta.icono && <span className="badge-icon">{renderEtiquetaIcon(etiqueta.icono)}</span>}
                 {etiqueta.nombre}
               </span>
             ))}
@@ -339,6 +458,31 @@ export default function PropiedadGeneral({ propiedad, onUpdate, onRefresh }: Pro
                     <span className="price-value">{formatMoney(propiedad.maintenance, propiedad.moneda)}/mes</span>
                   </div>
                 )}
+              </div>
+            )}
+
+            {/* Comisión - destacado en verde */}
+            {(propiedad.comision || propiedad.comision_nota) && (
+              <div className="comision-box">
+                <div className="comision-header">
+                  <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                    <circle cx="12" cy="12" r="10"/>
+                    <path d="M12 6v6l4 2"/>
+                  </svg>
+                  <span>Comisión</span>
+                </div>
+                <div className="comision-content">
+                  {propiedad.comision && (
+                    <div className="comision-value">
+                      {typeof propiedad.comision === 'number' || !isNaN(Number(propiedad.comision))
+                        ? `${propiedad.comision}%`
+                        : propiedad.comision}
+                    </div>
+                  )}
+                  {propiedad.comision_nota && (
+                    <div className="comision-nota">{propiedad.comision_nota}</div>
+                  )}
+                </div>
               </div>
             )}
           </div>
@@ -505,7 +649,7 @@ export default function PropiedadGeneral({ propiedad, onUpdate, onRefresh }: Pro
 
 const styles = `
   .propiedad-general {
-    max-width: 1200px;
+    width: 100%;
   }
 
   .main-grid {
@@ -650,18 +794,39 @@ const styles = `
   }
 
   .tipo-badge {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
     background: #f1f5f9;
     color: #475569;
   }
 
+  .tipo-badge svg {
+    flex-shrink: 0;
+  }
+
   .destacada-badge {
+    display: inline-flex;
+    align-items: center;
+    gap: 5px;
     background: rgba(245, 158, 11, 0.12);
     color: #d97706;
   }
 
+  .destacada-badge svg {
+    flex-shrink: 0;
+  }
+
   .exclusiva-badge {
+    display: inline-flex;
+    align-items: center;
+    gap: 5px;
     background: rgba(98, 54, 255, 0.12);
     color: #6236FF;
+  }
+
+  .exclusiva-badge svg {
+    flex-shrink: 0;
   }
 
   .etiqueta-badge {
@@ -729,6 +894,52 @@ const styles = `
     font-size: 1rem;
     font-weight: 600;
     color: #0f172a;
+  }
+
+  /* Comision Box - Recuadro verde destacado */
+  .comision-box {
+    margin-top: 16px;
+    margin-left: auto;
+    max-width: 280px;
+    background: linear-gradient(135deg, rgba(16, 185, 129, 0.08) 0%, rgba(16, 185, 129, 0.04) 100%);
+    border: 1.5px solid rgba(16, 185, 129, 0.35);
+    border-radius: 12px;
+    padding: 14px 16px;
+  }
+
+  .comision-header {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    color: #059669;
+    font-size: 0.8rem;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+    margin-bottom: 8px;
+  }
+
+  .comision-header svg {
+    flex-shrink: 0;
+  }
+
+  .comision-content {
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+  }
+
+  .comision-value {
+    font-size: 1.4rem;
+    font-weight: 700;
+    color: #047857;
+  }
+
+  .comision-nota {
+    font-size: 0.85rem;
+    color: #065f46;
+    line-height: 1.4;
+    font-style: italic;
   }
 
   /* Features */
@@ -996,6 +1207,7 @@ const styles = `
     object-fit: cover;
   }
 `;
+
 
 
 

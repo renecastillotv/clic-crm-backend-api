@@ -65,9 +65,10 @@ export default function CrmWebPaginaEditar() {
   const [error, setError] = useState<string | null>(null);
   const [activeTab, setActiveTab] = useState<'info' | 'componentes' | 'seo'>('info');
   const [showAddComponente, setShowAddComponente] = useState(false);
-  const [addModalStep, setAddModalStep] = useState<'selectType' | 'selectVariant' | 'selectGlobal'>('selectType');
+  const [addModalStep, setAddModalStep] = useState<'selectType' | 'selectImplementation' | 'selectVariant'>('selectType');
   const [selectedTipo, setSelectedTipo] = useState<TipoComponente | null>(null);
   const [selectedVariante, setSelectedVariante] = useState<string | null>(null);
+  const [selectedComponente, setSelectedComponente] = useState<any | null>(null); // Componente específico del catálogo
   const [catalogo, setCatalogo] = useState<any[]>([]);
 
   // Ref para la variante seleccionada (evitar problema de async state updates)
@@ -91,9 +92,9 @@ export default function CrmWebPaginaEditar() {
     }
   }, [successMessage]);
 
-  // Helper function to find component in catalog by codigo
-  const findComponenteEnCatalogo = useCallback((codigo: string) => {
-    return catalogo.find((c: any) => c.codigo === codigo);
+  // Helper function to find component in catalog by tipo
+  const findComponenteEnCatalogo = useCallback((tipo: string) => {
+    return catalogo.find((c: any) => c.tipo === tipo);
   }, [catalogo]);
 
   // Cargar catálogo de componentes al montar
@@ -102,8 +103,7 @@ export default function CrmWebPaginaEditar() {
 
     async function loadCatalogo() {
       try {
-        const token = await getToken();
-        const catalogoData = await getCatalogoComponentes(token);
+        const catalogoData = await getCatalogoComponentes(tenantActual.id);
         console.log('📚 Catálogo de componentes cargado:', catalogoData);
         setCatalogo(catalogoData);
       } catch (err: any) {
@@ -112,7 +112,7 @@ export default function CrmWebPaginaEditar() {
     }
 
     loadCatalogo();
-  }, [tenantActual?.id, getToken]);
+  }, [tenantActual?.id]);
 
   // Cargar página y componentes
   useEffect(() => {
@@ -170,7 +170,7 @@ export default function CrmWebPaginaEditar() {
     };
 
     const handleBack = () => {
-      navigate(`${basePath}/sitio-web`);
+      navigate(`${basePath}/web/paginas`);
     };
 
     setPageHeader({
@@ -228,9 +228,17 @@ export default function CrmWebPaginaEditar() {
     console.log('✅ Setting selectedVariante to:', variante);
     setSelectedVariante(variante);
     selectedVarianteRef.current = variante; // Actualizar ref inmediatamente
-    setAddModalStep('selectGlobal'); // Ir directo al paso de creación
+
+    // Crear el componente directamente sin paso extra
+    await createComponentDirectly(tipoAUsar, variante);
   };
 
+  // Obtener implementaciones de un tipo específico
+  const getImplementacionesPorTipo = useCallback((tipo: string) => {
+    return catalogo.filter((c: any) => c.tipo === tipo && c.disponible !== false);
+  }, [catalogo]);
+
+  // Seleccionar tipo de componente (paso 1)
   const handleSelectTipo = async (tipo: TipoComponente) => {
     if (!tenantActual?.id) return;
 
@@ -243,53 +251,60 @@ export default function CrmWebPaginaEditar() {
 
     setSelectedTipo(tipo);
 
-    // Obtener variantes disponibles del catálogo para este tipo
-    const componenteCatalogo = findComponenteEnCatalogo(tipo);
-    const variantesDisponibles = componenteCatalogo?.variantes || [];
+    // Ver cuántas implementaciones hay de este tipo
+    const implementaciones = getImplementacionesPorTipo(tipo);
 
-    // Normalizar variantes (pueden venir como strings o como objetos con codigo/id, nombre, descripcion)
+    if (implementaciones.length === 1) {
+      // Solo hay una implementación, seleccionarla automáticamente
+      handleSelectImplementation(implementaciones[0]);
+    } else if (implementaciones.length > 1) {
+      // Hay múltiples implementaciones, mostrar selector
+      setAddModalStep('selectImplementation');
+    } else {
+      // No hay implementaciones (no debería pasar)
+      setError('No hay implementaciones disponibles para este tipo');
+    }
+  };
+
+  // Seleccionar implementación específica (paso 2 - solo si hay múltiples)
+  const handleSelectImplementation = async (componente: any) => {
+    setSelectedComponente(componente);
+    setSelectedTipo(componente.tipo as TipoComponente);
+
+    // Obtener variantes disponibles del componente
+    const variantesDisponibles = componente?.variantes || [];
+
+    // Normalizar variantes
     const variantesNormalizadas = variantesDisponibles.map((v: any) => ({
       id: typeof v === 'string' ? v : (v.codigo || v.id),
       nombre: typeof v === 'string' ? v : (v.nombre || v.codigo || v.id),
       descripcion: typeof v === 'string' ? '' : (v.descripcion || ''),
     }));
-    
-    // Si solo hay una variante disponible, seleccionarla automáticamente
+
     if (variantesNormalizadas.length === 1) {
       const varianteId = variantesNormalizadas[0].id;
       setSelectedVariante(varianteId);
-      // Ir directamente a seleccionar componente global o crear nuevo
-      await handleSelectVariant(varianteId, tipo);
+      await handleSelectVariant(varianteId, componente.tipo);
     } else if (variantesNormalizadas.length > 1) {
-      // Si hay múltiples variantes, mostrar selector
       setAddModalStep('selectVariant');
     } else {
-      // Si no hay variantes definidas, usar 'default' como fallback
       setSelectedVariante('default');
-      await handleSelectVariant('default', tipo);
+      await handleSelectVariant('default', componente.tipo);
     }
   };
 
 
-  // Crear componente - detecta automáticamente el scope según el tipo
-  const handleCreateComponent = async () => {
-    console.log('📄 handleCreateComponent called');
-    const varianteToUse = selectedVarianteRef.current || selectedVariante;
-    console.log('📄 State:', { tenantActual: tenantActual?.id, identificadorPagina, selectedTipo, selectedVariante, selectedVarianteRef: selectedVarianteRef.current, varianteToUse });
+  // Crear componente directamente (llamado desde handleSelectVariant)
+  const createComponentDirectly = async (tipo: TipoComponente, variante: string) => {
+    console.log('📄 createComponentDirectly called:', { tipo, variante });
 
-    if (!tenantActual?.id || !identificadorPagina || !selectedTipo) return;
+    if (!tenantActual?.id || !identificadorPagina) {
+      setError('Error: No se puede crear componente sin tenant o página');
+      return;
+    }
 
     try {
       setSaving(true);
-
-      if (!varianteToUse) {
-        console.error('❌ No hay variante seleccionada:', { selectedVariante, ref: selectedVarianteRef.current });
-        throw new Error('No se ha seleccionado una variante');
-      }
-
-      console.log('✅ Creating component:', { tipo: selectedTipo, variante: varianteToUse });
-      console.log('📄 Pagina completa:', JSON.stringify(pagina, null, 2));
-      console.log('📌 pagina?.tipoPagina:', pagina?.tipoPagina);
 
       // Detectar scope automáticamente según reglas:
       // 1. Si tipo = "header" o "footer" → scope="tenant", tipo_pagina=NULL, pagina_id=NULL
@@ -299,8 +314,20 @@ export default function CrmWebPaginaEditar() {
       let tipo_pagina: string | null = null;
       let pagina_id: string | null = null;
 
-      if (selectedTipo === 'header' || selectedTipo === 'footer') {
+      if (tipo === 'header' || tipo === 'footer') {
         scope = 'tenant';
+
+        // SOLO para header/footer: verificar si ya existe (estos sí deben ser únicos)
+        const existingGlobal = componentes.find(
+          c => c.tipo === tipo && c.scope === 'tenant'
+        );
+        if (existingGlobal) {
+          const componenteCatalogo = findComponenteEnCatalogo(tipo);
+          const componenteNombre = componenteCatalogo?.nombre || tipo;
+          throw new Error(
+            `Ya existe un ${componenteNombre} global. Solo puede haber uno por tenant.`
+          );
+        }
       } else if (pagina?.tipoPagina === 'custom') {
         scope = 'page';
         tipo_pagina = 'custom';
@@ -310,23 +337,9 @@ export default function CrmWebPaginaEditar() {
         tipo_pagina = pagina?.tipoPagina || null;
       }
 
-      console.log('🎯 Scope detectado:', { scope, tipo_pagina, pagina_id, paginaTipoPagina: pagina?.tipoPagina });
+      console.log('🎯 Scope detectado:', { scope, tipo_pagina, pagina_id });
 
-      // Verificar si ya existe un componente similar
-      const existingComponent = componentes.find(
-        c => c.tipo === selectedTipo && c.variante === varianteToUse && c.scope === scope
-      );
-
-      if (existingComponent) {
-        const componenteCatalogo = findComponenteEnCatalogo(selectedTipo);
-        const componenteNombre = componenteCatalogo?.nombre || selectedTipo;
-        throw new Error(
-          `Ya existe un componente "${componenteNombre}" con variante "${varianteToUse}" en este scope. ` +
-          `Puedes editarlo o seleccionar una variante diferente.`
-        );
-      }
-
-      const componenteCatalogo = findComponenteEnCatalogo(selectedTipo);
+      const componenteCatalogo = findComponenteEnCatalogo(tipo);
 
       const datosIniciales: ComponenteDataEstructurado = {
         static_data: {},
@@ -347,8 +360,8 @@ export default function CrmWebPaginaEditar() {
       }
 
       await saveComponente(tenantActual.id, {
-        tipo: selectedTipo,
-        variante: varianteToUse,
+        tipo,
+        variante,
         datos: datosIniciales,
         activo: true,
         orden: componentes.length + 1,
@@ -363,7 +376,21 @@ export default function CrmWebPaginaEditar() {
       console.log('📦 Componentes recargados:', componentesData.length, 'componentes');
       setComponentes(componentesData);
       closeAddModal();
+      setSuccessMessage(`Componente "${componenteCatalogo?.nombre || tipo}" agregado correctamente`);
       console.log('✅ Modal cerrado y componentes actualizados');
+
+      // Abrir automáticamente el editor del componente recién creado
+      const componenteCreado = componentesData.find(
+        (c) => c.tipo === tipo && c.variante === variante
+      ) || componentesData[componentesData.length - 1];
+
+      if (componenteCreado) {
+        console.log('✏️ Abriendo editor para el componente recién creado:', componenteCreado.tipo);
+        // Usar setTimeout para permitir que el estado se actualice primero
+        setTimeout(() => {
+          handleEditPageComponent(componenteCreado);
+        }, 100);
+      }
     } catch (err: any) {
       console.error('Error agregando componente:', err);
       setError(err.message);
@@ -372,12 +399,23 @@ export default function CrmWebPaginaEditar() {
     }
   };
 
+  // Crear componente - detecta automáticamente el scope según el tipo (legacy, usado por botón manual)
+  const handleCreateComponent = async () => {
+    const varianteToUse = selectedVarianteRef.current || selectedVariante;
+    if (!selectedTipo || !varianteToUse) {
+      setError('Error: No se ha seleccionado tipo o variante');
+      return;
+    }
+    await createComponentDirectly(selectedTipo, varianteToUse);
+  };
+
   // Cerrar modal y resetear estado
   const closeAddModal = () => {
     setShowAddComponente(false);
     setAddModalStep('selectType');
     setSelectedTipo(null);
     setSelectedVariante(null);
+    setSelectedComponente(null);
   };
 
   // Navegar a editar componente global
@@ -403,6 +441,7 @@ export default function CrmWebPaginaEditar() {
   // Abrir modal para editar componente de página
   const handleEditPageComponent = async (componente: ComponentePagina) => {
     console.log('🔍 [handleEditPageComponent] Iniciando edición de componente:', componente.tipo);
+    console.log('🔍 [handleEditPageComponent] Componente completo:', componente);
     setEditingComponente(componente);
     // Normalizar datos para asegurar estructura correcta
     const datos = componente.datos || { static_data: {}, toggles: {} };
@@ -414,24 +453,32 @@ export default function CrmWebPaginaEditar() {
       styles: datos.styles,
     });
 
-    // Fetch schema del catálogo para este tipo de componente
-    try {
-      console.log('🔍 [handleEditPageComponent] Obteniendo schema para tipo:', componente.tipo);
-      const token = await getToken();
-      console.log('🔍 [handleEditPageComponent] Token obtenido:', token ? 'Sí' : 'No');
-      const catalogoComponente = await getComponenteSchema(componente.tipo, token);
-      console.log('🔍 [handleEditPageComponent] Schema obtenido:', catalogoComponente);
-      if (catalogoComponente) {
-        console.log('✅ [handleEditPageComponent] Schema config:', catalogoComponente.schema_config);
-        console.log('✅ [handleEditPageComponent] Número de campos:', catalogoComponente.schema_config?.campos?.length);
-        setComponenteSchema(catalogoComponente.schema_config);
-      } else {
-        console.warn('⚠️ [handleEditPageComponent] No hay schema disponible para este componente');
+    // Usar camposConfig que viene directamente del componente (incluido en la respuesta de getComponentesPagina)
+    const camposConfigFromComponent = (componente as any).camposConfig;
+    if (camposConfigFromComponent) {
+      console.log('✅ [handleEditPageComponent] Usando camposConfig incluido en el componente');
+      console.log('✅ [handleEditPageComponent] Número de campos:', camposConfigFromComponent.campos?.length);
+      console.log('✅ [handleEditPageComponent] Número de toggles:', camposConfigFromComponent.toggles?.length);
+      setComponenteSchema(camposConfigFromComponent);
+    } else {
+      // Fallback: Fetch schema del catálogo para este tipo de componente
+      try {
+        console.log('🔍 [handleEditPageComponent] Fallback: Obteniendo schema para tipo:', componente.tipo);
+        const token = await getToken();
+        const catalogoComponente = await getComponenteSchema(componente.tipo, token);
+        console.log('🔍 [handleEditPageComponent] Schema obtenido:', catalogoComponente);
+        if (catalogoComponente) {
+          console.log('✅ [handleEditPageComponent] Schema config:', catalogoComponente.schema_config);
+          console.log('✅ [handleEditPageComponent] Número de campos:', catalogoComponente.schema_config?.campos?.length);
+          setComponenteSchema(catalogoComponente.schema_config);
+        } else {
+          console.warn('⚠️ [handleEditPageComponent] No hay schema disponible para este componente');
+          setComponenteSchema(null);
+        }
+      } catch (error) {
+        console.error('❌ [handleEditPageComponent] Error obteniendo schema:', error);
         setComponenteSchema(null);
       }
-    } catch (error) {
-      console.error('❌ [handleEditPageComponent] Error obteniendo schema:', error);
-      setComponenteSchema(null);
     }
   };
 
@@ -917,74 +964,112 @@ export default function CrmWebPaginaEditar() {
           <div className="modal modal-wide" onClick={(e) => e.stopPropagation()}>
             <div className="modal-header">
               {addModalStep === 'selectType' && <h2>Agregar Componente</h2>}
-              {addModalStep === 'selectVariant' && (
+              {addModalStep === 'selectImplementation' && selectedTipo && (
                 <>
                   <button className="btn-back-modal" onClick={() => {
                     setAddModalStep('selectType');
-                    setSelectedVariante(null);
                     setSelectedTipo(null);
+                    setSelectedComponente(null);
                   }}>
                     ← Volver
                   </button>
-                  <h2>
-                    {selectedTipo && findComponenteEnCatalogo(selectedTipo)?.icono}{' '}
-                    {selectedTipo && findComponenteEnCatalogo(selectedTipo)?.nombre}
-                  </h2>
+                  <h2>Seleccionar {selectedTipo.charAt(0).toUpperCase() + selectedTipo.slice(1)}</h2>
                 </>
               )}
-              {addModalStep === 'selectGlobal' && (
+              {addModalStep === 'selectVariant' && (
                 <>
                   <button className="btn-back-modal" onClick={() => {
-                    const componenteCatalogo = findComponenteEnCatalogo(selectedTipo!);
-                    const variantesDisponibles = componenteCatalogo?.variantes || [];
-                    if (variantesDisponibles.length > 1) {
-                      setAddModalStep('selectVariant');
+                    // Volver al paso anterior correcto
+                    const implementaciones = getImplementacionesPorTipo(selectedTipo!);
+                    if (implementaciones.length > 1) {
+                      setAddModalStep('selectImplementation');
                     } else {
                       setAddModalStep('selectType');
+                      setSelectedTipo(null);
                     }
+                    setSelectedVariante(null);
+                    setSelectedComponente(null);
                   }}>
                     ← Volver
                   </button>
                   <h2>
-                    {selectedTipo && findComponenteEnCatalogo(selectedTipo)?.icono}{' '}
-                    {selectedTipo && findComponenteEnCatalogo(selectedTipo)?.nombre}
-                    {selectedVariante && selectedVariante !== 'default' && (
-                      <span className="variante-indicator-header"> ({selectedVariante})</span>
-                    )}
+                    {selectedComponente?.icono && getIconoEmoji(selectedComponente.icono)}{' '}
+                    {selectedComponente?.nombre || selectedTipo}
                   </h2>
-                </>
-              )}
-              {addModalStep === 'createNew' && (
-                <>
-                  <button className="btn-back-modal" onClick={() => setAddModalStep('selectGlobal')}>
-                    ← Volver
-                  </button>
-                  <h2>Crear nuevo componente global</h2>
                 </>
               )}
               <button className="modal-close" onClick={closeAddModal}>×</button>
             </div>
             <div className="modal-body">
-              {/* Paso 1: Seleccionar tipo de componente */}
+              {/* Paso 1: Seleccionar tipo de componente (agrupado por tipo) */}
               {addModalStep === 'selectType' && (
                 <div className="componentes-grid">
                   {catalogo.length === 0 ? (
                     <p>Cargando componentes disponibles...</p>
                   ) : (
-                    catalogo
-                      .filter((comp: any) => comp.codigo !== 'header' && comp.codigo !== 'footer' && comp.activo)
-                      .map((comp: any) => (
-                        <button
-                          key={comp.codigo}
-                          className="componente-option"
-                          onClick={() => handleSelectTipo(comp.codigo as TipoComponente)}
-                        >
-                          <span className="option-icon">{getIconoEmoji(comp.icono)}</span>
-                          <span className="option-name">{comp.nombre}</span>
-                          <span className="option-cat">{comp.categoria}</span>
-                        </button>
-                      ))
+                    (() => {
+                      // Agrupar componentes por tipo
+                      const tiposUnicos = catalogo
+                        .filter((comp: any) => comp.disponible !== false)
+                        .reduce((acc: Record<string, any[]>, comp: any) => {
+                          if (!acc[comp.tipo]) {
+                            acc[comp.tipo] = [];
+                          }
+                          acc[comp.tipo].push(comp);
+                          return acc;
+                        }, {});
+
+                      return Object.entries(tiposUnicos).map(([tipo, implementaciones]: [string, any[]]) => {
+                        // Usar el primer componente para mostrar info general
+                        const primerComp = implementaciones[0];
+                        const tieneMultiples = implementaciones.length > 1;
+
+                        return (
+                          <button
+                            key={`tipo-${tipo}-${primerComp.id}`}
+                            className="componente-option"
+                            onClick={() => handleSelectTipo(tipo as TipoComponente)}
+                          >
+                            <span className="option-icon">{getIconoEmoji(primerComp.icono)}</span>
+                            <span className="option-name">
+                              {tipo.charAt(0).toUpperCase() + tipo.slice(1).replace(/_/g, ' ')}
+                            </span>
+                            <span className="option-cat">{primerComp.categoria}</span>
+                            {tieneMultiples && (
+                              <span className="option-count">{implementaciones.length} opciones</span>
+                            )}
+                          </button>
+                        );
+                      });
+                    })()
                   )}
+                </div>
+              )}
+
+              {/* Paso 1.5: Seleccionar implementación específica (solo si hay múltiples) */}
+              {addModalStep === 'selectImplementation' && selectedTipo && (
+                <div className="variant-selector">
+                  <p className="variant-hint">
+                    Hay múltiples implementaciones de <strong>{selectedTipo}</strong> disponibles.
+                    Elige cuál quieres usar:
+                  </p>
+                  <div className="variantes-grid">
+                    {getImplementacionesPorTipo(selectedTipo).map((comp: any, idx: number) => (
+                      <button
+                        key={comp.id || `${comp.tipo}-${idx}`}
+                        className="variante-option"
+                        onClick={() => handleSelectImplementation(comp)}
+                      >
+                        <div className="variante-header">
+                          <span className="option-icon">{getIconoEmoji(comp.icono)}</span>
+                          <span className="variante-name">{comp.nombre}</span>
+                        </div>
+                        {comp.descripcion && (
+                          <p className="variante-desc">{comp.descripcion}</p>
+                        )}
+                      </button>
+                    ))}
+                  </div>
                 </div>
               )}
 
@@ -1031,30 +1116,6 @@ export default function CrmWebPaginaEditar() {
                 </div>
               )}
 
-              {/* Paso 3: Crear componente */}
-              {addModalStep === 'selectGlobal' && (
-                <div className="create-component-container">
-                  <div className="section-title">
-                    <h3>Agregar componente</h3>
-                    <p>El componente se creará automáticamente con el alcance adecuado</p>
-                  </div>
-                  <div className="create-actions">
-                    <button
-                      className="btn-secondary"
-                      onClick={() => setAddModalStep('selectVariante')}
-                    >
-                      Atrás
-                    </button>
-                    <button
-                      className="btn-primary"
-                      onClick={handleCreateComponent}
-                      disabled={saving}
-                    >
-                      {saving ? 'Creando...' : 'Crear componente'}
-                    </button>
-                  </div>
-                </div>
-              )}
             </div>
           </div>
         </div>
@@ -2018,6 +2079,16 @@ export default function CrmWebPaginaEditar() {
           font-weight: 500;
         }
 
+        .option-count {
+          font-size: 0.6875rem;
+          color: #3b82f6;
+          font-weight: 600;
+          background: #eff6ff;
+          padding: 2px 8px;
+          border-radius: 12px;
+          margin-top: 4px;
+        }
+
         /* Modal mejorado */
         .modal.modal-wide {
           max-width: 1000px;
@@ -2684,17 +2755,18 @@ export default function CrmWebPaginaEditar() {
         /* Panel lateral deslizable */
         .component-editor-panel {
           position: fixed;
-          top: 0;
+          top: 64px; /* Debajo del header del CRM */
           right: 0;
-          width: 560px;
+          width: 720px;
           max-width: 100vw;
-          height: 100vh;
+          height: calc(100vh - 64px); /* Altura menos el header */
           background: white;
           box-shadow: -8px 0 32px rgba(0, 0, 0, 0.12);
           z-index: 1000;
           display: flex;
           flex-direction: column;
           animation: slideInRight 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+          border-top-left-radius: 12px;
         }
 
         @keyframes slideInRight {

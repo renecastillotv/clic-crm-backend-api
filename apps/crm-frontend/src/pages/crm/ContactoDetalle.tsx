@@ -14,6 +14,7 @@ import { useAuth } from '../../contexts/AuthContext';
 import { usePageHeader } from '../../layouts/CrmLayout';
 import ActividadModal, { ActividadFormData } from '../../components/ActividadModal';
 import ExtensionesContactoPanel from '../../components/contactos/ExtensionesContactoPanel';
+import { useExtensionesContacto } from '../../hooks/useExtensionesContacto';
 import {
   getContacto,
   getContactos,
@@ -272,6 +273,9 @@ export default function ContactoDetalle() {
   const [actividades, setActividades] = useState<Actividad[]>([]);
   const [loadingActividades, setLoadingActividades] = useState(false);
   const [showCreateActividadModal, setShowCreateActividadModal] = useState(false);
+
+  // Hook de extensiones dinámicas - para obtener el contador correcto
+  const { extensionesContacto, recargarExtensionesContacto } = useExtensionesContacto(contactoId);
 
   // Configurar header con botón back y acciones
   useEffect(() => {
@@ -580,7 +584,7 @@ export default function ContactoDetalle() {
             Información
           </button>
           <button className={`tab ${activeTab === 'extensiones' ? 'active' : ''}`} onClick={() => setActiveTab('extensiones')}>
-            Extensiones {contacto.tipos_contacto?.length ? `(${contacto.tipos_contacto.length})` : ''}
+            Extensiones {extensionesContacto.length ? `(${extensionesContacto.length})` : ''}
           </button>
           <button className={`tab ${activeTab === 'relaciones' ? 'active' : ''}`} onClick={() => setActiveTab('relaciones')}>
             Relaciones {relaciones.length ? `(${relaciones.length})` : ''}
@@ -822,7 +826,10 @@ export default function ContactoDetalle() {
           <div className="tab-panel">
             <ExtensionesContactoPanel
               contactoId={contacto.id}
-              onExtensionChange={() => fetchContacto()}
+              onExtensionChange={() => {
+                cargarContacto();
+                recargarExtensionesContacto(contacto.id);
+              }}
             />
           </div>
         )}

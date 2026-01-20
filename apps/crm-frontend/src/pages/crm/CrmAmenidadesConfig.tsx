@@ -15,6 +15,7 @@ import { usePageHeader } from '../../layouts/CrmLayout';
 import { useIdiomas } from '../../services/idiomas';
 import {
   getAmenidadesTenant,
+  createAmenidadTenant,
   updateAmenidadTenant,
   deleteAmenidadTenant,
   getCategoriasAmenidades,
@@ -31,6 +32,7 @@ import {
   AlertCircle,
   CheckCircle,
   Clock,
+  Plus,
 } from 'lucide-react';
 
 // Traducciones de categorías
@@ -193,6 +195,146 @@ function EditModal({ amenidad, categorias, idiomas, onSave, onClose }: EditModal
   );
 }
 
+interface CreateModalProps {
+  categorias: string[];
+  idiomas: { code: string; labelNativo: string; flagEmoji: string }[];
+  onSave: (data: { nombre: string; icono: string; categoria: string; traducciones?: Record<string, string> }) => void;
+  onClose: () => void;
+  saving: boolean;
+}
+
+function CreateModal({ categorias, idiomas, onSave, onClose, saving }: CreateModalProps) {
+  const [nombre, setNombre] = useState('');
+  const [icono, setIcono] = useState('🎯');
+  const [categoria, setCategoria] = useState('personalizadas');
+  const [traducciones, setTraducciones] = useState<Record<string, string>>({});
+
+  const handleSave = () => {
+    if (!nombre.trim()) return;
+    // Solo incluir traducciones si hay alguna definida
+    const traduccionesLimpias = Object.fromEntries(
+      Object.entries(traducciones).filter(([_, v]) => v.trim())
+    );
+    onSave({
+      nombre: nombre.trim(),
+      icono,
+      categoria,
+      ...(Object.keys(traduccionesLimpias).length > 0 && { traducciones: traduccionesLimpias })
+    });
+  };
+
+  return (
+    <div className="modal-overlay" onClick={onClose}>
+      <div className="modal-content" onClick={(e) => e.stopPropagation()}>
+        <div className="modal-header">
+          <h2>Crear Nueva Amenidad</h2>
+          <button className="close-btn" onClick={onClose}>
+            <X size={20} />
+          </button>
+        </div>
+
+        <div className="modal-body">
+          <div className="form-group">
+            <label>Icono</label>
+            <div className="iconos-grid-edit">
+              {ICONOS_DISPONIBLES.map((i) => (
+                <button
+                  key={i.value}
+                  type="button"
+                  className={`icono-btn ${icono === i.value ? 'selected' : ''}`}
+                  onClick={() => setIcono(i.value)}
+                  title={i.label}
+                >
+                  {i.value}
+                </button>
+              ))}
+            </div>
+          </div>
+
+          <div className="form-group">
+            <label>Nombre</label>
+            <input
+              type="text"
+              value={nombre}
+              onChange={(e) => setNombre(e.target.value)}
+              placeholder="Nombre de la amenidad"
+              autoFocus
+            />
+          </div>
+
+          <div className="form-group">
+            <label>Categoria</label>
+            <select value={categoria} onChange={(e) => setCategoria(e.target.value)}>
+              <option value="personalizadas">Sin Categoria (Personalizadas)</option>
+              {categorias.map((cat) => (
+                <option key={cat} value={cat}>
+                  {CATEGORIAS_LABELS[cat] || cat}
+                </option>
+              ))}
+            </select>
+          </div>
+
+          {idiomas.length > 1 && (
+            <div className="form-group">
+              <label>Traducciones</label>
+              <div className="traducciones-grid-edit">
+                {idiomas.map((idioma) => (
+                  <div key={idioma.code} className="traduccion-item">
+                    <span className="idioma-label">
+                      {idioma.flagEmoji} {idioma.labelNativo}
+                    </span>
+                    <input
+                      type="text"
+                      value={traducciones[idioma.code] || ''}
+                      onChange={(e) =>
+                        setTraducciones((prev) => ({
+                          ...prev,
+                          [idioma.code]: e.target.value,
+                        }))
+                      }
+                      placeholder={`Nombre en ${idioma.labelNativo}`}
+                    />
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
+
+          <p className="create-info">
+            La amenidad se creara como "pendiente" y podras activarla despues.
+          </p>
+        </div>
+
+        <div className="modal-footer">
+          <button className="btn-cancel" onClick={onClose}>
+            Cancelar
+          </button>
+          <button
+            className="btn-save"
+            onClick={handleSave}
+            disabled={!nombre.trim() || saving}
+          >
+            {saving ? 'Creando...' : 'Crear Amenidad'}
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+// Helper para renderizar iconos (soporta emojis y FontAwesome)
+function renderIcon(icono: string | null | undefined, size: string = '2rem'): React.ReactNode {
+  const iconValue = icono || '🎯';
+
+  // Si es clase de FontAwesome (comienza con "fa")
+  if (iconValue.startsWith('fa')) {
+    return <i className={iconValue} style={{ fontSize: size }} />;
+  }
+
+  // Si es emoji u otro texto
+  return <span style={{ fontSize: size }}>{iconValue}</span>;
+}
+
 export default function CrmAmenidadesConfig() {
   const { tenantActual } = useAuth();
   const navigate = useNavigate();
@@ -207,6 +349,8 @@ export default function CrmAmenidadesConfig() {
   const [filtroEstado, setFiltroEstado] = useState<'todas' | 'activas' | 'pendientes'>('todas');
   const [editando, setEditando] = useState<Amenidad | null>(null);
   const [confirmDelete, setConfirmDelete] = useState<Amenidad | null>(null);
+  const [showCreateModal, setShowCreateModal] = useState(false);
+  const [creando, setCreando] = useState(false);
 
   // Configurar header
   useEffect(() => {
@@ -230,11 +374,13 @@ export default function CrmAmenidadesConfig() {
         setError(null);
 
         const [amenidadesData, categoriasData] = await Promise.all([
-          getAmenidadesTenant(tenantActual.id),
+          getAmenidadesTenant(tenantActual.id, true), // incluir inactivas para ver pendientes
           getCategoriasAmenidades(),
         ]);
 
-        setAmenidades(amenidadesData);
+        // Filtrar solo las amenidades del tenant (personalizadas), no las globales
+        const amenidadesTenant = amenidadesData.filter((a: any) => a.origen === 'tenant');
+        setAmenidades(amenidadesTenant);
         setCategorias(categoriasData.filter((c) => c !== 'personalizada' && c !== 'personalizadas'));
       } catch (err: any) {
         console.error('Error cargando amenidades:', err);
@@ -307,6 +453,22 @@ export default function CrmAmenidadesConfig() {
     }
   };
 
+  const handleCreate = async (data: { nombre: string; icono: string; categoria: string; traducciones?: Record<string, string> }) => {
+    if (!tenantActual?.id) return;
+
+    try {
+      setCreando(true);
+      const nuevaAmenidad = await createAmenidadTenant(tenantActual.id, data);
+      setAmenidades((prev) => [...prev, { ...nuevaAmenidad, origen: 'tenant' }]);
+      setShowCreateModal(false);
+    } catch (err: any) {
+      console.error('Error creando amenidad:', err);
+      setError(err.message);
+    } finally {
+      setCreando(false);
+    }
+  };
+
   const getCategoriaLabel = (cat: string | null) => {
     if (!cat) return 'Sin Categoría';
     return CATEGORIAS_LABELS[cat] || cat.charAt(0).toUpperCase() + cat.slice(1);
@@ -369,6 +531,14 @@ export default function CrmAmenidadesConfig() {
             {amenidades.filter((a) => !a.activo).length} pendientes
           </span>
         </div>
+
+        <button
+          className="btn-crear"
+          onClick={() => setShowCreateModal(true)}
+        >
+          <Plus size={18} />
+          Crear Nueva
+        </button>
       </div>
 
       {/* Lista de amenidades */}
@@ -387,7 +557,7 @@ export default function CrmAmenidadesConfig() {
               key={amenidad.id}
               className={`amenidad-card ${amenidad.activo ? 'activa' : 'pendiente'}`}
             >
-              <div className="amenidad-icon">{amenidad.icono || '🎯'}</div>
+              <div className="amenidad-icon">{renderIcon(amenidad.icono)}</div>
 
               <div className="amenidad-info">
                 <h3>{amenidad.nombre}</h3>
@@ -465,6 +635,17 @@ export default function CrmAmenidadesConfig() {
             </div>
           </div>
         </div>
+      )}
+
+      {/* Modal de creación de amenidad */}
+      {showCreateModal && (
+        <CreateModal
+          categorias={categorias}
+          idiomas={idiomasActivos}
+          onSave={handleCreate}
+          onClose={() => setShowCreateModal(false)}
+          saving={creando}
+        />
       )}
 
       <style>{`
@@ -965,6 +1146,36 @@ export default function CrmAmenidadesConfig() {
         .btn-save:disabled {
           opacity: 0.5;
           cursor: not-allowed;
+        }
+
+        .btn-crear {
+          display: flex;
+          align-items: center;
+          gap: 8px;
+          padding: 10px 16px;
+          background: #6366f1;
+          color: white;
+          border: none;
+          border-radius: 8px;
+          font-size: 0.95rem;
+          font-weight: 500;
+          cursor: pointer;
+          transition: background 0.2s;
+          margin-left: auto;
+        }
+
+        .btn-crear:hover {
+          background: #4f46e5;
+        }
+
+        .create-info {
+          font-size: 0.875rem;
+          color: #64748b;
+          margin-top: 8px;
+          padding: 12px;
+          background: #f8fafc;
+          border-radius: 8px;
+          border-left: 3px solid #6366f1;
         }
 
         .btn-delete-confirm {

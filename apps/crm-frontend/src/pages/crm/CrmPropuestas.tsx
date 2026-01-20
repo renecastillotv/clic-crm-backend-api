@@ -9,22 +9,14 @@
  */
 
 import { useState, useEffect, useCallback } from 'react';
-import { useParams, useSearchParams } from 'react-router-dom';
+import { useParams, useSearchParams, useNavigate } from 'react-router-dom';
 import { useAuth } from '../../contexts/AuthContext';
 import { usePageHeader } from '../../layouts/CrmLayout';
-import DatePicker from '../../components/DatePicker';
-import ContactPicker from '../../components/ContactPicker';
 import {
   getPropuestas,
-  createPropuesta,
-  updatePropuesta,
   deletePropuesta,
-  getContactos,
-  getSolicitudes,
   Propuesta,
   PropuestaFiltros,
-  Contacto,
-  Solicitud,
 } from '../../services/api';
 import {
   FileText,
@@ -41,10 +33,9 @@ import {
   Trash2,
   X,
   Building2,
-  Calendar,
-  User,
   Loader2,
   TrendingUp,
+  Pencil,
 } from 'lucide-react';
 
 // Estados de propuesta con iconos
@@ -60,6 +51,7 @@ const ESTADOS: Record<string, { label: string; color: string; bgColor: string; i
 export default function CrmPropuestas() {
   const { tenantSlug } = useParams<{ tenantSlug: string }>();
   const [searchParams, setSearchParams] = useSearchParams();
+  const navigate = useNavigate();
   const { tenantActual } = useAuth();
   const { setPageHeader } = usePageHeader();
 
@@ -71,27 +63,6 @@ export default function CrmPropuestas() {
   const [estadoFiltro, setEstadoFiltro] = useState<string>('');
   const [deleteConfirm, setDeleteConfirm] = useState<string | null>(null);
   const [copiedUrl, setCopiedUrl] = useState<string | null>(null);
-  const [showCreateModal, setShowCreateModal] = useState(false);
-  const [saving, setSaving] = useState(false);
-  const [editingPropuesta, setEditingPropuesta] = useState<Propuesta | null>(null);
-  const [nuevaPropuesta, setNuevaPropuesta] = useState({
-    titulo: '',
-    descripcion: '',
-    monto_total: '',
-    moneda: 'USD',
-    condiciones: '',
-    notas: '',
-    contacto_id: '',
-    solicitud_id: '',
-    fecha_validez: '',
-    estado: 'borrador',
-  });
-
-  // Contactos y solicitudes para selectores
-  const [contactos, setContactos] = useState<Contacto[]>([]);
-  const [solicitudes, setSolicitudes] = useState<Solicitud[]>([]);
-  const [contactoBusqueda, setContactoBusqueda] = useState('');
-  const [loadingContactos, setLoadingContactos] = useState(false);
 
   // Stats calculados
   const countByStatus = Object.keys(ESTADOS).reduce((acc, status) => {
@@ -114,13 +85,13 @@ export default function CrmPropuestas() {
         { label: 'Este Mes', value: totalCount, icon: <TrendingUp className="w-4 h-4" /> },
       ],
       actions: (
-        <button className="btn-primary" onClick={() => openModal()}>
+        <button className="btn-primary" onClick={() => navigate(`/crm/${tenantSlug}/propuestas/nueva`)}>
           <Plus className="w-4 h-4" />
           Nueva Propuesta
         </button>
       ),
     });
-  }, [setPageHeader, activeCount, wonCount, totalCount]);
+  }, [setPageHeader, activeCount, wonCount, totalCount, navigate, tenantSlug]);
 
   // Cargar propuestas
   const cargarPropuestas = useCallback(async () => {
@@ -149,126 +120,19 @@ export default function CrmPropuestas() {
     cargarPropuestas();
   }, [cargarPropuestas]);
 
-  // Abrir modal de crear si viene con query params
+  // Abrir edición si viene con query params
   useEffect(() => {
     const crear = searchParams.get('crear');
     const contactoId = searchParams.get('contacto_id');
 
     if (crear === 'true') {
-      openModal();
-      if (contactoId) {
-        setNuevaPropuesta(prev => ({ ...prev, contacto_id: contactoId }));
-      }
+      const url = contactoId
+        ? `/crm/${tenantSlug}/propuestas/nueva?contacto_id=${contactoId}`
+        : `/crm/${tenantSlug}/propuestas/nueva`;
+      navigate(url);
       setSearchParams({});
     }
-  }, [searchParams, setSearchParams]);
-
-  // Cargar contactos cuando se abre el modal
-  useEffect(() => {
-    if (showCreateModal && tenantActual?.id) {
-      const cargarContactos = async () => {
-        try {
-          setLoadingContactos(true);
-          const response = await getContactos(tenantActual.id, { busqueda: contactoBusqueda });
-          setContactos(response.data);
-        } catch (err) {
-          console.error('Error cargando contactos:', err);
-        } finally {
-          setLoadingContactos(false);
-        }
-      };
-      cargarContactos();
-    }
-  }, [showCreateModal, tenantActual?.id, contactoBusqueda]);
-
-  // Cargar solicitudes cuando se abre el modal
-  useEffect(() => {
-    if (showCreateModal && tenantActual?.id) {
-      const cargarSolicitudes = async () => {
-        try {
-          const response = await getSolicitudes(tenantActual.id, {});
-          setSolicitudes(response.data);
-        } catch (err) {
-          console.error('Error cargando solicitudes:', err);
-        }
-      };
-      cargarSolicitudes();
-    }
-  }, [showCreateModal, tenantActual?.id]);
-
-  // Abrir modal (crear o editar)
-  const openModal = (propuesta?: Propuesta) => {
-    if (propuesta) {
-      setEditingPropuesta(propuesta);
-      setNuevaPropuesta({
-        titulo: propuesta.titulo,
-        descripcion: propuesta.descripcion || '',
-        monto_total: propuesta.monto_total?.toString() || '',
-        moneda: propuesta.moneda || 'USD',
-        condiciones: propuesta.condiciones || '',
-        notas: propuesta.notas || '',
-        contacto_id: propuesta.contacto_id || '',
-        solicitud_id: propuesta.solicitud_id || '',
-        fecha_validez: propuesta.fecha_validez?.slice(0, 10) || '',
-        estado: propuesta.estado || 'borrador',
-      });
-      if (propuesta.contacto_nombre) {
-        setContactoBusqueda(`${propuesta.contacto_nombre} ${propuesta.contacto_apellido || ''}`.trim());
-      }
-    } else {
-      setEditingPropuesta(null);
-      setNuevaPropuesta({
-        titulo: '',
-        descripcion: '',
-        monto_total: '',
-        moneda: 'USD',
-        condiciones: '',
-        notas: '',
-        contacto_id: '',
-        solicitud_id: '',
-        fecha_validez: '',
-        estado: 'borrador',
-      });
-      setContactoBusqueda('');
-    }
-    setShowCreateModal(true);
-  };
-
-  // Crear o actualizar propuesta
-  const handleSavePropuesta = async () => {
-    if (!tenantActual?.id || !nuevaPropuesta.titulo.trim()) return;
-
-    try {
-      setSaving(true);
-      const data = {
-        titulo: nuevaPropuesta.titulo,
-        descripcion: nuevaPropuesta.descripcion || undefined,
-        monto_total: nuevaPropuesta.monto_total ? parseFloat(nuevaPropuesta.monto_total) : undefined,
-        moneda: nuevaPropuesta.moneda,
-        condiciones: nuevaPropuesta.condiciones || undefined,
-        notas: nuevaPropuesta.notas || undefined,
-        contacto_id: nuevaPropuesta.contacto_id || undefined,
-        solicitud_id: nuevaPropuesta.solicitud_id || undefined,
-        fecha_validez: nuevaPropuesta.fecha_validez || undefined,
-        estado: nuevaPropuesta.estado,
-      };
-
-      if (editingPropuesta) {
-        await updatePropuesta(tenantActual.id, editingPropuesta.id, data);
-      } else {
-        await createPropuesta(tenantActual.id, data);
-      }
-      setShowCreateModal(false);
-      setEditingPropuesta(null);
-      setContactoBusqueda('');
-      cargarPropuestas();
-    } catch (err: any) {
-      console.error('Error al guardar propuesta:', err);
-      setError(err.message);
-    } finally {
-      setSaving(false);
-    }
-  };
+  }, [searchParams, setSearchParams, navigate, tenantSlug]);
 
   // Eliminar propuesta
   const handleDelete = async (propuestaId: string) => {
@@ -285,9 +149,16 @@ export default function CrmPropuestas() {
   };
 
   // Copiar URL al portapapeles
-  const handleCopyUrl = async (url: string, propuestaId: string) => {
+  // Generar URL pública completa
+  const getUrlPublicaCompleta = (token: string) => {
+    const baseUrl = window.location.origin;
+    return `${baseUrl}/tenant/${tenantSlug}/propuestas/${token}`;
+  };
+
+  const handleCopyUrl = async (token: string, propuestaId: string) => {
     try {
-      await navigator.clipboard.writeText(url);
+      const urlCompleta = getUrlPublicaCompleta(token);
+      await navigator.clipboard.writeText(urlCompleta);
       setCopiedUrl(propuestaId);
       setTimeout(() => setCopiedUrl(null), 2000);
     } catch (err) {
@@ -414,7 +285,7 @@ export default function CrmPropuestas() {
               : 'Crea tu primera propuesta para comenzar'}
           </p>
           {!busqueda && !estadoFiltro && (
-            <button className="btn-primary" onClick={() => openModal()}>
+            <button className="btn-primary" onClick={() => navigate(`/crm/${tenantSlug}/propuestas/nueva`)}>
               <Plus className="w-4 h-4" />
               Nueva Propuesta
             </button>
@@ -441,13 +312,13 @@ export default function CrmPropuestas() {
                 const StatusIcon = estado.icon;
 
                 return (
-                  <tr key={propuesta.id} onClick={() => openModal(propuesta)}>
+                  <tr key={propuesta.id} onClick={() => navigate(`/crm/${tenantSlug}/propuestas/${propuesta.id}`)}>
                     <td>
                       <div className="propuesta-info">
                         <span className="propuesta-titulo">{propuesta.titulo}</span>
-                        {propuesta.monto_total && (
+                        {propuesta.precio_propuesto && (
                           <span className="propuesta-monto">
-                            {formatMoney(propuesta.monto_total, propuesta.moneda)}
+                            {formatMoney(propuesta.precio_propuesto, propuesta.moneda)}
                           </span>
                         )}
                       </div>
@@ -466,10 +337,10 @@ export default function CrmPropuestas() {
                       </span>
                     </td>
                     <td>
-                      {propuesta.propiedades && propuesta.propiedades.length > 0 ? (
+                      {(propuesta.propiedades_count ?? propuesta.propiedades?.length ?? 0) > 0 ? (
                         <span className="badge badge-blue">
                           <Building2 className="w-3 h-3" />
-                          {propuesta.propiedades.length}
+                          {propuesta.propiedades_count ?? propuesta.propiedades?.length ?? 0}
                         </span>
                       ) : (
                         <span className="text-muted">-</span>
@@ -495,6 +366,13 @@ export default function CrmPropuestas() {
                     </td>
                     <td>
                       <div className="actions-cell" onClick={(e) => e.stopPropagation()}>
+                        <button
+                          className="action-btn"
+                          onClick={() => navigate(`/crm/${tenantSlug}/propuestas/${propuesta.id}`)}
+                          title="Editar"
+                        >
+                          <Pencil className="w-4 h-4" />
+                        </button>
                         {propuesta.url_publica && (
                           <>
                             <button
@@ -509,7 +387,7 @@ export default function CrmPropuestas() {
                               )}
                             </button>
                             <a
-                              href={propuesta.url_publica}
+                              href={getUrlPublicaCompleta(propuesta.url_publica!)}
                               target="_blank"
                               rel="noopener noreferrer"
                               className="action-btn"
@@ -557,151 +435,6 @@ export default function CrmPropuestas() {
                 Eliminar
               </button>
             </div>
-          </div>
-        </div>
-      )}
-
-      {/* Modal de creación/edición de propuesta */}
-      {showCreateModal && (
-        <div className="modal-overlay" onClick={() => setShowCreateModal(false)}>
-          <div className="modal-content modal-form" onClick={(e) => e.stopPropagation()}>
-            <div className="modal-header">
-              <h3>{editingPropuesta ? 'Editar Propuesta' : 'Nueva Propuesta'}</h3>
-              <button className="modal-close-btn" onClick={() => setShowCreateModal(false)}>
-                <X className="w-5 h-5" />
-              </button>
-            </div>
-            <form onSubmit={(e) => { e.preventDefault(); handleSavePropuesta(); }}>
-              <div className="form-group">
-                <label htmlFor="titulo">Título *</label>
-                <input
-                  id="titulo"
-                  type="text"
-                  value={nuevaPropuesta.titulo}
-                  onChange={(e) => setNuevaPropuesta(prev => ({ ...prev, titulo: e.target.value }))}
-                  placeholder="Ej: Propuesta Casa Residencial"
-                  required
-                />
-              </div>
-
-              {/* Selector de Contacto */}
-              <div className="form-group">
-                <label>Contacto</label>
-                <ContactPicker
-                  value={nuevaPropuesta.contacto_id || null}
-                  onChange={(contactId) => setNuevaPropuesta(prev => ({ ...prev, contacto_id: contactId || '' }))}
-                  contacts={contactos}
-                  loading={loadingContactos}
-                  placeholder="Seleccionar contacto"
-                />
-              </div>
-
-              {/* Selector de Solicitud */}
-              <div className="form-group">
-                <label htmlFor="solicitud_id">Solicitud (opcional)</label>
-                <select
-                  id="solicitud_id"
-                  value={nuevaPropuesta.solicitud_id}
-                  onChange={(e) => setNuevaPropuesta(prev => ({ ...prev, solicitud_id: e.target.value }))}
-                >
-                  <option value="">Sin solicitud vinculada</option>
-                  {solicitudes.map(s => (
-                    <option key={s.id} value={s.id}>{s.titulo}</option>
-                  ))}
-                </select>
-              </div>
-
-              <div className="form-group">
-                <label htmlFor="descripcion">Descripción</label>
-                <textarea
-                  id="descripcion"
-                  value={nuevaPropuesta.descripcion}
-                  onChange={(e) => setNuevaPropuesta(prev => ({ ...prev, descripcion: e.target.value }))}
-                  placeholder="Describe brevemente la propuesta..."
-                  rows={3}
-                />
-              </div>
-
-              <div className="form-row">
-                <div className="form-group">
-                  <label htmlFor="monto_total">Monto Total</label>
-                  <input
-                    id="monto_total"
-                    type="number"
-                    value={nuevaPropuesta.monto_total}
-                    onChange={(e) => setNuevaPropuesta(prev => ({ ...prev, monto_total: e.target.value }))}
-                    placeholder="0"
-                    min="0"
-                  />
-                </div>
-                <div className="form-group">
-                  <label htmlFor="moneda">Moneda</label>
-                  <select
-                    id="moneda"
-                    value={nuevaPropuesta.moneda}
-                    onChange={(e) => setNuevaPropuesta(prev => ({ ...prev, moneda: e.target.value }))}
-                  >
-                    <option value="USD">USD</option>
-                    <option value="MXN">MXN</option>
-                    <option value="EUR">EUR</option>
-                  </select>
-                </div>
-              </div>
-
-              <div className="form-row">
-                <div className="form-group">
-                  <label htmlFor="fecha_validez">Válida hasta</label>
-                  <DatePicker
-                    value={nuevaPropuesta.fecha_validez || null}
-                    onChange={(val) => setNuevaPropuesta(prev => ({ ...prev, fecha_validez: val || '' }))}
-                    placeholder="Seleccionar fecha"
-                  />
-                </div>
-                <div className="form-group">
-                  <label htmlFor="estado">Estado</label>
-                  <select
-                    id="estado"
-                    value={nuevaPropuesta.estado}
-                    onChange={(e) => setNuevaPropuesta(prev => ({ ...prev, estado: e.target.value }))}
-                  >
-                    {Object.entries(ESTADOS).map(([key, val]) => (
-                      <option key={key} value={key}>{val.label}</option>
-                    ))}
-                  </select>
-                </div>
-              </div>
-
-              <div className="form-group">
-                <label htmlFor="condiciones">Condiciones</label>
-                <textarea
-                  id="condiciones"
-                  value={nuevaPropuesta.condiciones}
-                  onChange={(e) => setNuevaPropuesta(prev => ({ ...prev, condiciones: e.target.value }))}
-                  placeholder="Términos y condiciones de la propuesta..."
-                  rows={2}
-                />
-              </div>
-
-              <div className="form-group">
-                <label htmlFor="notas">Notas internas</label>
-                <textarea
-                  id="notas"
-                  value={nuevaPropuesta.notas}
-                  onChange={(e) => setNuevaPropuesta(prev => ({ ...prev, notas: e.target.value }))}
-                  placeholder="Notas adicionales (solo visibles internamente)..."
-                  rows={2}
-                />
-              </div>
-
-              <div className="modal-actions">
-                <button type="button" className="btn-cancel" onClick={() => setShowCreateModal(false)}>
-                  Cancelar
-                </button>
-                <button type="submit" className="btn-primary" disabled={saving || !nuevaPropuesta.titulo.trim()}>
-                  {saving ? 'Guardando...' : (editingPropuesta ? 'Guardar Cambios' : 'Crear Propuesta')}
-                </button>
-              </div>
-            </form>
           </div>
         </div>
       )}

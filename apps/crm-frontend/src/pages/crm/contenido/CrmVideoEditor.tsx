@@ -15,6 +15,7 @@ import { useAuth } from '../../../contexts/AuthContext';
 import { usePageHeader } from '../../../layouts/CrmLayout';
 import TagSelector from '../../../components/TagSelector';
 import DatePicker from '../../../components/DatePicker';
+import UserPicker from '../../../components/UserPicker';
 import ReactQuill from 'react-quill';
 import 'react-quill/dist/quill.snow.css';
 import {
@@ -25,8 +26,10 @@ import {
   uploadContenidoImage,
   getTagsGlobales,
   getTagsDeContenido,
+  getUsuariosTenant,
   CategoriaContenido,
   TagGlobal,
+  UsuarioTenant,
 } from '../../../services/api';
 import { useIdiomas } from '../../../services/idiomas';
 import { contenidoStyles } from './sharedStyles';
@@ -41,6 +44,7 @@ const Icons = {
   folder: <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z"/></svg>,
   edit: <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/></svg>,
   clock: <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>,
+  user: <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg>,
 };
 
 
@@ -59,11 +63,15 @@ interface Traducciones {
   };
 }
 
+interface SlugTraducciones {
+  [idioma: string]: string;
+}
+
 export default function CrmVideoEditor() {
   const { tenantSlug, id } = useParams<{ tenantSlug: string; id?: string }>();
   const navigate = useNavigate();
   const { getToken } = useClerkAuth();
-  const { tenantActual } = useAuth();
+  const { tenantActual, user } = useAuth();
   const { setPageHeader } = usePageHeader();
   const { idiomas } = useIdiomas(tenantActual?.id);
 
@@ -71,6 +79,7 @@ export default function CrmVideoEditor() {
 
   const [categorias, setCategorias] = useState<CategoriaContenido[]>([]);
   const [tagsGlobales, setTagsGlobales] = useState<TagGlobal[]>([]);
+  const [usuarios, setUsuarios] = useState<UsuarioTenant[]>([]);
   const [loading, setLoading] = useState(true);
   const [loadingTags, setLoadingTags] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -97,12 +106,16 @@ export default function CrmVideoEditor() {
     tagIds: [] as string[],
     publicado: true,
     destacado: false,
-    fechaPublicacion: '',
+    fechaPublicacion: new Date().toISOString().split('T')[0], // Fecha de hoy por defecto
     orden: 0,
+    autorId: '', // ID del autor (usuario que crea/edita)
   });
 
   // Traducciones separadas del form principal
   const [traducciones, setTraducciones] = useState<Traducciones>({});
+
+  // Slugs por idioma (para mostrar en cada tab)
+  const [slugTraducciones, setSlugTraducciones] = useState<SlugTraducciones>({});
 
   // Ref para mantener handleSave actualizado
   const handleSaveRef = useRef<() => void>(() => {});
@@ -133,6 +146,16 @@ export default function CrmVideoEditor() {
     loadInitialData();
   }, [tenantActual?.id, id]);
 
+  // Preseleccionar autor cuando user esté disponible (para videos nuevos)
+  useEffect(() => {
+    if (!isEditing && user?.id && !formData.autorId) {
+      setFormData(prev => ({
+        ...prev,
+        autorId: user.id,
+      }));
+    }
+  }, [user?.id, isEditing, formData.autorId]);
+
   // Convertir duración
   const segundosADuracion = (segundos: number) => ({
     horas: Math.floor(segundos / 3600),
@@ -153,8 +176,13 @@ export default function CrmVideoEditor() {
     setError(null);
 
     try {
-      const categoriasData = await getCategoriasContenido(tenantActual.id, 'video');
+      const token = await getToken();
+      const [categoriasData, usuariosData] = await Promise.all([
+        getCategoriasContenido(tenantActual.id, 'video'),
+        getUsuariosTenant(tenantActual.id, token),
+      ]);
       setCategorias(categoriasData);
+      setUsuarios(usuariosData);
 
       await loadTags();
 
@@ -170,26 +198,29 @@ export default function CrmVideoEditor() {
           tagIds = (video as any).tagIds || [];
         }
 
+        // Mapear campos soportando tanto snake_case (API) como camelCase
+        const v = video as any;
         setFormData({
-          slug: video.slug,
-          idioma: video.idioma,
-          titulo: video.titulo,
-          descripcion: video.descripcion || '',
-          categoriaId: video.categoriaId || '',
-          tipoVideo: video.tipoVideo,
-          videoUrl: video.videoUrl,
-          videoId: video.videoId || '',
-          embedCode: video.embedCode || '',
-          thumbnail: video.thumbnail || '',
-          duracionSegundos: video.duracionSegundos || 0,
+          slug: v.slug,
+          idioma: v.idioma,
+          titulo: v.titulo,
+          descripcion: v.descripcion || '',
+          categoriaId: v.categoria_id || v.categoriaId || '',
+          tipoVideo: v.tipo_video || v.tipoVideo || 'youtube',
+          videoUrl: v.video_url || v.videoUrl || '',
+          videoId: v.video_id || v.videoId || '',
+          embedCode: v.embed_code || v.embedCode || '',
+          thumbnail: v.thumbnail || '',
+          duracionSegundos: v.duracion_segundos || v.duracionSegundos || 0,
           tagIds,
-          publicado: video.publicado,
-          destacado: video.destacado,
-          fechaPublicacion: video.fechaPublicacion ? new Date(video.fechaPublicacion).toISOString().split('T')[0] : '',
-          orden: video.orden,
+          publicado: v.publicado,
+          destacado: v.destacado,
+          fechaPublicacion: (v.fecha_publicacion || v.fechaPublicacion) ? new Date(v.fecha_publicacion || v.fechaPublicacion).toISOString().split('T')[0] : '',
+          orden: v.orden,
+          autorId: v.autor_id || v.autorId || '',
         });
 
-        setDuracion(segundosADuracion(video.duracionSegundos || 0));
+        setDuracion(segundosADuracion(v.duracion_segundos || v.duracionSegundos || 0));
 
         // Cargar traducciones existentes
         if (video.traducciones) {
@@ -246,6 +277,14 @@ export default function CrmVideoEditor() {
     }));
   };
 
+  // Helper para verificar si un HTML de ReactQuill tiene contenido real
+  const tieneContenidoReal = (html: string | undefined): boolean => {
+    if (!html) return false;
+    // Remover tags HTML y espacios para ver si hay texto real
+    const textoLimpio = html.replace(/<[^>]*>/g, '').replace(/&nbsp;/g, ' ').trim();
+    return textoLimpio.length > 0;
+  };
+
   const handleSave = useCallback(async () => {
     if (!tenantActual?.id || !formData.titulo || !formData.videoUrl) {
       setError('Título y URL del video son requeridos');
@@ -256,11 +295,25 @@ export default function CrmVideoEditor() {
       setSaving(true);
       setError(null);
 
-      // Limpiar traducciones vacías
+      // Limpiar traducciones vacías (verificar contenido real, no solo tags HTML vacíos)
       const traduccionesLimpias: Traducciones = {};
       Object.entries(traducciones).forEach(([idioma, contenido]) => {
-        if (contenido.titulo || contenido.descripcion) {
-          traduccionesLimpias[idioma] = contenido;
+        const tieneTitulo = contenido.titulo && contenido.titulo.trim().length > 0;
+        const tieneDescripcion = tieneContenidoReal(contenido.descripcion);
+        if (tieneTitulo || tieneDescripcion) {
+          // Solo incluir campos con contenido real
+          traduccionesLimpias[idioma] = {
+            ...(tieneTitulo ? { titulo: contenido.titulo } : {}),
+            ...(tieneDescripcion ? { descripcion: contenido.descripcion } : {}),
+          };
+        }
+      });
+
+      // Generar slugTraducciones basado en los títulos de las traducciones
+      const slugTraduccionesLimpias: SlugTraducciones = {};
+      Object.entries(traduccionesLimpias).forEach(([idioma, contenido]) => {
+        if (contenido.titulo && contenido.titulo.trim().length > 0) {
+          slugTraduccionesLimpias[idioma] = generateSlug(contenido.titulo);
         }
       });
 
@@ -268,9 +321,11 @@ export default function CrmVideoEditor() {
         ...formData,
         slug: formData.slug || generateSlug(formData.titulo),
         categoriaId: formData.categoriaId || undefined,
+        autorId: formData.autorId || undefined,
         tagIds: formData.tagIds || [],
         fechaPublicacion: formData.fechaPublicacion || undefined,
         traducciones: Object.keys(traduccionesLimpias).length > 0 ? traduccionesLimpias : undefined,
+        slugTraducciones: Object.keys(slugTraduccionesLimpias).length > 0 ? slugTraduccionesLimpias : undefined,
       };
 
       if (isEditing && id) {
@@ -342,6 +397,7 @@ export default function CrmVideoEditor() {
           border: 1px solid #e2e8f0;
           border-radius: 12px;
           padding: 20px;
+          overflow: visible;
         }
 
         .editor-section h4 {
@@ -807,9 +863,28 @@ export default function CrmVideoEditor() {
                     <input
                       type="text"
                       value={traducciones[idiomaActivo]?.titulo || ''}
-                      onChange={(e) => handleTraduccionChange(idiomaActivo, 'titulo', e.target.value)}
+                      onChange={(e) => {
+                        handleTraduccionChange(idiomaActivo, 'titulo', e.target.value);
+                        // Generar slug para este idioma automáticamente
+                        const nuevoSlug = generateSlug(e.target.value);
+                        setSlugTraducciones(prev => ({
+                          ...prev,
+                          [idiomaActivo]: nuevoSlug
+                        }));
+                        // Si estamos creando (no editando) y el slug principal está vacío,
+                        // generar el slug desde el título en este idioma
+                        if (!isEditing && (!formData.titulo || !formData.slug)) {
+                          setFormData(prev => ({ ...prev, slug: nuevoSlug }));
+                        }
+                      }}
                       placeholder={`Traducción del título en ${idiomas.find(i => i.code === idiomaActivo)?.labelNativo}`}
                     />
+                    {slugTraducciones[idiomaActivo] && (
+                      <div className="slug-preview">
+                        <span>Slug:</span>
+                        <code>{slugTraducciones[idiomaActivo]}</code>
+                      </div>
+                    )}
                   </div>
                 </>
               )}
@@ -911,6 +986,7 @@ export default function CrmVideoEditor() {
             ) : (
               <div className="form-group quill-container" style={{ marginBottom: 0 }}>
                 <ReactQuill
+                  key={`descripcion-${idiomaActivo}`}
                   theme="snow"
                   value={traducciones[idiomaActivo]?.descripcion || ''}
                   onChange={(value) => handleTraduccionChange(idiomaActivo, 'descripcion', value)}
@@ -1000,6 +1076,19 @@ export default function CrmVideoEditor() {
                 </div>
               ))}
             </div>
+          </div>
+
+          {/* Autor */}
+          <div className="editor-section">
+            <h4>{Icons.user} Autor</h4>
+            <UserPicker
+              value={formData.autorId || null}
+              onChange={(userId) => setFormData({ ...formData, autorId: userId || '' })}
+              placeholder="Seleccionar autor..."
+              users={usuarios}
+              loading={loading}
+              clearable
+            />
           </div>
 
           {/* Tags */}

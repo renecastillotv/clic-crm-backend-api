@@ -1,9 +1,10 @@
 /**
  * UserPicker - Componente para seleccionar usuarios del tenant
- * Similar a ContactPicker pero para usuarios/asesores
+ * Muestra un trigger que abre un modal profesional con búsqueda y selección
+ * Consistente con el diseño de UserPickerModal
  */
 
-import React, { useState, useRef, useEffect } from 'react';
+import React, { useState, useRef, useEffect, useMemo } from 'react';
 import { createPortal } from 'react-dom';
 import { Search, User, X, Check, Loader2, Shield, UserCircle } from 'lucide-react';
 
@@ -49,138 +50,100 @@ export default function UserPicker({
 }: UserPickerProps) {
   const [isOpen, setIsOpen] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
-  const [debouncedQuery, setDebouncedQuery] = useState('');
-  const inputRef = useRef<HTMLDivElement>(null);
   const searchInputRef = useRef<HTMLInputElement>(null);
-  const dropdownRef = useRef<HTMLDivElement>(null);
 
   const selectedUser = users.find(u => u.id === value);
 
-  useEffect(() => {
-    const timer = setTimeout(() => {
-      setDebouncedQuery(searchQuery);
-    }, 200);
-    return () => clearTimeout(timer);
-  }, [searchQuery]);
+  // Filtrar usuarios por rol si se especifica
+  const filteredUsers = useMemo(() => {
+    return users.filter(user => {
+      if (user.activo === false) return false;
 
-  const filteredUsers = users.filter(user => {
-    if (user.activo === false) return false;
+      if (filterByRole) {
+        const hasRole = user.roles.some(role =>
+          role.codigo.toLowerCase().includes(filterByRole.toLowerCase()) ||
+          role.nombre.toLowerCase().includes(filterByRole.toLowerCase())
+        );
+        if (!hasRole) return false;
+      }
 
-    if (filterByRole) {
-      const hasRole = user.roles.some(role =>
-        role.codigo.toLowerCase().includes(filterByRole.toLowerCase()) ||
-        role.nombre.toLowerCase().includes(filterByRole.toLowerCase())
-      );
-      if (!hasRole) return false;
+      return true;
+    });
+  }, [users, filterByRole]);
+
+  // Filtrar usuarios por búsqueda
+  const displayUsers = useMemo(() => {
+    if (!searchQuery || !searchQuery.trim()) {
+      return filteredUsers;
     }
 
-    if (debouncedQuery) {
-      const query = debouncedQuery.toLowerCase();
+    const query = searchQuery.toLowerCase().trim();
+    return filteredUsers.filter(user => {
       const fullName = `${user.nombre || ''} ${user.apellido || ''}`.toLowerCase().trim();
-      const email = (user.email || '').toLowerCase();
+      const email = (user.email || '').toLowerCase().trim();
       return fullName.includes(query) || email.includes(query);
-    }
-    return true;
-  });
+    });
+  }, [filteredUsers, searchQuery]);
 
-  const sortedUsers = [...filteredUsers].sort((a, b) => {
-    const nameA = `${a.nombre || ''} ${a.apellido || ''}`.trim();
-    const nameB = `${b.nombre || ''} ${b.apellido || ''}`.trim();
-    return nameA.localeCompare(nameB);
-  });
-
+  // Focus en búsqueda al abrir
   useEffect(() => {
+    if (isOpen) {
+      setSearchQuery('');
+      setTimeout(() => searchInputRef.current?.focus(), 100);
+    }
+  }, [isOpen]);
+
+  // Cerrar con Escape
+  useEffect(() => {
+    if (!isOpen) return;
+
     const handleEscape = (event: KeyboardEvent) => {
       if (event.key === 'Escape') {
         setIsOpen(false);
       }
     };
-
-    const handleClickOutside = (event: MouseEvent) => {
-      if (
-        inputRef.current &&
-        !inputRef.current.contains(event.target as Node) &&
-        dropdownRef.current &&
-        !dropdownRef.current.contains(event.target as Node)
-      ) {
-        setIsOpen(false);
-      }
-    };
-
-    if (isOpen) {
-      document.addEventListener('keydown', handleEscape);
-      document.addEventListener('mousedown', handleClickOutside);
-      setTimeout(() => searchInputRef.current?.focus(), 100);
-    }
-
-    return () => {
-      document.removeEventListener('keydown', handleEscape);
-      document.removeEventListener('mousedown', handleClickOutside);
-    };
+    document.addEventListener('keydown', handleEscape);
+    return () => document.removeEventListener('keydown', handleEscape);
   }, [isOpen]);
 
-  const handleSelect = (user: TenantUser) => {
-    onChange(user.id, user);
-    setIsOpen(false);
-    setSearchQuery('');
+  const getNombreCompleto = (user: TenantUser) => {
+    if (user.nombre || user.apellido) {
+      return `${user.nombre || ''} ${user.apellido || ''}`.trim();
+    }
+    return user.email.split('@')[0];
   };
 
-  const handleClear = (e: React.MouseEvent) => {
+  const getIniciales = (user: TenantUser) => {
+    if (user.nombre && user.apellido) {
+      return `${user.nombre[0]}${user.apellido[0]}`.toUpperCase();
+    }
+    if (user.nombre) {
+      return user.nombre.substring(0, 2).toUpperCase();
+    }
+    return user.email.substring(0, 2).toUpperCase();
+  };
+
+  const handleUserClick = (user: TenantUser) => {
+    onChange(user.id === value ? null : user.id, user);
+    setIsOpen(false);
+  };
+
+  const handleClear = () => {
+    onChange(null);
+    setIsOpen(false);
+  };
+
+  const handleTriggerClear = (e: React.MouseEvent) => {
     e.stopPropagation();
     onChange(null);
   };
 
-  const getFullName = (user: TenantUser) => {
-    if (user.nombre || user.apellido) {
-      return `${user.nombre || ''} ${user.apellido || ''}`.trim();
-    }
-    return user.email;
-  };
-
-  const renderAvatar = (user: TenantUser, size: 'sm' | 'md' = 'sm') => {
-    const sizeClasses = {
-      sm: { container: 'w-8 h-8', text: 'text-xs' },
-      md: { container: 'w-10 h-10', text: 'text-sm' },
-    };
-
-    const initials = `${(user.nombre || '').charAt(0)}${(user.apellido || '').charAt(0)}`.toUpperCase() || user.email.charAt(0).toUpperCase();
-
-    if (user.avatarUrl) {
-      return (
-        <div className={`${sizeClasses[size].container} rounded-full overflow-hidden flex-shrink-0`}>
-          <img src={user.avatarUrl} alt="" className="w-full h-full object-cover" />
-        </div>
-      );
-    }
-
-    return (
-      <div
-        className={`${sizeClasses[size].container} rounded-full flex items-center justify-center flex-shrink-0`}
-        style={{ background: 'linear-gradient(135deg, #6366f1, #8b5cf6)' }}
-      >
-        <span className={`${sizeClasses[size].text} font-medium text-white`}>{initials}</span>
-      </div>
-    );
-  };
-
-  const getDropdownPosition = () => {
-    if (!inputRef.current) return { top: 0, left: 0, width: 0 };
-    const rect = inputRef.current.getBoundingClientRect();
-    return {
-      top: rect.bottom + window.scrollY + 4,
-      left: rect.left + window.scrollX,
-      width: rect.width,
-    };
-  };
-
-  const dropdownPosition = getDropdownPosition();
-
   return (
-    <div className={`user-picker ${className}`} style={{ position: 'relative' }}>
+    <div className={`user-picker ${className}`}>
+      {/* Trigger */}
       <div
-        ref={inputRef}
-        onClick={() => !disabled && setIsOpen(!isOpen)}
-        className={`user-picker-trigger ${disabled ? 'disabled' : ''} ${isOpen ? 'open' : ''}`}
+        onClick={() => !disabled && setIsOpen(true)}
+        className={`user-picker-trigger ${disabled ? 'disabled' : ''}`}
         style={{
           display: 'flex',
           alignItems: 'center',
@@ -197,20 +160,31 @@ export default function UserPicker({
           <Loader2 size={16} className="animate-spin" style={{ color: '#9ca3af' }} />
         ) : selectedUser ? (
           <>
-            {renderAvatar(selectedUser)}
+            <div
+              style={{
+                width: 28,
+                height: 28,
+                borderRadius: '50%',
+                background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                color: 'white',
+                fontSize: '0.7rem',
+                fontWeight: 600,
+                flexShrink: 0,
+              }}
+            >
+              {getIniciales(selectedUser)}
+            </div>
             <div style={{ flex: 1, minWidth: 0 }}>
               <div style={{ fontSize: '0.875rem', fontWeight: 500, color: '#1f2937', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-                {getFullName(selectedUser)}
+                {getNombreCompleto(selectedUser)}
               </div>
-              {selectedUser.roles.length > 0 && (
-                <div style={{ fontSize: '0.75rem', color: '#6b7280' }}>
-                  {selectedUser.roles.map(r => r.nombre).join(', ')}
-                </div>
-              )}
             </div>
             {clearable && !disabled && (
               <button
-                onClick={handleClear}
+                onClick={handleTriggerClear}
                 style={{
                   padding: '4px',
                   borderRadius: '4px',
@@ -234,163 +208,510 @@ export default function UserPicker({
         )}
       </div>
 
+      {/* Modal */}
       {isOpen && createPortal(
-        <div
-          ref={dropdownRef}
-          style={{
-            position: 'absolute',
-            top: dropdownPosition.top,
-            left: dropdownPosition.left,
-            width: Math.max(dropdownPosition.width, 280),
-            zIndex: 9999,
-            background: 'white',
-            borderRadius: '12px',
-            boxShadow: '0 10px 40px rgba(0, 0, 0, 0.15)',
-            border: '1px solid #e5e7eb',
-            overflow: 'hidden',
-          }}
-        >
-          <div style={{ padding: '12px', borderBottom: '1px solid #e5e7eb' }}>
-            <div style={{
-              display: 'flex',
-              alignItems: 'center',
-              gap: '8px',
-              padding: '8px 12px',
-              background: '#f3f4f6',
-              borderRadius: '8px',
-            }}>
-              <Search size={16} style={{ color: '#9ca3af' }} />
-              <input
-                ref={searchInputRef}
-                type="text"
-                value={searchQuery}
-                onChange={(e) => setSearchQuery(e.target.value)}
-                placeholder="Buscar usuario..."
-                style={{
-                  flex: 1,
-                  border: 'none',
-                  background: 'transparent',
-                  outline: 'none',
-                  fontSize: '0.875rem',
-                }}
-              />
-              {searchQuery && (
-                <button
-                  onClick={() => setSearchQuery('')}
-                  style={{ padding: '2px', border: 'none', background: 'transparent', cursor: 'pointer' }}
-                >
-                  <X size={14} style={{ color: '#9ca3af' }} />
-                </button>
+        <>
+          {/* Overlay */}
+          <div className="user-picker-overlay" onClick={() => setIsOpen(false)} />
+
+          {/* Modal */}
+          <div className="user-picker-modal" onClick={(e) => e.stopPropagation()}>
+            {/* Header */}
+            <div className="user-picker-header">
+              <div className="user-picker-header-content">
+                <div className="user-picker-header-icon">
+                  <UserCircle className="w-7 h-7" />
+                </div>
+                <div className="user-picker-header-text">
+                  <h2>Seleccionar Usuario</h2>
+                  <p>Selecciona un usuario de la lista</p>
+                </div>
+              </div>
+              <button className="user-picker-close" onClick={() => setIsOpen(false)}>
+                <X className="w-6 h-6" />
+              </button>
+            </div>
+
+            {/* Búsqueda */}
+            <div className="user-picker-search-container">
+              <div className="user-picker-search">
+                <Search style={{ width: 20, height: 20, minWidth: 20, color: '#94a3b8', flexShrink: 0 }} />
+                <input
+                  ref={searchInputRef}
+                  type="text"
+                  placeholder="Buscar usuario..."
+                  value={searchQuery}
+                  onChange={(e) => setSearchQuery(e.target.value)}
+                />
+                {searchQuery && (
+                  <button className="search-clear" onClick={() => setSearchQuery('')}>
+                    <X className="w-4 h-4" />
+                  </button>
+                )}
+              </div>
+            </div>
+
+            {/* Lista de usuarios */}
+            <div className="user-picker-list">
+              {loading ? (
+                <div className="user-picker-loading">
+                  <Loader2 className="w-10 h-10 animate-spin" />
+                  <span>Cargando usuarios...</span>
+                </div>
+              ) : displayUsers.length === 0 ? (
+                <div className="user-picker-empty">
+                  <div className="empty-icon">
+                    <User className="w-16 h-16" />
+                  </div>
+                  <h3>
+                    {searchQuery
+                      ? 'No se encontraron usuarios'
+                      : 'No hay usuarios disponibles'}
+                  </h3>
+                  <p>
+                    {searchQuery
+                      ? 'Intenta con otros términos de búsqueda'
+                      : 'No hay usuarios que coincidan con los filtros'}
+                  </p>
+                </div>
+              ) : (
+                <div className="user-list-container">
+                  {/* Opción para limpiar */}
+                  <button
+                    className="user-list-item clear-item"
+                    onClick={handleClear}
+                  >
+                    <div className="clear-item-icon">
+                      <X className="w-5 h-5" />
+                    </div>
+                    <div className="clear-item-text">
+                      <span className="clear-item-title">Sin usuario</span>
+                      <span className="clear-item-desc">Remover selección</span>
+                    </div>
+                  </button>
+
+                  {/* Lista de usuarios */}
+                  <div className="user-list">
+                    {displayUsers.map((user) => {
+                      const isSelected = user.id === value;
+
+                      return (
+                        <button
+                          key={user.id}
+                          className={`user-list-item ${isSelected ? 'selected' : ''}`}
+                          onClick={() => handleUserClick(user)}
+                        >
+                          {/* Indicador de selección */}
+                          {isSelected && (
+                            <div className="user-list-selected-indicator">
+                              <Check className="w-4 h-4" />
+                            </div>
+                          )}
+
+                          {/* Avatar */}
+                          <div className="user-list-avatar">
+                            {user.avatarUrl ? (
+                              <img src={user.avatarUrl} alt={getNombreCompleto(user)} />
+                            ) : (
+                              <div className="user-avatar-initials">
+                                {getIniciales(user)}
+                              </div>
+                            )}
+                          </div>
+
+                          {/* Info */}
+                          <div className="user-list-info">
+                            <div className="user-list-name-row">
+                              <span className="user-list-name">
+                                {getNombreCompleto(user)}
+                              </span>
+                              {user.esOwner && (
+                                <Shield className="w-4 h-4 owner-badge" />
+                              )}
+                            </div>
+                            <div className="user-list-email">{user.email}</div>
+                            {user.roles.length > 0 && (
+                              <div className="user-list-roles">
+                                {user.roles.slice(0, 2).map((role) => (
+                                  <span
+                                    key={role.id}
+                                    className="role-badge-small"
+                                    style={{
+                                      backgroundColor: role.color ? `${role.color}20` : '#e2e8f0',
+                                      color: role.color || '#64748b',
+                                    }}
+                                  >
+                                    {role.nombre}
+                                  </span>
+                                ))}
+                              </div>
+                            )}
+                          </div>
+                        </button>
+                      );
+                    })}
+                  </div>
+                </div>
               )}
             </div>
           </div>
 
-          <div style={{ maxHeight: '300px', overflowY: 'auto' }}>
-            {loading ? (
-              <div style={{ padding: '24px', textAlign: 'center', color: '#6b7280' }}>
-                <Loader2 size={24} className="animate-spin" style={{ margin: '0 auto 8px' }} />
-                <p style={{ fontSize: '0.875rem' }}>Cargando usuarios...</p>
-              </div>
-            ) : sortedUsers.length === 0 ? (
-              <div style={{ padding: '24px', textAlign: 'center', color: '#6b7280' }}>
-                <UserCircle size={32} style={{ margin: '0 auto 8px', opacity: 0.5 }} />
-                <p style={{ fontSize: '0.875rem' }}>
-                  {searchQuery ? 'No se encontraron usuarios' : 'No hay usuarios disponibles'}
-                </p>
-              </div>
-            ) : (
-              sortedUsers.map((user) => (
-                <button
-                  key={user.id}
-                  onClick={() => handleSelect(user)}
-                  style={{
-                    width: '100%',
-                    display: 'flex',
-                    alignItems: 'center',
-                    gap: '12px',
-                    padding: '10px 12px',
-                    border: 'none',
-                    background: user.id === value ? '#f0f9ff' : 'transparent',
-                    cursor: 'pointer',
-                    textAlign: 'left',
-                    transition: 'background 0.15s',
-                  }}
-                  onMouseEnter={(e) => {
-                    if (user.id !== value) {
-                      e.currentTarget.style.background = '#f9fafb';
-                    }
-                  }}
-                  onMouseLeave={(e) => {
-                    e.currentTarget.style.background = user.id === value ? '#f0f9ff' : 'transparent';
-                  }}
-                >
-                  {renderAvatar(user, 'md')}
-                  <div style={{ flex: 1, minWidth: 0 }}>
-                    <div style={{
-                      fontSize: '0.875rem',
-                      fontWeight: 500,
-                      color: '#1f2937',
-                      overflow: 'hidden',
-                      textOverflow: 'ellipsis',
-                      whiteSpace: 'nowrap',
-                    }}>
-                      {getFullName(user)}
-                      {user.esOwner && (
-                        <Shield size={12} style={{ marginLeft: '4px', color: '#f59e0b', display: 'inline' }} />
-                      )}
-                    </div>
-                    <div style={{ fontSize: '0.75rem', color: '#6b7280' }}>{user.email}</div>
-                    {user.roles.length > 0 && (
-                      <div style={{ display: 'flex', gap: '4px', marginTop: '4px', flexWrap: 'wrap' }}>
-                        {user.roles.slice(0, 2).map((role) => (
-                          <span
-                            key={role.id}
-                            style={{
-                              fontSize: '0.625rem',
-                              padding: '2px 6px',
-                              borderRadius: '4px',
-                              background: role.color ? `${role.color}20` : '#e5e7eb',
-                              color: role.color || '#4b5563',
-                            }}
-                          >
-                            {role.nombre}
-                          </span>
-                        ))}
-                        {user.roles.length > 2 && (
-                          <span style={{ fontSize: '0.625rem', color: '#9ca3af' }}>
-                            +{user.roles.length - 2}
-                          </span>
-                        )}
-                      </div>
-                    )}
-                  </div>
-                  {user.id === value && (
-                    <Check size={16} style={{ color: '#3b82f6', flexShrink: 0 }} />
-                  )}
-                </button>
-              ))
-            )}
-          </div>
-        </div>,
+          <style>{`
+            .user-picker-trigger:hover:not(.disabled) {
+              border-color: #d1d5db;
+            }
+
+            .user-picker-overlay {
+              position: fixed;
+              top: 0;
+              left: 0;
+              right: 0;
+              bottom: 0;
+              background: rgba(0, 0, 0, 0.5);
+              z-index: 9998;
+              animation: fadeIn 0.2s;
+            }
+
+            .user-picker-modal {
+              position: fixed;
+              top: 50%;
+              left: 50%;
+              transform: translate(-50%, -50%);
+              width: 90%;
+              max-width: 600px;
+              max-height: 90vh;
+              background: white;
+              border-radius: 16px;
+              box-shadow: 0 20px 60px rgba(0, 0, 0, 0.3);
+              z-index: 9999;
+              display: flex;
+              flex-direction: column;
+              animation: slideUp 0.3s ease-out;
+              overflow: hidden;
+            }
+
+            @keyframes fadeIn {
+              from { opacity: 0; }
+              to { opacity: 1; }
+            }
+
+            @keyframes slideUp {
+              from {
+                opacity: 0;
+                transform: translate(-50%, -40%);
+              }
+              to {
+                opacity: 1;
+                transform: translate(-50%, -50%);
+              }
+            }
+
+            .user-picker-header {
+              display: flex;
+              align-items: center;
+              justify-content: space-between;
+              padding: 24px;
+              border-bottom: 2px solid #f1f5f9;
+            }
+
+            .user-picker-header-content {
+              display: flex;
+              align-items: center;
+              gap: 16px;
+            }
+
+            .user-picker-header-icon {
+              width: 48px;
+              height: 48px;
+              border-radius: 12px;
+              background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+              display: flex;
+              align-items: center;
+              justify-content: center;
+              color: white;
+            }
+
+            .user-picker-header-text h2 {
+              margin: 0;
+              font-size: 1.5rem;
+              font-weight: 700;
+              color: #0f172a;
+            }
+
+            .user-picker-header-text p {
+              margin: 4px 0 0 0;
+              font-size: 0.9rem;
+              color: #64748b;
+            }
+
+            .user-picker-close {
+              background: none;
+              border: none;
+              color: #64748b;
+              cursor: pointer;
+              padding: 8px;
+              border-radius: 8px;
+              transition: all 0.2s;
+              display: flex;
+              align-items: center;
+              justify-content: center;
+            }
+
+            .user-picker-close:hover {
+              background: #f1f5f9;
+              color: #0f172a;
+            }
+
+            .user-picker-search-container {
+              padding: 16px 24px;
+              border-bottom: 2px solid #f1f5f9;
+            }
+
+            .user-picker-search {
+              display: flex;
+              align-items: center;
+              gap: 12px;
+              padding: 12px 16px;
+              border: 2px solid #e2e8f0;
+              border-radius: 10px;
+              background: #f8fafc;
+              transition: all 0.2s;
+            }
+
+            .user-picker-search:focus-within {
+              border-color: #1e293b;
+              background: white;
+            }
+
+            .user-picker-search input {
+              flex: 1;
+              border: none !important;
+              background: transparent !important;
+              outline: none !important;
+              box-shadow: none !important;
+              font-size: 0.95rem;
+              color: #0f172a;
+              -webkit-appearance: none;
+            }
+
+            .user-picker-search input:focus {
+              border: none !important;
+              outline: none !important;
+              box-shadow: none !important;
+            }
+
+            .user-picker-search input::placeholder {
+              color: #94a3b8;
+            }
+
+            .search-clear {
+              background: none;
+              border: none;
+              color: #94a3b8;
+              cursor: pointer;
+              padding: 4px;
+              display: flex;
+              align-items: center;
+              transition: color 0.2s;
+            }
+
+            .search-clear:hover {
+              color: #0f172a;
+            }
+
+            .user-picker-list {
+              flex: 1;
+              overflow-y: auto;
+              padding: 16px 24px;
+            }
+
+            .user-list-container {
+              display: flex;
+              flex-direction: column;
+              gap: 8px;
+            }
+
+            .user-list {
+              display: flex;
+              flex-direction: column;
+              gap: 4px;
+            }
+
+            .user-list-item {
+              position: relative;
+              display: flex;
+              align-items: center;
+              gap: 12px;
+              padding: 12px 16px;
+              background: white;
+              border: 1px solid #e2e8f0;
+              border-radius: 8px;
+              cursor: pointer;
+              transition: all 0.2s;
+              text-align: left;
+            }
+
+            .user-list-item:hover {
+              border-color: #1e293b;
+              background: #f8fafc;
+            }
+
+            .user-list-item.selected {
+              border-color: #1e293b;
+              background: #eff6ff;
+            }
+
+            .user-list-selected-indicator {
+              width: 20px;
+              height: 20px;
+              border-radius: 50%;
+              background: #1e293b;
+              color: white;
+              display: flex;
+              align-items: center;
+              justify-content: center;
+              flex-shrink: 0;
+            }
+
+            .user-list-avatar {
+              width: 40px;
+              height: 40px;
+              border-radius: 50%;
+              overflow: hidden;
+              flex-shrink: 0;
+            }
+
+            .user-list-avatar img {
+              width: 100%;
+              height: 100%;
+              object-fit: cover;
+            }
+
+            .user-avatar-initials {
+              width: 100%;
+              height: 100%;
+              background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+              display: flex;
+              align-items: center;
+              justify-content: center;
+              color: white;
+              font-weight: 600;
+              font-size: 0.9rem;
+            }
+
+            .user-list-info {
+              flex: 1;
+              min-width: 0;
+            }
+
+            .user-list-name-row {
+              display: flex;
+              align-items: center;
+              gap: 6px;
+              margin-bottom: 4px;
+            }
+
+            .user-list-name {
+              font-size: 0.95rem;
+              font-weight: 600;
+              color: #0f172a;
+            }
+
+            .owner-badge {
+              color: #f59e0b;
+              flex-shrink: 0;
+            }
+
+            .user-list-email {
+              font-size: 0.85rem;
+              color: #64748b;
+              margin-bottom: 4px;
+            }
+
+            .user-list-roles {
+              display: flex;
+              flex-wrap: wrap;
+              gap: 4px;
+            }
+
+            .role-badge-small {
+              font-size: 0.7rem;
+              padding: 2px 6px;
+              border-radius: 4px;
+              font-weight: 500;
+            }
+
+            .clear-item {
+              border-style: dashed;
+              background: #f8fafc;
+            }
+
+            .clear-item-icon {
+              width: 40px;
+              height: 40px;
+              border-radius: 50%;
+              background: #e2e8f0;
+              display: flex;
+              align-items: center;
+              justify-content: center;
+              color: #64748b;
+              flex-shrink: 0;
+            }
+
+            .clear-item-text {
+              display: flex;
+              flex-direction: column;
+              gap: 2px;
+            }
+
+            .clear-item-title {
+              font-weight: 600;
+              color: #0f172a;
+              font-size: 0.95rem;
+            }
+
+            .clear-item-desc {
+              font-size: 0.85rem;
+              color: #64748b;
+            }
+
+            .user-picker-loading,
+            .user-picker-empty {
+              padding: 64px 32px;
+              text-align: center;
+              color: #64748b;
+            }
+
+            .empty-icon {
+              margin-bottom: 16px;
+              opacity: 0.5;
+            }
+
+            .user-picker-empty h3 {
+              margin: 0 0 8px 0;
+              font-size: 1.1rem;
+              font-weight: 600;
+              color: #1e293b;
+            }
+
+            .user-picker-empty p {
+              margin: 0;
+              font-size: 0.9rem;
+              color: #64748b;
+            }
+
+            .animate-spin {
+              animation: spin 1s linear infinite;
+            }
+
+            @keyframes spin {
+              from { transform: rotate(0deg); }
+              to { transform: rotate(360deg); }
+            }
+          `}</style>
+        </>,
         document.body
       )}
-
-      <style>{`
-        .user-picker-trigger:hover:not(.disabled) {
-          border-color: #d1d5db;
-        }
-        .user-picker-trigger.open {
-          border-color: #6366f1;
-          box-shadow: 0 0 0 3px rgba(99, 102, 241, 0.1);
-        }
-        @keyframes spin {
-          from { transform: rotate(0deg); }
-          to { transform: rotate(360deg); }
-        }
-        .animate-spin {
-          animation: spin 1s linear infinite;
-        }
-      `}</style>
     </div>
   );
 }

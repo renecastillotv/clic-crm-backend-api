@@ -17,6 +17,9 @@ import DatePicker from '../../components/DatePicker';
 import DateRangeFilter, { DateRangePreset } from '../../components/DateRangeFilter';
 import ContactPicker from '../../components/ContactPicker';
 import UserPicker from '../../components/UserPicker';
+import PropertyPicker from '../../components/PropertyPicker';
+import SolicitudPicker from '../../components/SolicitudPicker';
+import PropiedadesSolicitudModal, { PropiedadOpcion } from '../../components/PropiedadesSolicitudModal';
 import ModalAplicarPago from '../../components/ModalAplicarPago';
 import '../../components/Modal.css';
 import {
@@ -33,6 +36,9 @@ import {
   getComisiones,
   createComision,
   updateComision,
+  getUnidadesProyecto,
+  getSolicitudes,
+  getPropuestas,
   Venta,
   VentaFiltros,
   EstadoVenta,
@@ -41,6 +47,8 @@ import {
   UsuarioTenant,
   TasasCambio,
   Comision,
+  UnidadProyecto,
+  Solicitud,
 } from '../../services/api';
 import { exportVentasToCSV, exportVentasToExcel } from '../../utils/exportUtils';
 import {
@@ -114,24 +122,41 @@ export default function CrmFinanzasVentas() {
   const [comisionData, setComisionData] = useState<{ montoTotal: number; montoPagado: number } | null>(null);
   const [loadingComision, setLoadingComision] = useState(false);
 
+  // Estado para unidades de proyecto
+  const [unidadesProyecto, setUnidadesProyecto] = useState<UnidadProyecto[]>([]);
+  const [loadingUnidades, setLoadingUnidades] = useState(false);
+
+  // Estado para solicitudes
+  const [solicitudes, setSolicitudes] = useState<Solicitud[]>([]);
+  const [loadingSolicitudes, setLoadingSolicitudes] = useState(false);
+
+  // Estado para modal de selección de propiedad desde solicitud
+  const [showPropiedadesSolicitudModal, setShowPropiedadesSolicitudModal] = useState(false);
+  const [propiedadesOpcionesSolicitud, setPropiedadesOpcionesSolicitud] = useState<PropiedadOpcion[]>([]);
+  const [solicitudSeleccionadaTitulo, setSolicitudSeleccionadaTitulo] = useState('');
+
   // Form state
   const [nuevaVenta, setNuevaVenta] = useState({
     nombre_negocio: '',
     descripcion: '',
     propiedad_id: '',
+    unidad_id: '',
     contacto_id: '',
     usuario_cerrador_id: user?.id || '',
+    captador_id: '',
     estado_venta_id: '',
     valor_cierre: '',
     moneda: 'USD',
     porcentaje_comision: '',
-    fecha_cierre: '',
+    fecha_cierre: new Date().toISOString().split('T')[0],
     vendedor_externo_tipo: '',
+    vendedor_externo_id: '',
     vendedor_externo_nombre: '',
     vendedor_externo_contacto: '',
     referidor_nombre: '',
     referidor_id: '',
     notas: '',
+    solicitud_id: '',
   });
 
   // Paginación
@@ -347,7 +372,8 @@ export default function CrmFinanzasVentas() {
       };
 
       console.log('📥 Filtros aplicados:', filtros);
-      const data = await getVentas(tenantActual.id, filtros);
+      const token = await getToken();
+      const data = await getVentas(tenantActual.id, filtros, token);
       console.log('✅ Ventas cargadas:', data.length);
       setVentas(data);
       
@@ -459,54 +485,356 @@ export default function CrmFinanzasVentas() {
     }
   };
 
-  const openModal = (venta?: Venta) => {
+  const cargarSolicitudes = async (solicitudIdActual?: string) => {
+    if (!tenantActual?.id) return;
+    setLoadingSolicitudes(true);
+    try {
+      const response = await getSolicitudes(tenantActual.id, { todos: true });
+      // Filtrar solicitudes activas (excluir cerradas/descartadas)
+      // PERO mantener la solicitud actualmente vinculada aunque esté cerrada
+      const etapasInactivas = ['ganado', 'perdido', 'descartado', 'cerrado_perdido', 'cerrado_ganado'];
+      const solicitudesActivas = response.data.filter(
+        (s: Solicitud) => !etapasInactivas.includes(s.etapa) || s.id === solicitudIdActual
+      );
+      setSolicitudes(solicitudesActivas);
+    } catch (err) {
+      console.error('Error cargando solicitudes:', err);
+    } finally {
+      setLoadingSolicitudes(false);
+    }
+  };
+
+  // Handler para cuando se selecciona una solicitud - auto-rellena campos
+  const handleSolicitudChange = async (_solicitudId: string | null, solicitud?: any) => {
+    if (!solicitud) {
+      // Si se limpia la solicitud, solo limpiar el ID
+      setNuevaVenta(prev => ({ ...prev, solicitud_id: '' }));
+      return;
+    }
+
+    // Guardar el título para el modal
+    setSolicitudSeleccionadaTitulo(solicitud.titulo || '');
+
+    // Auto-rellenar campos básicos desde la solicitud (sin propiedad aún)
+    const updates: any = {
+      solicitud_id: solicitud.id,
+    };
+
+    // Nombre del negocio desde título de solicitud
+    if (!nuevaVenta.nombre_negocio && solicitud.titulo) {
+      updates.nombre_negocio = solicitud.titulo;
+    }
+
+    // Cliente desde contacto de la solicitud
+    if (!nuevaVenta.contacto_id && solicitud.contacto_id) {
+      updates.contacto_id = solicitud.contacto_id;
+    }
+
+    // Asesor cerrador desde el asignado de la solicitud
+    if (!nuevaVenta.usuario_cerrador_id && solicitud.asignado_id) {
+      updates.usuario_cerrador_id = solicitud.asignado_id;
+    }
+
+    // Valor de cierre desde valor estimado
+    if (!nuevaVenta.valor_cierre && solicitud.valor_estimado) {
+      updates.valor_cierre = solicitud.valor_estimado.toString();
+    }
+
+    setNuevaVenta(prev => ({ ...prev, ...updates }));
+
+    // Obtener propiedades vinculadas a esta solicitud
+    if (!tenantActual?.id) return;
+
+    try {
+      console.log('🔍 Solicitud seleccionada:', {
+        id: solicitud.id,
+        titulo: solicitud.titulo,
+        propiedades_count: solicitud.propiedades_count,
+        propiedades_preview: solicitud.propiedades_preview,
+      });
+
+      // 1. Recopilar propiedades de diferentes fuentes
+      const propiedadesOpciones: PropiedadOpcion[] = [];
+
+      // a) Propiedades directas de la solicitud (propiedades_preview)
+      if (solicitud.propiedades_preview && solicitud.propiedades_preview.length > 0) {
+        for (const propPreview of solicitud.propiedades_preview) {
+          // Buscar la propiedad completa en el listado
+          const propiedadCompleta = propiedades.find(p => p.id === propPreview.id);
+          if (propiedadCompleta) {
+            propiedadesOpciones.push({
+              id: propiedadCompleta.id,
+              titulo: propiedadCompleta.titulo,
+              codigo: propiedadCompleta.codigo,
+              precio: propiedadCompleta.precio,
+              moneda: propiedadCompleta.moneda || 'USD',
+              imagen_principal: propiedadCompleta.imagen_principal,
+              tipo: propiedadCompleta.tipo,
+              operacion: propiedadCompleta.operacion,
+              ciudad: propiedadCompleta.ciudad,
+              origen: 'directa',
+            });
+          } else if (propPreview.id) {
+            // Si no está en el listado, usar los datos del preview
+            propiedadesOpciones.push({
+              id: propPreview.id,
+              titulo: propPreview.titulo || 'Propiedad',
+              codigo: propPreview.codigo,
+              precio: propPreview.precio,
+              moneda: propPreview.moneda || 'USD',
+              imagen_principal: propPreview.imagen_principal,
+              tipo: propPreview.tipo,
+              operacion: propPreview.operacion,
+              ciudad: propPreview.ciudad,
+              origen: 'directa',
+            });
+          }
+        }
+      }
+
+      // b) Propiedades de propuestas vinculadas a esta solicitud
+      const propuestasResponse = await getPropuestas(tenantActual.id, { solicitud_id: solicitud.id });
+
+      for (const propuesta of propuestasResponse.data) {
+        if (propuesta.propiedades && propuesta.propiedades.length > 0) {
+          for (const prop of propuesta.propiedades) {
+            // Evitar duplicados
+            if (!propiedadesOpciones.find(p => p.id === prop.propiedad_id)) {
+              propiedadesOpciones.push({
+                id: prop.propiedad_id,
+                titulo: prop.titulo,
+                codigo: prop.codigo,
+                precio: prop.precio_especial || prop.precio,
+                moneda: prop.moneda || 'USD',
+                imagen_principal: prop.imagen_principal,
+                tipo: prop.tipo,
+                operacion: prop.operacion,
+                ciudad: prop.ciudad,
+                origen: 'propuesta',
+                propuesta_titulo: propuesta.titulo,
+              });
+            }
+          }
+        }
+      }
+
+      console.log('📋 Propiedades encontradas:', propiedadesOpciones.length, propiedadesOpciones);
+
+      // 2. Decidir qué hacer según la cantidad de propiedades
+      if (propiedadesOpciones.length === 0) {
+        // No hay propiedades vinculadas, el usuario deberá seleccionar manualmente
+        console.log('⚠️ No hay propiedades vinculadas, selección manual requerida');
+        return;
+      } else if (propiedadesOpciones.length === 1) {
+        // Solo hay una propiedad, auto-seleccionar
+        seleccionarPropiedadParaCierre(propiedadesOpciones[0].id);
+      } else {
+        // Hay múltiples propiedades, mostrar modal para que elija
+        setPropiedadesOpcionesSolicitud(propiedadesOpciones);
+        setShowPropiedadesSolicitudModal(true);
+      }
+    } catch (err) {
+      console.error('Error obteniendo propiedades de la solicitud:', err);
+    }
+  };
+
+  // Función auxiliar para seleccionar una propiedad del cierre
+  const seleccionarPropiedadParaCierre = (propiedadId: string) => {
+    setNuevaVenta(prev => ({ ...prev, propiedad_id: propiedadId }));
+    cargarUnidadesPropiedad(propiedadId);
+
+    // Cargar captador de la propiedad (usa agente_id como captador)
+    const propiedadCompleta = propiedades.find(p => p.id === propiedadId);
+    if (propiedadCompleta?.agente_id) {
+      setNuevaVenta(prev => ({ ...prev, captador_id: propiedadCompleta.agente_id || '' }));
+    }
+
+    // Cerrar modal si estaba abierto
+    setShowPropiedadesSolicitudModal(false);
+  };
+
+  // Handler cuando el usuario elige una propiedad del modal
+  const handleSeleccionarPropiedadDelModal = (propiedadId: string) => {
+    seleccionarPropiedadParaCierre(propiedadId);
+  };
+
+  // Handler cuando el usuario quiere elegir manualmente (cierra el modal)
+  const handleElegirPropiedadManualmente = () => {
+    setShowPropiedadesSolicitudModal(false);
+    // El usuario usará el PropertyPicker normal del formulario
+  };
+
+  const openModal = async (venta?: Venta) => {
+    // Limpiar unidades al abrir modal
+    setUnidadesProyecto([]);
+
+    // Cargar solicitudes disponibles (pasar solicitud_id si se está editando para incluirla aunque esté cerrada)
+    cargarSolicitudes(venta?.solicitud_id || undefined);
+
     if (venta) {
       setEditingVenta(venta);
       setNuevaVenta({
         nombre_negocio: venta.nombre_negocio || '',
         descripcion: venta.descripcion || '',
         propiedad_id: venta.propiedad_id || '',
+        unidad_id: venta.unidad_id || '',
         contacto_id: venta.contacto_id || '',
         usuario_cerrador_id: venta.usuario_cerrador_id || user?.id || '',
+        captador_id: venta.captador_id || '',
         estado_venta_id: venta.estado_venta_id || '',
         valor_cierre: venta.valor_cierre?.toString() || '',
         moneda: venta.moneda || 'USD',
         porcentaje_comision: venta.porcentaje_comision?.toString() || '',
         fecha_cierre: venta.fecha_cierre ? new Date(venta.fecha_cierre).toISOString().split('T')[0] : '',
         vendedor_externo_tipo: venta.vendedor_externo_tipo || '',
+        vendedor_externo_id: venta.vendedor_externo_id || '',
         vendedor_externo_nombre: venta.vendedor_externo_nombre || '',
         vendedor_externo_contacto: venta.vendedor_externo_contacto || '',
         referidor_nombre: venta.referidor_nombre || '',
-        referidor_id: venta.referidor_id || '',
+        referidor_id: venta.referidor_contacto_id || '',
         notas: venta.notas || '',
+        solicitud_id: venta.solicitud_id || '',
       });
+
+      // Si hay propiedad, cargar sus unidades
+      if (venta.propiedad_id && tenantActual?.id) {
+        cargarUnidadesPropiedad(venta.propiedad_id);
+      }
     } else {
+      // Obtener el primer estado (menor orden) para preseleccionar
+      const primerEstado = estadosVenta.length > 0 ? estadosVenta[0].id : '';
+
       setEditingVenta(null);
       setNuevaVenta({
         nombre_negocio: '',
         descripcion: '',
         propiedad_id: '',
+        unidad_id: '',
         contacto_id: '',
         usuario_cerrador_id: user?.id || '',
-        estado_venta_id: '',
+        captador_id: '',
+        estado_venta_id: primerEstado,
         valor_cierre: '',
         moneda: 'USD',
         porcentaje_comision: '',
-        fecha_cierre: '',
+        fecha_cierre: new Date().toISOString().split('T')[0],
         vendedor_externo_tipo: '',
+        vendedor_externo_id: '',
         vendedor_externo_nombre: '',
         vendedor_externo_contacto: '',
         referidor_nombre: '',
         referidor_id: '',
         notas: '',
+        solicitud_id: '',
       });
     }
     setShowCreateModal(true);
   };
 
+  // Función para cargar unidades de una propiedad
+  const cargarUnidadesPropiedad = async (propiedadId: string) => {
+    if (!tenantActual?.id || !propiedadId) {
+      setUnidadesProyecto([]);
+      return;
+    }
+
+    try {
+      setLoadingUnidades(true);
+      const token = await getToken();
+      const unidades = await getUnidadesProyecto(tenantActual.id, propiedadId, token);
+      setUnidadesProyecto(unidades);
+    } catch (err) {
+      console.error('Error cargando unidades:', err);
+      setUnidadesProyecto([]);
+    } finally {
+      setLoadingUnidades(false);
+    }
+  };
+
+  // Función para manejar cambio de propiedad y auto-rellenar datos
+  const handlePropiedadChange = async (propiedadId: string | null, propiedadObj?: Propiedad) => {
+    // Si no hay ID, limpiar todo
+    if (!propiedadId) {
+      setNuevaVenta(prev => ({
+        ...prev,
+        propiedad_id: '',
+        unidad_id: '',
+      }));
+      setUnidadesProyecto([]);
+      return;
+    }
+
+    // Usar el objeto pasado o buscarlo en la lista
+    const propiedad = propiedadObj || propiedades.find(p => p.id === propiedadId);
+
+    // Actualizar propiedad_id y limpiar unidad_id
+    const updates: any = {
+      propiedad_id: propiedadId,
+      unidad_id: '',
+    };
+
+    // Auto-rellenar datos de la propiedad
+    if (propiedad) {
+      // Valor de cierre = precio de la propiedad
+      if (propiedad.precio) {
+        updates.valor_cierre = propiedad.precio.toString();
+      }
+
+      // Moneda de la propiedad
+      if (propiedad.moneda) {
+        updates.moneda = propiedad.moneda;
+      }
+
+      // Porcentaje de comisión de la propiedad
+      if (propiedad.comision) {
+        const comisionValue = typeof propiedad.comision === 'string'
+          ? parseFloat(propiedad.comision)
+          : propiedad.comision;
+        if (!isNaN(comisionValue)) {
+          updates.porcentaje_comision = comisionValue.toString();
+        }
+      }
+
+      // Captador = agente de la propiedad
+      if (propiedad.agente_id) {
+        updates.captador_id = propiedad.agente_id;
+      }
+
+      // Si el título de la propiedad es útil, usarlo como nombre del negocio
+      if (!nuevaVenta.nombre_negocio && propiedad.titulo) {
+        updates.nombre_negocio = `Venta - ${propiedad.titulo}`;
+      }
+    }
+
+    setNuevaVenta(prev => ({ ...prev, ...updates }));
+
+    // Cargar unidades del proyecto
+    await cargarUnidadesPropiedad(propiedadId);
+  };
+
+  // Función para manejar selección de unidad y actualizar precio
+  const handleUnidadChange = (unidadId: string) => {
+    const unidad = unidadesProyecto.find(u => u.id === unidadId);
+
+    const updates: any = {
+      unidad_id: unidadId,
+    };
+
+    // Si la unidad tiene precio, actualizar valor de cierre
+    if (unidad?.precio) {
+      updates.valor_cierre = unidad.precio.toString();
+      if (unidad.moneda) {
+        updates.moneda = unidad.moneda;
+      }
+    }
+
+    setNuevaVenta(prev => ({ ...prev, ...updates }));
+  };
+
   const closeModal = () => {
     setShowCreateModal(false);
     setEditingVenta(null);
+    setUnidadesProyecto([]);
   };
 
   const handleSave = async () => {
@@ -538,19 +866,23 @@ export default function CrmFinanzasVentas() {
         nombre_negocio: nuevaVenta.nombre_negocio || null,
         descripcion: nuevaVenta.descripcion || null,
         propiedad_id: nuevaVenta.propiedad_id || null,
+        unidad_id: nuevaVenta.unidad_id || null,
         contacto_id: nuevaVenta.contacto_id || null,
         usuario_cerrador_id: nuevaVenta.usuario_cerrador_id || null,
+        captador_id: nuevaVenta.captador_id || null,
         estado_venta_id: nuevaVenta.estado_venta_id || null,
         valor_cierre: valorCierre,
         moneda: nuevaVenta.moneda,
         porcentaje_comision: nuevaVenta.porcentaje_comision ? parseFloat(nuevaVenta.porcentaje_comision) : null,
         fecha_cierre: nuevaVenta.fecha_cierre || null,
         vendedor_externo_tipo: nuevaVenta.vendedor_externo_tipo || null,
+        vendedor_externo_id: nuevaVenta.vendedor_externo_id || null,
         vendedor_externo_nombre: nuevaVenta.vendedor_externo_nombre || null,
         vendedor_externo_contacto: nuevaVenta.vendedor_externo_contacto || null,
         referidor_nombre: nuevaVenta.referidor_nombre || null,
-        referidor_id: nuevaVenta.referidor_id || null,
+        referidor_contacto_id: nuevaVenta.referidor_id || null,
         notas: nuevaVenta.notas || null,
+        solicitud_id: nuevaVenta.solicitud_id || null,
       };
 
       if (editingVenta) {
@@ -645,30 +977,30 @@ export default function CrmFinanzasVentas() {
   return (
     <div className="page">
       {/* Sección de Estadísticas - Elegante y separada */}
-      <div style={{ 
-        marginBottom: '2rem',
-        padding: '1.5rem',
+      <div style={{
+        marginBottom: '1.25rem',
+        padding: '1rem',
         background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)',
-        borderRadius: '16px',
+        borderRadius: '12px',
         boxShadow: '0 10px 25px rgba(102, 126, 234, 0.15)'
       }}>
-        <div style={{ 
-          display: 'grid', 
-          gridTemplateColumns: 'minmax(140px, 0.8fr) minmax(220px, 1.5fr) minmax(220px, 1.5fr) minmax(140px, 0.8fr) minmax(140px, 0.8fr)',
-          gap: '1.5rem'
+        <div style={{
+          display: 'grid',
+          gridTemplateColumns: 'repeat(5, 1fr)',
+          gap: '0.75rem'
         }}>
           {/* Total Cierres */}
           <div style={{
             background: 'rgba(255, 255, 255, 0.95)',
-            borderRadius: '12px',
-            padding: '1.25rem',
-            boxShadow: '0 4px 6px rgba(0, 0, 0, 0.1)'
+            borderRadius: '10px',
+            padding: '0.75rem',
+            boxShadow: '0 2px 4px rgba(0, 0, 0, 0.08)'
           }}>
-            <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem', marginBottom: '0.5rem' }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
               <div style={{
-                width: '40px',
-                height: '40px',
-                borderRadius: '10px',
+                width: '32px',
+                height: '32px',
+                borderRadius: '8px',
                 background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)',
                 display: 'flex',
                 alignItems: 'center',
@@ -676,13 +1008,13 @@ export default function CrmFinanzasVentas() {
                 color: 'white',
                 flexShrink: 0
               }}>
-                <TrendingUp className="w-5 h-5" />
+                <TrendingUp className="w-4 h-4" />
               </div>
               <div style={{ flex: 1, minWidth: 0 }}>
-                <div style={{ fontSize: '0.75rem', color: '#64748b', fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.5px' }}>
+                <div style={{ fontSize: '0.65rem', color: '#64748b', fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.3px' }}>
                   Total Cierres
                 </div>
-                <div style={{ fontSize: '1.75rem', fontWeight: 700, color: '#1e293b', marginTop: '0.25rem' }}>
+                <div style={{ fontSize: '1.25rem', fontWeight: 700, color: '#1e293b', marginTop: '0.125rem' }}>
                   {ventas.length.toLocaleString('es-DO')}
                 </div>
               </div>
@@ -692,15 +1024,15 @@ export default function CrmFinanzasVentas() {
           {/* Valor Total */}
           <div style={{
             background: 'rgba(255, 255, 255, 0.95)',
-            borderRadius: '12px',
-            padding: '1.25rem',
-            boxShadow: '0 4px 6px rgba(0, 0, 0, 0.1)'
+            borderRadius: '10px',
+            padding: '0.75rem',
+            boxShadow: '0 2px 4px rgba(0, 0, 0, 0.08)'
           }}>
-            <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem', marginBottom: '0.5rem' }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
               <div style={{
-                width: '40px',
-                height: '40px',
-                borderRadius: '10px',
+                width: '32px',
+                height: '32px',
+                borderRadius: '8px',
                 background: 'linear-gradient(135deg, #10b981 0%, #059669 100%)',
                 display: 'flex',
                 alignItems: 'center',
@@ -708,16 +1040,16 @@ export default function CrmFinanzasVentas() {
                 color: 'white',
                 flexShrink: 0
               }}>
-                <DollarSign className="w-5 h-5" />
+                <DollarSign className="w-4 h-4" />
               </div>
               <div style={{ flex: 1, minWidth: 0 }}>
-                <div style={{ fontSize: '0.75rem', color: '#64748b', fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.5px' }}>
+                <div style={{ fontSize: '0.65rem', color: '#64748b', fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.3px' }}>
                   Valor Total
                 </div>
-                <div style={{ fontSize: '1.75rem', fontWeight: 700, color: '#1e293b', marginTop: '0.25rem', wordBreak: 'break-word' }}>
+                <div style={{ fontSize: '1.1rem', fontWeight: 700, color: '#1e293b', marginTop: '0.125rem', wordBreak: 'break-word' }}>
                   ${totalMonto.toLocaleString('es-DO', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
                 </div>
-                <div style={{ fontSize: '0.7rem', color: '#64748b', marginTop: '0.125rem' }}>USD</div>
+                <div style={{ fontSize: '0.6rem', color: '#64748b' }}>USD</div>
               </div>
             </div>
           </div>
@@ -725,15 +1057,15 @@ export default function CrmFinanzasVentas() {
           {/* Comisiones */}
           <div style={{
             background: 'rgba(255, 255, 255, 0.95)',
-            borderRadius: '12px',
-            padding: '1.25rem',
-            boxShadow: '0 4px 6px rgba(0, 0, 0, 0.1)'
+            borderRadius: '10px',
+            padding: '0.75rem',
+            boxShadow: '0 2px 4px rgba(0, 0, 0, 0.08)'
           }}>
-            <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem', marginBottom: '0.5rem' }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
               <div style={{
-                width: '40px',
-                height: '40px',
-                borderRadius: '10px',
+                width: '32px',
+                height: '32px',
+                borderRadius: '8px',
                 background: 'linear-gradient(135deg, #f59e0b 0%, #d97706 100%)',
                 display: 'flex',
                 alignItems: 'center',
@@ -741,16 +1073,16 @@ export default function CrmFinanzasVentas() {
                 color: 'white',
                 flexShrink: 0
               }}>
-                <DollarSign className="w-5 h-5" />
+                <DollarSign className="w-4 h-4" />
               </div>
               <div style={{ flex: 1, minWidth: 0 }}>
-                <div style={{ fontSize: '0.75rem', color: '#64748b', fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.5px' }}>
+                <div style={{ fontSize: '0.65rem', color: '#64748b', fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.3px' }}>
                   Comisiones
                 </div>
-                <div style={{ fontSize: '1.75rem', fontWeight: 700, color: '#1e293b', marginTop: '0.25rem', wordBreak: 'break-word' }}>
+                <div style={{ fontSize: '1.1rem', fontWeight: 700, color: '#1e293b', marginTop: '0.125rem', wordBreak: 'break-word' }}>
                   ${totalComisiones.toLocaleString('es-DO', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
                 </div>
-                <div style={{ fontSize: '0.7rem', color: '#64748b', marginTop: '0.125rem' }}>USD</div>
+                <div style={{ fontSize: '0.6rem', color: '#64748b' }}>USD</div>
               </div>
             </div>
           </div>
@@ -758,15 +1090,15 @@ export default function CrmFinanzasVentas() {
           {/* Completados */}
           <div style={{
             background: 'rgba(255, 255, 255, 0.95)',
-            borderRadius: '12px',
-            padding: '1.25rem',
-            boxShadow: '0 4px 6px rgba(0, 0, 0, 0.1)'
+            borderRadius: '10px',
+            padding: '0.75rem',
+            boxShadow: '0 2px 4px rgba(0, 0, 0, 0.08)'
           }}>
-            <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem', marginBottom: '0.5rem' }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
               <div style={{
-                width: '40px',
-                height: '40px',
-                borderRadius: '10px',
+                width: '32px',
+                height: '32px',
+                borderRadius: '8px',
                 background: 'linear-gradient(135deg, #3b82f6 0%, #2563eb 100%)',
                 display: 'flex',
                 alignItems: 'center',
@@ -774,13 +1106,13 @@ export default function CrmFinanzasVentas() {
                 color: 'white',
                 flexShrink: 0
               }}>
-                <CheckCircle className="w-5 h-5" />
+                <CheckCircle className="w-4 h-4" />
               </div>
               <div style={{ flex: 1, minWidth: 0 }}>
-                <div style={{ fontSize: '0.75rem', color: '#64748b', fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.5px' }}>
+                <div style={{ fontSize: '0.65rem', color: '#64748b', fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.3px' }}>
                   Completados
                 </div>
-                <div style={{ fontSize: '1.75rem', fontWeight: 700, color: '#1e293b', marginTop: '0.25rem' }}>
+                <div style={{ fontSize: '1.25rem', fontWeight: 700, color: '#1e293b', marginTop: '0.125rem' }}>
                   {completadas.toLocaleString('es-DO')}
                 </div>
               </div>
@@ -790,15 +1122,15 @@ export default function CrmFinanzasVentas() {
           {/* Tasa de Éxito */}
           <div style={{
             background: 'rgba(255, 255, 255, 0.95)',
-            borderRadius: '12px',
-            padding: '1.25rem',
-            boxShadow: '0 4px 6px rgba(0, 0, 0, 0.1)'
+            borderRadius: '10px',
+            padding: '0.75rem',
+            boxShadow: '0 2px 4px rgba(0, 0, 0, 0.08)'
           }}>
-            <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem', marginBottom: '0.5rem' }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
               <div style={{
-                width: '40px',
-                height: '40px',
-                borderRadius: '10px',
+                width: '32px',
+                height: '32px',
+                borderRadius: '8px',
                 background: 'linear-gradient(135deg, #8b5cf6 0%, #7c3aed 100%)',
                 display: 'flex',
                 alignItems: 'center',
@@ -806,13 +1138,13 @@ export default function CrmFinanzasVentas() {
                 color: 'white',
                 flexShrink: 0
               }}>
-                <TrendingUp className="w-5 h-5" />
+                <TrendingUp className="w-4 h-4" />
               </div>
               <div style={{ flex: 1, minWidth: 0 }}>
-                <div style={{ fontSize: '0.75rem', color: '#64748b', fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.5px' }}>
+                <div style={{ fontSize: '0.65rem', color: '#64748b', fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.3px' }}>
                   Tasa Éxito
                 </div>
-                <div style={{ fontSize: '1.75rem', fontWeight: 700, color: '#1e293b', marginTop: '0.25rem' }}>
+                <div style={{ fontSize: '1.25rem', fontWeight: 700, color: '#1e293b', marginTop: '0.125rem' }}>
                   {tasaExito.toLocaleString('es-DO', { minimumFractionDigits: 1, maximumFractionDigits: 1 })}%
                 </div>
               </div>
@@ -1182,14 +1514,14 @@ export default function CrmFinanzasVentas() {
                   </td>
                   <td style={{ width: '80px', minWidth: '80px', maxWidth: '80px', padding: '8px' }}>
                     <div className="flex items-center justify-center" style={{ width: '72px', height: '72px' }}>
-                      {venta.propiedad?.imagen_principal ? (
+                      {venta.propiedad_imagen ? (
                         <img
-                          src={venta.propiedad.imagen_principal}
-                          alt={venta.propiedad.titulo || 'Propiedad'}
+                          src={venta.propiedad_imagen}
+                          alt={venta.propiedad_nombre || 'Propiedad'}
                           className="rounded-lg shadow-sm border border-gray-200"
-                          style={{ 
-                            width: '72px', 
-                            height: '72px', 
+                          style={{
+                            width: '72px',
+                            height: '72px',
                             objectFit: 'cover',
                             maxWidth: '72px',
                             maxHeight: '72px',
@@ -1205,15 +1537,15 @@ export default function CrmFinanzasVentas() {
                           }}
                         />
                       ) : null}
-                      <div 
-                        style={{ 
-                          width: '72px', 
+                      <div
+                        style={{
+                          width: '72px',
                           height: '72px',
                           maxWidth: '72px',
                           maxHeight: '72px',
                           minWidth: '72px',
                           minHeight: '72px',
-                          display: venta.propiedad?.imagen_principal ? 'none' : 'flex',
+                          display: venta.propiedad_imagen ? 'none' : 'flex',
                           flexShrink: 0,
                           background: 'linear-gradient(135deg, #f0f9ff 0%, #e0f2fe 100%)',
                           borderRadius: '10px',
@@ -1235,10 +1567,10 @@ export default function CrmFinanzasVentas() {
                     </div>
                   </td>
                   <td style={{ padding: '12px 8px' }}>
-                    {venta.propiedad ? (
+                    {venta.propiedad_nombre ? (
                       <div className="flex items-center gap-2">
-                        <span className="font-semibold text-gray-900 truncate max-w-xs" title={venta.propiedad.titulo}>
-                          {venta.propiedad.titulo}
+                        <span className="font-semibold text-gray-900 truncate max-w-xs" title={venta.propiedad_nombre}>
+                          {venta.propiedad_nombre}
                         </span>
                       </div>
                     ) : venta.nombre_propiedad_externa ? (
@@ -1250,11 +1582,11 @@ export default function CrmFinanzasVentas() {
                     )}
                   </td>
                   <td style={{ padding: '12px 8px' }}>
-                    {venta.contacto ? (
+                    {venta.contacto_nombre ? (
                       <div>
-                        <div className="font-semibold text-gray-900">{venta.contacto.nombre}</div>
-                        {venta.contacto.email && (
-                          <div className="text-xs text-gray-500 mt-0.5">{venta.contacto.email}</div>
+                        <div className="font-semibold text-gray-900">{venta.contacto_nombre} {venta.contacto_apellido || ''}</div>
+                        {venta.contacto_email && (
+                          <div className="text-xs text-gray-500 mt-0.5">{venta.contacto_email}</div>
                         )}
                       </div>
                     ) : (
@@ -1262,10 +1594,10 @@ export default function CrmFinanzasVentas() {
                     )}
                   </td>
                   <td style={{ padding: '12px 8px' }}>
-                    {venta.usuario_cerrador ? (
+                    {venta.usuario_cerrador_nombre ? (
                       <div>
                         <div className="font-semibold text-gray-900">
-                          {venta.usuario_cerrador.nombre} {venta.usuario_cerrador.apellido}
+                          {venta.usuario_cerrador_nombre} {venta.usuario_cerrador_apellido || ''}
                         </div>
                       </div>
                     ) : (
@@ -1672,180 +2004,371 @@ export default function CrmFinanzasVentas() {
               </button>
             </div>
 
-            <div className="modal-body">
-              <div className="form-grid">
-                <div className="form-group">
-                  <label>Nombre del Negocio/Cliente</label>
-                  <input
-                    type="text"
-                    value={nuevaVenta.nombre_negocio}
-                    onChange={(e) => setNuevaVenta({ ...nuevaVenta, nombre_negocio: e.target.value })}
-                    placeholder="Nombre del negocio o cliente"
-                  />
-                </div>
+            <div className="modal-body" style={{ maxHeight: '70vh', overflowY: 'auto' }}>
+              {/* SECCIÓN 1: INFORMACIÓN DEL NEGOCIO */}
+              <div style={{ marginBottom: '24px' }}>
+                <h4 style={{
+                  fontSize: '0.875rem',
+                  fontWeight: 600,
+                  color: '#1e293b',
+                  marginBottom: '16px',
+                  paddingBottom: '8px',
+                  borderBottom: '2px solid #e2e8f0',
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: '8px'
+                }}>
+                  <Home size={16} style={{ color: '#64748b' }} />
+                  Información del Negocio
+                </h4>
+                <div className="form-grid">
+                  {/* Selector de Solicitud - auto-rellena campos relacionados */}
+                  <div className="form-group full-width">
+                    <label>
+                      Vincular desde Solicitud
+                      {loadingSolicitudes && <Loader2 className="w-3 h-3 animate-spin inline ml-2" />}
+                      <span style={{ fontSize: '11px', color: '#64748b', fontWeight: 'normal', marginLeft: '8px' }}>
+                        (opcional - auto-rellena cliente, propiedad y asesor)
+                      </span>
+                    </label>
+                    <SolicitudPicker
+                      value={nuevaVenta.solicitud_id || null}
+                      onChange={handleSolicitudChange}
+                      solicitudes={solicitudes}
+                      loading={loadingSolicitudes}
+                      placeholder="Seleccionar solicitud para auto-rellenar..."
+                      clearable
+                    />
+                  </div>
 
-                <div className="form-group">
-                  <label>Propiedad</label>
-                  <select
-                    value={nuevaVenta.propiedad_id}
-                    onChange={(e) => setNuevaVenta({ ...nuevaVenta, propiedad_id: e.target.value })}
-                  >
-                    <option value="">Seleccionar propiedad...</option>
-                    {propiedades.map(prop => (
-                      <option key={prop.id} value={prop.id}>
-                        {prop.titulo} - {prop.operacion} - {prop.moneda} {prop.precio?.toLocaleString()}
-                      </option>
-                    ))}
-                  </select>
-                </div>
+                  <div className="form-group">
+                    <label>Nombre del Negocio</label>
+                    <input
+                      type="text"
+                      value={nuevaVenta.nombre_negocio}
+                      onChange={(e) => setNuevaVenta({ ...nuevaVenta, nombre_negocio: e.target.value })}
+                      placeholder="Nombre identificador de la venta"
+                    />
+                  </div>
 
-                <div className="form-group">
-                  <label>Cliente</label>
-                  <ContactPicker
-                    tenantId={tenantActual?.id || ''}
-                    value={nuevaVenta.contacto_id}
-                    onChange={(contactoId) => setNuevaVenta({ ...nuevaVenta, contacto_id: contactoId || '' })}
-                    placeholder="Seleccionar cliente..."
-                    contacts={contactos}
-                    loading={loading}
-                  />
-                </div>
+                  <div className="form-group">
+                    <label>Cliente</label>
+                    <ContactPicker
+                      value={nuevaVenta.contacto_id}
+                      onChange={(contactoId) => setNuevaVenta({ ...nuevaVenta, contacto_id: contactoId || '' })}
+                      placeholder="Seleccionar cliente..."
+                      contacts={contactos}
+                      loading={loading}
+                    />
+                  </div>
 
-                <div className="form-group">
-                  <label>Asesor Cerrador</label>
-                  <UserPicker
-                    tenantId={tenantActual?.id || ''}
-                    value={nuevaVenta.usuario_cerrador_id}
-                    onChange={(usuarioId) => setNuevaVenta({ ...nuevaVenta, usuario_cerrador_id: usuarioId || '' })}
-                    placeholder="Seleccionar asesor..."
-                    users={usuarios}
-                    loading={loading}
-                  />
-                </div>
+                  <div className="form-group full-width">
+                    <label>Propiedad</label>
+                    <PropertyPicker
+                      value={nuevaVenta.propiedad_id || null}
+                      onChange={(propiedadId) => {
+                        const propiedadOriginal = propiedadId ? propiedades.find(p => p.id === propiedadId) : undefined;
+                        handlePropiedadChange(propiedadId, propiedadOriginal);
+                      }}
+                      properties={propiedades.map(p => ({
+                        id: p.id,
+                        titulo: p.titulo,
+                        codigo: p.codigo,
+                        tipo: p.tipo || '',
+                        operacion: p.operacion || '',
+                        precio: p.precio,
+                        moneda: p.moneda || 'USD',
+                        ciudad: p.ciudad,
+                        colonia: p.colonia,
+                        estado_propiedad: p.estado_propiedad,
+                        imagen_principal: p.imagen_principal,
+                        recamaras: p.recamaras,
+                        banos: p.banos,
+                        m2_construccion: p.m2_construccion,
+                      }))}
+                      loading={loading}
+                      placeholder="Seleccionar propiedad..."
+                      clearable
+                    />
+                  </div>
 
-                <div className="form-group">
-                  <label>Estado</label>
-                  <select
-                    value={nuevaVenta.estado_venta_id}
-                    onChange={(e) => setNuevaVenta({ ...nuevaVenta, estado_venta_id: e.target.value })}
-                  >
-                    <option value="">Seleccionar estado...</option>
-                    {estadosVenta.map(estado => (
-                      <option key={estado.id} value={estado.id}>{estado.nombre}</option>
-                    ))}
-                  </select>
+                  {/* Selector de unidad - Solo visible si la propiedad tiene unidades */}
+                  {unidadesProyecto.length > 0 && (
+                    <div className="form-group full-width">
+                      <label>
+                        Unidad del Proyecto
+                        {loadingUnidades && <Loader2 className="w-3 h-3 animate-spin inline ml-2" />}
+                      </label>
+                      <select
+                        value={nuevaVenta.unidad_id}
+                        onChange={(e) => handleUnidadChange(e.target.value)}
+                      >
+                        <option value="">Seleccionar unidad...</option>
+                        {unidadesProyecto
+                          .filter(u => u.estado === 'disponible' || u.id === nuevaVenta.unidad_id)
+                          .map(unidad => (
+                            <option key={unidad.id} value={unidad.id}>
+                              {unidad.codigo}
+                              {unidad.tipologia_nombre ? ` - ${unidad.tipologia_nombre}` : ''}
+                              {unidad.m2 ? ` - ${unidad.m2}m²` : ''}
+                              {unidad.precio ? ` - ${unidad.moneda || 'USD'} ${unidad.precio.toLocaleString()}` : ''}
+                              {unidad.estado !== 'disponible' ? ` (${unidad.estado})` : ''}
+                            </option>
+                          ))}
+                      </select>
+                      <small style={{ color: '#64748b', fontSize: '0.75rem', marginTop: '4px', display: 'block' }}>
+                        {unidadesProyecto.filter(u => u.estado === 'disponible').length} unidades disponibles de {unidadesProyecto.length} total
+                      </small>
+                    </div>
+                  )}
                 </div>
+              </div>
 
-                <div className="form-group">
-                  <label>Valor de Cierre</label>
-                  <div className="input-group">
+              {/* SECCIÓN 2: DATOS DEL CIERRE */}
+              <div style={{ marginBottom: '24px' }}>
+                <h4 style={{
+                  fontSize: '0.875rem',
+                  fontWeight: 600,
+                  color: '#1e293b',
+                  marginBottom: '16px',
+                  paddingBottom: '8px',
+                  borderBottom: '2px solid #e2e8f0',
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: '8px'
+                }}>
+                  <DollarSign size={16} style={{ color: '#64748b' }} />
+                  Datos del Cierre
+                </h4>
+                <div className="form-grid">
+                  <div className="form-group">
+                    <label>Estado</label>
                     <select
-                      value={nuevaVenta.moneda}
-                      onChange={(e) => setNuevaVenta({ ...nuevaVenta, moneda: e.target.value })}
-                      className="input-currency"
+                      value={nuevaVenta.estado_venta_id}
+                      onChange={(e) => setNuevaVenta({ ...nuevaVenta, estado_venta_id: e.target.value })}
                     >
-                      <option value="USD">USD</option>
-                      <option value="DOP">DOP</option>
-                      <option value="EUR">EUR</option>
+                      <option value="">Seleccionar estado...</option>
+                      {estadosVenta.map(estado => (
+                        <option key={estado.id} value={estado.id}>{estado.nombre}</option>
+                      ))}
                     </select>
-                    <input
-                      type="number"
-                      value={nuevaVenta.valor_cierre}
-                      onChange={(e) => setNuevaVenta({ ...nuevaVenta, valor_cierre: e.target.value })}
-                      placeholder="0.00"
-                      step="0.01"
+                  </div>
+
+                  <div className="form-group">
+                    <label>Fecha de Cierre</label>
+                    <DatePicker
+                      value={nuevaVenta.fecha_cierre}
+                      onChange={(date) => setNuevaVenta({ ...nuevaVenta, fecha_cierre: date || '' })}
                     />
                   </div>
-                </div>
 
-                <div className="form-group">
-                  <label>Porcentaje de Comisión</label>
-                  <div className="input-group">
-                    <input
-                      type="number"
-                      value={nuevaVenta.porcentaje_comision}
-                      onChange={(e) => setNuevaVenta({ ...nuevaVenta, porcentaje_comision: e.target.value })}
-                      placeholder="0.00"
-                      step="0.01"
-                      min="0"
-                      max="100"
-                    />
-                    <span className="input-suffix">%</span>
+                  <div className="form-group">
+                    <label>Valor de Cierre</label>
+                    <div className="input-group">
+                      <select
+                        value={nuevaVenta.moneda}
+                        onChange={(e) => setNuevaVenta({ ...nuevaVenta, moneda: e.target.value })}
+                        className="input-currency"
+                      >
+                        <option value="USD">USD</option>
+                        <option value="DOP">DOP</option>
+                        <option value="EUR">EUR</option>
+                      </select>
+                      <input
+                        type="number"
+                        value={nuevaVenta.valor_cierre}
+                        onChange={(e) => setNuevaVenta({ ...nuevaVenta, valor_cierre: e.target.value })}
+                        placeholder="0.00"
+                        step="0.01"
+                      />
+                    </div>
+                  </div>
+
+                  <div className="form-group">
+                    <label>Porcentaje de Comisión</label>
+                    <div className="input-group">
+                      <input
+                        type="number"
+                        value={nuevaVenta.porcentaje_comision}
+                        onChange={(e) => setNuevaVenta({ ...nuevaVenta, porcentaje_comision: e.target.value })}
+                        placeholder="0.00"
+                        step="0.01"
+                        min="0"
+                        max="100"
+                      />
+                      <span className="input-suffix">%</span>
+                    </div>
                   </div>
                 </div>
+              </div>
 
-                <div className="form-group">
-                  <label>Fecha de Cierre</label>
-                  <DatePicker
-                    value={nuevaVenta.fecha_cierre}
-                    onChange={(date) => setNuevaVenta({ ...nuevaVenta, fecha_cierre: date || '' })}
-                  />
+              {/* SECCIÓN 3: PARTICIPANTES DE LA COMISIÓN */}
+              <div style={{ marginBottom: '24px' }}>
+                <h4 style={{
+                  fontSize: '0.875rem',
+                  fontWeight: 600,
+                  color: '#1e293b',
+                  marginBottom: '16px',
+                  paddingBottom: '8px',
+                  borderBottom: '2px solid #e2e8f0',
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: '8px'
+                }}>
+                  <User size={16} style={{ color: '#64748b' }} />
+                  Participantes de la Comisión
+                </h4>
+                <div className="form-grid">
+                  <div className="form-group">
+                    <label>Asesor Vendedor (Cerrador)</label>
+                    <UserPicker
+                      value={nuevaVenta.usuario_cerrador_id}
+                      onChange={(usuarioId) => setNuevaVenta({ ...nuevaVenta, usuario_cerrador_id: usuarioId || '' })}
+                      placeholder="Seleccionar asesor vendedor..."
+                      users={usuarios}
+                      loading={loading}
+                    />
+                  </div>
+
+                  <div className="form-group">
+                    <label>Asesor Captador</label>
+                    <UserPicker
+                      value={nuevaVenta.captador_id}
+                      onChange={(usuarioId) => setNuevaVenta({ ...nuevaVenta, captador_id: usuarioId || '' })}
+                      placeholder="Seleccionar asesor captador..."
+                      users={usuarios}
+                      loading={loading}
+                    />
+                    <small style={{ color: '#64748b', fontSize: '0.75rem', marginTop: '4px', display: 'block' }}>
+                      Se auto-rellena al seleccionar propiedad
+                    </small>
+                  </div>
+
+                  <div className="form-group">
+                    <label>Referidor (Opcional)</label>
+                    <ContactPicker
+                      value={nuevaVenta.referidor_id}
+                      onChange={(contactoId, contacto) => {
+                        setNuevaVenta({
+                          ...nuevaVenta,
+                          referidor_id: contactoId || '',
+                          referidor_nombre: contacto ? `${contacto.nombre || ''} ${contacto.apellido || ''}`.trim() : ''
+                        });
+                      }}
+                      placeholder="Seleccionar referidor..."
+                      contacts={contactos}
+                      loading={loading}
+                    />
+                  </div>
+
+                  <div className="form-group">
+                    <label>Nombre Referidor (si no es contacto)</label>
+                    <input
+                      type="text"
+                      value={nuevaVenta.referidor_nombre}
+                      onChange={(e) => setNuevaVenta({ ...nuevaVenta, referidor_nombre: e.target.value })}
+                      placeholder="Escribir nombre manualmente"
+                    />
+                  </div>
+
+                  <div className="form-group">
+                    <label>Asesor Externo (Opcional)</label>
+                    <select
+                      value={nuevaVenta.vendedor_externo_tipo}
+                      onChange={(e) => setNuevaVenta({
+                        ...nuevaVenta,
+                        vendedor_externo_tipo: e.target.value,
+                        vendedor_externo_id: '',
+                        vendedor_externo_nombre: '',
+                        vendedor_externo_contacto: ''
+                      })}
+                    >
+                      <option value="">Ninguno</option>
+                      <option value="inmobiliaria">Otra Inmobiliaria</option>
+                      <option value="asesor_independiente">Asesor Independiente</option>
+                    </select>
+                  </div>
+
+                  {nuevaVenta.vendedor_externo_tipo && (
+                    <>
+                      <div className="form-group">
+                        <label>Contacto del Asesor Externo</label>
+                        <ContactPicker
+                          value={nuevaVenta.vendedor_externo_id}
+                          onChange={(contactoId, contacto) => {
+                            setNuevaVenta({
+                              ...nuevaVenta,
+                              vendedor_externo_id: contactoId || '',
+                              vendedor_externo_nombre: contacto ? `${contacto.nombre || ''} ${contacto.apellido || ''}`.trim() : nuevaVenta.vendedor_externo_nombre,
+                              vendedor_externo_contacto: contacto?.telefono || contacto?.email || nuevaVenta.vendedor_externo_contacto
+                            });
+                          }}
+                          placeholder="Seleccionar contacto..."
+                          contacts={contactos}
+                          loading={loading}
+                        />
+                      </div>
+
+                      <div className="form-group">
+                        <label>Nombre (si no es contacto)</label>
+                        <input
+                          type="text"
+                          value={nuevaVenta.vendedor_externo_nombre}
+                          onChange={(e) => setNuevaVenta({ ...nuevaVenta, vendedor_externo_nombre: e.target.value })}
+                          placeholder="Nombre de la inmobiliaria o asesor"
+                        />
+                      </div>
+
+                      <div className="form-group full-width">
+                        <label>Datos de Contacto del Asesor Externo</label>
+                        <input
+                          type="text"
+                          value={nuevaVenta.vendedor_externo_contacto}
+                          onChange={(e) => setNuevaVenta({ ...nuevaVenta, vendedor_externo_contacto: e.target.value })}
+                          placeholder="Email o teléfono"
+                        />
+                      </div>
+                    </>
+                  )}
                 </div>
+              </div>
 
-                <div className="form-group">
-                  <label>Vendedor Externo (Opcional)</label>
-                  <select
-                    value={nuevaVenta.vendedor_externo_tipo}
-                    onChange={(e) => setNuevaVenta({ ...nuevaVenta, vendedor_externo_tipo: e.target.value })}
-                  >
-                    <option value="">Ninguno</option>
-                    <option value="inmobiliaria">Otra Inmobiliaria</option>
-                    <option value="asesor_independiente">Asesor Independiente</option>
-                  </select>
-                </div>
+              {/* SECCIÓN 4: NOTAS */}
+              <div>
+                <h4 style={{
+                  fontSize: '0.875rem',
+                  fontWeight: 600,
+                  color: '#1e293b',
+                  marginBottom: '16px',
+                  paddingBottom: '8px',
+                  borderBottom: '2px solid #e2e8f0',
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: '8px'
+                }}>
+                  <FileText size={16} style={{ color: '#64748b' }} />
+                  Notas y Descripción
+                </h4>
+                <div className="form-grid">
+                  <div className="form-group full-width">
+                    <label>Descripción</label>
+                    <textarea
+                      value={nuevaVenta.descripcion}
+                      onChange={(e) => setNuevaVenta({ ...nuevaVenta, descripcion: e.target.value })}
+                      placeholder="Descripción de la venta..."
+                      rows={2}
+                    />
+                  </div>
 
-                {nuevaVenta.vendedor_externo_tipo && (
-                  <>
-                    <div className="form-group">
-                      <label>Nombre del Vendedor Externo</label>
-                      <input
-                        type="text"
-                        value={nuevaVenta.vendedor_externo_nombre}
-                        onChange={(e) => setNuevaVenta({ ...nuevaVenta, vendedor_externo_nombre: e.target.value })}
-                        placeholder="Nombre de la inmobiliaria o asesor"
-                      />
-                    </div>
-
-                    <div className="form-group">
-                      <label>Contacto del Vendedor Externo</label>
-                      <input
-                        type="text"
-                        value={nuevaVenta.vendedor_externo_contacto}
-                        onChange={(e) => setNuevaVenta({ ...nuevaVenta, vendedor_externo_contacto: e.target.value })}
-                        placeholder="Email o teléfono"
-                      />
-                    </div>
-                  </>
-                )}
-
-                <div className="form-group">
-                  <label>Referidor (Opcional)</label>
-                  <input
-                    type="text"
-                    value={nuevaVenta.referidor_nombre}
-                    onChange={(e) => setNuevaVenta({ ...nuevaVenta, referidor_nombre: e.target.value })}
-                    placeholder="Nombre del referidor"
-                  />
-                </div>
-
-                <div className="form-group full-width">
-                  <label>Descripción</label>
-                  <textarea
-                    value={nuevaVenta.descripcion}
-                    onChange={(e) => setNuevaVenta({ ...nuevaVenta, descripcion: e.target.value })}
-                    placeholder="Descripción de la venta..."
-                    rows={3}
-                  />
-                </div>
-
-                <div className="form-group full-width">
-                  <label>Notas</label>
-                  <textarea
-                    value={nuevaVenta.notas}
-                    onChange={(e) => setNuevaVenta({ ...nuevaVenta, notas: e.target.value })}
-                    placeholder="Notas internas..."
-                    rows={3}
-                  />
+                  <div className="form-group full-width">
+                    <label>Notas Internas</label>
+                    <textarea
+                      value={nuevaVenta.notas}
+                      onChange={(e) => setNuevaVenta({ ...nuevaVenta, notas: e.target.value })}
+                      placeholder="Notas internas..."
+                      rows={2}
+                    />
+                  </div>
                 </div>
               </div>
             </div>
@@ -1950,10 +2473,12 @@ export default function CrmFinanzasVentas() {
             if (data.recibo) {
               const formData = new FormData();
               formData.append('file', data.recibo);
-              
+              formData.append('folder', `comisiones/${comision.venta_id}/recibos`);
+
               const token = await getToken();
+              // Usar endpoint de upload del tenant
               const uploadResponse = await fetch(
-                `${import.meta.env.VITE_API_BASE_URL || 'http://localhost:3001/api'}/upload/comisiones/${tenantActual.id}/${comision.id}/recibo`,
+                `${import.meta.env.VITE_API_BASE_URL || 'http://localhost:3001/api'}/tenants/${tenantActual.id}/upload/file`,
                 {
                   method: 'POST',
                   headers: {
@@ -1965,7 +2490,7 @@ export default function CrmFinanzasVentas() {
 
               if (uploadResponse.ok) {
                 const uploadData = await uploadResponse.json();
-                reciboUrl = uploadData.url || uploadData.file?.url;
+                reciboUrl = uploadData.url;
               }
             }
 
@@ -1984,7 +2509,7 @@ export default function CrmFinanzasVentas() {
               fechaRegistro: new Date().toISOString()
             });
 
-            await updateComision(tenantActual.id, comision.id, {
+            await updateComision(tenantActual.id, comision.venta_id, comision.id, {
               monto_pagado: nuevoMontoPagado,
               fecha_pago: data.fechaPago || new Date().toISOString().split('T')[0],
               estado: nuevoEstado,
@@ -2873,6 +3398,16 @@ export default function CrmFinanzasVentas() {
           color: #64748b;
         }
       `}</style>
+
+      {/* Modal para seleccionar propiedad cuando la solicitud tiene múltiples */}
+      <PropiedadesSolicitudModal
+        isOpen={showPropiedadesSolicitudModal}
+        onClose={() => setShowPropiedadesSolicitudModal(false)}
+        onSelect={handleSeleccionarPropiedadDelModal}
+        onSelectManual={handleElegirPropiedadManualmente}
+        propiedades={propiedadesOpcionesSolicitud}
+        solicitudTitulo={solicitudSeleccionadaTitulo}
+      />
     </div>
   );
 }

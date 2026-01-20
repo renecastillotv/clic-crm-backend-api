@@ -1,0 +1,25 @@
+  }, [tenantActual?.id, getToken, buildFiltros]);
+
+  // Cargar usuarios solo una vez al montar el componente (separado para evitar loop infinito)
+  useEffect(() => {
+    const cargarUsuarios = async () => {
+      if (!tenantActual?.id) return;
+      try {
+        const token = await getToken();
+        const usuariosData = await getUsuariosTenant(tenantActual.id, token);
+        if (Array.isArray(usuariosData) && usuariosData.length > 0) {
+          setUsuarios(usuariosData);
+        }
+      } catch (err) {
+        console.error('Error cargando usuarios:', err);
+      }
+    };
+    cargarUsuarios();
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [tenantActual?.id]); // Solo se ejecuta cuando cambia el tenant
+
+  useEffect(() => {
+    cargarDatos();
+  }, [cargarDatos]);
+
+  // Resetear página cuando cambian filtros

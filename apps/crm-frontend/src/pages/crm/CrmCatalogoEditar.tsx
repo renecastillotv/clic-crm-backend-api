@@ -37,6 +37,8 @@ import {
   CircleDollarSign,
   type LucideIcon
 } from 'lucide-react';
+import * as LucideIcons from 'lucide-react';
+import { IconPickerModal } from '../../components/IconPickerModal';
 
 const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:3001/api';
 
@@ -133,7 +135,7 @@ const CATALOGOS_META: Record<TipoCatalogoExtendido, CatalogoMeta> = {
     icono: Tag,
     color: '#ec4899',
     soportaMultiidioma: true,
-    campos: { nombre: 'Nombre', descripcion: true, color: true }
+    campos: { nombre: 'Nombre', descripcion: true, icono: true, color: true }
   },
   tipo_documento: {
     titulo: 'Tipos de Documento',
@@ -197,7 +199,7 @@ const INITIAL_FORM: FormData = {
 };
 
 export default function CrmCatalogoEditar() {
-  const { tipoCatalogo } = useParams<{ tipoCatalogo: string }>();
+  const { tipo: tipoCatalogo } = useParams<{ tipo: string }>();
   const { tenantActual } = useAuth();
   const navigate = useNavigate();
   const { setPageHeader } = usePageHeader();
@@ -214,6 +216,9 @@ export default function CrmCatalogoEditar() {
   // Estado para items de tablas separadas
   const [itemsSeparados, setItemsSeparados] = useState<ItemGenerico[]>([]);
   const [loadingSeparados, setLoadingSeparados] = useState(false);
+
+  // Estado para el modal de selección de iconos
+  const [showIconPicker, setShowIconPicker] = useState(false);
 
   const meta = tipoCatalogo ? CATALOGOS_META[tipoCatalogo as TipoCatalogoExtendido] : null;
   const esTablaSepar = meta?.tablaSeparada === true;
@@ -537,15 +542,41 @@ export default function CrmCatalogoEditar() {
 
         {meta.campos.icono && (
           <div className="form-group">
-            <label>Icono (nombre Lucide)</label>
-            <input
-              type="text"
-              value={formData.icono}
-              onChange={(e) => setFormData({ ...formData, icono: e.target.value })}
-              placeholder="Ej: Home, Building, etc."
-            />
+            <label>Icono</label>
+            <button
+              type="button"
+              className="icon-picker-trigger"
+              onClick={() => setShowIconPicker(true)}
+            >
+              {formData.icono ? (
+                <>
+                  <span className="icon-preview">
+                    {(() => {
+                      const IconComp = (LucideIcons as Record<string, LucideIcon>)[formData.icono];
+                      return IconComp ? <IconComp size={20} /> : null;
+                    })()}
+                  </span>
+                  <span className="icon-name">{formData.icono}</span>
+                </>
+              ) : (
+                <span className="icon-placeholder">Seleccionar icono...</span>
+              )}
+              <span className="icon-chevron">
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                  <path d="m6 9 6 6 6-6"/>
+                </svg>
+              </span>
+            </button>
           </div>
         )}
+
+        <IconPickerModal
+          isOpen={showIconPicker}
+          onClose={() => setShowIconPicker(false)}
+          onSelect={(iconName) => setFormData({ ...formData, icono: iconName })}
+          currentIcon={formData.icono}
+          title="Seleccionar Icono"
+        />
 
         {meta.campos.color && (
           <div className="form-group">
@@ -1344,6 +1375,61 @@ export default function CrmCatalogoEditar() {
         .traduccion-campos .form-group input {
           padding: 8px 10px;
           font-size: 0.8125rem;
+        }
+
+        /* Icon Picker Trigger */
+        .icon-picker-trigger {
+          display: flex;
+          align-items: center;
+          gap: 10px;
+          width: 100%;
+          padding: 10px 14px;
+          background: white;
+          border: 1px solid #e2e8f0;
+          border-radius: 8px;
+          font-size: 0.9375rem;
+          color: #1e293b;
+          cursor: pointer;
+          transition: all 0.15s;
+          text-align: left;
+        }
+
+        .icon-picker-trigger:hover {
+          border-color: #cbd5e1;
+          background: #f8fafc;
+        }
+
+        .icon-picker-trigger:focus {
+          outline: none;
+          border-color: #3b82f6;
+          box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.1);
+        }
+
+        .icon-picker-trigger .icon-preview {
+          display: flex;
+          align-items: center;
+          justify-content: center;
+          width: 32px;
+          height: 32px;
+          background: #f1f5f9;
+          border-radius: 6px;
+          color: #475569;
+        }
+
+        .icon-picker-trigger .icon-name {
+          flex: 1;
+          font-weight: 500;
+          color: #1e293b;
+        }
+
+        .icon-picker-trigger .icon-placeholder {
+          flex: 1;
+          color: #94a3b8;
+        }
+
+        .icon-picker-trigger .icon-chevron {
+          color: #94a3b8;
+          font-size: 0.875rem;
         }
 
         @media (max-width: 640px) {

@@ -1,16 +1,18 @@
 /**
- * MiPerfil - Modal nativo de edición de perfil
+ * MiPerfil - Modal nativo de edicion de perfil
  *
  * Modal grande y centrado con:
  * - Foto de perfil mejorada
  * - Datos personales y de contacto
- * - Biografía para asesores inmobiliarios
- * - Cambio de contraseña
+ * - Perfil profesional para asesores inmobiliarios
+ * - Multi-select para especialidades, idiomas, zonas
+ * - Cambio de contrasena
  */
 
 import { useState, useEffect, useRef } from 'react';
 import { useAuth } from '../contexts/AuthContext';
 import { useAuth as useClerkAuth } from '@clerk/clerk-react';
+import { useCatalogos } from '../contexts/CatalogosContext';
 import ReactDOM from 'react-dom';
 
 const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:3001/api';
@@ -94,12 +96,6 @@ const Icons = {
       <line x1="1" y1="1" x2="23" y2="23"/>
     </svg>
   ),
-  edit: () => (
-    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-      <path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/>
-      <path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/>
-    </svg>
-  ),
   fileText: () => (
     <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
       <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/>
@@ -109,13 +105,186 @@ const Icons = {
       <polyline points="10 9 9 9 8 9"/>
     </svg>
   ),
+  chevronDown: () => (
+    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+      <polyline points="6 9 12 15 18 9"/>
+    </svg>
+  ),
+  plus: () => (
+    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+      <line x1="12" y1="5" x2="12" y2="19"/>
+      <line x1="5" y1="12" x2="19" y2="12"/>
+    </svg>
+  ),
 };
 
 type TabType = 'personal' | 'contacto' | 'profesional' | 'seguridad';
 
+// Opciones predefinidas
+const IDIOMAS_OPCIONES = [
+  { value: 'es', label: 'Espanol' },
+  { value: 'en', label: 'Ingles' },
+  { value: 'fr', label: 'Frances' },
+  { value: 'pt', label: 'Portugues' },
+  { value: 'de', label: 'Aleman' },
+  { value: 'it', label: 'Italiano' },
+  { value: 'zh', label: 'Chino Mandarin' },
+  { value: 'ja', label: 'Japones' },
+];
+
+const ESPECIALIDADES_OPCIONES = [
+  'Residencial',
+  'Comercial',
+  'Industrial',
+  'Terrenos',
+  'Lujo',
+  'Inversion',
+  'Alquileres',
+  'Primera Vivienda',
+  'Vacacional',
+  'Oficinas',
+];
+
+const TIPOS_PROPIEDAD_OPCIONES = [
+  'Casa',
+  'Apartamento',
+  'Villa',
+  'Penthouse',
+  'Local Comercial',
+  'Oficina',
+  'Bodega',
+  'Terreno',
+  'Finca',
+  'Edificio',
+];
+
+// Componente MultiSelect con chips
+interface MultiSelectProps {
+  label: string;
+  options: string[] | { value: string; label: string }[];
+  selected: string[];
+  onChange: (values: string[]) => void;
+  placeholder?: string;
+  allowCustom?: boolean;
+}
+
+function MultiSelect({ label, options, selected, onChange, placeholder, allowCustom = false }: MultiSelectProps) {
+  const [isOpen, setIsOpen] = useState(false);
+  const [customValue, setCustomValue] = useState('');
+  const dropdownRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    const handleClickOutside = (event: MouseEvent) => {
+      if (dropdownRef.current && !dropdownRef.current.contains(event.target as Node)) {
+        setIsOpen(false);
+      }
+    };
+    document.addEventListener('mousedown', handleClickOutside);
+    return () => document.removeEventListener('mousedown', handleClickOutside);
+  }, []);
+
+  const normalizedOptions = options.map(opt =>
+    typeof opt === 'string' ? { value: opt, label: opt } : opt
+  );
+
+  const toggleOption = (value: string) => {
+    if (selected.includes(value)) {
+      onChange(selected.filter(v => v !== value));
+    } else {
+      onChange([...selected, value]);
+    }
+  };
+
+  const removeChip = (value: string) => {
+    onChange(selected.filter(v => v !== value));
+  };
+
+  const addCustom = () => {
+    if (customValue.trim() && !selected.includes(customValue.trim())) {
+      onChange([...selected, customValue.trim()]);
+      setCustomValue('');
+    }
+  };
+
+  const getLabel = (value: string) => {
+    const opt = normalizedOptions.find(o => o.value === value);
+    return opt ? opt.label : value;
+  };
+
+  return (
+    <div className="mi-perfil-multiselect" ref={dropdownRef}>
+      <label>{label}</label>
+      <div className="multiselect-container">
+        <div className="multiselect-chips">
+          {selected.map(value => (
+            <span key={value} className="multiselect-chip">
+              {getLabel(value)}
+              <button type="button" onClick={() => removeChip(value)}>&times;</button>
+            </span>
+          ))}
+          <button type="button" className="multiselect-trigger" onClick={() => setIsOpen(!isOpen)}>
+            {selected.length === 0 && <span className="placeholder">{placeholder || 'Seleccionar...'}</span>}
+            <Icons.chevronDown />
+          </button>
+        </div>
+        {isOpen && (
+          <div className="multiselect-dropdown">
+            {normalizedOptions.map(opt => (
+              <label key={opt.value} className="multiselect-option">
+                <input
+                  type="checkbox"
+                  checked={selected.includes(opt.value)}
+                  onChange={() => toggleOption(opt.value)}
+                />
+                <span>{opt.label}</span>
+              </label>
+            ))}
+            {allowCustom && (
+              <div className="multiselect-custom">
+                <input
+                  type="text"
+                  placeholder="Agregar otro..."
+                  value={customValue}
+                  onChange={e => setCustomValue(e.target.value)}
+                  onKeyDown={e => e.key === 'Enter' && (e.preventDefault(), addCustom())}
+                />
+                <button type="button" onClick={addCustom}><Icons.plus /></button>
+              </div>
+            )}
+          </div>
+        )}
+      </div>
+    </div>
+  );
+}
+
+interface PerfilAsesorData {
+  biografia?: string;
+  especialidades?: string[];
+  idiomas?: string[];
+  zonas?: string[];
+  tiposPropiedad?: string[];
+  experienciaAnos?: number;
+  tituloProfesional?: string;
+  whatsapp?: string;
+  telefonoDirecto?: string;
+  redesSociales?: {
+    linkedin?: string;
+    instagram?: string;
+    facebook?: string;
+    twitter?: string;
+    youtube?: string;
+    tiktok?: string;
+  };
+  metadata?: {
+    licencia?: string;
+  };
+}
+
 export default function MiPerfil({ isOpen, onClose }: MiPerfilProps) {
   const { user, refetch, tenantActual } = useAuth();
   const { getToken } = useClerkAuth();
+  const { zonas: zonasDelCatalogo } = useCatalogos();
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   const [saving, setSaving] = useState(false);
@@ -130,6 +299,7 @@ export default function MiPerfil({ isOpen, onClose }: MiPerfilProps) {
   const [showCurrentPassword, setShowCurrentPassword] = useState(false);
   const [showNewPassword, setShowNewPassword] = useState(false);
   const [showConfirmPassword, setShowConfirmPassword] = useState(false);
+  const [loadingPerfil, setLoadingPerfil] = useState(false);
 
   // Verificar si el usuario es asesor inmobiliario
   const esAsesor = tenantActual?.roles?.some(r =>
@@ -149,27 +319,43 @@ export default function MiPerfil({ isOpen, onClose }: MiPerfilProps) {
     empresa: '',
     cargo: '',
     departamento: '',
+  });
+
+  // Datos de perfil asesor
+  const [perfilAsesor, setPerfilAsesor] = useState<PerfilAsesorData>({
     biografia: '',
-    especialidades: '',
-    aniosExperiencia: '',
-    licencia: '',
+    especialidades: [],
+    idiomas: ['es'],
+    zonas: [],
+    tiposPropiedad: [],
+    experienciaAnos: 0,
+    tituloProfesional: '',
+    whatsapp: '',
+    telefonoDirecto: '',
     redesSociales: {
       linkedin: '',
       instagram: '',
       facebook: '',
+      twitter: '',
+      youtube: '',
+      tiktok: '',
+    },
+    metadata: {
+      licencia: '',
     },
   });
 
-  // Formulario de contraseña
+  // Formulario de contrasena
   const [passwordForm, setPasswordForm] = useState({
     currentPassword: '',
     newPassword: '',
     confirmPassword: '',
   });
 
-  // Cargar datos del usuario al abrir
+  // Cargar datos del usuario y perfil asesor al abrir
   useEffect(() => {
     if (isOpen && user) {
+      // Cargar datos basicos del usuario
       setForm({
         nombre: user.nombre || '',
         apellido: user.apellido || '',
@@ -182,15 +368,6 @@ export default function MiPerfil({ isOpen, onClose }: MiPerfilProps) {
         empresa: user.empresa || '',
         cargo: user.cargo || '',
         departamento: user.departamento || '',
-        biografia: (user as any).biografia || '',
-        especialidades: (user as any).especialidades || '',
-        aniosExperiencia: (user as any).aniosExperiencia || '',
-        licencia: (user as any).licencia || '',
-        redesSociales: {
-          linkedin: (user as any).redesSociales?.linkedin || '',
-          instagram: (user as any).redesSociales?.instagram || '',
-          facebook: (user as any).redesSociales?.facebook || '',
-        },
       });
       setAvatarPreview(user.avatarUrl || null);
       setError(null);
@@ -198,19 +375,85 @@ export default function MiPerfil({ isOpen, onClose }: MiPerfilProps) {
       setPasswordForm({ currentPassword: '', newPassword: '', confirmPassword: '' });
       setPasswordError(null);
       setPasswordSuccess(false);
-    }
-  }, [isOpen, user]);
 
-  const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) => {
+      // Cargar perfil de asesor si aplica
+      if (esAsesor && tenantActual?.id) {
+        loadPerfilAsesor();
+      }
+    }
+  }, [isOpen, user, esAsesor, tenantActual?.id]);
+
+  const loadPerfilAsesor = async () => {
+    if (!tenantActual?.id) return;
+
+    try {
+      setLoadingPerfil(true);
+      const token = await getToken();
+
+      // Obtener perfil completo del usuario que incluye perfilAsesor
+      const response = await fetch(`${API_URL}/auth/me?tenantId=${tenantActual.id}`, {
+        headers: { Authorization: `Bearer ${token}` },
+      });
+
+      if (response.ok) {
+        const userData = await response.json();
+
+        // Si hay perfil de asesor en los datos, cargarlo
+        if (userData.perfilAsesor) {
+          const pa = userData.perfilAsesor;
+          setPerfilAsesor({
+            biografia: pa.biografia || '',
+            especialidades: Array.isArray(pa.especialidades) ? pa.especialidades : [],
+            idiomas: Array.isArray(pa.idiomas) ? pa.idiomas : ['es'],
+            zonas: Array.isArray(pa.zonas) ? pa.zonas : [],
+            tiposPropiedad: Array.isArray(pa.tiposPropiedad) ? pa.tiposPropiedad : [],
+            experienciaAnos: pa.experienciaAnos || 0,
+            tituloProfesional: pa.tituloProfesional || '',
+            whatsapp: pa.whatsapp || '',
+            telefonoDirecto: pa.telefonoDirecto || '',
+            redesSociales: {
+              linkedin: pa.redesSociales?.linkedin || '',
+              instagram: pa.redesSociales?.instagram || '',
+              facebook: pa.redesSociales?.facebook || '',
+              twitter: pa.redesSociales?.twitter || '',
+              youtube: pa.redesSociales?.youtube || '',
+              tiktok: pa.redesSociales?.tiktok || '',
+            },
+            metadata: {
+              licencia: pa.metadata?.licencia || '',
+            },
+          });
+        }
+      }
+    } catch (err) {
+      console.error('Error al cargar perfil de asesor:', err);
+    } finally {
+      setLoadingPerfil(false);
+    }
+  };
+
+  const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>) => {
     const { name, value } = e.target;
+    setForm(prev => ({ ...prev, [name]: value }));
+    setSuccess(false);
+  };
+
+  const handleAsesorChange = (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) => {
+    const { name, value } = e.target;
+
     if (name.startsWith('redes_')) {
       const redSocial = name.replace('redes_', '');
-      setForm(prev => ({
+      setPerfilAsesor(prev => ({
         ...prev,
         redesSociales: { ...prev.redesSociales, [redSocial]: value },
       }));
+    } else if (name === 'licencia') {
+      setPerfilAsesor(prev => ({
+        ...prev,
+        metadata: { ...prev.metadata, licencia: value },
+      }));
     } else {
-      setForm(prev => ({ ...prev, [name]: value }));
+      setPerfilAsesor(prev => ({ ...prev, [name]: value }));
     }
     setSuccess(false);
   };
@@ -230,7 +473,7 @@ export default function MiPerfil({ isOpen, onClose }: MiPerfilProps) {
     const file = e.target.files?.[0];
     if (file) {
       if (!file.type.startsWith('image/')) {
-        setError('Por favor selecciona una imagen válida');
+        setError('Por favor selecciona una imagen valida');
         return;
       }
       if (file.size > 5 * 1024 * 1024) {
@@ -259,24 +502,26 @@ export default function MiPerfil({ isOpen, onClose }: MiPerfilProps) {
 
       const token = await getToken();
 
+      // Construir datos para enviar
       const updateData: any = {
-        nombre: form.nombre,
-        apellido: form.apellido,
-        telefono: form.telefono,
-        direccion: form.direccion,
-        ciudad: form.ciudad,
-        estado: form.estado,
-        codigoPostal: form.codigoPostal,
-        pais: form.pais,
-        empresa: form.empresa,
-        cargo: form.cargo,
-        departamento: form.departamento,
-        biografia: form.biografia,
-        especialidades: form.especialidades,
-        aniosExperiencia: form.aniosExperiencia,
-        licencia: form.licencia,
-        redesSociales: form.redesSociales,
+        ...form,
+        tenantId: tenantActual?.id,
       };
+
+      // Agregar datos de asesor si aplica
+      if (esAsesor) {
+        updateData.biografia = perfilAsesor.biografia;
+        updateData.especialidades = perfilAsesor.especialidades?.join(',');
+        updateData.aniosExperiencia = perfilAsesor.experienciaAnos;
+        updateData.licencia = perfilAsesor.metadata?.licencia;
+        updateData.redesSociales = perfilAsesor.redesSociales;
+        updateData.idiomas = perfilAsesor.idiomas;
+        updateData.zonas = perfilAsesor.zonas;
+        updateData.tiposPropiedad = perfilAsesor.tiposPropiedad;
+        updateData.tituloProfesional = perfilAsesor.tituloProfesional;
+        updateData.whatsapp = perfilAsesor.whatsapp;
+        updateData.telefonoDirecto = perfilAsesor.telefonoDirecto;
+      }
 
       if (avatarFile) {
         const formData = new FormData();
@@ -286,7 +531,7 @@ export default function MiPerfil({ isOpen, onClose }: MiPerfilProps) {
             if (typeof value === 'object') {
               formData.append(key, JSON.stringify(value));
             } else {
-              formData.append(key, value as string);
+              formData.append(key, String(value));
             }
           }
         });
@@ -332,12 +577,12 @@ export default function MiPerfil({ isOpen, onClose }: MiPerfilProps) {
     e.preventDefault();
 
     if (passwordForm.newPassword !== passwordForm.confirmPassword) {
-      setPasswordError('Las contraseñas no coinciden');
+      setPasswordError('Las contrasenas no coinciden');
       return;
     }
 
     if (passwordForm.newPassword.length < 8) {
-      setPasswordError('La contraseña debe tener al menos 8 caracteres');
+      setPasswordError('La contrasena debe tener al menos 8 caracteres');
       return;
     }
 
@@ -362,18 +607,23 @@ export default function MiPerfil({ isOpen, onClose }: MiPerfilProps) {
 
       if (!response.ok) {
         const data = await response.json();
-        throw new Error(data.message || 'Error al cambiar contraseña');
+        throw new Error(data.message || 'Error al cambiar contrasena');
       }
 
       setPasswordSuccess(true);
       setPasswordForm({ currentPassword: '', newPassword: '', confirmPassword: '' });
     } catch (err: any) {
-      console.error('Error al cambiar contraseña:', err);
-      setPasswordError(err.message || 'Error al cambiar la contraseña');
+      console.error('Error al cambiar contrasena:', err);
+      setPasswordError(err.message || 'Error al cambiar la contrasena');
     } finally {
       setSavingPassword(false);
     }
   };
+
+  // Opciones de zonas del catalogo
+  const zonasOpciones = zonasDelCatalogo?.length > 0
+    ? zonasDelCatalogo.map(z => z.nombre)
+    : ['Zona Norte', 'Zona Sur', 'Centro', 'Este', 'Oeste', 'Piantini', 'Naco', 'Bella Vista', 'Ensanche Serralles'];
 
   if (!isOpen) return null;
 
@@ -417,7 +667,8 @@ export default function MiPerfil({ isOpen, onClose }: MiPerfilProps) {
             <div className="mi-perfil-user-info">
               <h3>{user?.nombre || ''} {user?.apellido || ''}</h3>
               <p>{user?.email}</p>
-              {user?.cargo && <span className="mi-perfil-badge">{user.cargo}</span>}
+              {esAsesor && <span className="mi-perfil-badge">Asesor Inmobiliario</span>}
+              {user?.cargo && !esAsesor && <span className="mi-perfil-badge">{user.cargo}</span>}
             </div>
 
             {/* Tabs Verticales */}
@@ -428,7 +679,7 @@ export default function MiPerfil({ isOpen, onClose }: MiPerfilProps) {
                 onClick={() => setActiveTab('personal')}
               >
                 <Icons.user />
-                <span>Información Personal</span>
+                <span>Informacion Personal</span>
               </button>
               <button
                 type="button"
@@ -436,7 +687,7 @@ export default function MiPerfil({ isOpen, onClose }: MiPerfilProps) {
                 onClick={() => setActiveTab('contacto')}
               >
                 <Icons.mapPin />
-                <span>Contacto y Ubicación</span>
+                <span>Contacto y Ubicacion</span>
               </button>
               <button
                 type="button"
@@ -459,12 +710,19 @@ export default function MiPerfil({ isOpen, onClose }: MiPerfilProps) {
 
           {/* Contenido Principal */}
           <div className="mi-perfil-content">
+            {loadingPerfil && (
+              <div className="mi-perfil-loading">
+                <Icons.loader />
+                <span>Cargando perfil...</span>
+              </div>
+            )}
+
             {/* Tab: Personal */}
-            {activeTab === 'personal' && (
+            {activeTab === 'personal' && !loadingPerfil && (
               <form onSubmit={handleSubmit} className="mi-perfil-form">
-                <h3>Información Personal</h3>
+                <h3>Informacion Personal</h3>
                 <p className="mi-perfil-description">
-                  Actualiza tu información básica de perfil.
+                  Actualiza tu informacion basica de perfil.
                 </p>
 
                 <div className="mi-perfil-fields">
@@ -489,7 +747,7 @@ export default function MiPerfil({ isOpen, onClose }: MiPerfilProps) {
                     />
                   </div>
                   <div className="mi-perfil-field">
-                    <label>Teléfono</label>
+                    <label>Telefono</label>
                     <input
                       type="tel"
                       name="telefono"
@@ -533,22 +791,22 @@ export default function MiPerfil({ isOpen, onClose }: MiPerfilProps) {
             )}
 
             {/* Tab: Contacto */}
-            {activeTab === 'contacto' && (
+            {activeTab === 'contacto' && !loadingPerfil && (
               <form onSubmit={handleSubmit} className="mi-perfil-form">
-                <h3>Contacto y Ubicación</h3>
+                <h3>Contacto y Ubicacion</h3>
                 <p className="mi-perfil-description">
-                  Tu dirección y datos de contacto.
+                  Tu direccion y datos de contacto.
                 </p>
 
                 <div className="mi-perfil-fields">
                   <div className="mi-perfil-field full-width">
-                    <label>Dirección</label>
+                    <label>Direccion</label>
                     <input
                       type="text"
                       name="direccion"
                       value={form.direccion}
                       onChange={handleChange}
-                      placeholder="Calle y número"
+                      placeholder="Calle y numero"
                     />
                   </div>
                   <div className="mi-perfil-field">
@@ -572,7 +830,7 @@ export default function MiPerfil({ isOpen, onClose }: MiPerfilProps) {
                     />
                   </div>
                   <div className="mi-perfil-field">
-                    <label>Código Postal</label>
+                    <label>Codigo Postal</label>
                     <input
                       type="text"
                       name="codigoPostal"
@@ -582,15 +840,39 @@ export default function MiPerfil({ isOpen, onClose }: MiPerfilProps) {
                     />
                   </div>
                   <div className="mi-perfil-field">
-                    <label>País</label>
+                    <label>Pais</label>
                     <input
                       type="text"
                       name="pais"
                       value={form.pais}
                       onChange={handleChange}
-                      placeholder="País"
+                      placeholder="Pais"
                     />
                   </div>
+                  {esAsesor && (
+                    <>
+                      <div className="mi-perfil-field">
+                        <label>WhatsApp</label>
+                        <input
+                          type="tel"
+                          name="whatsapp"
+                          value={perfilAsesor.whatsapp}
+                          onChange={handleAsesorChange}
+                          placeholder="+1 809 123 4567"
+                        />
+                      </div>
+                      <div className="mi-perfil-field">
+                        <label>Telefono Directo</label>
+                        <input
+                          type="tel"
+                          name="telefonoDirecto"
+                          value={perfilAsesor.telefonoDirecto}
+                          onChange={handleAsesorChange}
+                          placeholder="+1 809 123 4567"
+                        />
+                      </div>
+                    </>
+                  )}
                 </div>
 
                 {error && activeTab === 'contacto' && (
@@ -599,7 +881,7 @@ export default function MiPerfil({ isOpen, onClose }: MiPerfilProps) {
                 {success && activeTab === 'contacto' && (
                   <div className="mi-perfil-success">
                     <Icons.check />
-                    Información actualizada correctamente
+                    Informacion actualizada correctamente
                   </div>
                 )}
 
@@ -616,97 +898,151 @@ export default function MiPerfil({ isOpen, onClose }: MiPerfilProps) {
             )}
 
             {/* Tab: Profesional */}
-            {activeTab === 'profesional' && (
+            {activeTab === 'profesional' && !loadingPerfil && (
               <form onSubmit={handleSubmit} className="mi-perfil-form">
                 <h3>Perfil Profesional</h3>
                 <p className="mi-perfil-description">
                   {esAsesor
                     ? 'Completa tu perfil de asesor inmobiliario para destacar en la plataforma.'
-                    : 'Información sobre tu trabajo y empresa.'}
+                    : 'Informacion sobre tu trabajo y empresa.'}
                 </p>
 
                 <div className="mi-perfil-fields">
-                  <div className="mi-perfil-field">
-                    <label>Empresa</label>
-                    <input
-                      type="text"
-                      name="empresa"
-                      value={form.empresa}
-                      onChange={handleChange}
-                      placeholder="Nombre de la empresa"
-                    />
-                  </div>
-                  <div className="mi-perfil-field">
-                    <label>Cargo</label>
-                    <input
-                      type="text"
-                      name="cargo"
-                      value={form.cargo}
-                      onChange={handleChange}
-                      placeholder="Tu cargo"
-                    />
-                  </div>
-                  <div className="mi-perfil-field">
-                    <label>Departamento</label>
-                    <input
-                      type="text"
-                      name="departamento"
-                      value={form.departamento}
-                      onChange={handleChange}
-                      placeholder="Departamento"
-                    />
-                  </div>
-                  {esAsesor && (
+                  {!esAsesor && (
                     <>
                       <div className="mi-perfil-field">
-                        <label>Años de Experiencia</label>
+                        <label>Empresa</label>
                         <input
                           type="text"
-                          name="aniosExperiencia"
-                          value={form.aniosExperiencia}
+                          name="empresa"
+                          value={form.empresa}
                           onChange={handleChange}
-                          placeholder="Ej: 5 años"
+                          placeholder="Nombre de la empresa"
                         />
                       </div>
                       <div className="mi-perfil-field">
-                        <label>Licencia/Certificación</label>
+                        <label>Cargo</label>
                         <input
                           type="text"
-                          name="licencia"
-                          value={form.licencia}
+                          name="cargo"
+                          value={form.cargo}
                           onChange={handleChange}
-                          placeholder="Número de licencia"
+                          placeholder="Tu cargo"
                         />
                       </div>
                       <div className="mi-perfil-field">
-                        <label>Especialidades</label>
+                        <label>Departamento</label>
                         <input
                           type="text"
-                          name="especialidades"
-                          value={form.especialidades}
+                          name="departamento"
+                          value={form.departamento}
                           onChange={handleChange}
-                          placeholder="Ej: Residencial, Comercial, Lujo"
+                          placeholder="Departamento"
                         />
                       </div>
                     </>
                   )}
+
+                  {esAsesor && (
+                    <>
+                      <div className="mi-perfil-field">
+                        <label>Titulo Profesional</label>
+                        <input
+                          type="text"
+                          name="tituloProfesional"
+                          value={perfilAsesor.tituloProfesional}
+                          onChange={handleAsesorChange}
+                          placeholder="Ej: Agente Inmobiliario, Broker Asociado"
+                        />
+                      </div>
+                      <div className="mi-perfil-field">
+                        <label>Anos de Experiencia</label>
+                        <input
+                          type="number"
+                          name="experienciaAnos"
+                          value={perfilAsesor.experienciaAnos || ''}
+                          onChange={handleAsesorChange}
+                          placeholder="0"
+                          min="0"
+                          max="50"
+                        />
+                      </div>
+                      <div className="mi-perfil-field">
+                        <label>Licencia/Certificacion</label>
+                        <input
+                          type="text"
+                          name="licencia"
+                          value={perfilAsesor.metadata?.licencia || ''}
+                          onChange={handleAsesorChange}
+                          placeholder="Numero de licencia"
+                        />
+                      </div>
+                    </>
+                  )}
+                </div>
+
+                {esAsesor && (
+                  <>
+                    <h4 className="mi-perfil-section-title">Especializacion</h4>
+                    <div className="mi-perfil-fields">
+                      <MultiSelect
+                        label="Especialidades"
+                        options={ESPECIALIDADES_OPCIONES}
+                        selected={perfilAsesor.especialidades || []}
+                        onChange={(values) => setPerfilAsesor(prev => ({ ...prev, especialidades: values }))}
+                        placeholder="Selecciona tus especialidades"
+                        allowCustom
+                      />
+                      <MultiSelect
+                        label="Idiomas"
+                        options={IDIOMAS_OPCIONES}
+                        selected={perfilAsesor.idiomas || []}
+                        onChange={(values) => setPerfilAsesor(prev => ({ ...prev, idiomas: values }))}
+                        placeholder="Selecciona idiomas"
+                      />
+                      <MultiSelect
+                        label="Zonas de Cobertura"
+                        options={zonasOpciones}
+                        selected={perfilAsesor.zonas || []}
+                        onChange={(values) => setPerfilAsesor(prev => ({ ...prev, zonas: values }))}
+                        placeholder="Selecciona zonas"
+                        allowCustom
+                      />
+                      <MultiSelect
+                        label="Tipos de Propiedad"
+                        options={TIPOS_PROPIEDAD_OPCIONES}
+                        selected={perfilAsesor.tiposPropiedad || []}
+                        onChange={(values) => setPerfilAsesor(prev => ({ ...prev, tiposPropiedad: values }))}
+                        placeholder="Selecciona tipos"
+                        allowCustom
+                      />
+                    </div>
+
+                    <h4 className="mi-perfil-section-title">Acerca de Ti</h4>
+                  </>
+                )}
+
+                <div className="mi-perfil-fields">
                   <div className="mi-perfil-field full-width">
                     <label>
                       <Icons.fileText />
-                      Biografía / Acerca de mí
+                      {esAsesor ? 'Biografia / Acerca de mi' : 'Descripcion'}
                     </label>
                     <textarea
                       name="biografia"
-                      value={form.biografia}
-                      onChange={handleChange}
+                      value={esAsesor ? perfilAsesor.biografia : ''}
+                      onChange={handleAsesorChange}
                       placeholder={esAsesor
-                        ? "Cuéntale a tus clientes sobre ti, tu experiencia y qué te hace diferente..."
-                        : "Una breve descripción sobre ti..."}
+                        ? "Cuentale a tus clientes sobre ti, tu experiencia y que te hace diferente..."
+                        : "Una breve descripcion sobre ti..."}
                       rows={5}
+                      disabled={!esAsesor}
                     />
-                    <span className="mi-perfil-hint">
-                      {form.biografia.length}/500 caracteres
-                    </span>
+                    {esAsesor && (
+                      <span className="mi-perfil-hint">
+                        {(perfilAsesor.biografia || '').length}/500 caracteres
+                      </span>
+                    )}
                   </div>
                 </div>
 
@@ -719,8 +1055,8 @@ export default function MiPerfil({ isOpen, onClose }: MiPerfilProps) {
                         <input
                           type="url"
                           name="redes_linkedin"
-                          value={form.redesSociales.linkedin}
-                          onChange={handleChange}
+                          value={perfilAsesor.redesSociales?.linkedin || ''}
+                          onChange={handleAsesorChange}
                           placeholder="https://linkedin.com/in/tu-perfil"
                         />
                       </div>
@@ -729,8 +1065,8 @@ export default function MiPerfil({ isOpen, onClose }: MiPerfilProps) {
                         <input
                           type="text"
                           name="redes_instagram"
-                          value={form.redesSociales.instagram}
-                          onChange={handleChange}
+                          value={perfilAsesor.redesSociales?.instagram || ''}
+                          onChange={handleAsesorChange}
                           placeholder="@tu_usuario"
                         />
                       </div>
@@ -739,9 +1075,39 @@ export default function MiPerfil({ isOpen, onClose }: MiPerfilProps) {
                         <input
                           type="url"
                           name="redes_facebook"
-                          value={form.redesSociales.facebook}
-                          onChange={handleChange}
+                          value={perfilAsesor.redesSociales?.facebook || ''}
+                          onChange={handleAsesorChange}
                           placeholder="https://facebook.com/tu-pagina"
+                        />
+                      </div>
+                      <div className="mi-perfil-field">
+                        <label>Twitter / X</label>
+                        <input
+                          type="text"
+                          name="redes_twitter"
+                          value={perfilAsesor.redesSociales?.twitter || ''}
+                          onChange={handleAsesorChange}
+                          placeholder="@tu_usuario"
+                        />
+                      </div>
+                      <div className="mi-perfil-field">
+                        <label>YouTube</label>
+                        <input
+                          type="url"
+                          name="redes_youtube"
+                          value={perfilAsesor.redesSociales?.youtube || ''}
+                          onChange={handleAsesorChange}
+                          placeholder="https://youtube.com/@tu-canal"
+                        />
+                      </div>
+                      <div className="mi-perfil-field">
+                        <label>TikTok</label>
+                        <input
+                          type="text"
+                          name="redes_tiktok"
+                          value={perfilAsesor.redesSociales?.tiktok || ''}
+                          onChange={handleAsesorChange}
+                          placeholder="@tu_usuario"
                         />
                       </div>
                     </div>
@@ -771,23 +1137,23 @@ export default function MiPerfil({ isOpen, onClose }: MiPerfilProps) {
             )}
 
             {/* Tab: Seguridad */}
-            {activeTab === 'seguridad' && (
+            {activeTab === 'seguridad' && !loadingPerfil && (
               <form onSubmit={handlePasswordSubmit} className="mi-perfil-form">
                 <h3>Seguridad</h3>
                 <p className="mi-perfil-description">
-                  Cambia tu contraseña para mantener tu cuenta segura.
+                  Cambia tu contrasena para mantener tu cuenta segura.
                 </p>
 
                 <div className="mi-perfil-fields single-column">
                   <div className="mi-perfil-field">
-                    <label>Contraseña Actual</label>
+                    <label>Contrasena Actual</label>
                     <div className="mi-perfil-password-input">
                       <input
                         type={showCurrentPassword ? 'text' : 'password'}
                         name="currentPassword"
                         value={passwordForm.currentPassword}
                         onChange={handlePasswordChange}
-                        placeholder="Ingresa tu contraseña actual"
+                        placeholder="Ingresa tu contrasena actual"
                       />
                       <button
                         type="button"
@@ -799,14 +1165,14 @@ export default function MiPerfil({ isOpen, onClose }: MiPerfilProps) {
                     </div>
                   </div>
                   <div className="mi-perfil-field">
-                    <label>Nueva Contraseña</label>
+                    <label>Nueva Contrasena</label>
                     <div className="mi-perfil-password-input">
                       <input
                         type={showNewPassword ? 'text' : 'password'}
                         name="newPassword"
                         value={passwordForm.newPassword}
                         onChange={handlePasswordChange}
-                        placeholder="Mínimo 8 caracteres"
+                        placeholder="Minimo 8 caracteres"
                       />
                       <button
                         type="button"
@@ -818,14 +1184,14 @@ export default function MiPerfil({ isOpen, onClose }: MiPerfilProps) {
                     </div>
                   </div>
                   <div className="mi-perfil-field">
-                    <label>Confirmar Nueva Contraseña</label>
+                    <label>Confirmar Nueva Contrasena</label>
                     <div className="mi-perfil-password-input">
                       <input
                         type={showConfirmPassword ? 'text' : 'password'}
                         name="confirmPassword"
                         value={passwordForm.confirmPassword}
                         onChange={handlePasswordChange}
-                        placeholder="Repite la nueva contraseña"
+                        placeholder="Repite la nueva contrasena"
                       />
                       <button
                         type="button"
@@ -839,16 +1205,16 @@ export default function MiPerfil({ isOpen, onClose }: MiPerfilProps) {
                 </div>
 
                 <div className="mi-perfil-password-requirements">
-                  <p>La contraseña debe cumplir con:</p>
+                  <p>La contrasena debe cumplir con:</p>
                   <ul>
                     <li className={passwordForm.newPassword.length >= 8 ? 'valid' : ''}>
                       Al menos 8 caracteres
                     </li>
                     <li className={/[A-Z]/.test(passwordForm.newPassword) ? 'valid' : ''}>
-                      Una letra mayúscula
+                      Una letra mayuscula
                     </li>
                     <li className={/[0-9]/.test(passwordForm.newPassword) ? 'valid' : ''}>
-                      Un número
+                      Un numero
                     </li>
                   </ul>
                 </div>
@@ -859,7 +1225,7 @@ export default function MiPerfil({ isOpen, onClose }: MiPerfilProps) {
                 {passwordSuccess && (
                   <div className="mi-perfil-success">
                     <Icons.check />
-                    Contraseña actualizada correctamente
+                    Contrasena actualizada correctamente
                   </div>
                 )}
 
@@ -872,7 +1238,7 @@ export default function MiPerfil({ isOpen, onClose }: MiPerfilProps) {
                     {savingPassword ? (
                       <><Icons.loader /> Cambiando...</>
                     ) : (
-                      <><Icons.lock /> Cambiar Contraseña</>
+                      <><Icons.lock /> Cambiar Contrasena</>
                     )}
                   </button>
                 </div>
@@ -900,9 +1266,9 @@ export default function MiPerfil({ isOpen, onClose }: MiPerfilProps) {
           background: white;
           border-radius: 20px;
           width: 95%;
-          max-width: 1000px;
+          max-width: 1100px;
           height: 90vh;
-          max-height: 700px;
+          max-height: 750px;
           display: flex;
           flex-direction: column;
           z-index: 10001;
@@ -1111,6 +1477,15 @@ export default function MiPerfil({ isOpen, onClose }: MiPerfilProps) {
           overflow-y: auto;
         }
 
+        .mi-perfil-loading {
+          display: flex;
+          align-items: center;
+          justify-content: center;
+          gap: 12px;
+          padding: 40px;
+          color: #6B7280;
+        }
+
         .mi-perfil-form h3 {
           margin: 0 0 8px 0;
           font-size: 1.25rem;
@@ -1170,7 +1545,8 @@ export default function MiPerfil({ isOpen, onClose }: MiPerfilProps) {
         }
 
         .mi-perfil-field input,
-        .mi-perfil-field textarea {
+        .mi-perfil-field textarea,
+        .mi-perfil-field select {
           padding: 12px 16px;
           border: 1.5px solid #E2E8F0;
           border-radius: 10px;
@@ -1181,13 +1557,15 @@ export default function MiPerfil({ isOpen, onClose }: MiPerfilProps) {
         }
 
         .mi-perfil-field input:focus,
-        .mi-perfil-field textarea:focus {
+        .mi-perfil-field textarea:focus,
+        .mi-perfil-field select:focus {
           outline: none;
           border-color: #0057FF;
           box-shadow: 0 0 0 4px rgba(0, 87, 255, 0.1);
         }
 
-        .mi-perfil-field input.disabled {
+        .mi-perfil-field input.disabled,
+        .mi-perfil-field input:disabled {
           background: #F8FAFC;
           color: #94A3B8;
           cursor: not-allowed;
@@ -1199,9 +1577,159 @@ export default function MiPerfil({ isOpen, onClose }: MiPerfilProps) {
           font-family: inherit;
         }
 
+        .mi-perfil-field textarea:disabled {
+          background: #F8FAFC;
+          color: #94A3B8;
+        }
+
         .mi-perfil-hint {
           font-size: 0.75rem;
           color: #94A3B8;
+        }
+
+        /* MultiSelect Styles */
+        .mi-perfil-multiselect {
+          display: flex;
+          flex-direction: column;
+          gap: 8px;
+        }
+
+        .mi-perfil-multiselect label {
+          font-size: 0.875rem;
+          font-weight: 600;
+          color: #374151;
+        }
+
+        .multiselect-container {
+          position: relative;
+        }
+
+        .multiselect-chips {
+          display: flex;
+          flex-wrap: wrap;
+          gap: 8px;
+          padding: 10px 12px;
+          border: 1.5px solid #E2E8F0;
+          border-radius: 10px;
+          background: white;
+          min-height: 48px;
+          align-items: center;
+          cursor: pointer;
+        }
+
+        .multiselect-chips:hover {
+          border-color: #CBD5E1;
+        }
+
+        .multiselect-chip {
+          display: inline-flex;
+          align-items: center;
+          gap: 6px;
+          padding: 4px 10px;
+          background: #EFF6FF;
+          color: #1D4ED8;
+          font-size: 0.8125rem;
+          font-weight: 500;
+          border-radius: 6px;
+        }
+
+        .multiselect-chip button {
+          background: none;
+          border: none;
+          padding: 0;
+          cursor: pointer;
+          color: #1D4ED8;
+          font-size: 1rem;
+          line-height: 1;
+          opacity: 0.7;
+        }
+
+        .multiselect-chip button:hover {
+          opacity: 1;
+        }
+
+        .multiselect-trigger {
+          display: flex;
+          align-items: center;
+          gap: 8px;
+          background: none;
+          border: none;
+          padding: 4px;
+          cursor: pointer;
+          margin-left: auto;
+          color: #64748B;
+        }
+
+        .multiselect-trigger .placeholder {
+          color: #94A3B8;
+          font-size: 0.9375rem;
+        }
+
+        .multiselect-dropdown {
+          position: absolute;
+          top: 100%;
+          left: 0;
+          right: 0;
+          margin-top: 4px;
+          background: white;
+          border: 1px solid #E2E8F0;
+          border-radius: 10px;
+          box-shadow: 0 10px 40px rgba(0, 0, 0, 0.15);
+          z-index: 100;
+          max-height: 250px;
+          overflow-y: auto;
+        }
+
+        .multiselect-option {
+          display: flex;
+          align-items: center;
+          gap: 10px;
+          padding: 10px 14px;
+          cursor: pointer;
+          transition: background 0.1s ease;
+        }
+
+        .multiselect-option:hover {
+          background: #F8FAFC;
+        }
+
+        .multiselect-option input[type="checkbox"] {
+          width: 16px;
+          height: 16px;
+          cursor: pointer;
+        }
+
+        .multiselect-option span {
+          font-size: 0.9rem;
+          color: #374151;
+        }
+
+        .multiselect-custom {
+          display: flex;
+          gap: 8px;
+          padding: 10px 14px;
+          border-top: 1px solid #E2E8F0;
+        }
+
+        .multiselect-custom input {
+          flex: 1;
+          padding: 8px 12px;
+          border: 1px solid #E2E8F0;
+          border-radius: 6px;
+          font-size: 0.875rem;
+        }
+
+        .multiselect-custom button {
+          display: flex;
+          align-items: center;
+          justify-content: center;
+          width: 32px;
+          height: 32px;
+          background: #0057FF;
+          color: white;
+          border: none;
+          border-radius: 6px;
+          cursor: pointer;
         }
 
         .mi-perfil-password-input {

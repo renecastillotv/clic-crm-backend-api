@@ -945,8 +945,9 @@ export default function CrmInfoNegocio() {
         /* Content area */
         .content-area {
           flex: 1;
-          padding: 32px 48px;
+          padding: 32px 32px;
           overflow-y: auto;
+          min-width: 0;
         }
 
         .tab-content {
@@ -1043,17 +1044,11 @@ export default function CrmInfoNegocio() {
         /* Social grid */
         .social-grid {
           display: grid;
-          grid-template-columns: repeat(3, 1fr);
-          gap: 16px;
+          grid-template-columns: repeat(2, 1fr);
+          gap: 20px;
         }
 
-        @media (max-width: 1200px) {
-          .social-grid {
-            grid-template-columns: repeat(2, 1fr);
-          }
-        }
-
-        @media (max-width: 768px) {
+        @media (max-width: 900px) {
           .social-grid {
             grid-template-columns: 1fr;
           }
@@ -1063,6 +1058,7 @@ export default function CrmInfoNegocio() {
           display: flex;
           align-items: center;
           gap: 12px;
+          min-width: 0;
         }
 
         .social-icon {
@@ -1129,6 +1125,7 @@ export default function CrmInfoNegocio() {
           border-radius: 8px;
           overflow: hidden;
           transition: all 0.2s;
+          min-width: 0;
         }
 
         .input-with-prefix:focus-within {
@@ -1140,9 +1137,13 @@ export default function CrmInfoNegocio() {
           padding: 8px 0 8px 10px;
           background: #f8fafc;
           color: #94a3b8;
-          font-size: 0.75rem;
+          font-size: 0.7rem;
           white-space: nowrap;
           user-select: none;
+          flex-shrink: 0;
+          max-width: 130px;
+          overflow: hidden;
+          text-overflow: ellipsis;
         }
 
         .input-with-prefix input {

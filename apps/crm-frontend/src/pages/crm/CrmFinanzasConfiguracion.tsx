@@ -5,7 +5,26 @@
 import React, { useEffect, useState } from 'react';
 import { useAuth } from '../../contexts/AuthContext';
 import { usePageHeader } from '../../layouts/CrmLayout';
-import { Percent, Settings, FileText, Calendar, CreditCard, Users, UserCheck, Building2, Home } from 'lucide-react';
+import {
+  Percent, FileText, Calendar, CreditCard, Users, UserCheck, Building2, Home,
+  Plus, Edit2, Trash2, Save, X, ChevronDown, ChevronRight, Trophy, Award,
+  GraduationCap, User, Share2, Loader2, AlertCircle, ClipboardList, CheckCircle2,
+  Circle, FileCheck
+} from 'lucide-react';
+import {
+  getPlantillasComision,
+  createPlantillaComision,
+  updatePlantillaComision,
+  deletePlantillaComision,
+  getDistribucionEmpresa,
+  updateDistribucionEmpresa,
+  getRequerimientosExpedienteTenant,
+  PlantillaComision,
+  PlantillaComisionConfig,
+  DistribucionEmpresaItem,
+  DistribucionEmpresaConfig,
+  RequerimientoExpedienteConfig
+} from '../../services/api';
 
 export default function CrmFinanzasConfiguracion() {
   const { tenantActual } = useAuth();
@@ -25,6 +44,7 @@ export default function CrmFinanzasConfiguracion() {
     { id: 'facturacion', label: 'Facturación', icon: FileText },
     { id: 'periodos', label: 'Periodos de Pago', icon: Calendar },
     { id: 'metodos', label: 'Métodos de Pago', icon: CreditCard },
+    { id: 'expediente', label: 'Requerimientos de Expediente', icon: ClipboardList },
   ];
 
   return (
@@ -52,6 +72,7 @@ export default function CrmFinanzasConfiguracion() {
           {activeTab === 'facturacion' && <FacturacionTab />}
           {activeTab === 'periodos' && <PeriodosTab />}
           {activeTab === 'metodos' && <MetodosTab />}
+          {activeTab === 'expediente' && <ExpedienteRequerimientosTab />}
         </div>
       </div>
 
@@ -115,128 +136,1420 @@ export default function CrmFinanzasConfiguracion() {
 
 // Componente para la pestaña de Split de Comisiones
 function SplitComisionesTab() {
-  const [viewMode, setViewMode] = useState<'general' | 'personalizado'>('general');
-  const [tipoPropiedad, setTipoPropiedad] = useState<'lista' | 'proyecto' | 'ambas'>('ambas');
-  const [mismoAsesor, setMismoAsesor] = useState<boolean | null>(null); // null = sin separación
-  const [sinVariantesTipo, setSinVariantesTipo] = useState<boolean>(false);
+  const { tenantActual } = useAuth();
+  const [plantillas, setPlantillas] = useState<PlantillaComision[]>([]);
+  const [distribucionEmpresa, setDistribucionEmpresa] = useState<DistribucionEmpresaConfig | null>(null);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+  const [editingPlantilla, setEditingPlantilla] = useState<string | null>(null);
+  const [expandedPlantilla, setExpandedPlantilla] = useState<string | null>(null);
+  const [showNewModal, setShowNewModal] = useState(false);
+  const [editingDistribucion, setEditingDistribucion] = useState(false);
+
+  // Cargar datos
+  useEffect(() => {
+    if (tenantActual?.id) {
+      loadData();
+    }
+  }, [tenantActual?.id]);
+
+  const loadData = async () => {
+    if (!tenantActual?.id) return;
+    try {
+      setLoading(true);
+      setError(null);
+      const [plantillasData, distribucionData] = await Promise.all([
+        getPlantillasComision(tenantActual.id),
+        getDistribucionEmpresa(tenantActual.id)
+      ]);
+      setPlantillas(plantillasData);
+      setDistribucionEmpresa(distribucionData);
+    } catch (err: any) {
+      setError(err.message || 'Error al cargar datos');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleDeletePlantilla = async (plantillaId: string) => {
+    if (!tenantActual?.id) return;
+    if (!confirm('¿Eliminar esta plantilla de comisión?')) return;
+    try {
+      await deletePlantillaComision(tenantActual.id, plantillaId);
+      setPlantillas(plantillas.filter(p => p.id !== plantillaId));
+    } catch (err: any) {
+      alert(err.message || 'Error al eliminar');
+    }
+  };
+
+  const getIconForPlantilla = (codigo: string) => {
+    const icons: Record<string, React.ReactNode> = {
+      trainee: <GraduationCap size={20} />,
+      junior: <User size={20} />,
+      pleno: <UserCheck size={20} />,
+      senior: <Award size={20} />,
+      top_producer: <Trophy size={20} />,
+      asociado_externo: <Users size={20} />,
+      referidor: <Share2 size={20} />
+    };
+    return icons[codigo] || <Percent size={20} />;
+  };
+
+  if (loading) {
+    return (
+      <div className="loading-state">
+        <Loader2 className="spinner" size={32} />
+        <p>Cargando configuración...</p>
+      </div>
+    );
+  }
+
+  if (error) {
+    return (
+      <div className="error-state">
+        <AlertCircle size={32} />
+        <p>{error}</p>
+        <button onClick={loadData}>Reintentar</button>
+      </div>
+    );
+  }
 
   return (
     <div className="split-comisiones-container">
-      {/* Header con información y botón de Plan Personalizado */}
+      {/* Header */}
       <div className="section-header">
         <div>
-          <h2 style={{ margin: '0 0 8px 0', fontSize: '1.5rem', fontWeight: 700, color: '#0f172a' }}>
-            Split de Comisiones
-          </h2>
-          <p style={{ margin: 0, color: '#64748b', fontSize: '0.875rem' }}>
-            Configura cómo se distribuyen las comisiones entre asesores, captadores y la empresa
-          </p>
+          <h2>Split de Comisiones</h2>
+          <p>Configura cómo se distribuyen las comisiones entre asesores, captadores y la empresa</p>
         </div>
-        {viewMode === 'general' && (
-          <button 
-            className="btn-plan-personalizado"
-            onClick={() => setViewMode('personalizado')}
-          >
-            <UserCheck size={18} />
-            <span>Plan Personalizado</span>
-          </button>
-        )}
+        <button className="btn-primary" onClick={() => setShowNewModal(true)}>
+          <Plus size={18} />
+          Nueva Plantilla
+        </button>
       </div>
 
-      {viewMode === 'general' ? (
-        <ConfiguracionGeneral 
-          tipoPropiedad={tipoPropiedad} 
-          setTipoPropiedad={setTipoPropiedad}
-          mismoAsesor={mismoAsesor}
-          setMismoAsesor={setMismoAsesor}
-          sinVariantesTipo={sinVariantesTipo}
-          setSinVariantesTipo={setSinVariantesTipo}
+      {/* Lista de Plantillas */}
+      <div className="plantillas-section">
+        <div className="section-title">
+          <Users size={20} />
+          <h3>Plantillas de Distribución</h3>
+          <span className="badge">{plantillas.length} plantillas</span>
+        </div>
+
+        <div className="plantillas-grid">
+          {plantillas.map((plantilla) => (
+            <PlantillaCard
+              key={plantilla.id}
+              plantilla={plantilla}
+              icon={getIconForPlantilla(plantilla.codigo)}
+              isExpanded={expandedPlantilla === plantilla.id}
+              onToggleExpand={() => setExpandedPlantilla(
+                expandedPlantilla === plantilla.id ? null : plantilla.id
+              )}
+              onEdit={() => setEditingPlantilla(plantilla.id)}
+              onDelete={() => handleDeletePlantilla(plantilla.id)}
+              isGlobal={!plantilla.tenant_id}
+            />
+          ))}
+        </div>
+      </div>
+
+      {/* Distribución Interna de Empresa */}
+      <div className="distribucion-empresa-section">
+        <div className="section-title">
+          <Building2 size={20} />
+          <h3>Distribución Interna de Empresa</h3>
+          <button
+            className="btn-edit-small"
+            onClick={() => setEditingDistribucion(!editingDistribucion)}
+          >
+            <Edit2 size={14} />
+            {editingDistribucion ? 'Cancelar' : 'Editar'}
+          </button>
+        </div>
+        <p className="section-description">
+          Del porcentaje que recibe la empresa, distribuir entre roles internos
+        </p>
+
+        <DistribucionEmpresaEditor
+          config={distribucionEmpresa}
+          isEditing={editingDistribucion}
+          onSave={async (distribuciones) => {
+            if (!tenantActual?.id) return;
+            try {
+              const result = await updateDistribucionEmpresa(tenantActual.id, distribuciones);
+              setDistribucionEmpresa(result);
+              setEditingDistribucion(false);
+            } catch (err: any) {
+              alert(err.message || 'Error al guardar');
+            }
+          }}
+          onCancel={() => setEditingDistribucion(false)}
         />
-      ) : (
-        <PlanesPersonalizados onBack={() => setViewMode('general')} />
+      </div>
+
+      {/* Modal Nueva Plantilla */}
+      {showNewModal && (
+        <NuevaPlantillaModal
+          onClose={() => setShowNewModal(false)}
+          onSave={async (data) => {
+            if (!tenantActual?.id) return;
+            try {
+              const nueva = await createPlantillaComision(tenantActual.id, data);
+              setPlantillas([...plantillas, nueva]);
+              setShowNewModal(false);
+            } catch (err: any) {
+              alert(err.message || 'Error al crear');
+            }
+          }}
+        />
       )}
 
-      <style>{`
-        .split-comisiones-container {
-          display: flex;
-          flex-direction: column;
-          gap: 24px;
-        }
+      {/* Modal Editar Plantilla */}
+      {editingPlantilla && (
+        <EditarPlantillaModal
+          plantilla={plantillas.find(p => p.id === editingPlantilla)!}
+          onClose={() => setEditingPlantilla(null)}
+          onSave={async (data) => {
+            if (!tenantActual?.id || !editingPlantilla) return;
+            try {
+              const updated = await updatePlantillaComision(tenantActual.id, editingPlantilla, data);
+              setPlantillas(plantillas.map(p => p.id === editingPlantilla ? updated : p));
+              setEditingPlantilla(null);
+            } catch (err: any) {
+              alert(err.message || 'Error al actualizar');
+            }
+          }}
+        />
+      )}
 
-        .section-header {
-          padding-bottom: 20px;
-          border-bottom: 1px solid #e2e8f0;
-        }
-
-        .mode-selector {
-          display: flex;
-          gap: 12px;
-          padding: 8px;
-          background: #f8fafc;
-          border-radius: 10px;
-        }
-
-        .mode-button {
-          flex: 1;
-          display: flex;
-          align-items: center;
-          justify-content: center;
-          gap: 8px;
-          padding: 12px 20px;
-          border: 2px solid transparent;
-          background: white;
-          border-radius: 8px;
-          color: #64748b;
-          font-size: 0.9375rem;
-          font-weight: 500;
-          cursor: pointer;
-          transition: all 0.2s;
-        }
-
-        .mode-button:hover {
-          color: #334155;
-          border-color: #e2e8f0;
-        }
-
-        .mode-button.active {
-          color: #667eea;
-          border-color: #667eea;
-          background: #f0f4ff;
-        }
-
-        .section-header {
-          display: flex;
-          justify-content: space-between;
-          align-items: flex-start;
-          margin-bottom: 24px;
-          padding-bottom: 20px;
-          border-bottom: 1px solid #e2e8f0;
-        }
-
-        .btn-plan-personalizado {
-          display: flex;
-          align-items: center;
-          gap: 8px;
-          padding: 10px 20px;
-          border: 2px solid #667eea;
-          background: white;
-          border-radius: 8px;
-          color: #667eea;
-          font-size: 0.9375rem;
-          font-weight: 600;
-          cursor: pointer;
-          transition: all 0.2s;
-        }
-
-        .btn-plan-personalizado:hover {
-          background: #f0f4ff;
-          transform: translateY(-1px);
-          box-shadow: 0 2px 8px rgba(102, 126, 234, 0.2);
-        }
-      `}</style>
+      <style>{splitComisionesStyles}</style>
     </div>
   );
 }
+
+// Sub-componente: Card de Plantilla
+function PlantillaCard({
+  plantilla,
+  icon,
+  isExpanded,
+  onToggleExpand,
+  onEdit,
+  onDelete,
+  isGlobal
+}: {
+  plantilla: PlantillaComision;
+  icon: React.ReactNode;
+  isExpanded: boolean;
+  onToggleExpand: () => void;
+  onEdit: () => void;
+  onDelete: () => void;
+  isGlobal: boolean;
+}) {
+  const config = plantilla.config;
+  const isCustomized = !isGlobal; // Si tiene tenant_id, es personalizada
+
+  return (
+    <div className={`plantilla-card ${isExpanded ? 'expanded' : ''}`} style={{ borderLeftColor: plantilla.color || '#6366f1' }}>
+      <div className="plantilla-header" onClick={onToggleExpand}>
+        <div className="plantilla-icon" style={{ background: `${plantilla.color}20`, color: plantilla.color || '#6366f1' }}>
+          {icon}
+        </div>
+        <div className="plantilla-info">
+          <h4>{plantilla.nombre}</h4>
+          <p>{plantilla.descripcion || 'Sin descripción'}</p>
+        </div>
+        <div className="plantilla-badges">
+          {isCustomized && <span className="badge customized">Personalizada</span>}
+          {isGlobal && <span className="badge base">Base</span>}
+          {plantilla.es_default && <span className="badge default">Por defecto</span>}
+          {config.es_personal && <span className="badge personal">Personal</span>}
+        </div>
+        <div className="plantilla-expand">
+          {isExpanded ? <ChevronDown size={20} /> : <ChevronRight size={20} />}
+        </div>
+      </div>
+
+      {/* Preview compacto */}
+      {!isExpanded && (
+        <div className="plantilla-preview">
+          <div className="preview-row">
+            <Home size={14} />
+            <span>Lista: </span>
+            <strong style={{ color: '#10b981' }}>C:{config.distribuciones.propiedad_lista.capta_y_vende.captador}%</strong>
+            <strong style={{ color: '#3b82f6' }}>V:{config.distribuciones.propiedad_lista.capta_y_vende.vendedor}%</strong>
+            <strong style={{ color: '#f59e0b' }}>E:{config.distribuciones.propiedad_lista.capta_y_vende.empresa}%</strong>
+          </div>
+          <div className="preview-row">
+            <Building2 size={14} />
+            <span>Proyecto: </span>
+            <strong style={{ color: '#10b981' }}>C:{config.distribuciones.proyecto.capta_y_vende.captador}%</strong>
+            <strong style={{ color: '#3b82f6' }}>V:{config.distribuciones.proyecto.capta_y_vende.vendedor}%</strong>
+            <strong style={{ color: '#f59e0b' }}>E:{config.distribuciones.proyecto.capta_y_vende.empresa}%</strong>
+          </div>
+        </div>
+      )}
+
+      {/* Detalle expandido */}
+      {isExpanded && (
+        <div className="plantilla-detail">
+          <div className="detail-grid">
+            {/* Propiedad Lista */}
+            <div className="detail-block">
+              <h5><Home size={16} /> Propiedades Listas</h5>
+              <table className="dist-table">
+                <thead>
+                  <tr>
+                    <th>Escenario</th>
+                    <th>Captador</th>
+                    <th>Vendedor</th>
+                    <th>Empresa</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  <tr>
+                    <td>Capta y Vende</td>
+                    <td className="captador">{config.distribuciones.propiedad_lista.capta_y_vende.captador}%</td>
+                    <td className="vendedor">{config.distribuciones.propiedad_lista.capta_y_vende.vendedor}%</td>
+                    <td className="empresa">{config.distribuciones.propiedad_lista.capta_y_vende.empresa}%</td>
+                  </tr>
+                  <tr>
+                    <td>Solo Capta</td>
+                    <td className="captador">{config.distribuciones.propiedad_lista.solo_capta.captador}%</td>
+                    <td className="vendedor">{config.distribuciones.propiedad_lista.solo_capta.vendedor}%</td>
+                    <td className="empresa">{config.distribuciones.propiedad_lista.solo_capta.empresa}%</td>
+                  </tr>
+                  <tr>
+                    <td>Solo Vende</td>
+                    <td className="captador">{config.distribuciones.propiedad_lista.solo_vende.captador}%</td>
+                    <td className="vendedor">{config.distribuciones.propiedad_lista.solo_vende.vendedor}%</td>
+                    <td className="empresa">{config.distribuciones.propiedad_lista.solo_vende.empresa}%</td>
+                  </tr>
+                </tbody>
+              </table>
+            </div>
+
+            {/* Proyecto */}
+            <div className="detail-block">
+              <h5><Building2 size={16} /> Proyectos</h5>
+              <table className="dist-table">
+                <thead>
+                  <tr>
+                    <th>Escenario</th>
+                    <th>Captador</th>
+                    <th>Vendedor</th>
+                    <th>Empresa</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  <tr>
+                    <td>Capta y Vende</td>
+                    <td className="captador">{config.distribuciones.proyecto.capta_y_vende.captador}%</td>
+                    <td className="vendedor">{config.distribuciones.proyecto.capta_y_vende.vendedor}%</td>
+                    <td className="empresa">{config.distribuciones.proyecto.capta_y_vende.empresa}%</td>
+                  </tr>
+                  <tr>
+                    <td>Solo Capta</td>
+                    <td className="captador">{config.distribuciones.proyecto.solo_capta.captador}%</td>
+                    <td className="vendedor">{config.distribuciones.proyecto.solo_capta.vendedor}%</td>
+                    <td className="empresa">{config.distribuciones.proyecto.solo_capta.empresa}%</td>
+                  </tr>
+                  <tr>
+                    <td>Solo Vende</td>
+                    <td className="captador">{config.distribuciones.proyecto.solo_vende.captador}%</td>
+                    <td className="vendedor">{config.distribuciones.proyecto.solo_vende.vendedor}%</td>
+                    <td className="empresa">{config.distribuciones.proyecto.solo_vende.empresa}%</td>
+                  </tr>
+                </tbody>
+              </table>
+            </div>
+          </div>
+
+          {/* Fees previos */}
+          {config.fees_previos && config.fees_previos.length > 0 && (
+            <div className="fees-section">
+              <h5>Fees Previos (se deducen antes de distribuir)</h5>
+              <div className="fees-list">
+                {config.fees_previos.map((fee, idx) => (
+                  <span key={idx} className="fee-badge">
+                    {fee.rol}: {fee.porcentaje}%
+                  </span>
+                ))}
+              </div>
+            </div>
+          )}
+
+          {/* Acciones */}
+          <div className="plantilla-actions">
+            <button className="btn-edit" onClick={onEdit}>
+              <Edit2 size={14} /> {isGlobal ? 'Personalizar' : 'Editar'}
+            </button>
+            {!isGlobal && (
+              <button className="btn-delete" onClick={onDelete}>
+                <Trash2 size={14} /> Eliminar
+              </button>
+            )}
+          </div>
+          {isGlobal && (
+            <div className="global-notice info">
+              <AlertCircle size={14} />
+              Al personalizar, se creará una copia local con tus valores que reemplazará esta plantilla base.
+            </div>
+          )}
+        </div>
+      )}
+    </div>
+  );
+}
+
+// Sub-componente: Editor de Distribución Empresa
+function DistribucionEmpresaEditor({
+  config,
+  isEditing,
+  onSave,
+  onCancel
+}: {
+  config: DistribucionEmpresaConfig | null;
+  isEditing: boolean;
+  onSave: (distribuciones: DistribucionEmpresaItem[]) => void;
+  onCancel: () => void;
+}) {
+  const [distribuciones, setDistribuciones] = useState<DistribucionEmpresaItem[]>(
+    config?.distribuciones || []
+  );
+
+  useEffect(() => {
+    setDistribuciones(config?.distribuciones || []);
+  }, [config]);
+
+  const addItem = () => {
+    setDistribuciones([...distribuciones, { rol: '', tipo: 'porcentaje', valor: 0, descripcion: '' }]);
+  };
+
+  const removeItem = (idx: number) => {
+    setDistribuciones(distribuciones.filter((_, i) => i !== idx));
+  };
+
+  const updateItem = (idx: number, field: string, value: any) => {
+    setDistribuciones(distribuciones.map((item, i) =>
+      i === idx ? { ...item, [field]: value } : item
+    ));
+  };
+
+  const totalPorcentaje = distribuciones
+    .filter(d => d.tipo === 'porcentaje')
+    .reduce((sum, d) => sum + (d.valor || 0), 0);
+
+  if (!isEditing) {
+    return (
+      <div className="distribucion-preview-list">
+        {(!distribuciones || distribuciones.length === 0) ? (
+          <p className="empty-text">No hay distribución interna configurada</p>
+        ) : (
+          distribuciones.map((item, idx) => (
+            <div key={idx} className="dist-item">
+              <span className="dist-rol">{item.descripcion || item.rol}</span>
+              <span className="dist-valor">
+                {item.tipo === 'porcentaje' ? `${item.valor}%` : `$${item.valor} ${item.moneda || 'USD'}`}
+              </span>
+            </div>
+          ))
+        )}
+      </div>
+    );
+  }
+
+  return (
+    <div className="distribucion-editor">
+      {distribuciones.map((item, idx) => (
+        <div key={idx} className="dist-edit-row">
+          <input
+            type="text"
+            placeholder="Descripción (ej: Contabilidad)"
+            value={item.descripcion}
+            onChange={(e) => updateItem(idx, 'descripcion', e.target.value)}
+          />
+          <select
+            value={item.tipo}
+            onChange={(e) => updateItem(idx, 'tipo', e.target.value)}
+          >
+            <option value="porcentaje">Porcentaje</option>
+            <option value="fijo">Monto Fijo</option>
+          </select>
+          <input
+            type="number"
+            placeholder="Valor"
+            value={item.valor}
+            onChange={(e) => updateItem(idx, 'valor', parseFloat(e.target.value) || 0)}
+          />
+          <span>{item.tipo === 'porcentaje' ? '%' : 'USD'}</span>
+          <button className="btn-remove" onClick={() => removeItem(idx)}>
+            <X size={16} />
+          </button>
+        </div>
+      ))}
+
+      <button className="btn-add-item" onClick={addItem}>
+        <Plus size={16} /> Agregar rol
+      </button>
+
+      <div className="dist-summary">
+        <span>Total asignado: <strong className={totalPorcentaje > 100 ? 'error' : ''}>{totalPorcentaje}%</strong></span>
+        <span className="hint">El resto va a utilidad neta de la empresa</span>
+      </div>
+
+      <div className="dist-actions">
+        <button className="btn-cancel" onClick={onCancel}>Cancelar</button>
+        <button className="btn-save" onClick={() => onSave(distribuciones)} disabled={totalPorcentaje > 100}>
+          <Save size={16} /> Guardar
+        </button>
+      </div>
+    </div>
+  );
+}
+
+// Sub-componente: Modal Nueva Plantilla
+function NuevaPlantillaModal({
+  onClose,
+  onSave
+}: {
+  onClose: () => void;
+  onSave: (data: { codigo: string; nombre: string; descripcion?: string; config: PlantillaComisionConfig }) => void;
+}) {
+  const [nombre, setNombre] = useState('');
+  const [descripcion, setDescripcion] = useState('');
+  const [config, setConfig] = useState<PlantillaComisionConfig>({
+    distribuciones: {
+      propiedad_lista: {
+        solo_capta: { captador: 20, vendedor: 0, empresa: 80 },
+        solo_vende: { captador: 0, vendedor: 50, empresa: 50 },
+        capta_y_vende: { captador: 20, vendedor: 50, empresa: 30 }
+      },
+      proyecto: {
+        solo_capta: { captador: 15, vendedor: 0, empresa: 85 },
+        solo_vende: { captador: 0, vendedor: 45, empresa: 55 },
+        capta_y_vende: { captador: 15, vendedor: 45, empresa: 40 }
+      }
+    },
+    fees_previos: [],
+    roles_aplicables: [],
+    es_personal: false
+  });
+
+  const handleSubmit = () => {
+    if (!nombre.trim()) {
+      alert('El nombre es requerido');
+      return;
+    }
+    const codigo = nombre.toLowerCase().replace(/\s+/g, '_').replace(/[^a-z0-9_]/g, '');
+    onSave({ codigo, nombre, descripcion, config });
+  };
+
+  const updateDist = (tipo: 'propiedad_lista' | 'proyecto', escenario: string, campo: string, valor: number) => {
+    setConfig({
+      ...config,
+      distribuciones: {
+        ...config.distribuciones,
+        [tipo]: {
+          ...config.distribuciones[tipo],
+          [escenario]: {
+            ...(config.distribuciones[tipo] as any)[escenario],
+            [campo]: valor
+          }
+        }
+      }
+    });
+  };
+
+  return (
+    <div className="modal-overlay" onClick={onClose}>
+      <div className="modal-content modal-large" onClick={e => e.stopPropagation()}>
+        <div className="modal-header">
+          <h3>Nueva Plantilla de Comisión</h3>
+          <button className="btn-close" onClick={onClose}><X size={20} /></button>
+        </div>
+
+        <div className="modal-body">
+          <div className="form-row">
+            <div className="form-group">
+              <label>Nombre de la plantilla</label>
+              <input
+                type="text"
+                value={nombre}
+                onChange={e => setNombre(e.target.value)}
+                placeholder="Ej: Asesor VIP"
+              />
+            </div>
+            <div className="form-group">
+              <label>Descripción</label>
+              <input
+                type="text"
+                value={descripcion}
+                onChange={e => setDescripcion(e.target.value)}
+                placeholder="Descripción opcional"
+              />
+            </div>
+          </div>
+
+          <div className="dist-editor-section">
+            <h4><Home size={16} /> Propiedades Listas</h4>
+            <DistribucionInputs
+              distribuciones={config.distribuciones.propiedad_lista}
+              onChange={(escenario, campo, valor) => updateDist('propiedad_lista', escenario, campo, valor)}
+            />
+          </div>
+
+          <div className="dist-editor-section">
+            <h4><Building2 size={16} /> Proyectos</h4>
+            <DistribucionInputs
+              distribuciones={config.distribuciones.proyecto}
+              onChange={(escenario, campo, valor) => updateDist('proyecto', escenario, campo, valor)}
+            />
+          </div>
+        </div>
+
+        <div className="modal-footer">
+          <button className="btn-cancel" onClick={onClose}>Cancelar</button>
+          <button className="btn-save" onClick={handleSubmit}>
+            <Save size={16} /> Crear Plantilla
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+// Sub-componente: Modal Editar Plantilla
+function EditarPlantillaModal({
+  plantilla,
+  onClose,
+  onSave
+}: {
+  plantilla: PlantillaComision;
+  onClose: () => void;
+  onSave: (data: Partial<{ nombre: string; descripcion: string; config: PlantillaComisionConfig }>) => void;
+}) {
+  const [nombre, setNombre] = useState(plantilla.nombre);
+  const [descripcion, setDescripcion] = useState(plantilla.descripcion || '');
+  const [config, setConfig] = useState<PlantillaComisionConfig>(plantilla.config);
+
+  const handleSubmit = () => {
+    onSave({ nombre, descripcion, config });
+  };
+
+  const updateDist = (tipo: 'propiedad_lista' | 'proyecto', escenario: string, campo: string, valor: number) => {
+    setConfig({
+      ...config,
+      distribuciones: {
+        ...config.distribuciones,
+        [tipo]: {
+          ...config.distribuciones[tipo],
+          [escenario]: {
+            ...(config.distribuciones[tipo] as any)[escenario],
+            [campo]: valor
+          }
+        }
+      }
+    });
+  };
+
+  return (
+    <div className="modal-overlay" onClick={onClose}>
+      <div className="modal-content modal-large" onClick={e => e.stopPropagation()}>
+        <div className="modal-header">
+          <h3>Editar: {plantilla.nombre}</h3>
+          <button className="btn-close" onClick={onClose}><X size={20} /></button>
+        </div>
+
+        <div className="modal-body">
+          <div className="form-row">
+            <div className="form-group">
+              <label>Nombre</label>
+              <input type="text" value={nombre} onChange={e => setNombre(e.target.value)} />
+            </div>
+            <div className="form-group">
+              <label>Descripción</label>
+              <input type="text" value={descripcion} onChange={e => setDescripcion(e.target.value)} />
+            </div>
+          </div>
+
+          <div className="dist-editor-section">
+            <h4><Home size={16} /> Propiedades Listas</h4>
+            <DistribucionInputs
+              distribuciones={config.distribuciones.propiedad_lista}
+              onChange={(escenario, campo, valor) => updateDist('propiedad_lista', escenario, campo, valor)}
+            />
+          </div>
+
+          <div className="dist-editor-section">
+            <h4><Building2 size={16} /> Proyectos</h4>
+            <DistribucionInputs
+              distribuciones={config.distribuciones.proyecto}
+              onChange={(escenario, campo, valor) => updateDist('proyecto', escenario, campo, valor)}
+            />
+          </div>
+        </div>
+
+        <div className="modal-footer">
+          <button className="btn-cancel" onClick={onClose}>Cancelar</button>
+          <button className="btn-save" onClick={handleSubmit}>
+            <Save size={16} /> Guardar Cambios
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+// Sub-componente: Inputs de Distribución
+function DistribucionInputs({
+  distribuciones,
+  onChange
+}: {
+  distribuciones: any;
+  onChange: (escenario: string, campo: string, valor: number) => void;
+}) {
+  const escenarios = [
+    { key: 'capta_y_vende', label: 'Capta y Vende' },
+    { key: 'solo_capta', label: 'Solo Capta' },
+    { key: 'solo_vende', label: 'Solo Vende' }
+  ];
+
+  return (
+    <table className="dist-input-table">
+      <thead>
+        <tr>
+          <th>Escenario</th>
+          <th>Captador %</th>
+          <th>Vendedor %</th>
+          <th>Empresa %</th>
+          <th>Total</th>
+        </tr>
+      </thead>
+      <tbody>
+        {escenarios.map(({ key, label }) => {
+          const dist = distribuciones[key];
+          const total = (dist.captador || 0) + (dist.vendedor || 0) + (dist.empresa || 0);
+          return (
+            <tr key={key}>
+              <td>{label}</td>
+              <td>
+                <input
+                  type="number"
+                  value={dist.captador}
+                  onChange={e => onChange(key, 'captador', parseFloat(e.target.value) || 0)}
+                />
+              </td>
+              <td>
+                <input
+                  type="number"
+                  value={dist.vendedor}
+                  onChange={e => onChange(key, 'vendedor', parseFloat(e.target.value) || 0)}
+                />
+              </td>
+              <td>
+                <input
+                  type="number"
+                  value={dist.empresa}
+                  onChange={e => onChange(key, 'empresa', parseFloat(e.target.value) || 0)}
+                />
+              </td>
+              <td className={total === 100 ? 'valid' : 'invalid'}>{total}%</td>
+            </tr>
+          );
+        })}
+      </tbody>
+    </table>
+  );
+}
+
+// Estilos del Split de Comisiones
+const splitComisionesStyles = `
+  .split-comisiones-container {
+    display: flex;
+    flex-direction: column;
+    gap: 32px;
+  }
+
+  .loading-state, .error-state {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    padding: 60px;
+    color: #64748b;
+    gap: 16px;
+  }
+
+  .spinner {
+    animation: spin 1s linear infinite;
+  }
+
+  @keyframes spin {
+    from { transform: rotate(0deg); }
+    to { transform: rotate(360deg); }
+  }
+
+  .section-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: flex-start;
+    padding-bottom: 20px;
+    border-bottom: 1px solid #e2e8f0;
+  }
+
+  .section-header h2 {
+    margin: 0 0 8px 0;
+    font-size: 1.5rem;
+    font-weight: 700;
+    color: #0f172a;
+  }
+
+  .section-header p {
+    margin: 0;
+    color: #64748b;
+    font-size: 0.875rem;
+  }
+
+  .btn-primary {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 10px 20px;
+    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+    color: white;
+    border: none;
+    border-radius: 8px;
+    font-weight: 600;
+    cursor: pointer;
+    transition: all 0.2s;
+  }
+
+  .btn-primary:hover {
+    transform: translateY(-1px);
+    box-shadow: 0 4px 12px rgba(102, 126, 234, 0.3);
+  }
+
+  .plantillas-section, .distribucion-empresa-section {
+    background: #f8fafc;
+    border-radius: 12px;
+    padding: 24px;
+    border: 1px solid #e2e8f0;
+  }
+
+  .section-title {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    margin-bottom: 8px;
+  }
+
+  .section-title h3 {
+    margin: 0;
+    font-size: 1.125rem;
+    font-weight: 600;
+    color: #0f172a;
+  }
+
+  .section-title .badge {
+    margin-left: auto;
+    padding: 4px 12px;
+    background: #e0e7ff;
+    color: #4338ca;
+    border-radius: 12px;
+    font-size: 0.75rem;
+    font-weight: 600;
+  }
+
+  .section-description {
+    margin: 0 0 20px 0;
+    color: #64748b;
+    font-size: 0.875rem;
+  }
+
+  .plantillas-grid {
+    display: flex;
+    flex-direction: column;
+    gap: 16px;
+    margin-top: 16px;
+  }
+
+  .plantilla-card {
+    background: white;
+    border: 1px solid #e2e8f0;
+    border-left: 4px solid #6366f1;
+    border-radius: 8px;
+    overflow: hidden;
+    transition: all 0.2s;
+  }
+
+  .plantilla-card:hover {
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.08);
+  }
+
+  .plantilla-card.expanded {
+    box-shadow: 0 4px 16px rgba(0, 0, 0, 0.1);
+  }
+
+  .plantilla-header {
+    display: flex;
+    align-items: center;
+    gap: 16px;
+    padding: 16px;
+    cursor: pointer;
+    transition: background 0.15s;
+  }
+
+  .plantilla-header:hover {
+    background: #f8fafc;
+  }
+
+  .plantilla-icon {
+    width: 44px;
+    height: 44px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    border-radius: 10px;
+    flex-shrink: 0;
+  }
+
+  .plantilla-info {
+    flex: 1;
+  }
+
+  .plantilla-info h4 {
+    margin: 0 0 4px 0;
+    font-size: 1rem;
+    font-weight: 600;
+    color: #0f172a;
+  }
+
+  .plantilla-info p {
+    margin: 0;
+    font-size: 0.8125rem;
+    color: #64748b;
+  }
+
+  .plantilla-badges {
+    display: flex;
+    gap: 8px;
+  }
+
+  .plantilla-badges .badge {
+    padding: 4px 10px;
+    border-radius: 12px;
+    font-size: 0.6875rem;
+    font-weight: 600;
+    text-transform: uppercase;
+  }
+
+  .badge.base {
+    background: #f1f5f9;
+    color: #64748b;
+  }
+
+  .badge.customized {
+    background: #dbeafe;
+    color: #1e40af;
+  }
+
+  .badge.default {
+    background: #dcfce7;
+    color: #166534;
+  }
+
+  .badge.personal {
+    background: #fce7f3;
+    color: #9d174d;
+  }
+
+  .plantilla-expand {
+    color: #94a3b8;
+  }
+
+  .plantilla-preview {
+    padding: 0 16px 16px 76px;
+    display: flex;
+    gap: 24px;
+  }
+
+  .preview-row {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    font-size: 0.8125rem;
+    color: #64748b;
+  }
+
+  .preview-row strong {
+    font-weight: 600;
+  }
+
+  .plantilla-detail {
+    padding: 0 16px 16px;
+    border-top: 1px solid #e2e8f0;
+    margin-top: 0;
+    padding-top: 16px;
+  }
+
+  .detail-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 24px;
+  }
+
+  .detail-block h5 {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    margin: 0 0 12px 0;
+    font-size: 0.875rem;
+    font-weight: 600;
+    color: #0f172a;
+  }
+
+  .dist-table {
+    width: 100%;
+    border-collapse: collapse;
+    font-size: 0.8125rem;
+  }
+
+  .dist-table th {
+    text-align: left;
+    padding: 8px;
+    background: #f1f5f9;
+    font-weight: 500;
+    color: #64748b;
+  }
+
+  .dist-table td {
+    padding: 8px;
+    border-bottom: 1px solid #e2e8f0;
+  }
+
+  .dist-table .captador { color: #10b981; font-weight: 600; }
+  .dist-table .vendedor { color: #3b82f6; font-weight: 600; }
+  .dist-table .empresa { color: #f59e0b; font-weight: 600; }
+
+  .fees-section {
+    margin-top: 16px;
+    padding-top: 16px;
+    border-top: 1px solid #e2e8f0;
+  }
+
+  .fees-section h5 {
+    margin: 0 0 12px 0;
+    font-size: 0.875rem;
+    font-weight: 600;
+    color: #0f172a;
+  }
+
+  .fees-list {
+    display: flex;
+    gap: 8px;
+    flex-wrap: wrap;
+  }
+
+  .fee-badge {
+    padding: 4px 12px;
+    background: #fee2e2;
+    color: #991b1b;
+    border-radius: 12px;
+    font-size: 0.75rem;
+    font-weight: 500;
+  }
+
+  .plantilla-actions {
+    display: flex;
+    gap: 12px;
+    margin-top: 16px;
+    padding-top: 16px;
+    border-top: 1px solid #e2e8f0;
+  }
+
+  .global-notice {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    margin-top: 16px;
+    padding: 12px;
+    background: #fef3c7;
+    color: #92400e;
+    border-radius: 8px;
+    font-size: 0.8125rem;
+  }
+
+  .global-notice.info {
+    background: #eff6ff;
+    color: #1e40af;
+  }
+
+  .btn-edit, .btn-delete {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    padding: 8px 16px;
+    border-radius: 6px;
+    font-size: 0.8125rem;
+    font-weight: 500;
+    cursor: pointer;
+    transition: all 0.15s;
+  }
+
+  .btn-edit {
+    background: #f0f4ff;
+    color: #4338ca;
+    border: 1px solid #c7d2fe;
+  }
+
+  .btn-edit:hover {
+    background: #e0e7ff;
+  }
+
+  .btn-delete {
+    background: #fef2f2;
+    color: #dc2626;
+    border: 1px solid #fecaca;
+  }
+
+  .btn-delete:hover {
+    background: #fee2e2;
+  }
+
+  .btn-edit-small {
+    display: flex;
+    align-items: center;
+    gap: 4px;
+    padding: 6px 12px;
+    background: white;
+    color: #64748b;
+    border: 1px solid #e2e8f0;
+    border-radius: 6px;
+    font-size: 0.75rem;
+    cursor: pointer;
+  }
+
+  .btn-edit-small:hover {
+    border-color: #667eea;
+    color: #667eea;
+  }
+
+  .distribucion-preview-list {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+  }
+
+  .empty-text {
+    color: #94a3b8;
+    font-size: 0.875rem;
+    font-style: italic;
+  }
+
+  .dist-item {
+    display: flex;
+    justify-content: space-between;
+    padding: 12px 16px;
+    background: white;
+    border: 1px solid #e2e8f0;
+    border-radius: 8px;
+  }
+
+  .dist-rol {
+    color: #0f172a;
+    font-weight: 500;
+  }
+
+  .dist-valor {
+    color: #667eea;
+    font-weight: 600;
+  }
+
+  .distribucion-editor {
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+  }
+
+  .dist-edit-row {
+    display: flex;
+    gap: 12px;
+    align-items: center;
+  }
+
+  .dist-edit-row input[type="text"] {
+    flex: 2;
+    padding: 10px 12px;
+    border: 1px solid #e2e8f0;
+    border-radius: 6px;
+  }
+
+  .dist-edit-row select {
+    padding: 10px 12px;
+    border: 1px solid #e2e8f0;
+    border-radius: 6px;
+  }
+
+  .dist-edit-row input[type="number"] {
+    width: 80px;
+    padding: 10px 12px;
+    border: 1px solid #e2e8f0;
+    border-radius: 6px;
+  }
+
+  .btn-remove {
+    padding: 8px;
+    background: #fef2f2;
+    color: #dc2626;
+    border: 1px solid #fecaca;
+    border-radius: 6px;
+    cursor: pointer;
+  }
+
+  .btn-add-item {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 8px;
+    padding: 12px;
+    background: #f8fafc;
+    color: #64748b;
+    border: 2px dashed #cbd5e1;
+    border-radius: 8px;
+    cursor: pointer;
+  }
+
+  .btn-add-item:hover {
+    border-color: #667eea;
+    color: #667eea;
+  }
+
+  .dist-summary {
+    display: flex;
+    justify-content: space-between;
+    padding: 12px;
+    background: #f1f5f9;
+    border-radius: 8px;
+    font-size: 0.875rem;
+  }
+
+  .dist-summary .error {
+    color: #dc2626;
+  }
+
+  .dist-summary .hint {
+    color: #64748b;
+  }
+
+  .dist-actions {
+    display: flex;
+    gap: 12px;
+    justify-content: flex-end;
+  }
+
+  .btn-save, .btn-cancel {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 10px 20px;
+    border-radius: 8px;
+    font-weight: 600;
+    cursor: pointer;
+    transition: all 0.15s;
+  }
+
+  .btn-save {
+    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+    color: white;
+    border: none;
+  }
+
+  .btn-save:disabled {
+    opacity: 0.5;
+    cursor: not-allowed;
+  }
+
+  .btn-cancel {
+    background: white;
+    color: #64748b;
+    border: 1px solid #e2e8f0;
+  }
+
+  /* Modal */
+  .modal-overlay {
+    position: fixed;
+    inset: 0;
+    background: rgba(0, 0, 0, 0.5);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    z-index: 1000;
+    padding: 24px;
+  }
+
+  .modal-content {
+    background: white;
+    border-radius: 16px;
+    width: 100%;
+    max-width: 500px;
+    max-height: 90vh;
+    overflow: hidden;
+    display: flex;
+    flex-direction: column;
+  }
+
+  .modal-content.modal-large {
+    max-width: 800px;
+  }
+
+  .modal-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 20px 24px;
+    border-bottom: 1px solid #e2e8f0;
+  }
+
+  .modal-header h3 {
+    margin: 0;
+    font-size: 1.125rem;
+    font-weight: 700;
+  }
+
+  .btn-close {
+    padding: 8px;
+    background: transparent;
+    border: none;
+    color: #64748b;
+    cursor: pointer;
+    border-radius: 8px;
+  }
+
+  .btn-close:hover {
+    background: #f1f5f9;
+  }
+
+  .modal-body {
+    flex: 1;
+    overflow-y: auto;
+    padding: 24px;
+  }
+
+  .modal-footer {
+    display: flex;
+    gap: 12px;
+    justify-content: flex-end;
+    padding: 16px 24px;
+    border-top: 1px solid #e2e8f0;
+  }
+
+  .form-row {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 16px;
+    margin-bottom: 24px;
+  }
+
+  .form-group {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+  }
+
+  .form-group label {
+    font-size: 0.875rem;
+    font-weight: 500;
+    color: #0f172a;
+  }
+
+  .form-group input {
+    padding: 10px 14px;
+    border: 1px solid #e2e8f0;
+    border-radius: 8px;
+    font-size: 0.9375rem;
+  }
+
+  .form-group input:focus {
+    outline: none;
+    border-color: #667eea;
+    box-shadow: 0 0 0 3px rgba(102, 126, 234, 0.1);
+  }
+
+  .dist-editor-section {
+    margin-bottom: 24px;
+    padding: 16px;
+    background: #f8fafc;
+    border-radius: 12px;
+    border: 1px solid #e2e8f0;
+  }
+
+  .dist-editor-section h4 {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    margin: 0 0 16px 0;
+    font-size: 1rem;
+    font-weight: 600;
+    color: #0f172a;
+  }
+
+  .dist-input-table {
+    width: 100%;
+    border-collapse: collapse;
+  }
+
+  .dist-input-table th {
+    text-align: left;
+    padding: 8px;
+    font-size: 0.75rem;
+    font-weight: 500;
+    color: #64748b;
+    text-transform: uppercase;
+  }
+
+  .dist-input-table td {
+    padding: 8px;
+  }
+
+  .dist-input-table input {
+    width: 70px;
+    padding: 8px 10px;
+    border: 1px solid #e2e8f0;
+    border-radius: 6px;
+    text-align: center;
+    font-weight: 500;
+  }
+
+  .dist-input-table input:focus {
+    outline: none;
+    border-color: #667eea;
+  }
+
+  .dist-input-table .valid {
+    color: #10b981;
+    font-weight: 600;
+  }
+
+  .dist-input-table .invalid {
+    color: #dc2626;
+    font-weight: 600;
+  }
+
+  @media (max-width: 768px) {
+    .detail-grid {
+      grid-template-columns: 1fr;
+    }
+    .form-row {
+      grid-template-columns: 1fr;
+    }
+    .plantilla-preview {
+      flex-direction: column;
+      gap: 8px;
+      padding-left: 16px;
+    }
+  }
+`;
 
 // Componente para Variante de Distribución
 function VarianteCard({
@@ -2194,6 +3507,360 @@ function MetodosTab() {
       <CreditCard size={48} style={{ marginBottom: '16px', opacity: 0.5 }} />
       <h3>Métodos de Pago</h3>
       <p>Próximamente</p>
+    </div>
+  );
+}
+
+// Componente para la pestaña de Requerimientos de Expediente
+function ExpedienteRequerimientosTab() {
+  const { tenantActual } = useAuth();
+  const [requerimientos, setRequerimientos] = useState<RequerimientoExpedienteConfig[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+  const [categoriaFiltro, setCategoriaFiltro] = useState<string>('');
+
+  useEffect(() => {
+    if (tenantActual?.id) {
+      loadData();
+    }
+  }, [tenantActual?.id]);
+
+  const loadData = async () => {
+    if (!tenantActual?.id) return;
+    try {
+      setLoading(true);
+      setError(null);
+      const data = await getRequerimientosExpedienteTenant(tenantActual.id);
+      setRequerimientos(data);
+    } catch (err: any) {
+      setError(err.message || 'Error al cargar requerimientos');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  // Agrupar por categoría
+  const requerimientosPorCategoria = requerimientos.reduce((acc, req) => {
+    const cat = req.categoria || 'otros';
+    if (!acc[cat]) acc[cat] = [];
+    acc[cat].push(req);
+    return acc;
+  }, {} as Record<string, RequerimientoExpedienteConfig[]>);
+
+  const categorias = Object.keys(requerimientosPorCategoria);
+
+  const getCategoriaLabel = (cat: string) => {
+    const labels: Record<string, string> = {
+      cierre_venta: 'Cierre de Venta',
+      cierre_alquiler: 'Cierre de Alquiler',
+      cierre_renta: 'Cierre de Renta',
+      otros: 'Otros'
+    };
+    return labels[cat] || cat;
+  };
+
+  const getCategoriaIcon = (cat: string) => {
+    const icons: Record<string, React.ReactNode> = {
+      cierre_venta: <Home size={20} />,
+      cierre_alquiler: <Building2 size={20} />,
+      cierre_renta: <Building2 size={20} />,
+    };
+    return icons[cat] || <FileText size={20} />;
+  };
+
+  const formatFileSize = (bytes: number) => {
+    if (bytes < 1024) return `${bytes} B`;
+    if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(1)} KB`;
+    return `${(bytes / (1024 * 1024)).toFixed(1)} MB`;
+  };
+
+  if (loading) {
+    return (
+      <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', padding: '60px 20px', color: '#64748b' }}>
+        <Loader2 size={32} className="animate-spin" style={{ marginBottom: '16px' }} />
+        <p>Cargando requerimientos...</p>
+      </div>
+    );
+  }
+
+  if (error) {
+    return (
+      <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', padding: '60px 20px', color: '#ef4444' }}>
+        <AlertCircle size={32} style={{ marginBottom: '16px' }} />
+        <p>{error}</p>
+        <button
+          onClick={loadData}
+          style={{ marginTop: '16px', padding: '8px 16px', background: '#667eea', color: 'white', border: 'none', borderRadius: '8px', cursor: 'pointer' }}
+        >
+          Reintentar
+        </button>
+      </div>
+    );
+  }
+
+  return (
+    <div>
+      {/* Header */}
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '24px' }}>
+        <div>
+          <h2 style={{ fontSize: '1.25rem', fontWeight: 600, color: '#1e293b', marginBottom: '4px' }}>
+            Requerimientos de Expediente
+          </h2>
+          <p style={{ fontSize: '0.875rem', color: '#64748b' }}>
+            Documentos requeridos para completar el cierre de ventas y alquileres
+          </p>
+        </div>
+        <div style={{ display: 'flex', gap: '8px' }}>
+          <select
+            value={categoriaFiltro}
+            onChange={(e) => setCategoriaFiltro(e.target.value)}
+            style={{
+              padding: '8px 12px',
+              border: '1px solid #e2e8f0',
+              borderRadius: '8px',
+              fontSize: '0.875rem',
+              color: '#334155',
+              background: 'white',
+              cursor: 'pointer'
+            }}
+          >
+            <option value="">Todas las categorías</option>
+            {categorias.map(cat => (
+              <option key={cat} value={cat}>{getCategoriaLabel(cat)}</option>
+            ))}
+          </select>
+        </div>
+      </div>
+
+      {/* Stats */}
+      <div style={{
+        display: 'grid',
+        gridTemplateColumns: 'repeat(auto-fit, minmax(180px, 1fr))',
+        gap: '16px',
+        marginBottom: '24px'
+      }}>
+        <div style={{
+          background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)',
+          borderRadius: '12px',
+          padding: '16px',
+          color: 'white'
+        }}>
+          <div style={{ fontSize: '0.75rem', opacity: 0.9, marginBottom: '4px' }}>Total Requerimientos</div>
+          <div style={{ fontSize: '1.75rem', fontWeight: 700 }}>{requerimientos.length}</div>
+        </div>
+        <div style={{
+          background: 'linear-gradient(135deg, #10b981 0%, #059669 100%)',
+          borderRadius: '12px',
+          padding: '16px',
+          color: 'white'
+        }}>
+          <div style={{ fontSize: '0.75rem', opacity: 0.9, marginBottom: '4px' }}>Obligatorios</div>
+          <div style={{ fontSize: '1.75rem', fontWeight: 700 }}>
+            {requerimientos.filter(r => r.es_obligatorio).length}
+          </div>
+        </div>
+        <div style={{
+          background: 'linear-gradient(135deg, #f59e0b 0%, #d97706 100%)',
+          borderRadius: '12px',
+          padding: '16px',
+          color: 'white'
+        }}>
+          <div style={{ fontSize: '0.75rem', opacity: 0.9, marginBottom: '4px' }}>Opcionales</div>
+          <div style={{ fontSize: '1.75rem', fontWeight: 700 }}>
+            {requerimientos.filter(r => !r.es_obligatorio).length}
+          </div>
+        </div>
+      </div>
+
+      {/* Lista por categoría */}
+      {categorias
+        .filter(cat => !categoriaFiltro || cat === categoriaFiltro)
+        .map(categoria => (
+        <div key={categoria} style={{ marginBottom: '32px' }}>
+          <div style={{
+            display: 'flex',
+            alignItems: 'center',
+            gap: '10px',
+            marginBottom: '16px',
+            paddingBottom: '8px',
+            borderBottom: '2px solid #e2e8f0'
+          }}>
+            <div style={{
+              width: '36px',
+              height: '36px',
+              borderRadius: '10px',
+              background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              color: 'white'
+            }}>
+              {getCategoriaIcon(categoria)}
+            </div>
+            <h3 style={{ fontSize: '1rem', fontWeight: 600, color: '#1e293b' }}>
+              {getCategoriaLabel(categoria)}
+            </h3>
+            <span style={{
+              fontSize: '0.75rem',
+              padding: '2px 8px',
+              background: '#f1f5f9',
+              borderRadius: '12px',
+              color: '#64748b'
+            }}>
+              {requerimientosPorCategoria[categoria].length} documentos
+            </span>
+          </div>
+
+          <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
+            {requerimientosPorCategoria[categoria].map((req, index) => (
+              <div
+                key={req.id}
+                style={{
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: '16px',
+                  padding: '16px',
+                  background: 'white',
+                  border: '1px solid #e2e8f0',
+                  borderRadius: '12px',
+                  transition: 'all 0.2s'
+                }}
+              >
+                {/* Número de orden */}
+                <div style={{
+                  width: '32px',
+                  height: '32px',
+                  borderRadius: '8px',
+                  background: '#f1f5f9',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  fontSize: '0.875rem',
+                  fontWeight: 600,
+                  color: '#64748b',
+                  flexShrink: 0
+                }}>
+                  {index + 1}
+                </div>
+
+                {/* Info principal */}
+                <div style={{ flex: 1, minWidth: 0 }}>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '4px' }}>
+                    <span style={{ fontWeight: 600, color: '#1e293b' }}>{req.titulo}</span>
+                    {req.es_obligatorio ? (
+                      <span style={{
+                        fontSize: '0.625rem',
+                        padding: '2px 6px',
+                        background: '#fee2e2',
+                        color: '#dc2626',
+                        borderRadius: '4px',
+                        fontWeight: 600,
+                        textTransform: 'uppercase'
+                      }}>
+                        Obligatorio
+                      </span>
+                    ) : (
+                      <span style={{
+                        fontSize: '0.625rem',
+                        padding: '2px 6px',
+                        background: '#f1f5f9',
+                        color: '#64748b',
+                        borderRadius: '4px',
+                        fontWeight: 500
+                      }}>
+                        Opcional
+                      </span>
+                    )}
+                  </div>
+                  {req.descripcion && (
+                    <p style={{ fontSize: '0.8125rem', color: '#64748b', margin: 0 }}>
+                      {req.descripcion}
+                    </p>
+                  )}
+                </div>
+
+                {/* Tipos de archivo */}
+                <div style={{
+                  display: 'flex',
+                  flexDirection: 'column',
+                  alignItems: 'flex-end',
+                  gap: '4px',
+                  flexShrink: 0
+                }}>
+                  <div style={{
+                    display: 'flex',
+                    gap: '4px',
+                    flexWrap: 'wrap',
+                    justifyContent: 'flex-end'
+                  }}>
+                    {req.tipos_archivo_permitidos?.slice(0, 4).map(tipo => (
+                      <span
+                        key={tipo}
+                        style={{
+                          fontSize: '0.625rem',
+                          padding: '2px 6px',
+                          background: '#e0f2fe',
+                          color: '#0369a1',
+                          borderRadius: '4px',
+                          fontWeight: 500,
+                          textTransform: 'uppercase'
+                        }}
+                      >
+                        {tipo}
+                      </span>
+                    ))}
+                    {req.tipos_archivo_permitidos?.length > 4 && (
+                      <span style={{
+                        fontSize: '0.625rem',
+                        padding: '2px 6px',
+                        background: '#f1f5f9',
+                        color: '#64748b',
+                        borderRadius: '4px'
+                      }}>
+                        +{req.tipos_archivo_permitidos.length - 4}
+                      </span>
+                    )}
+                  </div>
+                  <span style={{ fontSize: '0.6875rem', color: '#94a3b8' }}>
+                    Máx. {formatFileSize(req.tamaño_maximo_archivo)}
+                  </span>
+                </div>
+
+                {/* Estado */}
+                <div style={{
+                  width: '32px',
+                  height: '32px',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  flexShrink: 0
+                }}>
+                  {req.requiere_documento ? (
+                    <FileCheck size={20} style={{ color: '#10b981' }} />
+                  ) : (
+                    <Circle size={20} style={{ color: '#cbd5e1' }} />
+                  )}
+                </div>
+              </div>
+            ))}
+          </div>
+        </div>
+      ))}
+
+      {requerimientos.length === 0 && (
+        <div style={{
+          padding: '60px 20px',
+          textAlign: 'center',
+          color: '#64748b',
+          background: '#f8fafc',
+          borderRadius: '12px',
+          border: '2px dashed #e2e8f0'
+        }}>
+          <ClipboardList size={48} style={{ marginBottom: '16px', opacity: 0.5 }} />
+          <h3 style={{ marginBottom: '8px' }}>No hay requerimientos configurados</h3>
+          <p>Los requerimientos de expediente aparecerán aquí una vez que sean creados.</p>
+        </div>
+      )}
     </div>
   );
 }

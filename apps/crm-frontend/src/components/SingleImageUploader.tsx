@@ -63,10 +63,10 @@ export default function SingleImageUploader({
     try {
       const token = await getToken();
       const formData = new FormData();
-      formData.append('file', file);
+      formData.append('image', file);
       formData.append('folder', folder);
 
-      const response = await fetch(`${import.meta.env.VITE_API_URL || 'http://localhost:3001/api'}/upload/${tenantId}`, {
+      const response = await fetch(`${import.meta.env.VITE_API_URL || 'http://localhost:3001/api'}/tenants/${tenantId}/upload/image`, {
         method: 'POST',
         headers: {
           'Authorization': `Bearer ${token}`,

@@ -43,21 +43,31 @@ interface CatalogoConfig {
   color: string;
   tablaSeparada?: boolean; // true si usa categorias_propiedades u operaciones
   sinConteo?: boolean; // true si no debe mostrar conteo
+  ruta?: string; // ruta personalizada, si no se especifica usa /configuracion/catalogos/:tipo
 }
 
+// Función helper para obtener la ruta de navegación
+const getRutaNavegacion = (config: CatalogoConfig, tenantSlug: string): string => {
+  const basePath = `/crm/${tenantSlug}/configuracion`;
+  if (config.ruta) {
+    return `${basePath}/${config.ruta}`;
+  }
+  return `${basePath}/catalogos/${config.tipo}`;
+};
+
 const CATALOGOS_CONFIG: CatalogoConfig[] = [
-  { tipo: 'tipo_propiedad', titulo: 'Tipos de Propiedad', descripcion: 'Casa, apartamento, local, terreno, etc.', icono: Home, color: '#3b82f6', tablaSeparada: true },
-  { tipo: 'tipo_operacion', titulo: 'Tipos de Operación', descripcion: 'Venta, alquiler, traspaso, etc.', icono: Key, color: '#10b981', tablaSeparada: true },
-  { tipo: 'amenidades', titulo: 'Amenidades Personalizadas', descripcion: 'Piscina, gimnasio, seguridad, etc.', icono: Sparkles, color: '#6366f1', tablaSeparada: true },
-  { tipo: 'tipo_contacto', titulo: 'Tipos de Contacto', descripcion: 'Cliente, propietario, desarrollador, etc.', icono: User, color: '#8b5cf6' },
-  { tipo: 'extensiones_contacto', titulo: 'Extensiones de Contacto', descripcion: 'Lead, Cliente, Asesor, Desarrollador, etc.', icono: Puzzle, color: '#7c3aed', tablaSeparada: true },
-  { tipo: 'fuentes_lead', titulo: 'Fuentes de Lead', descripcion: 'Web, referido, portales, redes sociales, etc.', icono: Target, color: '#f59e0b', sinConteo: true },
-  { tipo: 'tipo_actividad', titulo: 'Tipos de Actividad', descripcion: 'Llamada, reunión, visita, email, etc.', icono: Phone, color: '#f97316' },
-  { tipo: 'etiqueta_propiedad', titulo: 'Etiquetas de Propiedad', descripcion: 'Exclusiva, destacada, rebajada, nueva, etc.', icono: Tag, color: '#ec4899' },
-  { tipo: 'tipo_documento', titulo: 'Tipos de Documento', descripcion: 'Cédula, pasaporte, RNC, licencia, etc.', icono: FileText, color: '#64748b' },
-  { tipo: 'especialidad_asesor', titulo: 'Especialidades de Asesor', descripcion: 'Residencial, comercial, industrial, lujo, etc.', icono: Briefcase, color: '#0891b2' },
-  { tipo: 'tipo_asesor', titulo: 'Tipos de Asesor', descripcion: 'Niveles con % de comisión: senior, junior, etc.', icono: Users, color: '#7c3aed' },
-  { tipo: 'estado_venta', titulo: 'Estados de Venta', descripcion: 'En proceso, completada, cancelada, etc.', icono: CircleDollarSign, color: '#059669', tablaSeparada: true },
+  { tipo: 'tipo_propiedad', titulo: 'Tipos de Propiedad', descripcion: 'Casa, apartamento, local, terreno, etc.', icono: Home, color: '#3b82f6', tablaSeparada: true, ruta: 'catalogos/tipo_propiedad' },
+  { tipo: 'tipo_operacion', titulo: 'Tipos de Operación', descripcion: 'Venta, alquiler, traspaso, etc.', icono: Key, color: '#10b981', tablaSeparada: true, ruta: 'catalogos/tipo_operacion' },
+  { tipo: 'amenidades', titulo: 'Amenidades Personalizadas', descripcion: 'Piscina, gimnasio, seguridad, etc.', icono: Sparkles, color: '#6366f1', tablaSeparada: true, ruta: 'amenidades' },
+  { tipo: 'tipo_contacto', titulo: 'Tipos de Contacto', descripcion: 'Cliente, propietario, desarrollador, etc.', icono: User, color: '#8b5cf6', ruta: 'catalogos/tipo_contacto' },
+  { tipo: 'extensiones_contacto', titulo: 'Extensiones de Contacto', descripcion: 'Lead, Cliente, Asesor, Desarrollador, etc.', icono: Puzzle, color: '#7c3aed', tablaSeparada: true, ruta: 'extensiones-contacto' },
+  { tipo: 'fuentes_lead', titulo: 'Fuentes de Lead', descripcion: 'Web, referido, portales, redes sociales, etc.', icono: Target, color: '#f59e0b', sinConteo: true, ruta: 'fuentes-lead' },
+  { tipo: 'tipo_actividad', titulo: 'Tipos de Actividad', descripcion: 'Llamada, reunión, visita, email, etc.', icono: Phone, color: '#f97316', ruta: 'catalogos/tipo_actividad' },
+  { tipo: 'etiqueta_propiedad', titulo: 'Etiquetas de Propiedad', descripcion: 'Exclusiva, destacada, rebajada, nueva, etc.', icono: Tag, color: '#ec4899', ruta: 'catalogos/etiqueta_propiedad' },
+  { tipo: 'tipo_documento', titulo: 'Tipos de Documento', descripcion: 'Cédula, pasaporte, RNC, licencia, etc.', icono: FileText, color: '#64748b', ruta: 'catalogos/tipo_documento' },
+  { tipo: 'especialidad_asesor', titulo: 'Especialidades de Asesor', descripcion: 'Residencial, comercial, industrial, lujo, etc.', icono: Briefcase, color: '#0891b2', ruta: 'catalogos/especialidad_asesor' },
+  { tipo: 'tipo_asesor', titulo: 'Tipos de Asesor', descripcion: 'Niveles con % de comisión: senior, junior, etc.', icono: Users, color: '#7c3aed', ruta: 'catalogos/tipo_asesor' },
+  { tipo: 'estado_venta', titulo: 'Estados de Venta', descripcion: 'En proceso, completada, cancelada, etc.', icono: CircleDollarSign, color: '#059669', tablaSeparada: true, ruta: 'catalogos/estado_venta' },
 ];
 
 export default function CrmCatalogosConfig() {
@@ -130,7 +140,7 @@ export default function CrmCatalogosConfig() {
               <div
                 key={config.tipo}
                 className="categoria-card"
-                onClick={() => navigate(config.tipo)}
+                onClick={() => navigate(getRutaNavegacion(config, tenantActual?.slug || ''))}
               >
                 <div className="categoria-icon" style={{ backgroundColor: `${config.color}15`, color: config.color }}>
                   <Icon size={24} />

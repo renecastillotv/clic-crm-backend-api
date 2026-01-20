@@ -10,96 +10,29 @@ import { useState, useEffect, useMemo } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../../../contexts/AuthContext';
 import { usePageHeader } from '../../../layouts/CrmLayout';
-import { getPaginas, savePagina, getPlantillasParaTenant, PlantillaPagina, TipoPaginaConPlantillas, getTiposPaginaParaTenant, getAllTiposPagina } from '../../../services/api';
-import { PaginaWeb, TipoPagina, TIPOS_PAGINA, TipoPaginaInfo } from '../../../types/paginas';
+import { getPaginas } from '../../../services/api';
+import { PaginaWeb } from '../../../types/paginas';
 
-interface TipoPaginaEstandar {
-  id: string;
-  codigo: string;
-  nombre: string;
-  ruta_patron: string;
-  nivel: number;
-  visible: boolean;
-  publico: boolean;
-  descripcion?: string;
-  tieneComponentes: boolean;
-  cantidadComponentes: number;
+// Interfaz extendida para incluir cantidadComponentes del endpoint
+interface PaginaWebExtendida extends PaginaWeb {
+  cantidadComponentes?: number;
 }
-
-interface PaginaConHijos extends PaginaWeb {
-  hijos: PaginaConHijos[];
-  tipoInfo: TipoPaginaInfo;
-  esEstandar: boolean;
-}
-
-type ModalStep = 'tipo' | 'plantilla' | 'detalles';
-type TabView = 'estandar' | 'personalizadas';
-
-// Prefijos de rutas estándar (basados en adminTenantsService.ts)
-const RUTAS_ESTANDAR = [
-  '',  // Homepage (slug vacío o '/')
-  '/',  // Homepage (slug con barra)
-  'contacto',
-  'politicas-de-privacidad',
-  'politicas-privacidad',
-  'terminos-y-condiciones',
-  'terminos-condiciones',
-  'vende-con-nosotros',
-  'asesores',
-  'blog',
-  'articulos',  // Alias de blog
-  'proyectos',
-  'testimonios',
-  'videos',
-  'propiedades',
-  'propiedad',  // Singular de propiedades
-  'nosotros',
-  'servicios',
-  '_template',  // Todos los templates son del sistema
-];
 
 export default function CrmWebPaginas() {
   const { tenantActual } = useAuth();
   const navigate = useNavigate();
   const { setPageHeader } = usePageHeader();
 
-  const [paginas, setPaginas] = useState<PaginaWeb[]>([]);
-  const [tiposPaginaEstandar, setTiposPaginaEstandar] = useState<any[]>([]);
+  const [paginas, setPaginas] = useState<PaginaWebExtendida[]>([]);
   const [loading, setLoading] = useState(true);
-  const [loadingTipos, setLoadingTipos] = useState(true);
   const [error, setError] = useState<string | null>(null);
-  const [showNewModal, setShowNewModal] = useState(false);
   const [expandedGroups, setExpandedGroups] = useState<Set<string>>(new Set());
-  const [updatingStatus, setUpdatingStatus] = useState<string | null>(null);
-  const [activeTab, setActiveTab] = useState<TabView>('estandar');
-
-  // Modal state
-  const [modalStep, setModalStep] = useState<ModalStep>('tipo');
-  const [newPageType, setNewPageType] = useState<TipoPagina>('custom');
-  const [selectedPlantilla, setSelectedPlantilla] = useState<PlantillaPagina | null>(null);
-  const [newPageTitle, setNewPageTitle] = useState('');
-  const [newPageSlug, setNewPageSlug] = useState('');
-  const [creating, setCreating] = useState(false);
-
-  // Plantillas del backend
-  const [tiposPaginaDB, setTiposPaginaDB] = useState<TipoPaginaConPlantillas[]>([]);
-  const [plantillasDisponibles, setPlantillasDisponibles] = useState<PlantillaPagina[]>([]);
-  const [loadingPlantillas, setLoadingPlantillas] = useState(false);
 
   // Configurar header
   useEffect(() => {
     setPageHeader({
       title: 'Páginas Web',
-      subtitle: 'Gestiona y personaliza las páginas de tu sitio inmobiliario',
-      actions: (
-        <button className="btn-header-primary" onClick={() => openNewModal()}>
-          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-            <line x1="12" y1="5" x2="12" y2="19"/>
-            <line x1="5" y1="12" x2="19" y2="12"/>
-          </svg>
-          Nueva Página
-        </button>
-      ),
+      subtitle: 'Gestiona los componentes de cada tipo de página del sistema',
     });
   }, [setPageHeader]);
 
@@ -124,60 +57,15 @@ export default function CrmWebPaginas() {
     loadPaginas();
   }, [tenantActual?.id]);
 
-  // Cargar tipos de página
-  useEffect(() => {
-    if (!tenantActual?.id) return;
+  // Organizar páginas (tipos_pagina) por jerarquía usando los datos del endpoint /paginas
+  const paginasJerarquicas = useMemo(() => {
+    if (!paginas.length) return [];
 
-    async function loadTiposPagina() {
-      try {
-        const tipos = await getTiposPaginaParaTenant(tenantActual!.id);
-        setTiposPaginaDB(tipos);
-      } catch (err) {
-        console.error('Error cargando tipos de página:', err);
-      }
-    }
-
-    loadTiposPagina();
-  }, [tenantActual?.id]);
-
-  // Cargar todos los tipos de página estándar
-  useEffect(() => {
-    async function loadTiposPaginaEstandar() {
-      try {
-        setLoadingTipos(true);
-        const tipos = await getAllTiposPagina();
-
-        // Enriquecer con información de si tiene componentes configurados
-        const tiposEnriquecidos = tipos.map((tipo: any) => {
-          // Verificar si alguna página usa este tipo
-          const paginaConTipo = paginas.find(p => p.tipoPagina === tipo.codigo);
-          return {
-            ...tipo,
-            tieneComponentes: false, // TODO: obtener del backend
-            cantidadComponentes: 0,  // TODO: obtener del backend
-          };
-        });
-
-        setTiposPaginaEstandar(tiposEnriquecidos);
-      } catch (err) {
-        console.error('Error cargando tipos de página estándar:', err);
-      } finally {
-        setLoadingTipos(false);
-      }
-    }
-
-    loadTiposPaginaEstandar();
-  }, [paginas]);
-
-  // Organizar tipos de página por jerarquía
-  const tiposPaginaJerarquicos = useMemo(() => {
-    if (!tiposPaginaEstandar.length) return [];
-
-    // Crear un mapa de códigos a tipos
-    const mapaCodeToTipo: Record<string, any> = {};
-    tiposPaginaEstandar.forEach(tipo => {
-      mapaCodeToTipo[tipo.codigo] = {
-        ...tipo,
+    // Crear un mapa de códigos a páginas
+    const mapaCodeToPagina: Record<string, any> = {};
+    paginas.forEach(pagina => {
+      mapaCodeToPagina[pagina.tipoPagina] = {
+        ...pagina,
         hijos: []
       };
     });
@@ -185,180 +73,27 @@ export default function CrmWebPaginas() {
     // Construir jerarquía
     const raices: any[] = [];
 
-    tiposPaginaEstandar.forEach(tipo => {
-      const tipoConHijos = mapaCodeToTipo[tipo.codigo];
+    paginas.forEach(pagina => {
+      const paginaConHijos = mapaCodeToPagina[pagina.tipoPagina];
 
-      if (tipo.nivel === 0) {
-        raices.push(tipoConHijos);
+      if (pagina.orden === 0) {
+        raices.push(paginaConHijos);
       } else {
-        // Buscar padre basándose en el patrón de ruta
+        // Buscar padre basándose en el patrón de código
         // Por ejemplo: "videos-categoria" tiene padre "videos"
-        const codigoPadre = tipo.codigo.split('-')[0];
-        const padre = mapaCodeToTipo[codigoPadre];
-        if (padre) {
-          padre.hijos.push(tipoConHijos);
+        const codigoPadre = pagina.tipoPagina.split('-')[0];
+        const padre = mapaCodeToPagina[codigoPadre];
+        if (padre && padre.tipoPagina !== pagina.tipoPagina) {
+          padre.hijos.push(paginaConHijos);
         } else {
           // Si no tiene padre, es raíz
-          raices.push(tipoConHijos);
+          raices.push(paginaConHijos);
         }
       }
     });
 
     return raices;
-  }, [tiposPaginaEstandar]);
-
-  // Determinar si una página es estándar usando el campo 'origen' de la BD
-  const isPaginaEstandar = (pagina: any): boolean => {
-    // Si tiene el campo 'origen', usarlo directamente
-    if (pagina.origen) {
-      return pagina.origen === 'sistema';
-    }
-
-    // Fallback: verificar si el slug coincide con alguna ruta estándar (compatibilidad)
-    const slug = pagina.slug.replace(/^\//, ''); // Remover barra inicial
-    return RUTAS_ESTANDAR.some(rutaEst => {
-      return slug === rutaEst || slug.startsWith(`${rutaEst}/`);
-    });
-  };
-
-  // Separar páginas por tipo
-  const { paginasEstandar, paginasPersonalizadas } = useMemo(() => {
-    const estandar: PaginaWeb[] = [];
-    const personalizadas: PaginaWeb[] = [];
-
-    paginas.forEach(p => {
-      if (isPaginaEstandar(p)) {
-        estandar.push(p);
-      } else {
-        personalizadas.push(p);
-      }
-    });
-
-    return { paginasEstandar: estandar, paginasPersonalizadas: personalizadas };
   }, [paginas]);
-
-  // Organizar páginas en estructura jerárquica
-  const organizarPaginasJerarquicas = (listaPaginas: PaginaWeb[]) => {
-    const result: PaginaConHijos[] = [];
-    const mapaPorTipo = new Map<TipoPagina, PaginaWeb>();
-
-    listaPaginas.forEach(p => {
-      mapaPorTipo.set(p.tipoPagina as TipoPagina, p);
-    });
-
-    const paginasNivel0 = listaPaginas.filter(p => {
-      const tipoInfo = TIPOS_PAGINA[p.tipoPagina as TipoPagina];
-      return tipoInfo && tipoInfo.nivel === 0;
-    });
-
-    paginasNivel0.sort((a, b) => a.orden - b.orden);
-
-    paginasNivel0.forEach(padre => {
-      const tipoInfo = TIPOS_PAGINA[padre.tipoPagina as TipoPagina];
-      const paginaConHijos: PaginaConHijos = {
-        ...padre,
-        tipoInfo,
-        hijos: [],
-        esEstandar: isPaginaEstandar(padre),
-      };
-
-      Object.values(TIPOS_PAGINA).forEach(tipo => {
-        if (tipo.rutaPadre === padre.tipoPagina) {
-          const paginaHijo = listaPaginas.find(p => p.tipoPagina === tipo.codigo);
-          if (paginaHijo) {
-            const hijoConHijos: PaginaConHijos = {
-              ...paginaHijo,
-              tipoInfo: tipo,
-              hijos: [],
-              esEstandar: isPaginaEstandar(paginaHijo),
-            };
-
-            Object.values(TIPOS_PAGINA).forEach(tipoNieto => {
-              if (tipoNieto.rutaPadre === tipo.codigo) {
-                const paginaNieto = listaPaginas.find(p => p.tipoPagina === tipoNieto.codigo);
-                if (paginaNieto) {
-                  hijoConHijos.hijos.push({
-                    ...paginaNieto,
-                    tipoInfo: tipoNieto,
-                    hijos: [],
-                    esEstandar: isPaginaEstandar(paginaNieto),
-                  });
-                }
-              }
-            });
-
-            paginaConHijos.hijos.push(hijoConHijos);
-          }
-        }
-      });
-
-      result.push(paginaConHijos);
-    });
-
-    return result;
-  };
-
-  const paginasEstandarJerarquicas = useMemo(() => organizarPaginasJerarquicas(paginasEstandar), [paginasEstandar]);
-  const paginasPersonalizadasJerarquicas = useMemo(() => organizarPaginasJerarquicas(paginasPersonalizadas), [paginasPersonalizadas]);
-
-  // Abrir modal
-  const openNewModal = () => {
-    setModalStep('tipo');
-    setNewPageType('custom');
-    setSelectedPlantilla(null);
-    setNewPageTitle('');
-    setNewPageSlug('');
-    setPlantillasDisponibles([]);
-    setShowNewModal(true);
-  };
-
-  const closeModal = () => {
-    setShowNewModal(false);
-    setModalStep('tipo');
-    setNewPageType('custom');
-    setSelectedPlantilla(null);
-    setNewPageTitle('');
-    setNewPageSlug('');
-  };
-
-  const handleSelectTipo = async (tipo: TipoPagina) => {
-    setNewPageType(tipo);
-    if (!tenantActual?.id) return;
-
-    try {
-      setLoadingPlantillas(true);
-      const plantillas = await getPlantillasParaTenant(tenantActual.id, tipo);
-      setPlantillasDisponibles(plantillas);
-
-      if (plantillas.length > 0) {
-        setModalStep('plantilla');
-      } else {
-        setModalStep('detalles');
-      }
-    } catch (err) {
-      console.error('Error cargando plantillas:', err);
-      setModalStep('detalles');
-    } finally {
-      setLoadingPlantillas(false);
-    }
-  };
-
-  const handleSelectPlantilla = (plantilla: PlantillaPagina | null) => {
-    setSelectedPlantilla(plantilla);
-    setModalStep('detalles');
-  };
-
-  const handleBack = () => {
-    if (modalStep === 'detalles') {
-      if (plantillasDisponibles.length > 0) {
-        setModalStep('plantilla');
-      } else {
-        setModalStep('tipo');
-      }
-    } else if (modalStep === 'plantilla') {
-      setModalStep('tipo');
-    }
-  };
 
   const toggleGroup = (paginaId: string) => {
     setExpandedGroups(prev => {
@@ -372,201 +107,17 @@ export default function CrmWebPaginas() {
     });
   };
 
-  const togglePageStatus = async (pagina: PaginaWeb, e: React.MouseEvent) => {
-    e.stopPropagation();
-    if (!tenantActual?.id) return;
-
-    try {
-      setUpdatingStatus(pagina.id);
-      await savePagina(tenantActual.id, {
-        ...pagina,
-        activa: !pagina.activa,
-      });
-
-      setPaginas(prev =>
-        prev.map(p => (p.id === pagina.id ? { ...p, activa: !p.activa } : p))
-      );
-    } catch (err: any) {
-      console.error('Error actualizando estado:', err);
-      setError(err.message);
-    } finally {
-      setUpdatingStatus(null);
-    }
-  };
-
-  const generateSlug = (title: string) => {
-    return title
-      .toLowerCase()
-      .normalize('NFD')
-      .replace(/[\u0300-\u036f]/g, '')
-      .replace(/[^a-z0-9]+/g, '-')
-      .replace(/^-+|-+$/g, '');
-  };
-
-  const formatDate = (dateString: string) => {
-    const date = new Date(dateString);
-    return date.toLocaleDateString('es-ES', {
-      day: '2-digit',
-      month: 'short',
-      year: 'numeric',
-    });
-  };
-
-  const handleCreatePage = async () => {
-    if (!tenantActual?.id || !newPageTitle.trim()) return;
-
-    try {
-      setCreating(true);
-      const tipoPaginaInfo = TIPOS_PAGINA[newPageType];
-      const slug = tipoPaginaInfo?.requiereSlug
-        ? (newPageSlug || generateSlug(newPageTitle))
-        : generateSlug(newPageTitle);
-
-      const newPage = await savePagina(tenantActual.id, {
-        tipoPagina: newPageType,
-        titulo: newPageTitle,
-        slug,
-        descripcion: '',
-        contenido: selectedPlantilla?.configuracionDefault || {},
-        meta: {},
-        publica: true,
-        activa: true,
-        orden: paginas.length + 1,
-        plantillaId: selectedPlantilla?.id || null,
-      });
-
-      setPaginas([...paginas, newPage]);
-      closeModal();
-
-      // Cambiar a tab personalizada si es custom
-      if (newPageType === 'custom') {
-        setActiveTab('personalizadas');
-      }
-
-      navigate(`${newPage.id}`);
-    } catch (err: any) {
-      console.error('Error creando página:', err);
-      setError(err.message);
-    } finally {
-      setCreating(false);
-    }
-  };
-
-  const tiposDisponibles = useMemo(() => {
-    if (tiposPaginaDB.length > 0) {
-      return tiposPaginaDB
-        .filter(t => t.nivel === 0 && !t.esPlantilla && !t.protegida)
-        .map(t => ({
-          ...t,
-          ...(TIPOS_PAGINA[t.codigo as TipoPagina] || {}),
-          cantidadPlantillas: t.cantidadPlantillas,
-        }));
-    }
-
-    return Object.values(TIPOS_PAGINA)
-      .filter(t => t.nivel === 0 && !t.esPlantilla && !t.protegida)
-      .map(t => ({ ...t, cantidadPlantillas: 0 }));
-  }, [tiposPaginaDB]);
-
-  // Renderizar fila de página
-  // Renderizar tipo de página (para tab estándar)
-  const renderTipoPaginaRow = (tipo: any, nivel: number = 0) => {
-    const tieneHijos = tipo.hijos && tipo.hijos.length > 0;
-    const isExpanded = expandedGroups.has(tipo.codigo);
-
-    return (
-      <div key={tipo.codigo} className="pagina-group">
-        <div
-          className={`pagina-row tipo-row nivel-${nivel} ${tieneHijos ? 'tiene-hijos' : ''}`}
-          onClick={() => tieneHijos ? toggleGroup(tipo.codigo) : navigate(`/crm/${tenantActual?.slug}/${tipo.codigo}`)}
-        >
-          <div className="col-expand">
-            {tieneHijos && (
-              <button
-                className={`btn-expand ${isExpanded ? 'expanded' : ''}`}
-                onClick={(e) => {
-                  e.stopPropagation();
-                  toggleGroup(tipo.codigo);
-                }}
-              >
-                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-                  <polyline points="9 18 15 12 9 6"/>
-                </svg>
-              </button>
-            )}
-          </div>
-
-          <div className="col-nombre">
-            <div className="pagina-nombre-group">
-              <span className="pagina-nombre">{tipo.nombre}</span>
-              <span className="pagina-tipo">Tipo de Página del Sistema</span>
-            </div>
-          </div>
-
-          <div className="col-url">
-            <span className="pagina-url">
-              {tipo.ruta_patron || '/'}
-            </span>
-          </div>
-
-          <div className="col-nivel">
-            <span className="badge">Nivel {tipo.nivel}</span>
-          </div>
-
-          <div className="col-estado">
-            <div className="status-badges">
-              {tipo.visible && (
-                <span className="badge badge-success">Visible</span>
-              )}
-              {tipo.publico && (
-                <span className="badge badge-info">Público</span>
-              )}
-              {!tipo.visible && (
-                <span className="badge badge-gray">Oculto</span>
-              )}
-              {!tipo.publico && (
-                <span className="badge badge-warning">Privado</span>
-              )}
-            </div>
-          </div>
-
-          <div className="col-acciones">
-            <button
-              className="btn-icon"
-              onClick={(e) => {
-                e.stopPropagation();
-                navigate(`/crm/${tenantActual?.slug}/${tipo.codigo}`);
-              }}
-              title="Ver detalles"
-            >
-              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-                <path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/>
-                <circle cx="12" cy="12" r="3"/>
-              </svg>
-            </button>
-          </div>
-        </div>
-
-        {tieneHijos && isExpanded && (
-          <div className="pagina-hijos">
-            {tipo.hijos.map((hijo: any) => renderTipoPaginaRow(hijo, nivel + 1))}
-          </div>
-        )}
-      </div>
-    );
-  };
-
-  // Renderizar página (para tab personalizada)
-  const renderPaginaRow = (pagina: PaginaConHijos, nivel: number = 0) => {
-    const tieneHijos = pagina.hijos.length > 0;
-    const isExpanded = expandedGroups.has(pagina.id);
-    const isUpdating = updatingStatus === pagina.id;
+  // Renderizar fila de página (tipos_pagina del sistema)
+  const renderPaginaTipoRow = (pagina: any, nivel: number = 0) => {
+    const tieneHijos = pagina.hijos && pagina.hijos.length > 0;
+    const isExpanded = expandedGroups.has(pagina.tipoPagina);
+    const cantidadComponentes = pagina.cantidadComponentes || 0;
 
     return (
       <div key={pagina.id} className="pagina-group">
         <div
-          className={`pagina-row nivel-${nivel} ${tieneHijos ? 'tiene-hijos' : ''}`}
-          onClick={() => tieneHijos ? toggleGroup(pagina.id) : navigate(`${pagina.id}`)}
+          className={`pagina-row tipo-row nivel-${nivel} ${tieneHijos ? 'tiene-hijos' : ''}`}
+          onClick={() => tieneHijos ? toggleGroup(pagina.tipoPagina) : navigate(`/crm/${tenantActual?.slug}/web/paginas/${pagina.id}`)}
         >
           <div className="col-expand">
             {tieneHijos && (
@@ -574,7 +125,7 @@ export default function CrmWebPaginas() {
                 className={`btn-expand ${isExpanded ? 'expanded' : ''}`}
                 onClick={(e) => {
                   e.stopPropagation();
-                  toggleGroup(pagina.id);
+                  toggleGroup(pagina.tipoPagina);
                 }}
               >
                 <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
@@ -587,44 +138,47 @@ export default function CrmWebPaginas() {
           <div className="col-nombre">
             <div className="pagina-nombre-group">
               <span className="pagina-nombre">{pagina.titulo}</span>
-              <span className="pagina-tipo">{pagina.tipoInfo.nombre}</span>
+              <span className="pagina-tipo">{pagina.tipoPagina}</span>
             </div>
           </div>
 
           <div className="col-url">
             <span className="pagina-url">
-              {pagina.tipoInfo.esPlantilla
-                ? pagina.tipoInfo.rutaPatron
-                : pagina.slug.startsWith('/') ? pagina.slug : `/${pagina.slug}`}
+              {pagina.slug || '/'}
             </span>
           </div>
 
-          <div className="col-fecha">
-            <span className="pagina-fecha">{formatDate(pagina.createdAt)}</span>
+          <div className="col-componentes">
+            <span className={`badge ${cantidadComponentes > 0 ? 'badge-success' : 'badge-gray'}`}>
+              {cantidadComponentes} componente{cantidadComponentes !== 1 ? 's' : ''}
+            </span>
           </div>
 
           <div className="col-estado">
-            <button
-              className={`btn-toggle ${pagina.activa ? 'activa' : 'inactiva'} ${isUpdating ? 'updating' : ''}`}
-              onClick={(e) => togglePageStatus(pagina, e)}
-              disabled={isUpdating || pagina.tipoInfo.protegida}
-              title={pagina.tipoInfo.protegida ? 'Página protegida - no se puede desactivar' : (pagina.activa ? 'Desactivar' : 'Activar')}
-            >
-              <span className="toggle-track">
-                <span className="toggle-thumb"/>
-              </span>
-              <span className="toggle-label">{pagina.activa ? 'Activa' : 'Inactiva'}</span>
-            </button>
+            <div className="status-badges">
+              {pagina.activa && (
+                <span className="badge badge-success">Visible</span>
+              )}
+              {pagina.publica && (
+                <span className="badge badge-info">Público</span>
+              )}
+              {!pagina.activa && (
+                <span className="badge badge-gray">Oculto</span>
+              )}
+              {!pagina.publica && (
+                <span className="badge badge-warning">Privado</span>
+              )}
+            </div>
           </div>
 
           <div className="col-acciones">
             <button
-              className="btn-editar"
+              className="btn-icon"
               onClick={(e) => {
                 e.stopPropagation();
-                navigate(`${pagina.id}`);
+                navigate(`/crm/${tenantActual?.slug}/web/paginas/${pagina.id}`);
               }}
-              title="Editar página"
+              title="Editar componentes"
             >
               <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
                 <path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/>
@@ -636,264 +190,11 @@ export default function CrmWebPaginas() {
 
         {tieneHijos && isExpanded && (
           <div className="pagina-hijos">
-            {pagina.hijos.map(hijo => renderPaginaRow(hijo, nivel + 1))}
+            {pagina.hijos.map((hijo: any) => renderPaginaTipoRow(hijo, nivel + 1))}
           </div>
         )}
       </div>
     );
-  };
-
-  // Renderizar contenido del modal
-  const renderModalContent = () => {
-    switch (modalStep) {
-      case 'tipo':
-        return (
-          <>
-            <div className="modal-header">
-              <div>
-                <h2>Crear Nueva Página</h2>
-                <p className="modal-subtitle">Paso 1: Selecciona el tipo de página</p>
-              </div>
-              <button className="modal-close" onClick={closeModal}>×</button>
-            </div>
-
-            <div className="modal-body">
-              <div className="form-section">
-                <label className="form-label">Tipo de Página</label>
-                <p className="form-help">Selecciona el tipo de contenido que tendrá tu página</p>
-
-                <div className="tipo-grid">
-                  {tiposDisponibles.map((tipo) => (
-                    <button
-                      key={tipo.codigo}
-                      type="button"
-                      className={`tipo-card ${newPageType === tipo.codigo ? 'selected' : ''}`}
-                      onClick={() => handleSelectTipo(tipo.codigo as TipoPagina)}
-                      disabled={loadingPlantillas}
-                    >
-                      <div className="tipo-card-icon" style={{ backgroundColor: tipo.color || '#6366f1' }}>
-                        {tipo.icono || '📄'}
-                      </div>
-                      <div className="tipo-card-content">
-                        <span className="tipo-card-name">{tipo.nombre}</span>
-                        <span className="tipo-card-desc">{tipo.descripcion}</span>
-                        {tipo.cantidadPlantillas > 0 && (
-                          <span className="tipo-card-badge">{tipo.cantidadPlantillas} plantillas</span>
-                        )}
-                      </div>
-                      {loadingPlantillas && newPageType === tipo.codigo && (
-                        <div className="tipo-card-loading">
-                          <div className="mini-spinner" />
-                        </div>
-                      )}
-                    </button>
-                  ))}
-
-                  <button
-                    type="button"
-                    className={`tipo-card ${newPageType === 'custom' ? 'selected' : ''}`}
-                    onClick={() => handleSelectTipo('custom')}
-                    disabled={loadingPlantillas}
-                  >
-                    <div className="tipo-card-icon" style={{ backgroundColor: TIPOS_PAGINA.custom?.color || '#805ad5' }}>
-                      {TIPOS_PAGINA.custom?.icono || '✨'}
-                    </div>
-                    <div className="tipo-card-content">
-                      <span className="tipo-card-name">{TIPOS_PAGINA.custom?.nombre || 'Personalizada'}</span>
-                      <span className="tipo-card-desc">Crea una página desde cero con diseño libre</span>
-                    </div>
-                  </button>
-                </div>
-              </div>
-            </div>
-          </>
-        );
-
-      case 'plantilla':
-        return (
-          <>
-            <div className="modal-header">
-              <div>
-                <h2>Elegir Plantilla</h2>
-                <p className="modal-subtitle">Paso 2: Selecciona una plantilla para {TIPOS_PAGINA[newPageType]?.nombre || newPageType}</p>
-              </div>
-              <button className="modal-close" onClick={closeModal}>×</button>
-            </div>
-
-            <div className="modal-body">
-              <div className="form-section">
-                <label className="form-label">Plantillas Disponibles</label>
-                <p className="form-help">Elige una plantilla prediseñada o empieza desde cero</p>
-
-                <div className="plantilla-grid">
-                  <button
-                    type="button"
-                    className={`plantilla-card ${!selectedPlantilla ? 'selected' : ''}`}
-                    onClick={() => handleSelectPlantilla(null)}
-                  >
-                    <div className="plantilla-preview plantilla-blank">
-                      <svg width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5">
-                        <rect x="3" y="3" width="18" height="18" rx="2"/>
-                        <line x1="12" y1="8" x2="12" y2="16"/>
-                        <line x1="8" y1="12" x2="16" y2="12"/>
-                      </svg>
-                    </div>
-                    <div className="plantilla-info">
-                      <span className="plantilla-name">Desde cero</span>
-                      <span className="plantilla-desc">Diseño completamente personalizado</span>
-                    </div>
-                    {!selectedPlantilla && (
-                      <div className="plantilla-check">
-                        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3">
-                          <polyline points="20 6 9 17 4 12"/>
-                        </svg>
-                      </div>
-                    )}
-                  </button>
-
-                  {plantillasDisponibles.map((plantilla) => (
-                    <button
-                      key={plantilla.id}
-                      type="button"
-                      className={`plantilla-card ${selectedPlantilla?.id === plantilla.id ? 'selected' : ''} ${plantilla.esPremium ? 'premium' : ''}`}
-                      onClick={() => handleSelectPlantilla(plantilla)}
-                    >
-                      <div className="plantilla-preview">
-                        {plantilla.previewImage ? (
-                          <img src={plantilla.previewImage} alt={plantilla.nombre} />
-                        ) : (
-                          <div className="plantilla-placeholder" style={{ background: `linear-gradient(135deg, ${TIPOS_PAGINA[newPageType]?.color || '#6366f1'}22, ${TIPOS_PAGINA[newPageType]?.color || '#6366f1'}44)` }}>
-                            <span>{plantilla.nombre.charAt(0)}</span>
-                          </div>
-                        )}
-                        {plantilla.featured && (
-                          <span className="plantilla-featured-badge">Destacada</span>
-                        )}
-                        {plantilla.esPremium && (
-                          <span className="plantilla-premium-badge">Premium</span>
-                        )}
-                      </div>
-                      <div className="plantilla-info">
-                        <span className="plantilla-name">{plantilla.nombre}</span>
-                        <span className="plantilla-desc">{plantilla.descripcion || plantilla.categoria}</span>
-                      </div>
-                      {selectedPlantilla?.id === plantilla.id && (
-                        <div className="plantilla-check">
-                          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3">
-                            <polyline points="20 6 9 17 4 12"/>
-                          </svg>
-                        </div>
-                      )}
-                    </button>
-                  ))}
-                </div>
-              </div>
-            </div>
-
-            <div className="modal-footer">
-              <button className="btn-secondary" onClick={handleBack}>
-                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-                  <polyline points="15 18 9 12 15 6"/>
-                </svg>
-                Volver
-              </button>
-              <button className="btn-primary" onClick={() => setModalStep('detalles')}>
-                Continuar
-                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-                  <polyline points="9 18 15 12 9 6"/>
-                </svg>
-              </button>
-            </div>
-          </>
-        );
-
-      case 'detalles':
-        const tipoInfo = TIPOS_PAGINA[newPageType];
-        return (
-          <>
-            <div className="modal-header">
-              <div>
-                <h2>Detalles de la Página</h2>
-                <p className="modal-subtitle">Paso final: Configura los detalles básicos</p>
-              </div>
-              <button className="modal-close" onClick={closeModal}>×</button>
-            </div>
-
-            <div className="modal-body">
-              <div className="selection-summary">
-                <div className="summary-item">
-                  <span className="summary-label">Tipo:</span>
-                  <span className="summary-value">
-                    <span className="summary-icon" style={{ backgroundColor: tipoInfo?.color || '#6366f1' }}>
-                      {tipoInfo?.icono || '📄'}
-                    </span>
-                    {tipoInfo?.nombre || newPageType}
-                  </span>
-                </div>
-                {selectedPlantilla && (
-                  <div className="summary-item">
-                    <span className="summary-label">Plantilla:</span>
-                    <span className="summary-value">{selectedPlantilla.nombre}</span>
-                  </div>
-                )}
-              </div>
-
-              <div className="form-row">
-                <div className="form-group flex-1">
-                  <label htmlFor="titulo" className="form-label">Título de la Página *</label>
-                  <input
-                    id="titulo"
-                    type="text"
-                    className="form-input"
-                    value={newPageTitle}
-                    onChange={(e) => {
-                      setNewPageTitle(e.target.value);
-                      if (!newPageSlug) {
-                        setNewPageSlug(generateSlug(e.target.value));
-                      }
-                    }}
-                    placeholder="Ej: Sobre Nosotros, Nuestro Equipo..."
-                    autoFocus
-                  />
-                </div>
-              </div>
-
-              {tipoInfo?.requiereSlug && (
-                <div className="form-group">
-                  <label htmlFor="slug" className="form-label">URL de la Página</label>
-                  <div className="input-with-prefix">
-                    <span className="input-prefix">/</span>
-                    <input
-                      id="slug"
-                      type="text"
-                      className="form-input"
-                      value={newPageSlug}
-                      onChange={(e) => setNewPageSlug(generateSlug(e.target.value))}
-                      placeholder="sobre-nosotros"
-                    />
-                  </div>
-                </div>
-              )}
-            </div>
-
-            <div className="modal-footer">
-              <button className="btn-secondary" onClick={handleBack}>
-                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-                  <polyline points="15 18 9 12 15 6"/>
-                </svg>
-                Volver
-              </button>
-              <button
-                className="btn-primary"
-                onClick={handleCreatePage}
-                disabled={!newPageTitle.trim() || creating}
-              >
-                {creating ? 'Creando...' : 'Crear Página'}
-              </button>
-            </div>
-          </>
-        );
-    }
   };
 
   if (loading) {
@@ -915,116 +216,37 @@ export default function CrmWebPaginas() {
         </div>
       )}
 
-      {/* Tabs */}
-      <div className="tabs-container">
-        <button
-          className={`tab ${activeTab === 'estandar' ? 'active' : ''}`}
-          onClick={() => setActiveTab('estandar')}
-        >
-          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-            <rect x="3" y="3" width="7" height="7"/>
-            <rect x="14" y="3" width="7" height="7"/>
-            <rect x="14" y="14" width="7" height="7"/>
-            <rect x="3" y="14" width="7" height="7"/>
-          </svg>
-          <span>Páginas Estándar</span>
-          <span className="tab-badge">{tiposPaginaEstandar.length}</span>
-        </button>
-        <button
-          className={`tab ${activeTab === 'personalizadas' ? 'active' : ''}`}
-          onClick={() => setActiveTab('personalizadas')}
-        >
-          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-            <path d="M12 2l3.09 6.26L22 9.27l-5 4.87 1.18 6.88L12 17.77l-6.18 3.25L7 14.14 2 9.27l6.91-1.01L12 2z"/>
-          </svg>
-          <span>Páginas Personalizadas</span>
-          <span className="tab-badge tab-badge-custom">{paginasPersonalizadas.length}</span>
-        </button>
-      </div>
-
-      {/* Contenido del tab activo */}
+      {/* Contenido - Lista de tipos de página del sistema */}
       <div className="tab-content">
-        {activeTab === 'estandar' ? (
-          <>
-            {loadingTipos ? (
-              <div className="loading-state">
-                <p>Cargando tipos de página...</p>
-              </div>
-            ) : tiposPaginaEstandar.length === 0 ? (
-              <div className="empty-state">
-                <div className="empty-icon">
-                  <svg width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5">
-                    <rect x="3" y="3" width="7" height="7"/>
-                    <rect x="14" y="3" width="7" height="7"/>
-                    <rect x="14" y="14" width="7" height="7"/>
-                    <rect x="3" y="14" width="7" height="7"/>
-                  </svg>
-                </div>
-                <h3>No hay tipos de página registrados</h3>
-                <p>Los tipos de página del sistema aparecerán aquí</p>
-              </div>
-            ) : (
-              <div className="paginas-table">
-                <div className="table-header">
-                  <div className="col-expand"/>
-                  <div className="col-nombre">Nombre</div>
-                  <div className="col-url">Ruta Patrón</div>
-                  <div className="col-nivel">Nivel</div>
-                  <div className="col-estado">Estado</div>
-                  <div className="col-acciones"/>
-                </div>
-                <div className="table-body">
-                  {tiposPaginaJerarquicos.map(tipo => renderTipoPaginaRow(tipo))}
-                </div>
-              </div>
-            )}
-          </>
+        {paginas.length === 0 ? (
+          <div className="empty-state">
+            <div className="empty-icon">
+              <svg width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5">
+                <rect x="3" y="3" width="7" height="7"/>
+                <rect x="14" y="3" width="7" height="7"/>
+                <rect x="14" y="14" width="7" height="7"/>
+                <rect x="3" y="14" width="7" height="7"/>
+              </svg>
+            </div>
+            <h3>No hay tipos de página registrados</h3>
+            <p>Los tipos de página del sistema aparecerán aquí</p>
+          </div>
         ) : (
-          <>
-            {paginasPersonalizadasJerarquicas.length === 0 ? (
-              <div className="empty-state empty-state-custom">
-                <div className="empty-icon">
-                  <svg width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5">
-                    <path d="M12 2l3.09 6.26L22 9.27l-5 4.87 1.18 6.88L12 17.77l-6.18 3.25L7 14.14 2 9.27l6.91-1.01L12 2z"/>
-                  </svg>
-                </div>
-                <h3>Crea tu primera página personalizada</h3>
-                <p>Las páginas personalizadas te permiten crear contenido único sin límites. Landing pages, promociones especiales, lo que necesites.</p>
-                <button className="btn-primary" onClick={openNewModal}>
-                  <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-                    <line x1="12" y1="5" x2="12" y2="19"/>
-                    <line x1="5" y1="12" x2="19" y2="12"/>
-                  </svg>
-                  Crear Página Personalizada
-                </button>
-              </div>
-            ) : (
-              <div className="paginas-table">
-                <div className="table-header">
-                  <div className="col-expand"/>
-                  <div className="col-nombre">Página</div>
-                  <div className="col-url">URL</div>
-                  <div className="col-fecha">Fecha</div>
-                  <div className="col-estado">Estado</div>
-                  <div className="col-acciones"/>
-                </div>
-                <div className="table-body">
-                  {paginasPersonalizadasJerarquicas.map(pagina => renderPaginaRow(pagina))}
-                </div>
-              </div>
-            )}
-          </>
+          <div className="paginas-table">
+            <div className="table-header">
+              <div className="col-expand"/>
+              <div className="col-nombre">Nombre</div>
+              <div className="col-url">Ruta</div>
+              <div className="col-componentes">Componentes</div>
+              <div className="col-estado">Estado</div>
+              <div className="col-acciones"/>
+            </div>
+            <div className="table-body">
+              {paginasJerarquicas.map(pagina => renderPaginaTipoRow(pagina))}
+            </div>
+          </div>
         )}
       </div>
-
-      {/* Modal Nueva Página */}
-      {showNewModal && (
-        <div className="modal-overlay" onClick={closeModal}>
-          <div className="modal modal-large" onClick={(e) => e.stopPropagation()}>
-            {renderModalContent()}
-          </div>
-        </div>
-      )}
 
       <style>{styles}</style>
     </div>
@@ -1355,6 +577,7 @@ const styles = `
   .col-url { flex: 1.5; min-width: 160px; }
   .col-fecha { width: 110px; flex-shrink: 0; }
   .col-nivel { width: 100px; flex-shrink: 0; }
+  .col-componentes { width: 130px; flex-shrink: 0; }
   .col-estado { width: 180px; flex-shrink: 0; }
   .col-acciones { width: 60px; flex-shrink: 0; display: flex; justify-content: flex-end; }
 

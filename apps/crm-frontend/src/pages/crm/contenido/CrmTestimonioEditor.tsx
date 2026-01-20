@@ -93,6 +93,7 @@ export default function CrmTestimonioEditor() {
   // Idioma activo para traducciones
   const [idiomaActivo, setIdiomaActivo] = useState('es');
 
+  // Inicializar con strings vacíos para evitar warning de controlled/uncontrolled
   const [formData, setFormData] = useState({
     slug: '',
     idioma: 'es',
@@ -166,25 +167,27 @@ export default function CrmTestimonioEditor() {
 
       if (isEditing && id) {
         const testimonio = await getTestimonio(tenantActual.id, id);
+        // Mapear campos soportando tanto snake_case (API) como camelCase
+        const t = testimonio as any;
         setFormData({
-          slug: testimonio.slug,
-          idioma: testimonio.idioma,
-          clienteNombre: testimonio.clienteNombre,
-          clienteCargo: testimonio.clienteCargo || '',
-          clienteEmpresa: testimonio.clienteEmpresa || '',
-          clienteFoto: testimonio.clienteFoto || '',
-          clienteUbicacion: testimonio.clienteUbicacion || '',
-          titulo: testimonio.titulo || '',
-          contenido: testimonio.contenido,
-          categoriaId: testimonio.categoriaId || '',
-          rating: testimonio.rating,
-          publicado: testimonio.publicado,
-          destacado: testimonio.destacado,
-          verificado: testimonio.verificado,
-          fuente: testimonio.fuente || '',
-          contactoId: testimonio.contactoId || '',
-          asesorId: testimonio.asesorId || '',
-          propiedadId: testimonio.propiedadId || '',
+          slug: t.slug ?? '',
+          idioma: t.idioma ?? 'es',
+          clienteNombre: t.cliente_nombre || t.clienteNombre || '',
+          clienteCargo: t.cliente_cargo || t.clienteCargo || '',
+          clienteEmpresa: t.cliente_empresa || t.clienteEmpresa || '',
+          clienteFoto: t.cliente_foto || t.clienteFoto || '',
+          clienteUbicacion: t.cliente_ubicacion || t.clienteUbicacion || '',
+          titulo: t.titulo ?? '',
+          contenido: t.contenido ?? '',
+          categoriaId: t.categoria_id || t.categoriaId || '',
+          rating: t.rating ?? 5,
+          publicado: t.publicado ?? true,
+          destacado: t.destacado ?? false,
+          verificado: t.verificado ?? false,
+          fuente: t.fuente ?? '',
+          contactoId: t.contacto_id || t.contactoId || '',
+          asesorId: t.asesor_id || t.asesorId || '',
+          propiedadId: t.propiedad_id || t.propiedadId || '',
         });
         // Cargar traducciones existentes
         if (testimonio.traducciones) {
@@ -278,11 +281,25 @@ export default function CrmTestimonioEditor() {
       setSaving(true);
       setError(null);
 
-      // Limpiar traducciones vacías
+      // Helper para verificar si un HTML de ReactQuill tiene contenido real
+      const tieneContenidoReal = (html: string | undefined): boolean => {
+        if (!html) return false;
+        // Remover tags HTML y espacios para ver si hay texto real
+        const textoLimpio = html.replace(/<[^>]*>/g, '').replace(/&nbsp;/g, ' ').trim();
+        return textoLimpio.length > 0;
+      };
+
+      // Limpiar traducciones vacías (verificar contenido real, no solo tags HTML vacíos)
       const traduccionesLimpias: Traducciones = {};
       Object.entries(traducciones).forEach(([idioma, contenido]) => {
-        if (contenido.titulo || contenido.contenido) {
-          traduccionesLimpias[idioma] = contenido;
+        const tieneTitulo = contenido.titulo && contenido.titulo.trim().length > 0;
+        const tieneContenido = tieneContenidoReal(contenido.contenido);
+        if (tieneTitulo || tieneContenido) {
+          // Solo incluir campos con contenido real
+          traduccionesLimpias[idioma] = {
+            ...(tieneTitulo ? { titulo: contenido.titulo } : {}),
+            ...(tieneContenido ? { contenido: contenido.contenido } : {}),
+          };
         }
       });
 
@@ -365,6 +382,7 @@ export default function CrmTestimonioEditor() {
           border: 1px solid #e2e8f0;
           border-radius: 12px;
           padding: 20px;
+          overflow: visible;
         }
 
         .editor-section h4 {

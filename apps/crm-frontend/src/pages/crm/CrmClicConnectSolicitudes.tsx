@@ -325,7 +325,7 @@ export default function CrmClicConnectSolicitudes() {
       setLoading(true);
       setError(null);
       const token = await getToken();
-      const data = await getJoinRequests(tenantActual.id, token || undefined);
+      const data = await getJoinRequests(tenantActual.id, undefined, token);
       setRequests(data);
     } catch (err: any) {
       setError(err.message || 'Error al cargar solicitudes');
@@ -674,6 +674,7 @@ export default function CrmClicConnectSolicitudes() {
     </div>
   );
 }
+
 
 
 

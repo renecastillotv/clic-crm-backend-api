@@ -1,0 +1,701 @@
+/**
+ * CrmMarketingApiConfig - Configuración de APIs de Marketing
+ *
+ * Página para conectar y gestionar las integraciones de APIs externas:
+ * - Google (Search Console, Ads)
+ * - Meta (Facebook, Instagram, Ads)
+ * - Email (Mailchimp, SendGrid, SMTP)
+ */
+
+import React, { useEffect, useState } from 'react';
+import { useNavigate } from 'react-router-dom';
+import { usePageHeader } from '../../layouts/CrmLayout';
+import { useAuth } from '../../contexts/AuthContext';
+import { apiFetch } from '../../services/api';
+import {
+  ArrowLeft,
+  Link as LinkIcon,
+  CheckCircle,
+  XCircle,
+  ExternalLink,
+  RefreshCw,
+  Shield,
+  AlertTriangle,
+  Mail,
+  Instagram,
+  Facebook,
+  Search,
+  Megaphone,
+  ChevronRight,
+  Loader2,
+  Info,
+  Settings,
+  User,
+  Building,
+} from 'lucide-react';
+
+// Interfaz para las credenciales del tenant
+interface TenantApiCredentials {
+  id: string;
+  tenantId: string;
+  googleSearchConsoleConnected: boolean;
+  googleSearchConsoleSiteUrl?: string;
+  googleAdsConnected: boolean;
+  googleAdsCustomerId?: string;
+  metaConnected: boolean;
+  metaPageId?: string;
+  metaPageName?: string;
+  metaInstagramBusinessAccountId?: string;
+  metaInstagramUsername?: string;
+  metaAdsConnected: boolean;
+  metaAdAccountId?: string;
+  emailProvider: 'mailchimp' | 'sendgrid' | 'mailjet' | 'ses' | 'smtp' | 'none';
+  emailConnected: boolean;
+  emailSenderName?: string;
+  emailSenderEmail?: string;
+}
+
+// Componente de tarjeta de integración
+interface IntegrationCardProps {
+  icon: React.ReactNode;
+  name: string;
+  description: string;
+  connected: boolean;
+  connectionInfo?: string;
+  color: string;
+  onConnect: () => void;
+  onDisconnect: () => void;
+  loading?: boolean;
+}
+
+const IntegrationCard: React.FC<IntegrationCardProps> = ({
+  icon,
+  name,
+  description,
+  connected,
+  connectionInfo,
+  color,
+  onConnect,
+  onDisconnect,
+  loading,
+}) => (
+  <div
+    style={{
+      background: 'white',
+      borderRadius: '16px',
+      border: connected ? `2px solid ${color}` : '1px solid #e2e8f0',
+      overflow: 'hidden',
+    }}
+  >
+    {/* Header */}
+    <div
+      style={{
+        padding: '20px 24px',
+        display: 'flex',
+        alignItems: 'center',
+        gap: '16px',
+        borderBottom: '1px solid #f1f5f9',
+      }}
+    >
+      <div
+        style={{
+          width: '52px',
+          height: '52px',
+          borderRadius: '14px',
+          background: connected ? `${color}15` : '#f8fafc',
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'center',
+          color: connected ? color : '#94a3b8',
+        }}
+      >
+        {icon}
+      </div>
+      <div style={{ flex: 1 }}>
+        <h3 style={{ fontSize: '16px', fontWeight: 600, color: '#1e293b', margin: 0 }}>
+          {name}
+        </h3>
+        <p style={{ fontSize: '13px', color: '#64748b', margin: '4px 0 0 0' }}>
+          {description}
+        </p>
+      </div>
+      {/* Status badge */}
+      <div
+        style={{
+          display: 'flex',
+          alignItems: 'center',
+          gap: '6px',
+          padding: '6px 12px',
+          borderRadius: '20px',
+          background: connected ? '#dcfce7' : '#f1f5f9',
+          color: connected ? '#16a34a' : '#64748b',
+          fontSize: '12px',
+          fontWeight: 600,
+        }}
+      >
+        {connected ? <CheckCircle size={14} /> : <XCircle size={14} />}
+        {connected ? 'Conectado' : 'No conectado'}
+      </div>
+    </div>
+
+    {/* Connection info */}
+    {connected && connectionInfo && (
+      <div
+        style={{
+          padding: '12px 24px',
+          background: '#f8fafc',
+          borderBottom: '1px solid #f1f5f9',
+          display: 'flex',
+          alignItems: 'center',
+          gap: '8px',
+        }}
+      >
+        <Info size={14} color="#64748b" />
+        <span style={{ fontSize: '13px', color: '#64748b' }}>{connectionInfo}</span>
+      </div>
+    )}
+
+    {/* Actions */}
+    <div
+      style={{
+        padding: '16px 24px',
+        display: 'flex',
+        alignItems: 'center',
+        justifyContent: 'space-between',
+      }}
+    >
+      {loading ? (
+        <div style={{ display: 'flex', alignItems: 'center', gap: '8px', color: '#64748b' }}>
+          <Loader2 size={16} className="animate-spin" style={{ animation: 'spin 1s linear infinite' }} />
+          <span style={{ fontSize: '13px' }}>Procesando...</span>
+        </div>
+      ) : connected ? (
+        <>
+          <button
+            onClick={onDisconnect}
+            style={{
+              display: 'flex',
+              alignItems: 'center',
+              gap: '6px',
+              padding: '8px 16px',
+              background: '#fef2f2',
+              color: '#ef4444',
+              border: 'none',
+              borderRadius: '8px',
+              fontSize: '13px',
+              fontWeight: 500,
+              cursor: 'pointer',
+            }}
+          >
+            <XCircle size={16} />
+            Desconectar
+          </button>
+          <button
+            onClick={onConnect}
+            style={{
+              display: 'flex',
+              alignItems: 'center',
+              gap: '6px',
+              padding: '8px 16px',
+              background: '#f1f5f9',
+              color: '#64748b',
+              border: 'none',
+              borderRadius: '8px',
+              fontSize: '13px',
+              fontWeight: 500,
+              cursor: 'pointer',
+            }}
+          >
+            <RefreshCw size={16} />
+            Reconectar
+          </button>
+        </>
+      ) : (
+        <button
+          onClick={onConnect}
+          style={{
+            display: 'flex',
+            alignItems: 'center',
+            gap: '6px',
+            padding: '10px 20px',
+            background: `linear-gradient(135deg, ${color} 0%, ${color}dd 100%)`,
+            color: 'white',
+            border: 'none',
+            borderRadius: '10px',
+            fontSize: '14px',
+            fontWeight: 600,
+            cursor: 'pointer',
+          }}
+        >
+          <LinkIcon size={16} />
+          Conectar
+          <ChevronRight size={16} />
+        </button>
+      )}
+    </div>
+  </div>
+);
+
+// Sección de integraciones
+interface SectionProps {
+  title: string;
+  subtitle: string;
+  icon: React.ReactNode;
+  color: string;
+  children: React.ReactNode;
+}
+
+const Section: React.FC<SectionProps> = ({ title, subtitle, icon, color, children }) => (
+  <div style={{ marginBottom: '40px' }}>
+    <div
+      style={{
+        display: 'flex',
+        alignItems: 'center',
+        gap: '12px',
+        marginBottom: '20px',
+      }}
+    >
+      <div
+        style={{
+          width: '44px',
+          height: '44px',
+          borderRadius: '12px',
+          background: `${color}15`,
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'center',
+          color: color,
+        }}
+      >
+        {icon}
+      </div>
+      <div>
+        <h2 style={{ fontSize: '18px', fontWeight: 700, color: '#1e293b', margin: 0 }}>
+          {title}
+        </h2>
+        <p style={{ fontSize: '13px', color: '#64748b', margin: 0 }}>{subtitle}</p>
+      </div>
+    </div>
+    <div style={{ display: 'grid', gap: '16px' }}>{children}</div>
+  </div>
+);
+
+const CrmMarketingApiConfig: React.FC = () => {
+  const navigate = useNavigate();
+  const { setPageHeader } = usePageHeader();
+  const { tenantActual } = useAuth();
+  const [credentials, setCredentials] = useState<TenantApiCredentials | null>(null);
+  const [loading, setLoading] = useState(true);
+  const [actionLoading, setActionLoading] = useState<string | null>(null);
+
+  useEffect(() => {
+    setPageHeader({
+      title: 'Configuración de APIs',
+      subtitle: 'Conecta tus cuentas de Google, Meta y email marketing',
+    });
+  }, [setPageHeader]);
+
+  // Cargar credenciales del tenant
+  useEffect(() => {
+    const fetchCredentials = async () => {
+      if (!tenantActual?.id) return;
+
+      try {
+        const data = await apiFetch(`/tenants/${tenantActual.id}/api-credentials`);
+        setCredentials(data);
+      } catch (error) {
+        console.error('Error fetching API credentials:', error);
+        // Si no hay credenciales, establecer estado vacío
+        setCredentials(null);
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    fetchCredentials();
+  }, [tenantActual?.id]);
+
+  // Handlers de conexión (estos abrirán modales o flujos OAuth)
+  const handleConnectGoogleSearchConsole = () => {
+    setActionLoading('google-search-console');
+    // TODO: Implementar flujo OAuth de Google
+    // Por ahora, simular con un alert
+    alert('El flujo de OAuth de Google Search Console se implementará próximamente.\n\nNecesitarás:\n1. Un proyecto en Google Cloud Console\n2. Search Console API habilitada\n3. Credenciales OAuth 2.0');
+    setActionLoading(null);
+  };
+
+  const handleDisconnectGoogleSearchConsole = async () => {
+    if (!tenantActual?.id) return;
+    if (!confirm('¿Estás seguro de desconectar Google Search Console?')) return;
+
+    setActionLoading('google-search-console');
+    try {
+      await apiFetch(`/tenants/${tenantActual.id}/api-credentials/google-search-console`, { method: 'DELETE' });
+      setCredentials(prev => prev ? { ...prev, googleSearchConsoleConnected: false, googleSearchConsoleSiteUrl: undefined } : null);
+    } catch (error) {
+      console.error('Error disconnecting:', error);
+      alert('Error al desconectar Google Search Console');
+    } finally {
+      setActionLoading(null);
+    }
+  };
+
+  const handleConnectGoogleAds = () => {
+    setActionLoading('google-ads');
+    alert('El flujo de OAuth de Google Ads se implementará próximamente.\n\nNecesitarás:\n1. Una cuenta de Google Ads\n2. Developer Token de Google Ads API\n3. OAuth 2.0 configurado');
+    setActionLoading(null);
+  };
+
+  const handleDisconnectGoogleAds = async () => {
+    if (!tenantActual?.id) return;
+    if (!confirm('¿Estás seguro de desconectar Google Ads?')) return;
+
+    setActionLoading('google-ads');
+    try {
+      await apiFetch(`/tenants/${tenantActual.id}/api-credentials/google-ads`, { method: 'DELETE' });
+      setCredentials(prev => prev ? { ...prev, googleAdsConnected: false, googleAdsCustomerId: undefined } : null);
+    } catch (error) {
+      console.error('Error disconnecting:', error);
+      alert('Error al desconectar Google Ads');
+    } finally {
+      setActionLoading(null);
+    }
+  };
+
+  const handleConnectMeta = () => {
+    setActionLoading('meta');
+    alert('El flujo de OAuth de Meta se implementará próximamente.\n\nNecesitarás:\n1. Una cuenta de Facebook Business\n2. Una aplicación en Meta for Developers\n3. Permisos de pages_manage_posts e instagram_basic');
+    setActionLoading(null);
+  };
+
+  const handleDisconnectMeta = async () => {
+    if (!tenantActual?.id) return;
+    if (!confirm('¿Estás seguro de desconectar Meta (Facebook/Instagram)?')) return;
+
+    setActionLoading('meta');
+    try {
+      await apiFetch(`/tenants/${tenantActual.id}/api-credentials/meta`, { method: 'DELETE' });
+      setCredentials(prev => prev ? {
+        ...prev,
+        metaConnected: false,
+        metaPageId: undefined,
+        metaPageName: undefined,
+        metaInstagramBusinessAccountId: undefined,
+        metaInstagramUsername: undefined,
+      } : null);
+    } catch (error) {
+      console.error('Error disconnecting:', error);
+      alert('Error al desconectar Meta');
+    } finally {
+      setActionLoading(null);
+    }
+  };
+
+  const handleConnectMetaAds = () => {
+    setActionLoading('meta-ads');
+    alert('El flujo de OAuth de Meta Ads se implementará próximamente.\n\nNecesitarás:\n1. Una cuenta publicitaria en Meta Ads Manager\n2. Permisos de ads_management');
+    setActionLoading(null);
+  };
+
+  const handleDisconnectMetaAds = async () => {
+    if (!tenantActual?.id) return;
+    if (!confirm('¿Estás seguro de desconectar Meta Ads?')) return;
+
+    setActionLoading('meta-ads');
+    try {
+      await apiFetch(`/tenants/${tenantActual.id}/api-credentials/meta-ads`, { method: 'DELETE' });
+      setCredentials(prev => prev ? { ...prev, metaAdsConnected: false, metaAdAccountId: undefined } : null);
+    } catch (error) {
+      console.error('Error disconnecting:', error);
+      alert('Error al desconectar Meta Ads');
+    } finally {
+      setActionLoading(null);
+    }
+  };
+
+  const handleConnectEmail = () => {
+    setActionLoading('email');
+    alert('La configuración de email se implementará próximamente.\n\nProveedores soportados:\n- Mailchimp\n- SendGrid\n- Mailjet\n- Amazon SES\n- SMTP personalizado');
+    setActionLoading(null);
+  };
+
+  const handleDisconnectEmail = async () => {
+    if (!tenantActual?.id) return;
+    if (!confirm('¿Estás seguro de desconectar el proveedor de email?')) return;
+
+    setActionLoading('email');
+    try {
+      await apiFetch(`/tenants/${tenantActual.id}/api-credentials/email`, { method: 'DELETE' });
+      setCredentials(prev => prev ? {
+        ...prev,
+        emailConnected: false,
+        emailProvider: 'none',
+        emailSenderName: undefined,
+        emailSenderEmail: undefined,
+      } : null);
+    } catch (error) {
+      console.error('Error disconnecting:', error);
+      alert('Error al desconectar email');
+    } finally {
+      setActionLoading(null);
+    }
+  };
+
+  const basePath = tenantActual?.slug ? `/crm/${tenantActual.slug}` : '/crm';
+
+  if (loading) {
+    return (
+      <div style={{ padding: '24px', display: 'flex', justifyContent: 'center', alignItems: 'center', minHeight: '400px' }}>
+        <Loader2 size={32} style={{ animation: 'spin 1s linear infinite', color: '#3b82f6' }} />
+      </div>
+    );
+  }
+
+  return (
+    <div style={{ padding: '24px', maxWidth: '900px' }}>
+      {/* Back button */}
+      <button
+        onClick={() => navigate(`${basePath}/marketing`)}
+        style={{
+          display: 'flex',
+          alignItems: 'center',
+          gap: '8px',
+          padding: '8px 16px',
+          background: '#f1f5f9',
+          border: 'none',
+          borderRadius: '8px',
+          color: '#64748b',
+          fontSize: '13px',
+          fontWeight: 500,
+          cursor: 'pointer',
+          marginBottom: '24px',
+        }}
+      >
+        <ArrowLeft size={16} />
+        Volver al Marketing Hub
+      </button>
+
+      {/* Security notice */}
+      <div
+        style={{
+          background: 'linear-gradient(135deg, #eff6ff 0%, #dbeafe 100%)',
+          border: '1px solid #93c5fd',
+          borderRadius: '16px',
+          padding: '20px 24px',
+          display: 'flex',
+          alignItems: 'flex-start',
+          gap: '16px',
+          marginBottom: '32px',
+        }}
+      >
+        <Shield size={24} color="#3b82f6" />
+        <div>
+          <h4 style={{ fontSize: '14px', fontWeight: 600, color: '#1e40af', margin: '0 0 6px 0' }}>
+            Tus credenciales están seguras
+          </h4>
+          <p style={{ fontSize: '13px', color: '#3b82f6', margin: 0, lineHeight: 1.5 }}>
+            Todas las claves y tokens se almacenan encriptados. Solo tu empresa tiene acceso a sus propias integraciones.
+            Nunca compartimos tus credenciales ni las usamos para otros fines.
+          </p>
+        </div>
+      </div>
+
+      {/* Google Section */}
+      <Section
+        title="Google"
+        subtitle="Search Console y Google Ads"
+        icon={
+          <svg width="22" height="22" viewBox="0 0 24 24" fill="currentColor">
+            <path d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z"/>
+            <path d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z"/>
+            <path d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.07H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.93l2.85-2.22.81-.62z"/>
+            <path d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.07l3.66 2.84c.87-2.6 3.3-4.53 6.16-4.53z"/>
+          </svg>
+        }
+        color="#4285f4"
+      >
+        <IntegrationCard
+          icon={<Search size={24} />}
+          name="Google Search Console"
+          description="Monitorea la indexación y posicionamiento de tus páginas de propiedades en Google"
+          connected={credentials?.googleSearchConsoleConnected || false}
+          connectionInfo={credentials?.googleSearchConsoleSiteUrl ? `Sitio: ${credentials.googleSearchConsoleSiteUrl}` : undefined}
+          color="#16a34a"
+          onConnect={handleConnectGoogleSearchConsole}
+          onDisconnect={handleDisconnectGoogleSearchConsole}
+          loading={actionLoading === 'google-search-console'}
+        />
+        <IntegrationCard
+          icon={<Megaphone size={24} />}
+          name="Google Ads"
+          description="Crea y gestiona campañas de búsqueda y display para atraer compradores"
+          connected={credentials?.googleAdsConnected || false}
+          connectionInfo={credentials?.googleAdsCustomerId ? `ID Cliente: ${credentials.googleAdsCustomerId}` : undefined}
+          color="#4285f4"
+          onConnect={handleConnectGoogleAds}
+          onDisconnect={handleDisconnectGoogleAds}
+          loading={actionLoading === 'google-ads'}
+        />
+      </Section>
+
+      {/* Meta Section */}
+      <Section
+        title="Meta"
+        subtitle="Facebook, Instagram y Meta Ads"
+        icon={
+          <svg width="22" height="22" viewBox="0 0 24 24" fill="currentColor">
+            <path d="M24 12.073c0-6.627-5.373-12-12-12s-12 5.373-12 12c0 5.99 4.388 10.954 10.125 11.854v-8.385H7.078v-3.47h3.047V9.43c0-3.007 1.792-4.669 4.533-4.669 1.312 0 2.686.235 2.686.235v2.953H15.83c-1.491 0-1.956.925-1.956 1.874v2.25h3.328l-.532 3.47h-2.796v8.385C19.612 23.027 24 18.062 24 12.073z"/>
+          </svg>
+        }
+        color="#1877f2"
+      >
+        <IntegrationCard
+          icon={
+            <div style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
+              <Facebook size={20} />
+              <span style={{ fontSize: '12px', fontWeight: 600 }}>/</span>
+              <Instagram size={20} />
+            </div>
+          }
+          name="Facebook & Instagram"
+          description="Publica posts y stories en las páginas de tu empresa y perfiles de asesores"
+          connected={credentials?.metaConnected || false}
+          connectionInfo={
+            credentials?.metaPageName
+              ? `Página: ${credentials.metaPageName}${credentials.metaInstagramUsername ? ` | IG: @${credentials.metaInstagramUsername}` : ''}`
+              : undefined
+          }
+          color="#e11d48"
+          onConnect={handleConnectMeta}
+          onDisconnect={handleDisconnectMeta}
+          loading={actionLoading === 'meta'}
+        />
+        <IntegrationCard
+          icon={<Megaphone size={24} />}
+          name="Meta Ads"
+          description="Lanza campañas publicitarias en Facebook e Instagram con audiencias segmentadas"
+          connected={credentials?.metaAdsConnected || false}
+          connectionInfo={credentials?.metaAdAccountId ? `Cuenta: ${credentials.metaAdAccountId}` : undefined}
+          color="#1877f2"
+          onConnect={handleConnectMetaAds}
+          onDisconnect={handleDisconnectMetaAds}
+          loading={actionLoading === 'meta-ads'}
+        />
+      </Section>
+
+      {/* Email Section */}
+      <Section
+        title="Email Marketing"
+        subtitle="Envío masivo de correos"
+        icon={<Mail size={22} />}
+        color="#f59e0b"
+      >
+        <IntegrationCard
+          icon={<Mail size={24} />}
+          name={credentials?.emailProvider && credentials.emailProvider !== 'none'
+            ? credentials.emailProvider.charAt(0).toUpperCase() + credentials.emailProvider.slice(1)
+            : 'Email Provider'
+          }
+          description="Conecta Mailchimp, SendGrid, Mailjet, Amazon SES o configura SMTP personalizado"
+          connected={credentials?.emailConnected || false}
+          connectionInfo={
+            credentials?.emailSenderEmail
+              ? `Remitente: ${credentials.emailSenderName} <${credentials.emailSenderEmail}>`
+              : undefined
+          }
+          color="#f59e0b"
+          onConnect={handleConnectEmail}
+          onDisconnect={handleDisconnectEmail}
+          loading={actionLoading === 'email'}
+        />
+      </Section>
+
+      {/* Multi-tenant info */}
+      <div
+        style={{
+          background: '#f8fafc',
+          borderRadius: '16px',
+          padding: '24px',
+          border: '1px solid #e2e8f0',
+        }}
+      >
+        <div style={{ display: 'flex', alignItems: 'flex-start', gap: '16px' }}>
+          <div
+            style={{
+              width: '48px',
+              height: '48px',
+              borderRadius: '12px',
+              background: '#6366f115',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              color: '#6366f1',
+            }}
+          >
+            <Building size={24} />
+          </div>
+          <div style={{ flex: 1 }}>
+            <h4 style={{ fontSize: '15px', fontWeight: 600, color: '#1e293b', margin: '0 0 8px 0' }}>
+              Arquitectura Multi-Tenant
+            </h4>
+            <p style={{ fontSize: '13px', color: '#64748b', margin: 0, lineHeight: 1.6 }}>
+              Cada inmobiliaria tiene sus propias credenciales de API completamente aisladas.
+              Esto significa que puedes conectar las cuentas de <strong>tu empresa</strong> sin afectar a otras inmobiliarias de la plataforma.
+              Tus límites de cuota de Google y Meta son exclusivos de tu cuenta.
+            </p>
+          </div>
+        </div>
+
+        <div style={{ display: 'flex', alignItems: 'flex-start', gap: '16px', marginTop: '20px' }}>
+          <div
+            style={{
+              width: '48px',
+              height: '48px',
+              borderRadius: '12px',
+              background: '#8b5cf615',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              color: '#8b5cf6',
+            }}
+          >
+            <User size={24} />
+          </div>
+          <div style={{ flex: 1 }}>
+            <h4 style={{ fontSize: '15px', fontWeight: 600, color: '#1e293b', margin: '0 0 8px 0' }}>
+              Cuentas de Asesores
+            </h4>
+            <p style={{ fontSize: '13px', color: '#64748b', margin: 0, lineHeight: 1.6 }}>
+              Además de las cuentas de la empresa, cada asesor puede conectar sus propias redes sociales personales
+              para publicar contenido desde su perfil individual.{' '}
+              <button
+                onClick={() => navigate(`${basePath}/marketing`)}
+                style={{
+                  background: 'none',
+                  border: 'none',
+                  color: '#6366f1',
+                  textDecoration: 'underline',
+                  cursor: 'pointer',
+                  padding: 0,
+                  fontSize: '13px',
+                }}
+              >
+                Gestionar cuentas de asesores
+              </button>
+            </p>
+          </div>
+        </div>
+      </div>
+
+      {/* CSS for spin animation */}
+      <style>{`
+        @keyframes spin {
+          from { transform: rotate(0deg); }
+          to { transform: rotate(360deg); }
+        }
+      `}</style>
+    </div>
+  );
+};
+
+export default CrmMarketingApiConfig;

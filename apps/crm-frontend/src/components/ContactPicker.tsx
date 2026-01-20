@@ -610,16 +610,23 @@ export default function ContactPicker({
 
         .contact-picker-search:focus-within {
           border-color: #6366f1;
-          box-shadow: 0 0 0 4px rgba(99, 102, 241, 0.1);
         }
 
         .contact-picker-search input {
           flex: 1;
-          border: none;
-          background: transparent;
+          border: none !important;
+          background: transparent !important;
           font-size: 1rem;
           color: #1f2937;
-          outline: none;
+          outline: none !important;
+          box-shadow: none !important;
+          -webkit-appearance: none;
+        }
+
+        .contact-picker-search input:focus {
+          border: none !important;
+          outline: none !important;
+          box-shadow: none !important;
         }
 
         .contact-picker-search input::placeholder {

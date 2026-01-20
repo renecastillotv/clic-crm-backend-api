@@ -380,221 +380,52 @@ export default function CrmFinanzasVentaDetalle() {
               />
             </div>
 
-            {/* Participantes y Propiedad - Una sola fila */}
+            {/* Propiedad y Cliente - Una sola fila compacta */}
             <div style={{
               display: 'grid',
               gridTemplateColumns: '1fr 1fr',
               gap: '24px',
               marginBottom: '24px'
             }}>
-              {/* Participantes */}
-              <div style={{
-                background: 'white',
-                borderRadius: '16px',
-                border: '1px solid #e2e8f0',
-                boxShadow: '0 1px 3px rgba(0, 0, 0, 0.1)',
-                padding: '24px'
-              }}>
-                <h3 style={{ 
-                  fontSize: '1.125rem', 
-                  fontWeight: 600, 
-                  color: '#1e293b',
-                  marginBottom: '20px',
-                  paddingBottom: '16px',
-                  borderBottom: '1px solid #e2e8f0'
-                }}>
-                  Participantes
-                </h3>
-
-                <div style={{ display: 'flex', flexDirection: 'column', gap: '20px' }}>
-                  {/* Agente */}
-                  <div>
-                    <p style={{ 
-                      fontSize: '0.75rem', 
-                      fontWeight: 600, 
-                      color: '#64748b',
-                      textTransform: 'uppercase',
-                      letterSpacing: '0.5px',
-                      marginBottom: '12px'
-                    }}>
-                      Agente de Cierre
-                    </p>
-                    {venta.usuario_cerrador ? (
-                      <div style={{
-                        display: 'flex',
-                        alignItems: 'center',
-                        gap: '12px',
-                        padding: '12px',
-                        background: 'linear-gradient(135deg, #fff7ed 0%, #ffedd5 100%)',
-                        border: '1px solid #fed7aa',
-                        borderRadius: '12px'
-                      }}>
-                        <div style={{
-                          width: '48px',
-                          height: '48px',
-                          borderRadius: '12px',
-                          background: 'linear-gradient(135deg, #f97316 0%, #ea580c 100%)',
-                          display: 'flex',
-                          alignItems: 'center',
-                          justifyContent: 'center',
-                          color: 'white',
-                          flexShrink: 0
-                        }}>
-                          {venta.usuario_cerrador.avatarUrl ? (
-                            <img
-                              src={venta.usuario_cerrador.avatarUrl}
-                              alt={`${venta.usuario_cerrador.nombre} ${venta.usuario_cerrador.apellido}`}
-                              style={{
-                                width: '48px',
-                                height: '48px',
-                                borderRadius: '12px',
-                                objectFit: 'cover'
-                              }}
-                              onError={(e) => {
-                                e.currentTarget.style.display = 'none';
-                                const fallback = e.currentTarget.nextElementSibling as HTMLElement;
-                                if (fallback) fallback.style.display = 'flex';
-                              }}
-                            />
-                          ) : null}
-                          <User className={`w-6 h-6 ${venta.usuario_cerrador.avatarUrl ? 'hidden' : ''}`} />
-                        </div>
-                        <div style={{ flex: 1, minWidth: 0 }}>
-                          <p style={{ 
-                            fontSize: '0.9375rem', 
-                            fontWeight: 600, 
-                            color: '#1e293b',
-                            marginBottom: '4px'
-                          }}>
-                            {venta.usuario_cerrador.nombre} {venta.usuario_cerrador.apellido}
-                          </p>
-                          {venta.usuario_cerrador.email && (
-                            <p style={{ 
-                              fontSize: '0.8125rem', 
-                              color: '#64748b'
-                            }}>
-                              {venta.usuario_cerrador.email}
-                            </p>
-                          )}
-                        </div>
-                      </div>
-                    ) : (
-                      <p style={{ 
-                        color: '#94a3b8',
-                        fontSize: '0.875rem',
-                        fontStyle: 'italic'
-                      }}>
-                        No asignado
-                      </p>
-                    )}
-                  </div>
-
-                  {/* Cliente */}
-                  <div>
-                    <p style={{ 
-                      fontSize: '0.75rem', 
-                      fontWeight: 600, 
-                      color: '#64748b',
-                      textTransform: 'uppercase',
-                      letterSpacing: '0.5px',
-                      marginBottom: '12px'
-                    }}>
-                      Cliente
-                    </p>
-                    {venta.contacto ? (
-                      <div style={{
-                        display: 'flex',
-                        alignItems: 'center',
-                        gap: '12px',
-                        padding: '12px',
-                        background: 'linear-gradient(135deg, #faf5ff 0%, #f3e8ff 100%)',
-                        border: '1px solid #c4b5fd',
-                        borderRadius: '12px'
-                      }}>
-                        <div style={{
-                          width: '48px',
-                          height: '48px',
-                          borderRadius: '12px',
-                          background: 'linear-gradient(135deg, #a78bfa 0%, #8b5cf6 100%)',
-                          display: 'flex',
-                          alignItems: 'center',
-                          justifyContent: 'center',
-                          color: 'white',
-                          flexShrink: 0
-                        }}>
-                          <Users className="w-6 h-6" />
-                        </div>
-                        <div style={{ flex: 1 }}>
-                          <p style={{ 
-                            fontSize: '0.9375rem', 
-                            fontWeight: 600, 
-                            color: '#1e293b',
-                            marginBottom: '4px'
-                          }}>
-                            {venta.contacto.nombre}
-                          </p>
-                          {venta.contacto.email && (
-                            <p style={{ 
-                              fontSize: '0.8125rem', 
-                              color: '#64748b'
-                            }}>
-                              {venta.contacto.email}
-                            </p>
-                          )}
-                        </div>
-                      </div>
-                    ) : (
-                      <p style={{ 
-                        color: '#94a3b8',
-                        fontSize: '0.875rem',
-                        fontStyle: 'italic'
-                      }}>
-                        No especificado
-                      </p>
-                    )}
-                  </div>
-                </div>
-              </div>
-
               {/* Propiedad */}
               <div style={{
                 background: 'white',
                 borderRadius: '16px',
                 border: '1px solid #e2e8f0',
                 boxShadow: '0 1px 3px rgba(0, 0, 0, 0.1)',
-                padding: '24px'
+                padding: '20px'
               }}>
-                <div style={{ 
-                  display: 'flex', 
-                  alignItems: 'center', 
+                <div style={{
+                  display: 'flex',
+                  alignItems: 'center',
                   justifyContent: 'space-between',
-                  marginBottom: '16px',
-                  paddingBottom: '16px',
-                  borderBottom: '1px solid #e2e8f0'
+                  marginBottom: '16px'
                 }}>
-                  <h3 style={{ 
-                    fontSize: '1.125rem', 
-                    fontWeight: 600, 
-                    color: '#1e293b',
+                  <p style={{
+                    fontSize: '0.75rem',
+                    fontWeight: 600,
+                    color: '#64748b',
+                    textTransform: 'uppercase',
+                    letterSpacing: '0.5px',
                     margin: 0
                   }}>
-                    Propiedad Vinculada
-                  </h3>
+                    Propiedad
+                  </p>
                   {venta.propiedad_id && (
                     <button
                       onClick={() => navigate(`/crm/${tenantSlug}/propiedades/${venta.propiedad_id}`)}
                       style={{
-                        padding: '6px 12px',
-                        borderRadius: '8px',
+                        padding: '4px 10px',
+                        borderRadius: '6px',
                         border: '1px solid #e2e8f0',
                         background: 'white',
                         color: '#475569',
                         fontWeight: 500,
                         cursor: 'pointer',
-                        fontSize: '0.8125rem',
+                        fontSize: '0.75rem',
                         display: 'flex',
                         alignItems: 'center',
-                        gap: '6px',
+                        gap: '4px',
                         transition: 'all 0.2s'
                       }}
                       onMouseEnter={(e) => {
@@ -611,15 +442,15 @@ export default function CrmFinanzasVentaDetalle() {
                     </button>
                   )}
                 </div>
-                <div style={{ display: 'flex', alignItems: 'center', gap: '16px' }}>
-                  {venta.propiedad?.imagen_principal ? (
+                <div style={{ display: 'flex', alignItems: 'center', gap: '14px' }}>
+                  {(venta.propiedad?.imagen_principal || venta.propiedad_imagen) ? (
                     <img
-                      src={venta.propiedad.imagen_principal}
+                      src={venta.propiedad?.imagen_principal || venta.propiedad_imagen || ''}
                       alt="Propiedad"
                       style={{
-                        width: '80px',
-                        height: '80px',
-                        borderRadius: '12px',
+                        width: '64px',
+                        height: '64px',
+                        borderRadius: '10px',
                         objectFit: 'cover',
                         border: '2px solid #e2e8f0',
                         flexShrink: 0
@@ -627,41 +458,44 @@ export default function CrmFinanzasVentaDetalle() {
                     />
                   ) : (
                     <div style={{
-                      width: '80px',
-                      height: '80px',
-                      borderRadius: '12px',
+                      width: '64px',
+                      height: '64px',
+                      borderRadius: '10px',
                       background: 'linear-gradient(135deg, #f1f5f9 0%, #e2e8f0 100%)',
                       display: 'flex',
                       alignItems: 'center',
                       justifyContent: 'center',
                       flexShrink: 0
                     }}>
-                      <Building className="w-8 h-8" style={{ color: '#94a3b8' }} />
+                      <Building className="w-7 h-7" style={{ color: '#94a3b8' }} />
                     </div>
                   )}
                   <div style={{ flex: 1, minWidth: 0 }}>
-                    <p style={{ 
-                      fontSize: '0.9375rem', 
-                      fontWeight: 600, 
+                    <p style={{
+                      fontSize: '0.875rem',
+                      fontWeight: 600,
                       color: '#1e293b',
-                      marginBottom: '6px',
-                      lineHeight: '1.4'
+                      marginBottom: '4px',
+                      lineHeight: '1.3',
+                      overflow: 'hidden',
+                      textOverflow: 'ellipsis',
+                      whiteSpace: 'nowrap'
                     }}>
-                      {venta.propiedad?.titulo || venta.nombre_propiedad_externa || 'Propiedad Externa'}
+                      {venta.propiedad?.titulo || venta.propiedad_nombre || venta.nombre_propiedad_externa || 'Propiedad Externa'}
                     </p>
-                    <p style={{ 
-                      fontSize: '0.8125rem', 
+                    <p style={{
+                      fontSize: '0.75rem',
                       color: '#64748b',
-                      marginBottom: '8px'
+                      marginBottom: '6px'
                     }}>
-                      Código: {venta.propiedad?.codigo || venta.codigo_propiedad_externa || 'Sin código'}
+                      Código: {venta.propiedad?.codigo || venta.propiedad_codigo || venta.codigo_propiedad_externa || 'N/A'}
                     </p>
                     <span style={{
                       display: 'inline-flex',
                       alignItems: 'center',
-                      padding: '4px 10px',
-                      borderRadius: '8px',
-                      fontSize: '0.75rem',
+                      padding: '2px 8px',
+                      borderRadius: '6px',
+                      fontSize: '0.6875rem',
                       fontWeight: 600,
                       background: venta.es_propiedad_externa ? '#fef3c7' : '#dcfce7',
                       color: venta.es_propiedad_externa ? '#92400e' : '#166534'
@@ -670,6 +504,100 @@ export default function CrmFinanzasVentaDetalle() {
                     </span>
                   </div>
                 </div>
+              </div>
+
+              {/* Cliente */}
+              <div style={{
+                background: 'white',
+                borderRadius: '16px',
+                border: '1px solid #e2e8f0',
+                boxShadow: '0 1px 3px rgba(0, 0, 0, 0.1)',
+                padding: '20px'
+              }}>
+                <p style={{
+                  fontSize: '0.75rem',
+                  fontWeight: 600,
+                  color: '#64748b',
+                  textTransform: 'uppercase',
+                  letterSpacing: '0.5px',
+                  marginBottom: '16px'
+                }}>
+                  Cliente / Comprador
+                </p>
+                {(venta.contacto || venta.contacto_nombre) ? (
+                  <div style={{
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: '14px'
+                  }}>
+                    <div style={{
+                      width: '64px',
+                      height: '64px',
+                      borderRadius: '10px',
+                      background: 'linear-gradient(135deg, #a78bfa 0%, #8b5cf6 100%)',
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'center',
+                      color: 'white',
+                      flexShrink: 0
+                    }}>
+                      <Users className="w-7 h-7" />
+                    </div>
+                    <div style={{ flex: 1, minWidth: 0 }}>
+                      <p style={{
+                        fontSize: '0.875rem',
+                        fontWeight: 600,
+                        color: '#1e293b',
+                        marginBottom: '4px'
+                      }}>
+                        {venta.contacto?.nombre || venta.contacto_nombre || ''} {venta.contacto?.apellido || venta.contacto_apellido || ''}
+                      </p>
+                      {(venta.contacto?.email || venta.contacto_email) && (
+                        <p style={{
+                          fontSize: '0.75rem',
+                          color: '#64748b',
+                          marginBottom: '4px'
+                        }}>
+                          {venta.contacto?.email || venta.contacto_email}
+                        </p>
+                      )}
+                      {(venta.contacto?.telefono || venta.contacto_telefono) && (
+                        <p style={{
+                          fontSize: '0.75rem',
+                          color: '#64748b'
+                        }}>
+                          {venta.contacto?.telefono || venta.contacto_telefono}
+                        </p>
+                      )}
+                    </div>
+                  </div>
+                ) : (
+                  <div style={{
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: '14px'
+                  }}>
+                    <div style={{
+                      width: '64px',
+                      height: '64px',
+                      borderRadius: '10px',
+                      background: 'linear-gradient(135deg, #f1f5f9 0%, #e2e8f0 100%)',
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'center',
+                      flexShrink: 0
+                    }}>
+                      <Users className="w-7 h-7" style={{ color: '#94a3b8' }} />
+                    </div>
+                    <p style={{
+                      color: '#94a3b8',
+                      fontSize: '0.875rem',
+                      fontStyle: 'italic'
+                    }}>
+                      Cliente no especificado
+                    </p>
+                  </div>
+                )}
               </div>
             </div>
 

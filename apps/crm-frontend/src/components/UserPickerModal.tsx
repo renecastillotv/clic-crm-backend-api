@@ -494,16 +494,23 @@ export default function UserPickerModal({
         .user-picker-search:focus-within {
           border-color: #1e293b;
           background: white;
-          box-shadow: 0 0 0 4px rgba(15, 23, 42, 0.08);
         }
 
         .user-picker-search input {
           flex: 1;
-          border: none;
-          background: transparent;
-          outline: none;
+          border: none !important;
+          background: transparent !important;
+          outline: none !important;
+          box-shadow: none !important;
           font-size: 0.95rem;
           color: #0f172a;
+          -webkit-appearance: none;
+        }
+
+        .user-picker-search input:focus {
+          border: none !important;
+          outline: none !important;
+          box-shadow: none !important;
         }
 
         .user-picker-search input::placeholder {

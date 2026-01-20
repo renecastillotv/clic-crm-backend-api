@@ -1359,23 +1359,23 @@ const styles = `
 
   /* Quick Actions */
   .quick-actions-section {
-    margin-bottom: 32px;
+    margin-bottom: 20px;
   }
 
   .section-title {
     display: flex;
     align-items: center;
-    gap: 8px;
-    font-size: 1.1rem;
+    gap: 6px;
+    font-size: 0.95rem;
     font-weight: 600;
     color: #374151;
-    margin-bottom: 16px;
+    margin-bottom: 12px;
   }
 
   .quick-actions-grid {
     display: grid;
     grid-template-columns: repeat(7, 1fr);
-    gap: 16px;
+    gap: 10px;
   }
 
   .quick-action-btn {
@@ -1383,14 +1383,14 @@ const styles = `
     overflow: hidden;
     background: white;
     border: 1px solid #e5e7eb;
-    border-radius: 16px;
-    padding: 24px 16px;
+    border-radius: 12px;
+    padding: 16px 10px;
     cursor: pointer;
     transition: all 0.3s ease;
     display: flex;
     flex-direction: column;
     align-items: center;
-    gap: 12px;
+    gap: 8px;
     box-shadow: 0 1px 3px rgba(0, 0, 0, 0.05);
   }
 
@@ -1416,13 +1416,18 @@ const styles = `
   .quick-action-icon {
     position: relative;
     z-index: 1;
-    width: 48px;
-    height: 48px;
-    border-radius: 12px;
+    width: 40px;
+    height: 40px;
+    border-radius: 10px;
     display: flex;
     align-items: center;
     justify-content: center;
     transition: all 0.3s ease;
+  }
+
+  .quick-action-icon svg {
+    width: 20px;
+    height: 20px;
   }
 
   .quick-action-btn:hover .quick-action-icon {
@@ -1436,7 +1441,7 @@ const styles = `
   .quick-action-label {
     position: relative;
     z-index: 1;
-    font-size: 0.875rem;
+    font-size: 0.8rem;
     font-weight: 500;
     color: #374151;
     transition: color 0.3s ease;
@@ -1450,31 +1455,35 @@ const styles = `
   .filters-bar {
     display: flex;
     align-items: center;
-    gap: 16px;
-    margin-bottom: 24px;
+    gap: 10px;
+    margin-bottom: 16px;
     position: relative;
     z-index: 100;
+    flex-wrap: wrap;
   }
 
   .search-box {
     position: relative;
-    width: 384px;
+    width: 280px;
+    flex-shrink: 0;
   }
 
   .search-box .search-icon {
     position: absolute;
-    left: 16px;
+    left: 12px;
     top: 50%;
     transform: translateY(-50%);
     color: #9ca3af;
+    width: 16px;
+    height: 16px;
   }
 
   .search-box input {
     width: 100%;
-    padding: 12px 16px 12px 48px;
+    padding: 8px 12px 8px 36px;
     border: 1px solid #e5e7eb;
-    border-radius: 12px;
-    font-size: 0.9rem;
+    border-radius: 8px;
+    font-size: 0.85rem;
     background: white;
     transition: all 0.2s;
   }
@@ -1492,25 +1501,27 @@ const styles = `
 
   .sort-select .sort-icon {
     position: absolute;
-    left: 14px;
+    left: 10px;
     top: 50%;
     transform: translateY(-50%);
     color: #9ca3af;
     pointer-events: none;
     z-index: 202;
+    width: 14px;
+    height: 14px;
   }
 
   .sort-select select {
     position: relative;
     z-index: 201;
-    padding: 12px 16px 12px 44px;
+    padding: 8px 12px 8px 32px;
     border: 1px solid #e5e7eb;
-    border-radius: 12px;
-    font-size: 0.9rem;
+    border-radius: 8px;
+    font-size: 0.8rem;
     background: white;
     cursor: pointer;
     appearance: none;
-    padding-right: 32px;
+    padding-right: 24px;
   }
 
   /* Asegurar que el dropdown nativo se muestre por encima */
@@ -1522,23 +1533,24 @@ const styles = `
   .status-checkboxes {
     display: flex;
     align-items: center;
-    gap: 6px;
+    gap: 4px;
     background: white;
-    padding: 6px 10px;
-    border-radius: 10px;
+    padding: 4px 6px;
+    border-radius: 8px;
     border: 1px solid #e5e7eb;
   }
 
   .status-checkbox {
     display: flex;
     align-items: center;
-    gap: 6px;
+    gap: 4px;
     cursor: pointer;
     user-select: none;
-    padding: 6px 10px;
-    border-radius: 8px;
-    border: 2px solid transparent;
+    padding: 4px 8px;
+    border-radius: 6px;
+    border: 1.5px solid transparent;
     transition: all 0.15s;
+    font-size: 0.75rem;
   }
 
   .status-checkbox:hover {
@@ -1562,16 +1574,21 @@ const styles = `
   }
 
   .checkbox-indicator {
-    width: 18px;
-    height: 18px;
-    border-radius: 4px;
-    border: 2px solid #d1d5db;
+    width: 14px;
+    height: 14px;
+    border-radius: 3px;
+    border: 1.5px solid #d1d5db;
     display: flex;
     align-items: center;
     justify-content: center;
     transition: all 0.15s;
     background: white;
     flex-shrink: 0;
+  }
+
+  .checkbox-indicator svg {
+    width: 10px;
+    height: 10px;
   }
 
   /* Checkbox marcado - lleno con color */
@@ -1591,7 +1608,7 @@ const styles = `
   }
 
   .checkbox-label {
-    font-size: 0.8rem;
+    font-size: 0.75rem;
     font-weight: 500;
     color: #9ca3af;
     transition: all 0.15s;
@@ -1611,21 +1628,26 @@ const styles = `
   .view-toggle {
     display: flex;
     background: #f3f4f6;
-    padding: 4px;
-    border-radius: 12px;
+    padding: 3px;
+    border-radius: 8px;
   }
 
   .view-btn {
     display: flex;
     align-items: center;
     justify-content: center;
-    padding: 10px 12px;
+    padding: 6px 8px;
     background: none;
     border: none;
-    border-radius: 8px;
+    border-radius: 6px;
     color: #6b7280;
     cursor: pointer;
     transition: all 0.2s;
+  }
+
+  .view-btn svg {
+    width: 16px;
+    height: 16px;
   }
 
   .view-btn.active {

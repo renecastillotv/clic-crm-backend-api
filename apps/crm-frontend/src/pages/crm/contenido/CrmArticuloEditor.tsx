@@ -66,13 +66,16 @@ export default function CrmArticuloEditor() {
   const { tenantSlug, id } = useParams<{ tenantSlug: string; id?: string }>();
   const navigate = useNavigate();
   const { getToken } = useClerkAuth();
-  const { tenantActual } = useAuth();
+  const { tenantActual, user } = useAuth();
   const { setPageHeader } = usePageHeader();
 
   // Cargar idiomas dinámicamente desde el tenant
   const { idiomas } = useIdiomas(tenantActual?.id);
 
   const isEditing = id && id !== 'nuevo';
+
+  // Fecha actual en formato YYYY-MM-DD
+  const todayDate = new Date().toISOString().split('T')[0];
 
   // Estado de idioma activo
   const [idiomaActivo, setIdiomaActivo] = useState('es');
@@ -89,7 +92,7 @@ export default function CrmArticuloEditor() {
   const [uploadingBancoImage, setUploadingBancoImage] = useState(false);
   const [copiedUrl, setCopiedUrl] = useState<string | null>(null);
 
-  const [formData, setFormData] = useState({
+  const [formData, setFormData] = useState(() => ({
     slug: '',
     idioma: 'es',
     titulo: '',
@@ -104,8 +107,9 @@ export default function CrmArticuloEditor() {
     tagIds: [] as string[],
     publicado: false,
     destacado: false,
-    fechaPublicacion: '',
-  });
+    // Inicializar con fecha de hoy para artículos nuevos
+    fechaPublicacion: new Date().toISOString().split('T')[0],
+  }));
 
   // Traducciones separadas
   const [traducciones, setTraducciones] = useState<Traducciones>({});
@@ -139,6 +143,16 @@ export default function CrmArticuloEditor() {
     loadInitialData();
   }, [tenantActual?.id, id]);
 
+  // Preseleccionar autor cuando user esté disponible (para artículos nuevos)
+  useEffect(() => {
+    if (!isEditing && user?.id && !formData.autorId) {
+      setFormData(prev => ({
+        ...prev,
+        autorId: user.id,
+      }));
+    }
+  }, [user?.id, isEditing, formData.autorId]);
+
   const loadInitialData = async () => {
     if (!tenantActual?.id) return;
     setLoading(true);
@@ -156,6 +170,15 @@ export default function CrmArticuloEditor() {
       // Cargar tags
       await loadTags();
 
+      // Si es nuevo artículo, preseleccionar autor (usuario actual) y fecha de hoy
+      if (!isEditing && user?.id) {
+        setFormData(prev => ({
+          ...prev,
+          autorId: user.id,
+          fechaPublicacion: todayDate,
+        }));
+      }
+
       // Si es edición, cargar artículo
       if (isEditing && id) {
         const articulo = await getArticulo(tenantActual.id, id);
@@ -170,22 +193,24 @@ export default function CrmArticuloEditor() {
           tagIds = (articulo as any).tagIds || [];
         }
 
+        // Mapear campos soportando tanto snake_case (API) como camelCase
+        const art = articulo as any;
         setFormData({
-          slug: articulo.slug,
-          idioma: articulo.idioma,
-          titulo: articulo.titulo,
-          extracto: articulo.extracto || '',
-          contenido: articulo.contenido,
-          categoriaId: articulo.categoriaId || '',
-          imagenPrincipal: articulo.imagenPrincipal || '',
-          imagenes: articulo.imagenes || [],
-          autorId: (articulo as any).autorId || '',
-          metaTitulo: articulo.metaTitulo || '',
-          metaDescripcion: articulo.metaDescripcion || '',
+          slug: art.slug,
+          idioma: art.idioma,
+          titulo: art.titulo,
+          extracto: art.extracto || '',
+          contenido: art.contenido,
+          categoriaId: art.categoria_id || art.categoriaId || '',
+          imagenPrincipal: art.imagen_principal || art.imagenPrincipal || '',
+          imagenes: art.imagenes || [],
+          autorId: art.autor_id || art.autorId || '',
+          metaTitulo: art.meta_titulo || art.metaTitulo || '',
+          metaDescripcion: art.meta_descripcion || art.metaDescripcion || '',
           tagIds,
-          publicado: articulo.publicado,
-          destacado: articulo.destacado,
-          fechaPublicacion: articulo.fechaPublicacion ? new Date(articulo.fechaPublicacion).toISOString().split('T')[0] : '',
+          publicado: art.publicado,
+          destacado: art.destacado,
+          fechaPublicacion: (art.fecha_publicacion || art.fechaPublicacion) ? new Date(art.fecha_publicacion || art.fechaPublicacion).toISOString().split('T')[0] : '',
         });
 
         // Cargar traducciones si existen
@@ -285,6 +310,14 @@ export default function CrmArticuloEditor() {
     setTimeout(() => setCopiedUrl(null), 2000);
   };
 
+  // Helper para verificar si un HTML de ReactQuill tiene contenido real
+  const tieneContenidoReal = (html: string | undefined): boolean => {
+    if (!html) return false;
+    // Remover tags HTML y espacios para ver si hay texto real
+    const textoLimpio = html.replace(/<[^>]*>/g, '').replace(/&nbsp;/g, ' ').trim();
+    return textoLimpio.length > 0;
+  };
+
   const handleSave = useCallback(async () => {
     if (!tenantActual?.id || !formData.titulo) {
       setError('Título es requerido');
@@ -295,6 +328,22 @@ export default function CrmArticuloEditor() {
       setSaving(true);
       setError(null);
 
+      // Limpiar traducciones vacías (verificar contenido real, no solo tags HTML vacíos)
+      const traduccionesLimpias: typeof traducciones = {};
+      Object.entries(traducciones).forEach(([idioma, contenido]) => {
+        const tieneTitulo = contenido.titulo && contenido.titulo.trim().length > 0;
+        const tieneContenido = tieneContenidoReal(contenido.contenido);
+        const tieneExtracto = contenido.extracto && contenido.extracto.trim().length > 0;
+        if (tieneTitulo || tieneContenido || tieneExtracto) {
+          // Solo incluir campos con contenido real
+          traduccionesLimpias[idioma] = {
+            ...(tieneTitulo ? { titulo: contenido.titulo } : {}),
+            ...(tieneContenido ? { contenido: contenido.contenido } : {}),
+            ...(tieneExtracto ? { extracto: contenido.extracto } : {}),
+          };
+        }
+      });
+
       const articuloData = {
         ...formData,
         slug: formData.slug || generateSlug(formData.titulo),
@@ -303,7 +352,7 @@ export default function CrmArticuloEditor() {
         tagIds: formData.tagIds.filter(id => id.trim()),
         autorId: formData.autorId || undefined,
         fechaPublicacion: formData.fechaPublicacion || undefined,
-        traducciones,
+        traducciones: Object.keys(traduccionesLimpias).length > 0 ? traduccionesLimpias : undefined,
       };
 
       if (isEditing && id) {
@@ -369,6 +418,7 @@ export default function CrmArticuloEditor() {
           border: 1px solid #e2e8f0;
           border-radius: 12px;
           padding: 20px;
+          overflow: visible;
         }
 
         .editor-section h4 {
@@ -888,6 +938,7 @@ export default function CrmArticuloEditor() {
                 />
               ) : (
                 <ReactQuill
+                  key={`contenido-${idiomaActivo}`}
                   theme="snow"
                   value={traducciones[idiomaActivo]?.contenido || ''}
                   onChange={(value) => handleTraduccionChange(idiomaActivo, 'contenido', value)}
