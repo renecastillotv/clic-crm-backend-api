@@ -15,6 +15,7 @@ import { usePageHeader } from '../../layouts/CrmLayout';
 import {
   getPropuestas,
   deletePropuesta,
+  getTenantConfiguracion,
   Propuesta,
   PropuestaFiltros,
 } from '../../services/api';
@@ -63,6 +64,7 @@ export default function CrmPropuestas() {
   const [estadoFiltro, setEstadoFiltro] = useState<string>('');
   const [deleteConfirm, setDeleteConfirm] = useState<string | null>(null);
   const [copiedUrl, setCopiedUrl] = useState<string | null>(null);
+  const [dominioPersonalizado, setDominioPersonalizado] = useState<string | null>(null);
 
   // Stats calculados
   const countByStatus = Object.keys(ESTADOS).reduce((acc, status) => {
@@ -120,6 +122,20 @@ export default function CrmPropuestas() {
     cargarPropuestas();
   }, [cargarPropuestas]);
 
+  // Cargar dominio personalizado del tenant
+  useEffect(() => {
+    const loadTenantConfig = async () => {
+      if (!tenantActual?.id) return;
+      try {
+        const config = await getTenantConfiguracion(tenantActual.id);
+        setDominioPersonalizado(config.dominio_personalizado);
+      } catch (err) {
+        console.error('Error cargando configuración del tenant:', err);
+      }
+    };
+    loadTenantConfig();
+  }, [tenantActual?.id]);
+
   // Abrir edición si viene con query params
   useEffect(() => {
     const crear = searchParams.get('crear');
@@ -148,11 +164,14 @@ export default function CrmPropuestas() {
     }
   };
 
-  // Copiar URL al portapapeles
-  // Generar URL pública completa
+  // Generar URL pública completa usando el dominio personalizado si existe
   const getUrlPublicaCompleta = (token: string) => {
-    const baseUrl = window.location.origin;
-    return `${baseUrl}/tenant/${tenantSlug}/propuestas/${token}`;
+    // Si tiene dominio personalizado, usar ese
+    if (dominioPersonalizado) {
+      return `https://${dominioPersonalizado}/propuestas/${token}`;
+    }
+    // Fallback: usar subdominio
+    return `https://${tenantSlug}.clic.casa/propuestas/${token}`;
   };
 
   const handleCopyUrl = async (token: string, propuestaId: string) => {
@@ -460,23 +479,23 @@ const styles = `
     gap: 16px;
   }
 
-  /* Toolbar */
+  /* Toolbar - Compact */
   .toolbar {
     display: flex;
-    gap: 16px;
-    margin-bottom: 20px;
+    gap: 12px;
+    margin-bottom: 16px;
     flex-wrap: wrap;
   }
 
   .search-box {
     flex: 1;
-    min-width: 280px;
+    min-width: 240px;
     position: relative;
   }
 
   .search-icon {
     position: absolute;
-    left: 14px;
+    left: 12px;
     top: 50%;
     transform: translateY(-50%);
     color: #94a3b8;
@@ -484,10 +503,10 @@ const styles = `
 
   .search-box input {
     width: 100%;
-    padding: 12px 16px 12px 44px;
+    padding: 10px 14px 10px 38px;
     border: 1px solid #e2e8f0;
-    border-radius: 10px;
-    font-size: 0.9rem;
+    border-radius: 8px;
+    font-size: 0.85rem;
     background: white;
     transition: all 0.2s;
   }
@@ -495,17 +514,17 @@ const styles = `
   .search-box input:focus {
     outline: none;
     border-color: #2563eb;
-    box-shadow: 0 0 0 3px rgba(37, 99, 235, 0.1);
+    box-shadow: 0 0 0 2px rgba(37, 99, 235, 0.1);
   }
 
   .filter-select {
-    padding: 10px 16px;
+    padding: 10px 14px;
     border: 1px solid #e2e8f0;
-    border-radius: 10px;
-    font-size: 0.9rem;
+    border-radius: 8px;
+    font-size: 0.85rem;
     background: white;
     cursor: pointer;
-    min-width: 180px;
+    min-width: 160px;
   }
 
   /* Error Banner */
@@ -529,66 +548,77 @@ const styles = `
     padding: 4px;
   }
 
-  /* Status Stats */
+  /* Status Stats - Compact */
   .status-stats {
     display: grid;
     grid-template-columns: repeat(6, 1fr);
-    gap: 12px;
-    margin-bottom: 24px;
+    gap: 10px;
+    margin-bottom: 20px;
   }
 
   .status-card {
     display: flex;
     align-items: center;
-    gap: 12px;
-    padding: 16px;
+    gap: 10px;
+    padding: 12px 14px;
     background: white;
     border: 1px solid #e2e8f0;
-    border-radius: 12px;
+    border-radius: 10px;
     cursor: pointer;
     transition: all 0.2s;
   }
 
   .status-card:hover {
     border-color: #94a3b8;
+    transform: translateY(-1px);
   }
 
   .status-card.active {
     border-color: #2563eb;
-    box-shadow: 0 0 0 3px rgba(37, 99, 235, 0.1);
+    box-shadow: 0 0 0 2px rgba(37, 99, 235, 0.15);
   }
 
   .status-card-icon {
-    width: 40px;
-    height: 40px;
-    border-radius: 10px;
+    width: 34px;
+    height: 34px;
+    border-radius: 8px;
     display: flex;
     align-items: center;
     justify-content: center;
+    flex-shrink: 0;
+  }
+
+  .status-card-icon svg {
+    width: 18px;
+    height: 18px;
   }
 
   .status-card-info {
     display: flex;
     flex-direction: column;
+    min-width: 0;
   }
 
   .status-card-count {
-    font-size: 1.5rem;
+    font-size: 1.25rem;
     font-weight: 700;
     color: #0f172a;
     line-height: 1;
   }
 
   .status-card-label {
-    font-size: 0.75rem;
+    font-size: 0.7rem;
     color: #64748b;
     margin-top: 2px;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
   }
 
-  /* Table Container */
+  /* Table Container - Compact */
   .table-container {
     background: white;
-    border-radius: 12px;
+    border-radius: 10px;
     border: 1px solid #e2e8f0;
     overflow: hidden;
   }
@@ -600,8 +630,8 @@ const styles = `
 
   .propuestas-table th {
     text-align: left;
-    padding: 14px 16px;
-    font-size: 0.75rem;
+    padding: 10px 14px;
+    font-size: 0.7rem;
     font-weight: 600;
     text-transform: uppercase;
     letter-spacing: 0.05em;
@@ -611,7 +641,7 @@ const styles = `
   }
 
   .propuestas-table td {
-    padding: 14px 16px;
+    padding: 10px 14px;
     border-bottom: 1px solid #f1f5f9;
     vertical-align: middle;
   }
@@ -625,61 +655,72 @@ const styles = `
     background: #f8fafc;
   }
 
-  /* Table cells */
+  /* Table cells - Compact */
   .propuesta-info {
     display: flex;
     flex-direction: column;
-    gap: 2px;
+    gap: 1px;
   }
 
   .propuesta-titulo {
     font-weight: 500;
     color: #0f172a;
+    font-size: 0.875rem;
   }
 
   .propuesta-monto {
-    font-size: 0.8rem;
+    font-size: 0.75rem;
     color: #059669;
-    font-weight: 500;
+    font-weight: 600;
   }
 
   .cliente-info {
     display: flex;
     align-items: center;
-    gap: 10px;
+    gap: 8px;
   }
 
   .cliente-avatar {
-    width: 32px;
-    height: 32px;
+    width: 28px;
+    height: 28px;
     border-radius: 50%;
     background: linear-gradient(135deg, #f59e0b, #f97316);
     color: white;
     display: flex;
     align-items: center;
     justify-content: center;
-    font-size: 0.85rem;
+    font-size: 0.75rem;
     font-weight: 600;
+    flex-shrink: 0;
   }
 
   .cliente-nombre {
-    font-size: 0.9rem;
+    font-size: 0.85rem;
     color: #0f172a;
   }
 
   .solicitud-text {
-    font-size: 0.85rem;
+    font-size: 0.8rem;
     color: #64748b;
+    max-width: 140px;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
   }
 
   .badge {
     display: inline-flex;
     align-items: center;
-    gap: 4px;
-    padding: 4px 10px;
-    border-radius: 20px;
-    font-size: 0.75rem;
-    font-weight: 500;
+    gap: 3px;
+    padding: 3px 8px;
+    border-radius: 6px;
+    font-size: 0.7rem;
+    font-weight: 600;
+  }
+
+  .badge svg {
+    width: 12px;
+    height: 12px;
   }
 
   .badge-blue {
@@ -694,6 +735,7 @@ const styles = `
 
   .text-muted {
     color: #94a3b8;
+    font-size: 0.8rem;
   }
 
   .estado-badge {
@@ -702,33 +744,45 @@ const styles = `
     gap: 4px;
     padding: 4px 10px;
     border-radius: 6px;
-    font-size: 0.75rem;
+    font-size: 0.7rem;
     font-weight: 600;
+    white-space: nowrap;
+  }
+
+  .estado-badge svg {
+    width: 12px;
+    height: 12px;
   }
 
   .fecha-text {
-    font-size: 0.85rem;
+    font-size: 0.8rem;
     color: #64748b;
+    white-space: nowrap;
   }
 
   .actions-cell {
     display: flex;
-    gap: 6px;
+    gap: 4px;
   }
 
   .action-btn {
     display: flex;
     align-items: center;
     justify-content: center;
-    width: 32px;
-    height: 32px;
+    width: 28px;
+    height: 28px;
     border: none;
     background: #f1f5f9;
-    border-radius: 8px;
+    border-radius: 6px;
     color: #64748b;
     cursor: pointer;
     transition: all 0.15s;
     text-decoration: none;
+  }
+
+  .action-btn svg {
+    width: 14px;
+    height: 14px;
   }
 
   .action-btn:hover {
@@ -741,31 +795,37 @@ const styles = `
     color: #dc2626;
   }
 
-  /* Empty state */
+  /* Empty state - Compact */
   .empty-state {
     display: flex;
     flex-direction: column;
     align-items: center;
     justify-content: center;
-    padding: 80px 24px;
+    padding: 48px 24px;
     background: white;
     border: 1px dashed #e2e8f0;
-    border-radius: 12px;
+    border-radius: 10px;
     text-align: center;
   }
 
+  .empty-state svg {
+    width: 48px;
+    height: 48px;
+    color: #cbd5e1;
+  }
+
   .empty-state h3 {
-    margin: 16px 0 8px 0;
-    font-size: 1.1rem;
+    margin: 12px 0 6px 0;
+    font-size: 1rem;
     font-weight: 600;
     color: #0f172a;
   }
 
   .empty-state p {
-    margin: 0 0 20px 0;
+    margin: 0 0 16px 0;
     color: #64748b;
-    font-size: 0.9rem;
-    max-width: 300px;
+    font-size: 0.85rem;
+    max-width: 280px;
   }
 
   /* Modal */
