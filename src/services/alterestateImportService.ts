@@ -476,6 +476,25 @@ function generateSlug(title: string): string {
 }
 
 /**
+ * Obtiene un código de moneda válido, con fallback a USD
+ * Evita valores inválidos como 0, null, undefined, o strings vacíos
+ */
+function getCurrencyCode(...values: any[]): string {
+  const validCodes = ['USD', 'DOP', 'EUR', 'MXN', 'COP', 'ARS', 'CLP', 'PEN', 'BRL'];
+
+  for (const val of values) {
+    if (typeof val === 'string' && val.length >= 2 && val.length <= 4) {
+      const upper = val.toUpperCase();
+      if (validCodes.includes(upper) || /^[A-Z]{3}$/.test(upper)) {
+        return upper;
+      }
+    }
+  }
+
+  return 'USD'; // Default
+}
+
+/**
  * Extrae URL de un objeto de foto con diferentes formatos posibles
  */
 function extractPhotoUrl(photo: any): string | null {
@@ -729,7 +748,7 @@ export function transformProperty(
     precio_alquiler: precioAlquiler,
     precio_min: precioMin,
     precio_max: precioMax,
-    moneda: pv.currency_min_sale || property.currency_sale || property.currency_rent || property.currency_furnished || 'USD',
+    moneda: getCurrencyCode(pv.currency_min_sale, property.currency_sale, property.currency_rent, property.currency_furnished),
     maintenance: property.maintenance_fee || null,
 
     // Características físicas
