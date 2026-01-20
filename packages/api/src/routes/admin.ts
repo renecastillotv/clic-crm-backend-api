@@ -24,6 +24,15 @@ import {
   PlantillaPaginaUpdate
 } from '../services/adminPlantillasPaginaService.js';
 import { requireAuth, requirePlatformAdmin } from '../middleware/clerkAuth.js';
+import {
+  initializeMeilisearchTags,
+  syncAllTags,
+  syncTag,
+  deleteTagFromIndex,
+  resetAndSyncTags,
+  searchTags,
+  getIndexStats
+} from '../services/meilisearchTagsService.js';
 
 const router = express.Router();
 
@@ -1173,6 +1182,174 @@ router.delete('/plantillas/:id', async (req, res) => {
         message: error.message
       });
     }
+  }
+});
+
+// ==================== RUTAS: MEILISEARCH TAGS ====================
+
+/**
+ * GET /api/admin/meilisearch/tags/stats
+ *
+ * Obtiene estadísticas del índice de tags en Meilisearch
+ */
+router.get('/meilisearch/tags/stats', async (req, res) => {
+  try {
+    const stats = await getIndexStats();
+    res.json(stats);
+  } catch (error: any) {
+    console.error('Error en GET /admin/meilisearch/tags/stats:', error);
+    res.status(500).json({
+      error: 'Error al obtener estadísticas de Meilisearch',
+      message: error.message
+    });
+  }
+});
+
+/**
+ * POST /api/admin/meilisearch/tags/sync
+ *
+ * Sincroniza todos los tags activos con Meilisearch
+ */
+router.post('/meilisearch/tags/sync', async (req, res) => {
+  try {
+    console.log('🔄 Iniciando sincronización de tags con Meilisearch...');
+    const result = await syncAllTags();
+    res.json({
+      success: true,
+      message: 'Sincronización completada',
+      ...result
+    });
+  } catch (error: any) {
+    console.error('Error en POST /admin/meilisearch/tags/sync:', error);
+    res.status(500).json({
+      error: 'Error al sincronizar tags',
+      message: error.message
+    });
+  }
+});
+
+/**
+ * POST /api/admin/meilisearch/tags/reset
+ *
+ * Resetea el índice y sincroniza todos los tags desde cero
+ */
+router.post('/meilisearch/tags/reset', async (req, res) => {
+  try {
+    console.log('🔄 Reseteando índice de tags en Meilisearch...');
+    const result = await resetAndSyncTags();
+    res.json({
+      success: true,
+      message: 'Reset y sincronización completados',
+      ...result
+    });
+  } catch (error: any) {
+    console.error('Error en POST /admin/meilisearch/tags/reset:', error);
+    res.status(500).json({
+      error: 'Error al resetear índice',
+      message: error.message
+    });
+  }
+});
+
+/**
+ * POST /api/admin/meilisearch/tags/initialize
+ *
+ * Inicializa el índice de Meilisearch (configuración + sync)
+ */
+router.post('/meilisearch/tags/initialize', async (req, res) => {
+  try {
+    console.log('🚀 Inicializando Meilisearch Tags...');
+    await initializeMeilisearchTags();
+    const stats = await getIndexStats();
+    res.json({
+      success: true,
+      message: 'Inicialización completada',
+      stats
+    });
+  } catch (error: any) {
+    console.error('Error en POST /admin/meilisearch/tags/initialize:', error);
+    res.status(500).json({
+      error: 'Error al inicializar Meilisearch',
+      message: error.message
+    });
+  }
+});
+
+/**
+ * PUT /api/admin/meilisearch/tags/:tagId
+ *
+ * Sincroniza un tag específico (para usar después de crear/actualizar)
+ */
+router.put('/meilisearch/tags/:tagId', async (req, res) => {
+  try {
+    const { tagId } = req.params;
+    await syncTag(tagId);
+    res.json({
+      success: true,
+      message: `Tag ${tagId} sincronizado`
+    });
+  } catch (error: any) {
+    console.error('Error en PUT /admin/meilisearch/tags/:tagId:', error);
+    res.status(500).json({
+      error: 'Error al sincronizar tag',
+      message: error.message
+    });
+  }
+});
+
+/**
+ * DELETE /api/admin/meilisearch/tags/:tagId
+ *
+ * Elimina un tag del índice de Meilisearch
+ */
+router.delete('/meilisearch/tags/:tagId', async (req, res) => {
+  try {
+    const { tagId } = req.params;
+    await deleteTagFromIndex(tagId);
+    res.json({
+      success: true,
+      message: `Tag ${tagId} eliminado del índice`
+    });
+  } catch (error: any) {
+    console.error('Error en DELETE /admin/meilisearch/tags/:tagId:', error);
+    res.status(500).json({
+      error: 'Error al eliminar tag del índice',
+      message: error.message
+    });
+  }
+});
+
+/**
+ * GET /api/admin/meilisearch/tags/search
+ *
+ * Busca tags en Meilisearch (para testing)
+ * Query params: q (query), tenant_id, tipo, limit, lang
+ */
+router.get('/meilisearch/tags/search', async (req, res) => {
+  try {
+    const { q, tenant_id, tipo, limit, lang } = req.query;
+
+    if (!q) {
+      return res.status(400).json({
+        error: 'Query requerido',
+        message: 'El parámetro "q" es requerido'
+      });
+    }
+
+    const result = await searchTags(String(q), {
+      tenantId: tenant_id ? String(tenant_id) : undefined,
+      tipo: tipo ? String(tipo) : undefined,
+      limit: limit ? parseInt(String(limit)) : 20,
+      lang: lang ? String(lang) : 'es'
+    });
+
+    res.json(result);
+  } catch (error: any) {
+    console.error('Error en GET /admin/meilisearch/tags/search:', error);
+    res.status(500).json({
+      error: 'Error al buscar tags',
+      message: error.message
+    });
   }
 });
 
