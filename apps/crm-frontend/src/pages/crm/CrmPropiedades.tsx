@@ -539,9 +539,9 @@ export default function CrmPropiedades() {
                       <Home size={48} />
                     </div>
                   )}
-                  {/* Badge destacada - sutil, escala de grises */}
+                  {/* Badge destacada - pequeño y elegante */}
                   {propiedad.destacada && (
-                    <span className="badge-destacada">Destacada</span>
+                    <span className="badge-destacada"><Star size={9} fill="currentColor" /></span>
                   )}
                   {/* Badge estado - solo si no es disponible y no coincide con filtro */}
                   {mostrarEstado && (
@@ -593,16 +593,16 @@ export default function CrmPropiedades() {
                     </div>
                     <div className="card-features">
                       {propiedad.habitaciones != null && (
-                        <span className="feature"><Bed size={13} /> {propiedad.habitaciones}</span>
+                        <span className="feature"><Bed size={11} /> {propiedad.habitaciones}</span>
                       )}
                       {propiedad.banos != null && (
-                        <span className="feature"><Bath size={13} /> {propiedad.banos}</span>
+                        <span className="feature"><Bath size={11} /> {propiedad.banos}</span>
                       )}
                       {propiedad.estacionamientos != null && (
-                        <span className="feature"><Car size={13} /> {propiedad.estacionamientos}</span>
+                        <span className="feature"><Car size={11} /> {propiedad.estacionamientos}</span>
                       )}
                       {propiedad.m2_construccion != null && (
-                        <span className="feature"><Maximize size={13} /> {propiedad.m2_construccion.toLocaleString()}</span>
+                        <span className="feature"><Maximize size={11} /> {propiedad.m2_construccion.toLocaleString()}m²</span>
                       )}
                     </div>
                   </div>
@@ -1258,26 +1258,29 @@ const styles = `
 
   .badge-destacada {
     position: absolute;
-    top: 12px;
-    left: 12px;
-    background: rgba(255, 255, 255, 0.95);
-    color: #374151;
-    padding: 4px 10px;
-    border-radius: 4px;
-    font-size: 0.7rem;
-    font-weight: 500;
-    letter-spacing: 0.02em;
-    box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
+    top: 8px;
+    left: 8px;
+    background: linear-gradient(135deg, #fbbf24, #f59e0b);
+    color: white;
+    width: 20px;
+    height: 20px;
+    border-radius: 50%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    box-shadow: 0 1px 3px rgba(0, 0, 0, 0.2);
   }
 
   .badge-estado {
     position: absolute;
-    top: 12px;
-    right: 12px;
-    padding: 4px 10px;
-    border-radius: 4px;
-    font-size: 0.7rem;
-    font-weight: 500;
+    top: 8px;
+    right: 8px;
+    padding: 2px 6px;
+    border-radius: 3px;
+    font-size: 0.6rem;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.02em;
   }
 
   .card-body {
@@ -1434,15 +1437,15 @@ const styles = `
 
   .card-features {
     display: flex;
-    gap: 8px;
+    gap: 6px;
     flex-shrink: 0;
   }
 
   .feature {
     display: flex;
     align-items: center;
-    gap: 3px;
-    font-size: 0.75rem;
+    gap: 2px;
+    font-size: 0.7rem;
     color: #64748b;
   }
 
