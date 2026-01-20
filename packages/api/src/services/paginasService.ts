@@ -26,45 +26,53 @@ export interface PaginaWebResponse {
 
 /**
  * Obtiene todas las páginas de un tenant
+ *
+ * Las "páginas" se derivan de:
+ * 1. tipos_pagina que tienen al menos un componente_web asociado para ese tenant
+ * 2. rutas_config_custom del tenant (páginas personalizadas)
+ *
+ * NO existe tabla paginas_web - las páginas son combinaciones de tipos_pagina + componentes_web
  */
 export async function getPaginasByTenant(tenantId: string): Promise<PaginaWebResponse[]> {
   try {
+    // Obtener tipos de página que tienen componentes configurados para este tenant
     const sql = `
-      SELECT 
-        id,
-        tenant_id as "tenantId",
-        tipo_pagina as "tipoPagina",
-        titulo,
-        slug,
-        descripcion,
-        contenido,
-        meta,
-        publica,
-        activa,
-        orden,
-        created_at as "createdAt",
-        updated_at as "updatedAt"
-      FROM paginas_web
-      WHERE tenant_id = $1
-      ORDER BY orden ASC, created_at ASC
+      SELECT DISTINCT
+        tp.id,
+        tp.codigo as "tipoPagina",
+        tp.nombre as titulo,
+        tp.ruta_patron as slug,
+        tp.descripcion,
+        tp.visible as activa,
+        tp.publico as publica,
+        tp.nivel as orden,
+        tp.created_at as "createdAt",
+        tp.updated_at as "updatedAt",
+        COUNT(cw.id) as "cantidadComponentes"
+      FROM tipos_pagina tp
+      LEFT JOIN componentes_web cw ON cw.tipo_pagina_id = tp.id AND cw.tenant_id = $1 AND cw.activo = true
+      WHERE tp.visible = true
+      GROUP BY tp.id, tp.codigo, tp.nombre, tp.ruta_patron, tp.descripcion, tp.visible, tp.publico, tp.nivel, tp.created_at, tp.updated_at
+      ORDER BY tp.nivel ASC, tp.nombre ASC
     `;
-    
+
     const result = await query(sql, [tenantId]);
-    
+
     return result.rows.map((row: any) => ({
       id: row.id,
-      tenantId: row.tenantId,
+      tenantId: tenantId,
       tipoPagina: row.tipoPagina,
       titulo: row.titulo,
-      slug: row.slug,
+      slug: row.slug || '/',
       descripcion: row.descripcion || undefined,
-      contenido: typeof row.contenido === 'string' ? JSON.parse(row.contenido) : row.contenido,
-      meta: typeof row.meta === 'string' ? JSON.parse(row.meta) : row.meta,
-      publica: row.publica,
-      activa: row.activa,
-      orden: row.orden,
-      createdAt: row.createdAt.toISOString(),
-      updatedAt: row.updatedAt.toISOString(),
+      contenido: {},
+      meta: {},
+      publica: row.publica ?? true,
+      activa: row.activa ?? true,
+      orden: row.orden || 0,
+      createdAt: row.createdAt ? row.createdAt.toISOString() : new Date().toISOString(),
+      updatedAt: row.updatedAt ? row.updatedAt.toISOString() : new Date().toISOString(),
+      cantidadComponentes: parseInt(row.cantidadComponentes) || 0,
     }));
   } catch (error: any) {
     console.error('Error al obtener páginas:', error);
@@ -73,221 +81,49 @@ export async function getPaginasByTenant(tenantId: string): Promise<PaginaWebRes
 }
 
 /**
- * Crea o actualiza una página
- */
-// Función helper para validar UUID
-function isValidUUID(uuid: string): boolean {
-  const uuidRegex = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
-  return uuidRegex.test(uuid);
-}
-
-export async function savePagina(
-  tenantId: string,
-  pagina: {
-    id?: string;
-    tipoPagina: string;
-    titulo: string;
-    slug: string;
-    descripcion?: string;
-    contenido?: Record<string, any>;
-    meta?: Record<string, any>;
-    publica?: boolean;
-    activa?: boolean;
-    orden?: number;
-  }
-): Promise<PaginaWebResponse> {
-  try {
-    const contenidoJson = JSON.stringify(pagina.contenido || {});
-    const metaJson = JSON.stringify(pagina.meta || {});
-    const publica = pagina.publica !== undefined ? pagina.publica : true;
-    const activa = pagina.activa !== undefined ? pagina.activa : true;
-    const orden = pagina.orden !== undefined ? pagina.orden : 0;
-
-    // Validar que si viene un ID, sea un UUID válido
-    // Si no es válido, tratarlo como página nueva (no incluir ID)
-    const tieneIdValido = pagina.id && isValidUUID(pagina.id);
-    const paginaId = tieneIdValido ? pagina.id : undefined;
-
-    if (paginaId) {
-      // Actualizar página existente
-      const sql = `
-        UPDATE paginas_web
-        SET 
-          tipo_pagina = $1,
-          titulo = $2,
-          slug = $3,
-          descripcion = $4,
-          contenido = $5,
-          meta = $6,
-          publica = $7,
-          activa = $8,
-          orden = $9,
-          updated_at = NOW()
-        WHERE id = $10 AND tenant_id = $11
-        RETURNING 
-          id,
-          tenant_id as "tenantId",
-          tipo_pagina as "tipoPagina",
-          titulo,
-          slug,
-          descripcion,
-          contenido,
-          meta,
-          publica,
-          activa,
-          orden,
-          created_at as "createdAt",
-          updated_at as "updatedAt"
-      `;
-
-      const result = await query(sql, [
-        pagina.tipoPagina,
-        pagina.titulo,
-        pagina.slug,
-        pagina.descripcion || null,
-        contenidoJson,
-        metaJson,
-        publica,
-        activa,
-        orden,
-        paginaId,
-        tenantId,
-      ]);
-
-      if (result.rows.length === 0) {
-        throw new Error('Página no encontrada o no pertenece al tenant');
-      }
-
-      const row = result.rows[0];
-      return {
-        id: row.id,
-        tenantId: row.tenantId,
-        tipoPagina: row.tipoPagina,
-        titulo: row.titulo,
-        slug: row.slug,
-        descripcion: row.descripcion || undefined,
-        contenido: typeof row.contenido === 'string' ? JSON.parse(row.contenido) : row.contenido,
-        meta: typeof row.meta === 'string' ? JSON.parse(row.meta) : row.meta,
-        publica: row.publica,
-        activa: row.activa,
-        orden: row.orden,
-        createdAt: row.createdAt.toISOString(),
-        updatedAt: row.updatedAt.toISOString(),
-      };
-    } else {
-      // Crear nueva página
-      const sql = `
-        INSERT INTO paginas_web (
-          tenant_id,
-          tipo_pagina,
-          titulo,
-          slug,
-          descripcion,
-          contenido,
-          meta,
-          publica,
-          activa,
-          orden
-        )
-        VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)
-        RETURNING 
-          id,
-          tenant_id as "tenantId",
-          tipo_pagina as "tipoPagina",
-          titulo,
-          slug,
-          descripcion,
-          contenido,
-          meta,
-          publica,
-          activa,
-          orden,
-          created_at as "createdAt",
-          updated_at as "updatedAt"
-      `;
-
-      const result = await query(sql, [
-        tenantId,
-        pagina.tipoPagina,
-        pagina.titulo,
-        pagina.slug,
-        pagina.descripcion || null,
-        contenidoJson,
-        metaJson,
-        publica,
-        activa,
-        orden,
-      ]);
-
-      const row = result.rows[0];
-      return {
-        id: row.id,
-        tenantId: row.tenantId,
-        tipoPagina: row.tipoPagina,
-        titulo: row.titulo,
-        slug: row.slug,
-        descripcion: row.descripcion || undefined,
-        contenido: typeof row.contenido === 'string' ? JSON.parse(row.contenido) : row.contenido,
-        meta: typeof row.meta === 'string' ? JSON.parse(row.meta) : row.meta,
-        publica: row.publica,
-        activa: row.activa,
-        orden: row.orden,
-        createdAt: row.createdAt.toISOString(),
-        updatedAt: row.updatedAt.toISOString(),
-      };
-    }
-  } catch (error: any) {
-    console.error('Error al guardar página:', error);
-    throw new Error(`Error al guardar página: ${error.message}`);
-  }
-}
-
-/**
- * Obtiene una página por ID
+ * Obtiene una página por ID (busca en tipos_pagina)
+ * El ID puede ser el UUID del tipo_pagina
  */
 export async function getPaginaById(tenantId: string, paginaId: string): Promise<PaginaWebResponse | null> {
   try {
     const sql = `
-      SELECT 
-        id,
-        tenant_id as "tenantId",
-        tipo_pagina as "tipoPagina",
-        titulo,
-        slug,
-        descripcion,
-        contenido,
-        meta,
-        publica,
-        activa,
-        orden,
-        created_at as "createdAt",
-        updated_at as "updatedAt"
-      FROM paginas_web
-      WHERE id = $1 AND tenant_id = $2
+      SELECT
+        tp.id,
+        tp.codigo as "tipoPagina",
+        tp.nombre as titulo,
+        tp.ruta_patron as slug,
+        tp.descripcion,
+        tp.visible as activa,
+        tp.publico as publica,
+        tp.nivel as orden,
+        tp.created_at as "createdAt",
+        tp.updated_at as "updatedAt"
+      FROM tipos_pagina tp
+      WHERE tp.id = $1
       LIMIT 1
     `;
-    
-    const result = await query(sql, [paginaId, tenantId]);
-    
+
+    const result = await query(sql, [paginaId]);
+
     if (result.rows.length === 0) {
       return null;
     }
-    
+
     const row = result.rows[0];
     return {
       id: row.id,
-      tenantId: row.tenantId,
+      tenantId: tenantId,
       tipoPagina: row.tipoPagina,
       titulo: row.titulo,
-      slug: row.slug,
+      slug: row.slug || '/',
       descripcion: row.descripcion || undefined,
-      contenido: typeof row.contenido === 'string' ? JSON.parse(row.contenido) : row.contenido,
-      meta: typeof row.meta === 'string' ? JSON.parse(row.meta) : row.meta,
-      publica: row.publica,
-      activa: row.activa,
-      orden: row.orden,
-      createdAt: row.createdAt.toISOString(),
-      updatedAt: row.updatedAt.toISOString(),
+      contenido: {},
+      meta: {},
+      publica: row.publica ?? true,
+      activa: row.activa ?? true,
+      orden: row.orden || 0,
+      createdAt: row.createdAt ? row.createdAt.toISOString() : new Date().toISOString(),
+      updatedAt: row.updatedAt ? row.updatedAt.toISOString() : new Date().toISOString(),
     };
   } catch (error: any) {
     console.error('Error al obtener página:', error);
@@ -296,52 +132,50 @@ export async function getPaginaById(tenantId: string, paginaId: string): Promise
 }
 
 /**
- * Obtiene una página por tipo de página (para páginas dinámicas como single_property)
+ * Obtiene una página por tipo de página (busca en tipos_pagina por codigo)
+ * Ejemplo: getPaginaByTipo(tenantId, 'homepage') -> retorna el tipo homepage
  */
 export async function getPaginaByTipo(tenantId: string, tipoPagina: string): Promise<PaginaWebResponse | null> {
   try {
     const sql = `
-      SELECT 
-        id,
-        tenant_id as "tenantId",
-        tipo_pagina as "tipoPagina",
-        titulo,
-        slug,
-        descripcion,
-        contenido,
-        meta,
-        publica,
-        activa,
-        orden,
-        created_at as "createdAt",
-        updated_at as "updatedAt"
-      FROM paginas_web
-      WHERE tenant_id = $1 AND tipo_pagina = $2 AND activa = true
-      ORDER BY orden ASC
+      SELECT
+        tp.id,
+        tp.codigo as "tipoPagina",
+        tp.nombre as titulo,
+        tp.ruta_patron as slug,
+        tp.descripcion,
+        tp.visible as activa,
+        tp.publico as publica,
+        tp.nivel as orden,
+        tp.created_at as "createdAt",
+        tp.updated_at as "updatedAt"
+      FROM tipos_pagina tp
+      WHERE tp.codigo = $1 AND tp.visible = true
+      ORDER BY tp.nivel ASC
       LIMIT 1
     `;
-    
-    const result = await query(sql, [tenantId, tipoPagina]);
-    
+
+    const result = await query(sql, [tipoPagina]);
+
     if (result.rows.length === 0) {
       return null;
     }
-    
+
     const row = result.rows[0];
     return {
       id: row.id,
-      tenantId: row.tenantId,
+      tenantId: tenantId,
       tipoPagina: row.tipoPagina,
       titulo: row.titulo,
-      slug: row.slug,
+      slug: row.slug || '/',
       descripcion: row.descripcion || undefined,
-      contenido: typeof row.contenido === 'string' ? JSON.parse(row.contenido) : row.contenido,
-      meta: typeof row.meta === 'string' ? JSON.parse(row.meta) : row.meta,
-      publica: row.publica,
-      activa: row.activa,
-      orden: row.orden,
-      createdAt: row.createdAt.toISOString(),
-      updatedAt: row.updatedAt.toISOString(),
+      contenido: {},
+      meta: {},
+      publica: row.publica ?? true,
+      activa: row.activa ?? true,
+      orden: row.orden || 0,
+      createdAt: row.createdAt ? row.createdAt.toISOString() : new Date().toISOString(),
+      updatedAt: row.updatedAt ? row.updatedAt.toISOString() : new Date().toISOString(),
     };
   } catch (error: any) {
     console.error('Error al obtener página por tipo:', error);
@@ -350,65 +184,69 @@ export async function getPaginaByTipo(tenantId: string, tipoPagina: string): Pro
 }
 
 /**
- * Obtiene una página por slug
+ * Obtiene una página por slug (busca en tipos_pagina por ruta_patron)
+ * Ejemplo: getPaginaBySlug(tenantId, '/') -> retorna homepage
+ *          getPaginaBySlug(tenantId, '/propiedades') -> retorna listados_propiedades
  */
 export async function getPaginaBySlug(tenantId: string, slug: string): Promise<PaginaWebResponse | null> {
   try {
     console.log(`🔍 Buscando página por slug: "${slug}" para tenant: ${tenantId}`);
-    
+
+    // Normalizar el slug (quitar slash inicial si existe para comparar)
+    const normalizedSlug = slug.startsWith('/') ? slug : `/${slug}`;
+    const slugWithoutSlash = slug.startsWith('/') ? slug.slice(1) : slug;
+
     const sql = `
-      SELECT 
-        id,
-        tenant_id as "tenantId",
-        tipo_pagina as "tipoPagina",
-        titulo,
-        slug,
-        descripcion,
-        contenido,
-        meta,
-        publica,
-        activa,
-        orden,
-        created_at as "createdAt",
-        updated_at as "updatedAt"
-      FROM paginas_web
-      WHERE tenant_id = $1 AND slug = $2 AND activa = true
+      SELECT
+        tp.id,
+        tp.codigo as "tipoPagina",
+        tp.nombre as titulo,
+        tp.ruta_patron as slug,
+        tp.descripcion,
+        tp.visible as activa,
+        tp.publico as publica,
+        tp.nivel as orden,
+        tp.created_at as "createdAt",
+        tp.updated_at as "updatedAt"
+      FROM tipos_pagina tp
+      WHERE (tp.ruta_patron = $1 OR tp.ruta_patron = $2 OR tp.ruta_patron = $3)
+        AND tp.visible = true
       LIMIT 1
     `;
-    
-    const result = await query(sql, [tenantId, slug]);
-    
+
+    const result = await query(sql, [slug, normalizedSlug, slugWithoutSlash]);
+
     if (result.rows.length === 0) {
-      // Debug: Buscar todas las páginas de este tenant para ver qué slugs existen
-      const debugSql = `SELECT slug, titulo, activa, tipo_pagina FROM paginas_web WHERE tenant_id = $1`;
-      const debugResult = await query(debugSql, [tenantId]);
-      console.log(`🔍 Páginas encontradas para tenant ${tenantId}:`, debugResult.rows.map((r: any) => ({
-        slug: r.slug,
-        titulo: r.titulo,
-        activa: r.activa,
-        tipo: r.tipo_pagina
+      // Debug: Buscar todos los tipos de página para ver qué rutas existen
+      const debugSql = `SELECT codigo, nombre, ruta_patron, visible FROM tipos_pagina`;
+      const debugResult = await query(debugSql, []);
+      console.log(`🔍 Tipos de página disponibles:`, debugResult.rows.map((r: any) => ({
+        codigo: r.codigo,
+        nombre: r.nombre,
+        ruta: r.ruta_patron,
+        visible: r.visible
       })));
-      console.warn(`⚠️ No se encontró página activa con slug "${slug}" para tenant ${tenantId}`);
+      console.warn(`⚠️ No se encontró tipo de página con slug "${slug}"`);
       return null;
     }
-    
-    console.log(`✅ Página encontrada: ${result.rows[0].titulo} (slug: ${result.rows[0].slug}, activa: ${result.rows[0].activa})`);
-    
+
+    console.log(`✅ Página encontrada: ${result.rows[0].titulo} (slug: ${result.rows[0].slug})`);
+
     const row = result.rows[0];
     return {
       id: row.id,
-      tenantId: row.tenantId,
+      tenantId: tenantId,
       tipoPagina: row.tipoPagina,
       titulo: row.titulo,
-      slug: row.slug,
+      slug: row.slug || '/',
       descripcion: row.descripcion || undefined,
-      contenido: typeof row.contenido === 'string' ? JSON.parse(row.contenido) : row.contenido,
-      meta: typeof row.meta === 'string' ? JSON.parse(row.meta) : row.meta,
-      publica: row.publica,
-      activa: row.activa,
-      orden: row.orden,
-      createdAt: row.createdAt.toISOString(),
-      updatedAt: row.updatedAt.toISOString(),
+      contenido: {},
+      meta: {},
+      publica: row.publica ?? true,
+      activa: row.activa ?? true,
+      orden: row.orden || 0,
+      createdAt: row.createdAt ? row.createdAt.toISOString() : new Date().toISOString(),
+      updatedAt: row.updatedAt ? row.updatedAt.toISOString() : new Date().toISOString(),
     };
   } catch (error: any) {
     console.error('Error al obtener página por slug:', error);
@@ -428,9 +266,12 @@ export interface PaginaCompletaResponse {
 /**
  * Obtiene una página completa con todos sus componentes y tema
  * Este es el endpoint principal que el frontend debe usar
- * 
+ *
+ * Las páginas se derivan de tipos_pagina (NO existe tabla paginas_web)
+ * Los componentes se obtienen de componentes_web filtrando por tipo_pagina_id
+ *
  * @param tenantId - ID del tenant
- * @param slug - Slug de la página
+ * @param slug - Slug de la página (ruta_patron en tipos_pagina)
  * @returns Página completa con componentes ya filtrados y ordenados
  */
 export async function getPaginaCompleta(
@@ -438,7 +279,7 @@ export async function getPaginaCompleta(
   slug: string
 ): Promise<PaginaCompletaResponse> {
   try {
-    // 1. Obtener la página
+    // 1. Obtener el tipo de página por slug (ruta_patron)
     const pagina = await getPaginaBySlug(tenantId, slug);
 
     if (!pagina) {
@@ -452,16 +293,18 @@ export async function getPaginaCompleta(
       throw new Error(`Tema no encontrado para el tenant ${tenantId}`);
     }
 
-    // 3. Obtener secciones usando el nuevo sistema de herencia
-    // Prioridad: página específica > tipo de página > configuración global del tenant
+    // 3. Obtener componentes del tenant para este tipo de página
+    // Los componentes se vinculan a tipos_pagina mediante tipo_pagina_id
     let componentes: ComponenteWebResponse[] = [];
 
     try {
       // Intentar usar el nuevo sistema de secciones resueltas
+      // pagina.id aquí es el UUID del tipo_pagina
       const seccionesResueltas = await getSeccionesResueltas(
         tenantId,
-        pagina.id,
-        pagina.tipoPagina
+        pagina.tipoPagina,  // Código del tipo_pagina (ej: listado_asesores)
+        pagina.id,          // UUID del tipo_pagina (para componentes específicos)
+        true                // includeFallback: usar plantillas_pagina si no hay componentes (para componentes específicos)
       );
 
       // Convertir secciones al formato de componentes
@@ -469,10 +312,10 @@ export async function getPaginaCompleta(
         id: seccion.id,
         tipo: seccion.tipo,
         variante: seccion.variante,
-        datos: seccion.datos,
+        datos: seccion.datos as any, // Los datos de secciones ya están formateados
         activo: seccion.activo,
         orden: seccion.orden,
-        paginaId: seccion.paginaId,
+        paginaId: seccion.paginaId || undefined,
         predeterminado: true,
       }));
 
@@ -525,7 +368,7 @@ export async function getPaginaCompleta(
     console.log(`   - Tema: ${Object.keys(tema).length} colores`);
 
     const componentesConDinamicos = componentes.filter(
-      (c) => c.datos?.dynamic_data?.resolved?.length > 0
+      (c) => (c.datos?.dynamic_data?.resolved?.length ?? 0) > 0
     );
     if (componentesConDinamicos.length > 0) {
       console.log(`   - Componentes con datos dinámicos: ${componentesConDinamicos.length}`);

@@ -5,6 +5,8 @@
  */
 
 import { query } from '../utils/db.js';
+import { createClerkUserWithoutPassword } from '../middleware/clerkAuth.js';
+import { v4 as uuidv4 } from 'uuid';
 
 export interface Usuario {
   id: string;
@@ -696,21 +698,52 @@ export async function agregarUsuarioATenant(
     telefono?: string;
     rolIds?: string[];
     esOwner?: boolean;
+    cedula?: string;
+    fechaNacimiento?: string;
+    direccion?: string;
+    ciudad?: string;
+    estado?: string;
+    codigoPostal?: string;
+    pais?: string;
+    empresa?: string;
+    cargo?: string;
+    departamento?: string;
+    notas?: string;
+    datosExtra?: Record<string, any>;
+    tiposUsuario?: string[];
   }
 ): Promise<UsuarioTenant> {
   // Buscar o crear usuario por email
   let usuario = await getUsuarioByEmail(data.email);
 
   if (!usuario) {
-    // Crear nuevo usuario (SIN Clerk ID - usuarios internos del tenant)
+    // Crear nuevo usuario CON Clerk ID (bidireccionalidad)
+    let clerkId: string | null = null;
+
+    try {
+      // Crear usuario en Clerk sin contraseña (recibirá email para configurar)
+      console.log(`🔄 Creando usuario en Clerk: ${data.email}`);
+      const clerkUser = await createClerkUserWithoutPassword({
+        email: data.email,
+        firstName: data.nombre,
+        lastName: data.apellido,
+      });
+      clerkId = clerkUser.id;
+      console.log(`✅ Usuario creado en Clerk: ${data.email} (ID: ${clerkId})`);
+    } catch (clerkError: any) {
+      // Si falla Clerk, verificar si el usuario ya existe en Clerk
+      console.error(`⚠️ Error creando usuario en Clerk: ${clerkError.message}`);
+      // Continuamos sin clerk_id - el usuario podrá sincronizarse después
+    }
+
     const insertSql = `
       INSERT INTO usuarios (
-        email, nombre, apellido, telefono, 
+        email, nombre, apellido, telefono, clerk_id,
         cedula, fecha_nacimiento, direccion, ciudad, estado, codigo_postal, pais,
         empresa, cargo, departamento, notas, datos_extra, tipos_usuario,
         activo
       )
-      VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, true)
+      VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18, true)
       RETURNING
         id,
         email,
@@ -731,6 +764,7 @@ export async function agregarUsuarioATenant(
       data.nombre || null,
       data.apellido || null,
       data.telefono || null,
+      clerkId, // Ahora incluimos el clerk_id
       data.cedula || null,
       data.fechaNacimiento || null,
       data.direccion || null,
@@ -746,6 +780,10 @@ export async function agregarUsuarioATenant(
       data.tiposUsuario ? JSON.stringify(data.tiposUsuario) : '[]',
     ]);
     usuario = result.rows[0];
+  }
+
+  if (!usuario) {
+    throw new Error(`No se pudo crear o encontrar el usuario con email: ${data.email}`);
   }
 
   // Verificar si ya está en el tenant
@@ -783,6 +821,7 @@ export async function agregarUsuarioATenant(
     );
 
     // Insertar nuevos roles
+    let tieneRolAsesor = false;
     for (const rolId of data.rolIds) {
       await query(
         `INSERT INTO usuarios_roles (usuario_id, tenant_id, rol_id, activo)
@@ -790,6 +829,47 @@ export async function agregarUsuarioATenant(
          ON CONFLICT (usuario_id, tenant_id, rol_id) DO UPDATE SET activo = true`,
         [usuario.id, tenantId, rolId]
       );
+
+      // Verificar si es rol de asesor
+      const rolInfo = await query(`SELECT nombre FROM roles WHERE id = $1`, [rolId]);
+      const rolNombre = rolInfo.rows[0]?.nombre?.toLowerCase() || '';
+      if (rolNombre.includes('asesor')) {
+        tieneRolAsesor = true;
+      }
+    }
+
+    // Si tiene rol de asesor, crear perfil automáticamente
+    if (tieneRolAsesor) {
+      const perfilExiste = await query(
+        `SELECT id FROM perfiles_asesor WHERE usuario_id = $1 AND tenant_id = $2`,
+        [usuario.id, tenantId]
+      );
+
+      if (perfilExiste.rows.length === 0) {
+        const nombre = data.nombre || usuario.nombre || 'asesor';
+        const apellido = data.apellido || usuario.apellido || '';
+        const slug = `${nombre.toLowerCase()}-${apellido.toLowerCase()}`
+          .replace(/\s+/g, '-')
+          .replace(/[^a-z0-9-]/g, '')
+          .substring(0, 100);
+
+        await query(
+          `INSERT INTO perfiles_asesor (
+            id, tenant_id, usuario_id, slug, titulo_profesional,
+            whatsapp, activo, visible_en_web, destacado, orden, created_at, updated_at
+          ) VALUES ($1, $2, $3, $4, 'Asesor Inmobiliario', $5, true, true, false, 0, NOW(), NOW())`,
+          [uuidv4(), tenantId, usuario.id, slug, data.telefono || null]
+        );
+        console.log(`✅ Perfil de asesor creado automáticamente para ${data.email} en tenant ${tenantId}`);
+      } else {
+        // Reactivar perfil existente
+        await query(
+          `UPDATE perfiles_asesor SET activo = true, visible_en_web = true, updated_at = NOW()
+           WHERE usuario_id = $1 AND tenant_id = $2`,
+          [usuario.id, tenantId]
+        );
+        console.log(`✅ Perfil de asesor reactivado para ${data.email} en tenant ${tenantId}`);
+      }
     }
   }
 
@@ -930,13 +1010,25 @@ export async function actualizarUsuarioTenant(
 
   // Actualizar roles si se proporcionan
   if (data.rolIds !== undefined) {
+    // Verificar si tenía rol de asesor antes
+    const rolesAnteriores = await query(
+      `SELECT r.nombre FROM usuarios_roles ur
+       JOIN roles r ON ur.rol_id = r.id
+       WHERE ur.usuario_id = $1 AND ur.tenant_id = $2 AND ur.activo = true`,
+      [usuarioId, tenantId]
+    );
+    const teniaRolAsesor = rolesAnteriores.rows.some(
+      (r: any) => r.nombre?.toLowerCase().includes('asesor')
+    );
+
     // Eliminar roles actuales del tenant
     await query(
       `DELETE FROM usuarios_roles WHERE usuario_id = $1 AND tenant_id = $2`,
       [usuarioId, tenantId]
     );
 
-    // Insertar nuevos roles
+    // Insertar nuevos roles y verificar si tiene rol de asesor
+    let tieneRolAsesor = false;
     if (data.rolIds.length > 0) {
       for (const rolId of data.rolIds) {
         await query(
@@ -945,7 +1037,62 @@ export async function actualizarUsuarioTenant(
            ON CONFLICT (usuario_id, tenant_id, rol_id) DO UPDATE SET activo = true`,
           [usuarioId, tenantId, rolId]
         );
+
+        // Verificar si es rol de asesor
+        const rolInfo = await query(`SELECT nombre FROM roles WHERE id = $1`, [rolId]);
+        const rolNombre = rolInfo.rows[0]?.nombre?.toLowerCase() || '';
+        if (rolNombre.includes('asesor')) {
+          tieneRolAsesor = true;
+        }
       }
+    }
+
+    // Manejar perfil de asesor según cambios de rol
+    if (tieneRolAsesor && !teniaRolAsesor) {
+      // Se agregó rol de asesor - crear o reactivar perfil
+      const perfilExiste = await query(
+        `SELECT id FROM perfiles_asesor WHERE usuario_id = $1 AND tenant_id = $2`,
+        [usuarioId, tenantId]
+      );
+
+      if (perfilExiste.rows.length === 0) {
+        // Obtener datos del usuario
+        const userData = await query(
+          `SELECT nombre, apellido, telefono FROM usuarios WHERE id = $1`,
+          [usuarioId]
+        );
+        const user = userData.rows[0];
+        const nombre = data.nombre || user?.nombre || 'asesor';
+        const apellido = data.apellido || user?.apellido || '';
+        const slug = `${nombre.toLowerCase()}-${apellido.toLowerCase()}`
+          .replace(/\s+/g, '-')
+          .replace(/[^a-z0-9-]/g, '')
+          .substring(0, 100);
+
+        await query(
+          `INSERT INTO perfiles_asesor (
+            id, tenant_id, usuario_id, slug, titulo_profesional,
+            whatsapp, activo, visible_en_web, destacado, orden, created_at, updated_at
+          ) VALUES ($1, $2, $3, $4, 'Asesor Inmobiliario', $5, true, true, false, 0, NOW(), NOW())`,
+          [uuidv4(), tenantId, usuarioId, slug, data.telefono || user?.telefono || null]
+        );
+        console.log(`✅ Perfil de asesor creado para usuario ${usuarioId} en tenant ${tenantId}`);
+      } else {
+        await query(
+          `UPDATE perfiles_asesor SET activo = true, visible_en_web = true, updated_at = NOW()
+           WHERE usuario_id = $1 AND tenant_id = $2`,
+          [usuarioId, tenantId]
+        );
+        console.log(`✅ Perfil de asesor reactivado para usuario ${usuarioId} en tenant ${tenantId}`);
+      }
+    } else if (!tieneRolAsesor && teniaRolAsesor) {
+      // Se quitó rol de asesor - desactivar perfil
+      await query(
+        `UPDATE perfiles_asesor SET activo = false, visible_en_web = false, updated_at = NOW()
+         WHERE usuario_id = $1 AND tenant_id = $2`,
+        [usuarioId, tenantId]
+      );
+      console.log(`⚠️ Perfil de asesor desactivado para usuario ${usuarioId} en tenant ${tenantId}`);
     }
   }
 
@@ -977,7 +1124,7 @@ export async function eliminarUsuarioDeTenant(
     [usuarioId, tenantId]
   );
 
-  return result.rowCount > 0;
+  return (result.rowCount ?? 0) > 0;
 }
 
 /**
@@ -1451,5 +1598,247 @@ export async function eliminarDocumentoUsuario(
   `;
 
   const result = await query(sql, [documentoId, tenantId]);
-  return result.rowCount > 0;
+  return (result.rowCount ?? 0) > 0;
+}
+
+// ==================== FUNCIONES DE PERFIL ASESOR ====================
+
+/**
+ * Obtener perfil de asesor por usuario y tenant
+ */
+export async function getPerfilAsesor(
+  usuarioId: string,
+  tenantId: string
+): Promise<any | null> {
+  const sql = `
+    SELECT
+      id,
+      tenant_id as "tenantId",
+      usuario_id as "usuarioId",
+      slug,
+      titulo_profesional as "tituloProfesional",
+      biografia,
+      foto_url as "fotoUrl",
+      video_presentacion_url as "videoPresentacionUrl",
+      especialidades,
+      idiomas,
+      zonas,
+      tipos_propiedad as "tiposPropiedad",
+      experiencia_anos as "experienciaAnos",
+      rango,
+      fecha_inicio as "fechaInicio",
+      equipo_id as "equipoId",
+      split_comision as "splitComision",
+      meta_mensual as "metaMensual",
+      stats,
+      redes_sociales as "redesSociales",
+      whatsapp,
+      telefono_directo as "telefonoDirecto",
+      certificaciones,
+      logros,
+      activo,
+      destacado,
+      visible_en_web as "visibleEnWeb",
+      orden,
+      traducciones,
+      metadata,
+      created_at as "createdAt",
+      updated_at as "updatedAt"
+    FROM perfiles_asesor
+    WHERE usuario_id = $1 AND tenant_id = $2
+  `;
+
+  const result = await query(sql, [usuarioId, tenantId]);
+  if (result.rows.length === 0) {
+    return null;
+  }
+
+  const perfil = result.rows[0];
+  return {
+    ...perfil,
+    especialidades: typeof perfil.especialidades === 'string' ? JSON.parse(perfil.especialidades) : (perfil.especialidades || []),
+    idiomas: typeof perfil.idiomas === 'string' ? JSON.parse(perfil.idiomas) : (perfil.idiomas || ['es']),
+    zonas: typeof perfil.zonas === 'string' ? JSON.parse(perfil.zonas) : (perfil.zonas || []),
+    tiposPropiedad: typeof perfil.tiposPropiedad === 'string' ? JSON.parse(perfil.tiposPropiedad) : (perfil.tiposPropiedad || []),
+    stats: typeof perfil.stats === 'string' ? JSON.parse(perfil.stats) : (perfil.stats || {}),
+    redesSociales: typeof perfil.redesSociales === 'string' ? JSON.parse(perfil.redesSociales) : (perfil.redesSociales || {}),
+    certificaciones: typeof perfil.certificaciones === 'string' ? JSON.parse(perfil.certificaciones) : (perfil.certificaciones || []),
+    logros: typeof perfil.logros === 'string' ? JSON.parse(perfil.logros) : (perfil.logros || []),
+    traducciones: typeof perfil.traducciones === 'string' ? JSON.parse(perfil.traducciones) : (perfil.traducciones || {}),
+    metadata: typeof perfil.metadata === 'string' ? JSON.parse(perfil.metadata) : (perfil.metadata || {}),
+  };
+}
+
+/**
+ * Actualizar o crear perfil de asesor
+ */
+export async function upsertPerfilAsesor(
+  usuarioId: string,
+  tenantId: string,
+  data: {
+    biografia?: string;
+    especialidades?: string | string[];
+    idiomas?: string | string[];
+    zonas?: string | string[];
+    tiposPropiedad?: string | string[];
+    experienciaAnos?: number | string;
+    licencia?: string;
+    redesSociales?: Record<string, string>;
+    tituloProfesional?: string;
+    whatsapp?: string;
+    telefonoDirecto?: string;
+  }
+): Promise<any> {
+  // Verificar si ya existe el perfil
+  const existingPerfil = await getPerfilAsesor(usuarioId, tenantId);
+
+  // Helper para convertir string o array a array
+  const toArray = (value: string | string[] | undefined): string[] => {
+    if (!value) return [];
+    if (typeof value === 'string') {
+      // Si viene como string separado por comas
+      return value.split(',').map(e => e.trim()).filter(Boolean);
+    }
+    return Array.isArray(value) ? value : [];
+  };
+
+  // Preparar campos como arrays
+  const especialidadesArray = toArray(data.especialidades);
+  const idiomasArray = toArray(data.idiomas);
+  const zonasArray = toArray(data.zonas);
+  const tiposPropiedadArray = toArray(data.tiposPropiedad);
+
+  // Convertir años de experiencia a número
+  const experienciaAnos = data.experienciaAnos
+    ? parseInt(String(data.experienciaAnos).replace(/\D/g, ''), 10) || 0
+    : 0;
+
+  if (existingPerfil) {
+    // Actualizar perfil existente
+    const updates: string[] = [];
+    const values: any[] = [];
+    let paramIndex = 1;
+
+    if (data.biografia !== undefined) {
+      updates.push(`biografia = $${paramIndex++}`);
+      values.push(data.biografia || null);
+    }
+    if (data.especialidades !== undefined) {
+      updates.push(`especialidades = $${paramIndex++}`);
+      values.push(JSON.stringify(especialidadesArray));
+    }
+    if (data.idiomas !== undefined) {
+      updates.push(`idiomas = $${paramIndex++}`);
+      values.push(JSON.stringify(idiomasArray));
+    }
+    if (data.zonas !== undefined) {
+      updates.push(`zonas = $${paramIndex++}`);
+      values.push(JSON.stringify(zonasArray));
+    }
+    if (data.tiposPropiedad !== undefined) {
+      updates.push(`tipos_propiedad = $${paramIndex++}`);
+      values.push(JSON.stringify(tiposPropiedadArray));
+    }
+    if (data.experienciaAnos !== undefined) {
+      updates.push(`experiencia_anos = $${paramIndex++}`);
+      values.push(experienciaAnos);
+    }
+    if (data.redesSociales !== undefined) {
+      // Merge con redes sociales existentes
+      const mergedRedes = {
+        ...existingPerfil.redesSociales,
+        ...data.redesSociales,
+      };
+      updates.push(`redes_sociales = $${paramIndex++}`);
+      values.push(JSON.stringify(mergedRedes));
+    }
+    if (data.tituloProfesional !== undefined) {
+      updates.push(`titulo_profesional = $${paramIndex++}`);
+      values.push(data.tituloProfesional || null);
+    }
+    if (data.whatsapp !== undefined) {
+      updates.push(`whatsapp = $${paramIndex++}`);
+      values.push(data.whatsapp || null);
+    }
+    if (data.telefonoDirecto !== undefined) {
+      updates.push(`telefono_directo = $${paramIndex++}`);
+      values.push(data.telefonoDirecto || null);
+    }
+    // Guardar licencia en metadata
+    if (data.licencia !== undefined) {
+      const newMetadata = {
+        ...existingPerfil.metadata,
+        licencia: data.licencia,
+      };
+      updates.push(`metadata = $${paramIndex++}`);
+      values.push(JSON.stringify(newMetadata));
+    }
+
+    if (updates.length === 0) {
+      return existingPerfil;
+    }
+
+    updates.push(`updated_at = NOW()`);
+    values.push(usuarioId);
+    values.push(tenantId);
+
+    const sql = `
+      UPDATE perfiles_asesor SET
+        ${updates.join(', ')}
+      WHERE usuario_id = $${paramIndex} AND tenant_id = $${paramIndex + 1}
+      RETURNING id
+    `;
+
+    await query(sql, values);
+    return await getPerfilAsesor(usuarioId, tenantId);
+  } else {
+    // Crear nuevo perfil de asesor
+    // Generar slug basado en el usuario
+    const usuarioResult = await query(
+      `SELECT nombre, apellido, email FROM usuarios WHERE id = $1`,
+      [usuarioId]
+    );
+    const usuario = usuarioResult.rows[0];
+    const baseSlug = usuario.nombre && usuario.apellido
+      ? `${usuario.nombre}-${usuario.apellido}`.toLowerCase().replace(/[^a-z0-9]+/g, '-')
+      : usuario.email.split('@')[0].toLowerCase().replace(/[^a-z0-9]+/g, '-');
+
+    // Asegurar que el slug sea único
+    const slugCheckResult = await query(
+      `SELECT COUNT(*) as count FROM perfiles_asesor WHERE tenant_id = $1 AND slug LIKE $2`,
+      [tenantId, `${baseSlug}%`]
+    );
+    const count = parseInt(slugCheckResult.rows[0].count, 10);
+    const slug = count > 0 ? `${baseSlug}-${count + 1}` : baseSlug;
+
+    const sql = `
+      INSERT INTO perfiles_asesor (
+        tenant_id, usuario_id, slug, biografia, especialidades,
+        idiomas, zonas, tipos_propiedad,
+        experiencia_anos, redes_sociales, titulo_profesional,
+        whatsapp, telefono_directo, metadata, activo, visible_en_web
+      )
+      VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, true, true)
+      RETURNING id
+    `;
+
+    await query(sql, [
+      tenantId,
+      usuarioId,
+      slug,
+      data.biografia || null,
+      JSON.stringify(especialidadesArray),
+      JSON.stringify(idiomasArray.length > 0 ? idiomasArray : ['es']),
+      JSON.stringify(zonasArray),
+      JSON.stringify(tiposPropiedadArray),
+      experienciaAnos,
+      JSON.stringify(data.redesSociales || {}),
+      data.tituloProfesional || null,
+      data.whatsapp || null,
+      data.telefonoDirecto || null,
+      JSON.stringify({ licencia: data.licencia || null }),
+    ]);
+
+    return await getPerfilAsesor(usuarioId, tenantId);
+  }
 }

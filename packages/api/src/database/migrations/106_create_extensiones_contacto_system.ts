@@ -16,7 +16,9 @@ import { Knex } from 'knex';
  */
 export async function up(knex: Knex): Promise<void> {
   // ==================== TABLA CATALOGO_EXTENSIONES_CONTACTO ====================
-  await knex.schema.createTable('catalogo_extensiones_contacto', (table) => {
+  const hasCatalogo = await knex.schema.hasTable('catalogo_extensiones_contacto');
+  if (!hasCatalogo) {
+    await knex.schema.createTable('catalogo_extensiones_contacto', (table) => {
     table.uuid('id').primary().defaultTo(knex.raw('gen_random_uuid()'));
     table.uuid('tenant_id').nullable().references('id').inTable('tenants').onDelete('CASCADE');
     table.string('codigo', 50).notNullable();
@@ -42,10 +44,13 @@ export async function up(knex: Knex): Promise<void> {
 
     // Código único por tenant (o global si null)
     table.unique(['tenant_id', 'codigo'], { indexName: 'uq_cat_ext_contacto_tenant_codigo' });
-  });
+    });
+  }
 
   // ==================== TABLA CONTACTO_EXTENSIONES ====================
-  await knex.schema.createTable('contacto_extensiones', (table) => {
+  const hasContactoExt = await knex.schema.hasTable('contacto_extensiones');
+  if (!hasContactoExt) {
+    await knex.schema.createTable('contacto_extensiones', (table) => {
     table.uuid('id').primary().defaultTo(knex.raw('gen_random_uuid()'));
     table.uuid('tenant_id').notNullable().references('id').inTable('tenants').onDelete('CASCADE');
     table.uuid('contacto_id').notNullable().references('id').inTable('contactos').onDelete('CASCADE');
@@ -66,10 +71,13 @@ export async function up(knex: Knex): Promise<void> {
 
     // Un contacto solo puede tener una vez cada extensión
     table.unique(['contacto_id', 'extension_id'], { indexName: 'uq_contacto_extension' });
-  });
+    });
+  }
 
   // ==================== TABLA TENANT_EXTENSION_PREFERENCIAS ====================
-  await knex.schema.createTable('tenant_extension_preferencias', (table) => {
+  const hasTenantPref = await knex.schema.hasTable('tenant_extension_preferencias');
+  if (!hasTenantPref) {
+    await knex.schema.createTable('tenant_extension_preferencias', (table) => {
     table.uuid('id').primary().defaultTo(knex.raw('gen_random_uuid()'));
     table.uuid('tenant_id').notNullable().references('id').inTable('tenants').onDelete('CASCADE');
     table.uuid('extension_id').notNullable().references('id').inTable('catalogo_extensiones_contacto').onDelete('CASCADE');
@@ -81,9 +89,16 @@ export async function up(knex: Knex): Promise<void> {
 
     // Una preferencia por tenant/extensión
     table.unique(['tenant_id', 'extension_id'], { indexName: 'uq_tenant_extension_pref' });
-  });
+    });
+  }
 
   // ==================== SEED DE EXTENSIONES DE SISTEMA ====================
+  // Solo insertar si no existen
+  const existingExtensions = await knex('catalogo_extensiones_contacto').where({ es_sistema: true }).first();
+  if (existingExtensions) {
+    console.log('✅ Extensiones de sistema ya existen, saltando seed');
+    return;
+  }
   const extensionesSistema = [
     {
       codigo: 'lead',

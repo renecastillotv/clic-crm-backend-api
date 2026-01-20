@@ -19,6 +19,12 @@ export interface ComponenteCatalogo {
       default?: any;
       opciones?: string[];
     }>;
+    toggles?: Array<{
+      nombre: string;
+      tipo: string;
+      label?: string;
+      default?: any;
+    }>;
   };
   plan_minimo?: string;
   feature_requerido?: string;

@@ -6,6 +6,7 @@ import { query, getClient } from '../utils/db.js';
 import bcrypt from 'bcrypt';
 import { createTemaDefault } from './componentesService.js';
 import { Feature } from './adminFeaturesService.js';
+import { initComponentesWebTenant } from './tenantInitService.js';
 import type { PoolClient } from 'pg';
 
 // NOTA: Las rutas estándar ahora se definen globalmente en tipos_pagina.alias_rutas
@@ -41,6 +42,8 @@ export interface UpdateTenantData {
   idiomasDisponibles?: string[];
   activo?: boolean;
   configuracion?: Record<string, any>;
+  plan?: string;
+  dominioPersonalizado?: string | null;
 }
 
 // OBSOLETA: insertRutasEstandarTenant fue eliminada
@@ -236,8 +239,11 @@ export async function createTenant(data: CreateTenantData) {
     // NOTA: Las rutas estándar ya no se insertan por tenant
     // Se obtienen de tipos_pagina.alias_rutas (fuente global)
 
-    // Insertar páginas base para el tenant
+    // Insertar páginas base para el tenant (legacy - puede eliminarse)
     await insertPaginasBaseTenant(tenant.id);
+
+    // Inicializar componentes_web desde plantillas_pagina
+    await initComponentesWebTenant(tenant.id);
 
     return tenant;
   } catch (error: any) {
@@ -573,8 +579,11 @@ export async function createTenantWithAdmin(data: CreateTenantWithAdminData) {
     // 12. Las rutas estándar ya no se insertan por tenant
     // Se obtienen de tipos_pagina.alias_rutas (fuente global)
 
-    // 13. Insertar páginas base para el tenant
+    // 13. Insertar páginas base para el tenant (legacy)
     await insertPaginasBaseTenant(tenant.id, client);
+
+    // 14. Inicializar componentes_web desde plantillas_pagina
+    await initComponentesWebTenant(tenant.id, client);
 
     await client.query('COMMIT');
 

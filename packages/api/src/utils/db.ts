@@ -1,10 +1,10 @@
 import { pool } from '../config/database.js';
-import { QueryResult } from 'pg';
+import { QueryResult, QueryResultRow } from 'pg';
 
 /**
  * Ejecuta una query y retorna los resultados
  */
-export async function query<T = any>(
+export async function query<T extends QueryResultRow = any>(
   text: string,
   params?: any[]
 ): Promise<QueryResult<T>> {

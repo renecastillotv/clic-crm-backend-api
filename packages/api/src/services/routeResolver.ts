@@ -620,7 +620,8 @@ async function resolveHomepage(
   // vinculados directamente al tipo_pagina 'homepage' para este tenant.
   // Ya NO se usa paginas_web (tabla obsoleta)
   // NUEVO: Pasamos el idioma para traducir componentes y datos dinámicos
-  let secciones = await getSeccionesResueltas(tenantId, tipoPagina, undefined, undefined, idioma);
+  // includeFallback=true para usar plantillas_pagina si no hay componentes en BD
+  let secciones = await getSeccionesResueltas(tenantId, tipoPagina, undefined, true, idioma);
 
   // Resolver datos dinámicos para cada componente que tenga dynamic_data
   secciones = await Promise.all(
@@ -817,7 +818,7 @@ async function resolveContenidoPrefijo(
       'videos': 'videos_single',
       'articulos': 'single_articulo',
       'blog': 'single_articulo',
-      'asesores': 'single_asesor',
+      'asesores': 'asesor_single',
       'proyectos': 'single_proyecto',
       'propiedades': 'single_property',
     };
@@ -920,9 +921,31 @@ async function resolveContenidoDinamico(
   // getSeccionesResueltas busca componentes por tipo de página (ej: 'videos_directory', 'videos_single', 'asesores_directory')
   const { getSeccionesResueltas } = await import('./seccionesService.js');
   const { resolveDynamicData } = await import('./dynamicDataResolver.js');
+  const { assemblePageData, hasRecipeForPage } = await import('./pageDataAssembler.js');
+
   // Páginas dinámicas son sistema, usar tipoPaginaCodigo para buscar componentes
   // NUEVO: Pasamos el idioma para traducir componentes y datos dinámicos
-  let secciones = await getSeccionesResueltas(tenantId, tipoPaginaCodigo, undefined, undefined, idioma);
+  // includeFallback=true para usar plantillas_pagina si no hay componentes en BD
+  let secciones = await getSeccionesResueltas(tenantId, tipoPaginaCodigo, undefined, true, idioma);
+
+  // Para páginas single que tienen receta en el assembler, usar el assembler
+  // para obtener datos completos (primario + secundarios como propiedades, artículos, etc.)
+  let assembledData: any = null;
+  if (tipoPagina === 'single' && hasRecipeForPage(tipoPaginaCodigo)) {
+    console.log(`   🍽️ Usando PageDataAssembler para ${tipoPaginaCodigo}`);
+    try {
+      assembledData = await assemblePageData({
+        tenantId,
+        tipoPagina: tipoPaginaCodigo,
+        slug: slug || undefined,
+        categoriaSlug: categoria || undefined,
+        idioma,
+      });
+      console.log(`   ✅ Datos ensamblados: primary=${assembledData?.primary ? 'OK' : 'NULL'}, keys=[${Object.keys(assembledData || {}).filter(k => k !== '_meta').join(', ')}]`);
+    } catch (error) {
+      console.error(`   ❌ Error en PageDataAssembler para ${tipoPaginaCodigo}:`, error);
+    }
+  }
 
   // Resolver datos dinámicos para cada componente que tenga dynamic_data
   secciones = await Promise.all(
@@ -930,7 +953,24 @@ async function resolveContenidoDinamico(
       if (seccion.datos?.dynamic_data?.dataType) {
         console.log(`   🔄 Resolviendo dynamic_data para ${seccion.tipo}: ${seccion.datos.dynamic_data.dataType}`);
         try {
-          // Para páginas single, agregar el slug como filtro
+          // Si tenemos datos del assembler y es el componente principal de la página single,
+          // usar los datos ya ensamblados (incluyen primary + secundarios)
+          if (assembledData && tipoPagina === 'single') {
+            console.log(`   📦 Usando datos del assembler para ${seccion.tipo}`);
+            // El assembledData ya tiene: { primary: asesor, propiedades: [...], testimonios: [...], etc. }
+            return {
+              ...seccion,
+              datos: {
+                ...seccion.datos,
+                dynamic_data: {
+                  ...seccion.datos.dynamic_data,
+                  resolved: assembledData, // Pasar todo el objeto con primary y secundarios
+                },
+              },
+            };
+          }
+
+          // Para páginas que no tienen assembler o no son single, usar el resolver tradicional
           let dynamicConfig = { ...seccion.datos.dynamic_data };
           if (tipoPagina === 'single' && slug) {
             dynamicConfig = {
@@ -1259,7 +1299,8 @@ async function resolveSingleProperty(
   const { getSeccionesResueltas } = await import('./seccionesService.js');
   const { resolveDynamicData } = await import('./dynamicDataResolver.js');
   // Single property es página de sistema, no necesita paginaId
-  let secciones = await getSeccionesResueltas(tenantId, tipoPaginaCodigo, undefined, undefined, idioma);
+  // includeFallback=true para usar plantillas_pagina si no hay componentes en BD
+  let secciones = await getSeccionesResueltas(tenantId, tipoPaginaCodigo, undefined, true, idioma);
 
   // Resolver datos dinámicos para cada componente
   secciones = await Promise.all(
@@ -1392,7 +1433,8 @@ async function resolvePropertyListing(
   const { getSeccionesResueltas } = await import('./seccionesService.js');
   const { resolveDynamicData } = await import('./dynamicDataResolver.js');
   // Property listing es página de sistema, no necesita paginaId
-  let secciones = await getSeccionesResueltas(tenantId, tipoPaginaCodigo, undefined, undefined, idioma);
+  // includeFallback=true para usar plantillas_pagina si no hay componentes en BD
+  let secciones = await getSeccionesResueltas(tenantId, tipoPaginaCodigo, undefined, true, idioma);
 
   // Resolver datos dinámicos para cada componente
   secciones = await Promise.all(
@@ -1588,7 +1630,8 @@ async function resolvePaginaEstatica(
   // Ej: 'nosotros' -> 'nosotros', 'quienes-somos' -> 'quienes_somos'
   const tipoPagina = slug.replace(/-/g, '_');
   // Páginas estáticas son del sistema, buscar componentes por tipo_pagina_id
-  const secciones = await getSeccionesResueltas(tenantId, tipoPagina, undefined, undefined, idioma);
+  // includeFallback=true para usar plantillas_pagina si no hay componentes en BD
+  const secciones = await getSeccionesResueltas(tenantId, tipoPagina, undefined, true, idioma);
 
   return {
     page: {

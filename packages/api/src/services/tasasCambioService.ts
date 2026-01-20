@@ -4,7 +4,7 @@
  * Gestiona las tasas de cambio de monedas para conversión a USD
  */
 
-import { query } from '../utils/db';
+import { query } from '../utils/db.js';
 
 export interface TasasCambio {
   [moneda: string]: number; // Ej: { DOP: 58.5, EUR: 0.92, MXN: 17.2 }
@@ -159,6 +159,7 @@ function getTasasCambioDefault(): TasasCambio {
     // Agregar más monedas según sea necesario
   };
 }
+
 
 
 

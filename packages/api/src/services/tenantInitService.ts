@@ -1,319 +1,382 @@
 /**
- * Servicio de Inicialización de Tenant
+ * tenantInitService.ts
  *
- * Crea todas las páginas y componentes por defecto cuando se crea un nuevo tenant.
- * Todo el contenido se inicializa desde el catálogo de campos.
+ * Servicio para inicializar componentes_web cuando se crea un nuevo tenant.
+ * Lee las plantillas de plantillas_pagina y crea los componentes correspondientes.
+ *
+ * ARQUITECTURA:
+ * - plantillas_pagina: Define qué componentes van en cada tipo de página con config default
+ * - componentes_web: Instancias de componentes por tenant, con tipo_pagina_id o global (null)
+ * - catalogo_componentes: Catálogo de componentes disponibles
  */
 
-import { query } from '../database/connection.js';
-import { inicializarContenidoComponente } from './contenidoService.js';
+import { query, getClient } from '../utils/db.js';
+import type { PoolClient } from 'pg';
 
-// ============================================================
-// TIPOS
-// ============================================================
-
-interface ComponenteConfig {
-  tipo: string;
-  variante: string;
+interface PlantillaComponente {
+  id: string;
+  tipoPaginaId: string;
+  tipoPaginaCodigo: string;
+  componenteCatalogoId: string;
+  componenteTipo: string;
+  componenteNombre: string;
   orden: number;
-  scope: 'tenant' | 'page';
-  toggles?: Record<string, boolean>;
+  datosDefault: Record<string, any>;
+  esGlobal: boolean;
 }
 
-interface PaginaConfig {
-  tipoPagina: string;
-  titulo: string;
-  slug: string;
-  descripcion: string;
-  componentes: ComponenteConfig[];
+/**
+ * Obtiene todas las plantillas de componentes agrupadas por tipo de página
+ */
+async function getPlantillasComponentes(
+  client?: PoolClient
+): Promise<PlantillaComponente[]> {
+  const sql = `
+    SELECT
+      pp.id,
+      pp.tipo_pagina_id as "tipoPaginaId",
+      tp.codigo as "tipoPaginaCodigo",
+      pp.componente_catalogo_id as "componenteCatalogoId",
+      cc.tipo as "componenteTipo",
+      cc.nombre as "componenteNombre",
+      pp.orden,
+      pp.datos_default as "datosDefault",
+      pp.es_global as "esGlobal"
+    FROM plantillas_pagina pp
+    INNER JOIN tipos_pagina tp ON pp.tipo_pagina_id = tp.id
+    INNER JOIN catalogo_componentes cc ON pp.componente_catalogo_id = cc.id
+    WHERE pp.activo = true
+    ORDER BY tp.codigo, pp.orden
+  `;
+
+  const executeQuery = client
+    ? (sql: string, params: any[]) => client.query(sql, params)
+    : (sql: string, params: any[]) => query(sql, params);
+
+  const result = await executeQuery(sql, []);
+  return result.rows.map((row: any) => ({
+    ...row,
+    datosDefault: typeof row.datosDefault === 'string'
+      ? JSON.parse(row.datosDefault)
+      : row.datosDefault || {}
+  }));
 }
 
-// ============================================================
-// CONFIGURACIÓN POR DEFECTO
-// ============================================================
-
 /**
- * Páginas que se crean por defecto para un nuevo tenant
+ * Inicializa los componentes_web para un nuevo tenant
+ *
+ * Lee las plantillas de plantillas_pagina y crea registros en componentes_web
+ * para cada tipo de página.
+ *
+ * Los componentes globales (header, footer) se crean UNA sola vez
+ * sin tipo_pagina_id. Los demás se crean con su tipo_pagina_id correspondiente.
  */
-const PAGINAS_DEFAULT: PaginaConfig[] = [
-  {
-    tipoPagina: 'homepage',
-    titulo: 'Inicio',
-    slug: '/',
-    descripcion: 'Página principal',
-    componentes: [
-      { tipo: 'hero', variante: 'default', orden: 1, scope: 'page', toggles: { mostrarBuscador: true, mostrarStats: true } },
-      { tipo: 'features', variante: 'default', orden: 2, scope: 'page' },
-      { tipo: 'property_list', variante: 'default', orden: 3, scope: 'page' },
-      { tipo: 'testimonials', variante: 'default', orden: 4, scope: 'page' },
-      { tipo: 'cta', variante: 'default', orden: 5, scope: 'page' }
-    ]
-  },
-  {
-    tipoPagina: 'contacto',
-    titulo: 'Contacto',
-    slug: '/contacto',
-    descripcion: 'Página de contacto',
-    componentes: [
-      { tipo: 'hero', variante: 'default', orden: 1, scope: 'page', toggles: { mostrarBuscador: false, mostrarStats: false } },
-      { tipo: 'contact_form', variante: 'default', orden: 2, scope: 'page' }
-    ]
-  },
-  {
-    tipoPagina: 'nosotros',
-    titulo: 'Nosotros',
-    slug: '/nosotros',
-    descripcion: 'Sobre nosotros',
-    componentes: [
-      { tipo: 'hero', variante: 'default', orden: 1, scope: 'page', toggles: { mostrarBuscador: false, mostrarStats: false } },
-      { tipo: 'features', variante: 'default', orden: 2, scope: 'page' }
-    ]
-  }
-];
-
-/**
- * Componentes globales (header/footer) que aplican a todas las páginas
- */
-const COMPONENTES_GLOBALES: ComponenteConfig[] = [
-  { tipo: 'header', variante: 'default', orden: 0, scope: 'tenant' },
-  { tipo: 'footer', variante: 'default', orden: 100, scope: 'tenant' }
-];
-
-// ============================================================
-// FUNCIONES DE INICIALIZACIÓN
-// ============================================================
-
-/**
- * Crea un componente y su contenido inicial
- */
-async function crearComponenteConContenido(
+export async function initComponentesWebTenant(
   tenantId: string,
-  config: ComponenteConfig,
-  paginaId: string | null = null,
-  idioma: string = 'es'
-): Promise<string> {
-  // Crear el componente
-  const result = await query(
-    `INSERT INTO componentes_web (
-      tenant_id, tipo, variante, orden, scope, pagina_id, activo, predeterminado,
-      datos
-    ) VALUES ($1, $2, $3, $4, $5, $6, true, true, $7)
-    RETURNING id`,
-    [
-      tenantId,
-      config.tipo,
-      config.variante,
-      config.orden,
-      config.scope,
-      paginaId,
-      JSON.stringify({
-        toggles: config.toggles || {}
-      })
-    ]
-  );
+  clientOrNull?: PoolClient | null
+): Promise<{ created: number; skipped: number }> {
+  console.log(`\n🔧 Inicializando componentes_web para tenant ${tenantId}...`);
 
-  const componenteId = result.rows[0].id;
+  const executeQuery = clientOrNull
+    ? (sql: string, params: any[]) => clientOrNull.query(sql, params)
+    : (sql: string, params: any[]) => query(sql, params);
 
-  // Inicializar contenido desde el catálogo
-  await inicializarContenidoComponente(componenteId, config.tipo, config.variante, idioma);
-
-  console.log(`  ✓ Componente creado: ${config.tipo}/${config.variante} (${componenteId})`);
-
-  return componenteId;
-}
-
-/**
- * Crea una página con sus componentes
- */
-async function crearPaginaConComponentes(
-  tenantId: string,
-  config: PaginaConfig,
-  idioma: string = 'es'
-): Promise<string> {
-  // Crear la página
-  const paginaResult = await query(
-    `INSERT INTO paginas_web (
-      tenant_id, tipo_pagina, titulo, slug, descripcion, publica, activa, orden
-    ) VALUES ($1, $2, $3, $4, $5, true, true, 0)
-    RETURNING id`,
-    [tenantId, config.tipoPagina, config.titulo, config.slug, config.descripcion]
-  );
-
-  const paginaId = paginaResult.rows[0].id;
-  console.log(`✓ Página creada: ${config.titulo} (${config.slug})`);
-
-  // Crear componentes de la página
-  for (const compConfig of config.componentes) {
-    await crearComponenteConContenido(tenantId, compConfig, paginaId, idioma);
-  }
-
-  return paginaId;
-}
-
-/**
- * Inicializa completamente un nuevo tenant con páginas y componentes por defecto
- */
-export async function inicializarTenantCompleto(
-  tenantId: string,
-  opciones: {
-    idioma?: string;
-    nombreEmpresa?: string;
-  } = {}
-): Promise<{
-  paginas: string[];
-  componentesGlobales: string[];
-}> {
-  const idioma = opciones.idioma || 'es';
-
-  console.log(`\n🏗️  Inicializando tenant ${tenantId}...`);
-
-  // Verificar si ya tiene páginas
-  const existentes = await query(
-    `SELECT COUNT(*) as count FROM paginas_web WHERE tenant_id = $1`,
+  // Verificar si el tenant ya tiene componentes_web
+  const existingComponents = await executeQuery(
+    `SELECT COUNT(*) as count FROM componentes_web WHERE tenant_id = $1`,
     [tenantId]
   );
 
-  if (parseInt(existentes.rows[0].count) > 0) {
-    console.log(`⚠️  El tenant ya tiene ${existentes.rows[0].count} páginas, saltando inicialización`);
-    return { paginas: [], componentesGlobales: [] };
+  if (Number(existingComponents.rows[0].count) > 0) {
+    console.log(`  ⏭️  Tenant ya tiene ${existingComponents.rows[0].count} componentes, omitiendo inicialización`);
+    return { created: 0, skipped: Number(existingComponents.rows[0].count) };
   }
 
-  const paginasCreadas: string[] = [];
-  const componentesGlobales: string[] = [];
+  // Obtener plantillas
+  const plantillas = await getPlantillasComponentes(clientOrNull || undefined);
 
-  // 1. Crear componentes globales (header, footer)
-  console.log('\n📦 Creando componentes globales...');
-  for (const config of COMPONENTES_GLOBALES) {
-    const id = await crearComponenteConContenido(tenantId, config, null, idioma);
-    componentesGlobales.push(id);
+  if (plantillas.length === 0) {
+    console.log(`  ⚠️  No hay plantillas definidas en plantillas_pagina`);
+    return { created: 0, skipped: 0 };
   }
 
-  // 2. Crear páginas con sus componentes
-  console.log('\n📄 Creando páginas...');
-  for (const paginaConfig of PAGINAS_DEFAULT) {
-    const id = await crearPaginaConComponentes(tenantId, paginaConfig, idioma);
-    paginasCreadas.push(id);
+  let created = 0;
+  const globalComponentesCreados = new Set<string>(); // Para evitar duplicar header/footer
+
+  // Agrupar por tipo de página
+  const plantillasPorTipo = new Map<string, PlantillaComponente[]>();
+  for (const p of plantillas) {
+    if (!plantillasPorTipo.has(p.tipoPaginaCodigo)) {
+      plantillasPorTipo.set(p.tipoPaginaCodigo, []);
+    }
+    plantillasPorTipo.get(p.tipoPaginaCodigo)!.push(p);
   }
 
-  // 3. Si se proporcionó nombre de empresa, actualizar contenido personalizado
-  if (opciones.nombreEmpresa) {
-    await personalizarContenidoInicial(tenantId, opciones.nombreEmpresa, idioma);
+  // Crear componentes globales primero (header, footer)
+  console.log(`\n  📦 Creando componentes globales...`);
+
+  for (const plantilla of plantillas) {
+    if (plantilla.esGlobal && !globalComponentesCreados.has(plantilla.componenteTipo)) {
+      await executeQuery(
+        `INSERT INTO componentes_web (
+          tenant_id,
+          componente_catalogo_id,
+          nombre,
+          datos,
+          activo,
+          orden,
+          tipo_pagina_id,
+          tenant_rutas_config_custom_id
+        ) VALUES ($1, $2, $3, $4, true, $5, NULL, NULL)`,
+        [
+          tenantId,
+          plantilla.componenteCatalogoId,
+          plantilla.componenteNombre,
+          JSON.stringify(plantilla.datosDefault),
+          plantilla.orden
+        ]
+      );
+
+      globalComponentesCreados.add(plantilla.componenteTipo);
+      created++;
+      console.log(`    ✅ ${plantilla.componenteTipo} (global)`);
+    }
   }
 
-  console.log(`\n✅ Tenant inicializado exitosamente:`);
-  console.log(`   - ${componentesGlobales.length} componentes globales`);
-  console.log(`   - ${paginasCreadas.length} páginas`);
+  // Crear componentes por tipo de página
+  console.log(`\n  📦 Creando componentes por tipo de página...`);
 
-  return { paginas: paginasCreadas, componentesGlobales };
+  for (const [tipoPagina, componentesPlantilla] of Array.from(plantillasPorTipo.entries())) {
+    const componentesNonGlobal = componentesPlantilla.filter(p => !p.esGlobal);
+
+    if (componentesNonGlobal.length === 0) {
+      continue;
+    }
+
+    for (const plantilla of componentesNonGlobal) {
+      await executeQuery(
+        `INSERT INTO componentes_web (
+          tenant_id,
+          componente_catalogo_id,
+          nombre,
+          datos,
+          activo,
+          orden,
+          tipo_pagina_id,
+          tenant_rutas_config_custom_id
+        ) VALUES ($1, $2, $3, $4, true, $5, $6, NULL)`,
+        [
+          tenantId,
+          plantilla.componenteCatalogoId,
+          `${plantilla.componenteNombre} - ${tipoPagina}`,
+          JSON.stringify(plantilla.datosDefault),
+          plantilla.orden,
+          plantilla.tipoPaginaId
+        ]
+      );
+
+      created++;
+    }
+
+    console.log(`    ✅ ${tipoPagina}: ${componentesNonGlobal.length} componente(s)`);
+  }
+
+  console.log(`\n✅ Inicialización completada: ${created} componentes creados`);
+  return { created, skipped: 0 };
 }
 
 /**
- * Personaliza el contenido inicial con el nombre de la empresa
+ * Reinicializa los componentes de un tenant (elimina y vuelve a crear)
+ * CUIDADO: Esto elimina TODOS los componentes existentes y su configuración personalizada
  */
-async function personalizarContenidoInicial(
-  tenantId: string,
-  nombreEmpresa: string,
-  idioma: string = 'es'
-): Promise<void> {
-  // Actualizar el badge del hero con el nombre de la empresa
-  await query(
-    `UPDATE contenido_campos cc
-     SET valor = $3
-     FROM componentes_web cw
-     WHERE cc.componente_id = cw.id
-       AND cw.tenant_id = $1
-       AND cw.tipo = 'hero'
-       AND cc.campo = 'badge'
-       AND cc.idioma = $4`,
-    [tenantId, null, `${nombreEmpresa} - Tu inmobiliaria de confianza`, idioma]
-  );
+export async function reinitComponentesWebTenant(
+  tenantId: string
+): Promise<{ deleted: number; created: number }> {
+  const client = await getClient();
 
-  // Actualizar el logo alt text del header
-  await query(
-    `UPDATE contenido_campos cc
-     SET valor = $2
-     FROM componentes_web cw
-     WHERE cc.componente_id = cw.id
-       AND cw.tenant_id = $1
-       AND cw.tipo = 'header'
-       AND cc.campo = 'logoAlt'
-       AND cc.idioma = $3`,
-    [tenantId, nombreEmpresa, idioma]
-  );
+  try {
+    await client.query('BEGIN');
 
-  // Actualizar copyright del footer
-  const year = new Date().getFullYear();
-  await query(
-    `UPDATE contenido_campos cc
-     SET valor = $2
-     FROM componentes_web cw
-     WHERE cc.componente_id = cw.id
-       AND cw.tenant_id = $1
-       AND cw.tipo = 'footer'
-       AND cc.campo = 'textoCopyright'
-       AND cc.idioma = $3`,
-    [tenantId, `© ${year} ${nombreEmpresa}. Todos los derechos reservados.`, idioma]
-  );
+    // Contar componentes existentes
+    const existing = await client.query(
+      `SELECT COUNT(*) as count FROM componentes_web WHERE tenant_id = $1`,
+      [tenantId]
+    );
+    const deletedCount = Number(existing.rows[0].count);
 
-  console.log(`  ✓ Contenido personalizado para: ${nombreEmpresa}`);
+    // Eliminar todos los componentes existentes
+    await client.query(
+      `DELETE FROM componentes_web WHERE tenant_id = $1`,
+      [tenantId]
+    );
+
+    console.log(`🗑️  Eliminados ${deletedCount} componentes existentes`);
+
+    // Reinicializar
+    const { created } = await initComponentesWebTenant(tenantId, client);
+
+    await client.query('COMMIT');
+
+    return { deleted: deletedCount, created };
+  } catch (error) {
+    await client.query('ROLLBACK');
+    throw error;
+  } finally {
+    client.release();
+  }
 }
 
 /**
- * Reinicializa un tenant (borra todo y vuelve a crear)
- * PRECAUCIÓN: Esta función borra todos los datos existentes
+ * Inicializa componentes para un tipo de página específico
+ * Útil cuando se agrega un nuevo tipo de página a un tenant existente
  */
-export async function reinicializarTenant(
+export async function initComponentesTipoPagina(
   tenantId: string,
-  opciones: {
-    idioma?: string;
-    nombreEmpresa?: string;
-  } = {}
+  tipoPaginaCodigo: string
+): Promise<{ created: number }> {
+  console.log(`🔧 Inicializando componentes para ${tipoPaginaCodigo} en tenant ${tenantId}...`);
+
+  // Obtener plantillas solo para este tipo de página
+  const sql = `
+    SELECT
+      pp.id,
+      pp.tipo_pagina_id as "tipoPaginaId",
+      tp.codigo as "tipoPaginaCodigo",
+      pp.componente_catalogo_id as "componenteCatalogoId",
+      cc.tipo as "componenteTipo",
+      cc.nombre as "componenteNombre",
+      pp.orden,
+      pp.datos_default as "datosDefault",
+      pp.es_global as "esGlobal"
+    FROM plantillas_pagina pp
+    INNER JOIN tipos_pagina tp ON pp.tipo_pagina_id = tp.id
+    INNER JOIN catalogo_componentes cc ON pp.componente_catalogo_id = cc.id
+    WHERE pp.activo = true AND tp.codigo = $1
+    ORDER BY pp.orden
+  `;
+
+  const plantillasResult = await query(sql, [tipoPaginaCodigo]);
+
+  if (plantillasResult.rows.length === 0) {
+    console.log(`  ⚠️  No hay plantillas definidas para ${tipoPaginaCodigo}`);
+    return { created: 0 };
+  }
+
+  let created = 0;
+
+  for (const plantilla of plantillasResult.rows) {
+    // Omitir componentes globales (ya deberían existir)
+    if (plantilla.esGlobal) {
+      continue;
+    }
+
+    // Verificar si ya existe
+    const exists = await query(
+      `SELECT id FROM componentes_web
+       WHERE tenant_id = $1 AND componente_catalogo_id = $2 AND tipo_pagina_id = $3`,
+      [tenantId, plantilla.componenteCatalogoId, plantilla.tipoPaginaId]
+    );
+
+    if (exists.rows.length === 0) {
+      const datosDefault = typeof plantilla.datosDefault === 'string'
+        ? JSON.parse(plantilla.datosDefault)
+        : plantilla.datosDefault || {};
+
+      await query(
+        `INSERT INTO componentes_web (
+          tenant_id,
+          componente_catalogo_id,
+          nombre,
+          datos,
+          activo,
+          orden,
+          tipo_pagina_id,
+          tenant_rutas_config_custom_id
+        ) VALUES ($1, $2, $3, $4, true, $5, $6, NULL)`,
+        [
+          tenantId,
+          plantilla.componenteCatalogoId,
+          `${plantilla.componenteNombre} - ${tipoPaginaCodigo}`,
+          JSON.stringify(datosDefault),
+          plantilla.orden,
+          plantilla.tipoPaginaId
+        ]
+      );
+
+      created++;
+    }
+  }
+
+  console.log(`✅ ${created} componentes creados para ${tipoPaginaCodigo}`);
+  return { created };
+}
+
+/**
+ * Verifica si un tenant tiene todos los componentes necesarios
+ * según las plantillas definidas
+ */
+export async function verificarComponentesTenant(
+  tenantId: string
 ): Promise<{
-  paginas: string[];
-  componentesGlobales: string[];
+  completo: boolean;
+  faltantes: Array<{ tipoPagina: string; componente: string }>;
+  existentes: number;
 }> {
-  console.log(`\n⚠️  Reinicializando tenant ${tenantId}...`);
+  // Obtener todas las plantillas
+  const plantillas = await getPlantillasComponentes();
 
-  // Borrar componentes existentes (el contenido se borra en cascada)
-  await query(`DELETE FROM componentes_web WHERE tenant_id = $1`, [tenantId]);
+  // Obtener componentes existentes del tenant
+  const existentesResult = await query(
+    `SELECT
+       c.componente_catalogo_id,
+       c.tipo_pagina_id,
+       tp.codigo as "tipoPaginaCodigo"
+     FROM componentes_web c
+     LEFT JOIN tipos_pagina tp ON c.tipo_pagina_id = tp.id
+     WHERE c.tenant_id = $1`,
+    [tenantId]
+  );
 
-  // Borrar páginas existentes
-  await query(`DELETE FROM paginas_web WHERE tenant_id = $1`, [tenantId]);
+  const existentes = new Set<string>();
+  for (const e of existentesResult.rows) {
+    // Key: componenteCatalogoId|tipoPaginaId (null para globales)
+    existentes.add(`${e.componente_catalogo_id}|${e.tipo_pagina_id || 'global'}`);
+  }
 
-  console.log('  ✓ Datos anteriores eliminados');
+  const faltantes: Array<{ tipoPagina: string; componente: string }> = [];
 
-  // Reinicializar
-  return inicializarTenantCompleto(tenantId, opciones);
+  for (const p of plantillas) {
+    const key = p.esGlobal
+      ? `${p.componenteCatalogoId}|global`
+      : `${p.componenteCatalogoId}|${p.tipoPaginaId}`;
+
+    if (!existentes.has(key)) {
+      faltantes.push({
+        tipoPagina: p.esGlobal ? 'global' : p.tipoPaginaCodigo,
+        componente: p.componenteNombre
+      });
+    }
+  }
+
+  return {
+    completo: faltantes.length === 0,
+    faltantes,
+    existentes: existentesResult.rows.length
+  };
 }
 
-/**
- * Agrega una nueva página a un tenant existente
- */
-export async function agregarPaginaATenant(
-  tenantId: string,
-  config: PaginaConfig,
-  idioma: string = 'es'
-): Promise<string> {
-  return crearPaginaConComponentes(tenantId, config, idioma);
-}
-
-/**
- * Agrega un componente a una página existente
- */
-export async function agregarComponenteAPagina(
-  tenantId: string,
-  paginaId: string,
-  config: ComponenteConfig,
-  idioma: string = 'es'
-): Promise<string> {
-  return crearComponenteConContenido(tenantId, config, paginaId, idioma);
-}
+// Exportar funciones legadas por compatibilidad (deprecadas)
+/** @deprecated Usar initComponentesWebTenant */
+export const inicializarTenantCompleto = initComponentesWebTenant;
+/** @deprecated Usar reinitComponentesWebTenant */
+export const reinicializarTenant = reinitComponentesWebTenant;
 
 export default {
+  initComponentesWebTenant,
+  reinitComponentesWebTenant,
+  initComponentesTipoPagina,
+  verificarComponentesTenant,
+  // Legadas
   inicializarTenantCompleto,
-  reinicializarTenant,
-  agregarPaginaATenant,
-  agregarComponenteAPagina,
-  PAGINAS_DEFAULT,
-  COMPONENTES_GLOBALES
+  reinicializarTenant
 };

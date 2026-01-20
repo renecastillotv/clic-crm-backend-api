@@ -50,7 +50,14 @@ export async function resolveDynamicDataType(
     case 'categorias_videos':
     case 'categorias_articulos':
     case 'categorias_testimonios':
-      return await resolveCategorias(params, tipo);
+    case 'videos_por_categoria':  // Alias para categorias_videos
+    case 'articulos_por_categoria':  // Alias para categorias_articulos
+    case 'testimonios_por_categoria':  // Alias para categorias_testimonios
+      // Normalizar el tipo para el resolver
+      const tipoCategoria = tipo.startsWith('videos_') ? 'categorias_videos' :
+                            tipo.startsWith('articulos_') ? 'categorias_articulos' :
+                            tipo.startsWith('testimonios_') ? 'categorias_testimonios' : tipo;
+      return await resolveCategorias(params, tipoCategoria);
     
     case 'propiedades':
       return await resolvePropiedades(params);
@@ -195,9 +202,17 @@ async function resolveCategorias(
     sql += ' ORDER BY orden ASC, nombre ASC';
 
     const result = await query(sql, queryParams);
+    console.log(`✅ Categorías ${tipoContenido} encontradas: ${result.rows.length}`);
+
+    // Mapear los campos para que coincidan con lo que esperan los componentes
     return result.rows.map(row => ({
       ...row,
       traducciones: typeof row.traducciones === 'string' ? JSON.parse(row.traducciones) : row.traducciones,
+      // Campos de conteo con aliases para compatibilidad con componentes
+      total: row.total_items,
+      total_videos: row.total_items,
+      total_articulos: row.total_items,
+      total_testimonios: row.total_items,
     }));
   } catch (error: any) {
     console.error(`Error resolviendo categorias_${tipoContenido}:`, error);
@@ -243,7 +258,33 @@ async function resolvePropiedades(params: DynamicDataParams): Promise<any[]> {
       if (filters?.destacada) {
         sql += ` AND destacada = true`;
       }
-      
+
+      // Filtro por agente/asesor (para propiedades del asesor)
+      // Busca tanto en agente_id como en perfil_asesor_id
+      if (filters?.agente_id) {
+        sql += ` AND (agente_id = $${paramIndex} OR perfil_asesor_id = $${paramIndex})`;
+        paramIndex++;
+        queryParams.push(filters.agente_id);
+      }
+
+      // Excluir una propiedad específica (para similares)
+      if (filters?.exclude_id) {
+        sql += ` AND id != $${paramIndex++}`;
+        queryParams.push(filters.exclude_id);
+      }
+
+      // Filtro por ciudad (para propiedades similares)
+      if (filters?.ciudad) {
+        sql += ` AND ciudad = $${paramIndex++}`;
+        queryParams.push(filters.ciudad);
+      }
+
+      // Filtro por operación (venta, alquiler)
+      if (filters?.operacion) {
+        sql += ` AND operacion = $${paramIndex++}`;
+        queryParams.push(filters.operacion);
+      }
+
       sql += ` ORDER BY created_at DESC LIMIT $${paramIndex++} OFFSET $${paramIndex++}`;
       queryParams.push(limit, offset);
       
@@ -682,6 +723,18 @@ async function resolveListaVideos(params: DynamicDataParams): Promise<any[]> {
       sql += ' AND v.destacado = true';
     }
 
+    // Filtro por autor (para videos del asesor)
+    if (filters?.autor_id) {
+      sql += ` AND v.autor_id = $${paramIndex++}`;
+      queryParams.push(filters.autor_id);
+    }
+
+    // Excluir un video específico (para relacionados)
+    if (filters?.exclude_id) {
+      sql += ` AND v.id != $${paramIndex++}`;
+      queryParams.push(filters.exclude_id);
+    }
+
     sql += ` ORDER BY v.orden ASC, v.fecha_publicacion DESC LIMIT $${paramIndex++} OFFSET $${paramIndex++}`;
     queryParams.push(limit, offset);
 
@@ -864,6 +917,18 @@ async function resolveListaArticulos(params: DynamicDataParams): Promise<any[]> 
 
     if (filters?.destacado) {
       sql += ' AND a.destacado = true';
+    }
+
+    // Filtro por autor (para artículos del asesor)
+    if (filters?.autor_id) {
+      sql += ` AND a.autor_id = $${paramIndex++}`;
+      queryParams.push(filters.autor_id);
+    }
+
+    // Excluir un artículo específico (para relacionados)
+    if (filters?.exclude_id) {
+      sql += ` AND a.id != $${paramIndex++}`;
+      queryParams.push(filters.exclude_id);
     }
 
     sql += ` ORDER BY a.fecha_publicacion DESC LIMIT $${paramIndex++} OFFSET $${paramIndex++}`;
@@ -1156,6 +1221,18 @@ async function resolveListaTestimonios(params: DynamicDataParams): Promise<any[]
     if (filters?.categoria_slug) {
       sql += ` AND c.slug = $${paramIndex++}`;
       queryParams.push(filters.categoria_slug);
+    }
+
+    // Filtro por asesor (para testimonios del asesor)
+    if (filters?.asesor_id) {
+      sql += ` AND t.asesor_id = $${paramIndex++}`;
+      queryParams.push(filters.asesor_id);
+    }
+
+    // Excluir un testimonio específico (para relacionados)
+    if (filters?.exclude_id) {
+      sql += ` AND t.id != $${paramIndex++}`;
+      queryParams.push(filters.exclude_id);
     }
 
     sql += ` ORDER BY t.destacado DESC, t.fecha DESC LIMIT $${paramIndex++} OFFSET $${paramIndex++}`;
@@ -1547,7 +1624,10 @@ async function resolveListaAsesores(params: DynamicDataParams): Promise<any[]> {
   const limit = pagination?.limit || 20;
   const offset = (page - 1) * limit;
 
+  console.log(`👥 Resolviendo lista de asesores para tenant ${tenantId}`);
+
   try {
+    // Query principal con conteo de propiedades activas
     let sql = `
       SELECT
         pa.id,
@@ -1588,10 +1668,20 @@ async function resolveListaAsesores(params: DynamicDataParams): Promise<any[]> {
         e.id as equipo_id,
         e.nombre as equipo_nombre,
         e.slug as equipo_slug,
-        e.zona_principal as equipo_zona
+        e.zona_principal as equipo_zona,
+        -- Conteo real de propiedades activas (por perfil_asesor_id o agente_id=usuario_id)
+        COALESCE(prop_count.total, 0)::integer as propiedades_activas_count
       FROM perfiles_asesor pa
       INNER JOIN usuarios u ON pa.usuario_id = u.id
       LEFT JOIN equipos e ON pa.equipo_id = e.id
+      LEFT JOIN (
+        SELECT
+          COALESCE(perfil_asesor_id, agente_id) as asesor_ref,
+          COUNT(*) as total
+        FROM propiedades
+        WHERE tenant_id = $1 AND activo = true
+        GROUP BY COALESCE(perfil_asesor_id, agente_id)
+      ) prop_count ON prop_count.asesor_ref = pa.id OR prop_count.asesor_ref = u.id
       WHERE pa.tenant_id = $1
     `;
     const queryParams: any[] = [tenantId];
@@ -1620,15 +1710,24 @@ async function resolveListaAsesores(params: DynamicDataParams): Promise<any[]> {
     queryParams.push(limit, offset);
 
     const result = await query(sql, queryParams);
-    return result.rows.map(row => {
+
+    const asesores = result.rows.map(row => {
       // Extraer stats para propiedades_vendidas (compatibilidad)
       const stats = typeof row.stats === 'string' ? JSON.parse(row.stats) : (row.stats || {});
+
+      // Usar el conteo real de propiedades activas
+      const propiedadesActivas = row.propiedades_activas_count || stats.propiedades_activas || 0;
+
+      // Construir URL para el single del asesor
+      const url = `/asesores/${row.slug}`;
 
       return {
         id: row.id,
         slug: row.slug,
+        url, // URL al perfil del asesor
         nombre: row.nombre,
         apellido: row.apellido,
+        nombre_completo: `${row.nombre} ${row.apellido}`.trim(),
         cargo: row.cargo || 'Asesor Inmobiliario',
         biografia: row.biografia,
         email: row.email,
@@ -1648,7 +1747,7 @@ async function resolveListaAsesores(params: DynamicDataParams): Promise<any[]> {
         meta_mensual: row.meta_mensual,
         stats: stats,
         propiedades_vendidas: stats.propiedades_vendidas || 0,
-        propiedades_activas: stats.propiedades_activas || 0,
+        propiedades_activas: propiedadesActivas,
         volumen_ventas: stats.volumen_ventas || 0,
         calificacion_promedio: stats.calificacion_promedio || 0,
         total_resenas: stats.total_resenas || 0,
@@ -1669,6 +1768,9 @@ async function resolveListaAsesores(params: DynamicDataParams): Promise<any[]> {
         metadata: typeof row.metadata === 'string' ? JSON.parse(row.metadata) : row.metadata,
       };
     });
+
+    console.log(`✅ Asesores resueltos: ${asesores.length} encontrados`);
+    return asesores;
   } catch (error: any) {
     console.error('Error resolviendo lista asesores:', error);
     // Fallback a mock_asesores si la tabla real no existe
@@ -1728,17 +1830,23 @@ async function resolveListaAsesoresMock(params: DynamicDataParams): Promise<any[
  * Resuelve asesor single por ID o slug desde perfiles_asesor + usuarios + equipos
  */
 async function resolveAsesorSingle(params: DynamicDataParams): Promise<any | null> {
-  const { tenantId, id, slug } = params;
+  const { tenantId, id, slug, filters } = params;
 
-  if (!id && !slug) {
+  // Soportar slug desde filters o directamente
+  const asesorSlug = slug || filters?.slug;
+  const asesorId = id || filters?.id;
+
+  if (!asesorId && !asesorSlug) {
     return null;
   }
 
+  console.log(`👤 Resolviendo asesor single: ${asesorId || asesorSlug}`);
+
   try {
     // Determinar si buscar por id o slug
-    const isUUID = id && /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(id);
+    const searchValue = asesorId || asesorSlug;
+    const isUUID = searchValue && /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(searchValue);
     const searchField = isUUID ? 'pa.id' : 'pa.slug';
-    const searchValue = id || slug;
 
     const result = await query(
       `SELECT
@@ -1781,16 +1889,27 @@ async function resolveAsesorSingle(params: DynamicDataParams): Promise<any | nul
         e.nombre as equipo_nombre,
         e.slug as equipo_slug,
         e.zona_principal as equipo_zona,
-        e.descripcion as equipo_descripcion
+        e.descripcion as equipo_descripcion,
+        -- Conteo real de propiedades activas
+        COALESCE(prop_count.total, 0)::integer as propiedades_activas_count
       FROM perfiles_asesor pa
       INNER JOIN usuarios u ON pa.usuario_id = u.id
       LEFT JOIN equipos e ON pa.equipo_id = e.id
-      WHERE ${searchField} = $1 AND pa.tenant_id = $2 AND pa.activo = true
+      LEFT JOIN (
+        SELECT
+          COALESCE(perfil_asesor_id, agente_id) as asesor_ref,
+          COUNT(*) as total
+        FROM propiedades
+        WHERE tenant_id = $2 AND activo = true
+        GROUP BY COALESCE(perfil_asesor_id, agente_id)
+      ) prop_count ON prop_count.asesor_ref = pa.id OR prop_count.asesor_ref = u.id
+      WHERE (${searchField} = $1 OR pa.slug = $1) AND pa.tenant_id = $2 AND pa.activo = true
       LIMIT 1`,
       [searchValue, tenantId]
     );
 
     if (result.rows.length === 0) {
+      console.log(`⚠️ Asesor no encontrado en perfiles_asesor, intentando mock...`);
       // Fallback a mock_asesores
       return resolveAsesorSingleMock(params);
     }
@@ -1798,11 +1917,22 @@ async function resolveAsesorSingle(params: DynamicDataParams): Promise<any | nul
     const row = result.rows[0];
     const stats = typeof row.stats === 'string' ? JSON.parse(row.stats) : (row.stats || {});
 
+    // Usar el conteo real de propiedades activas
+    const propiedadesActivas = row.propiedades_activas_count || stats.propiedades_activas || 0;
+
+    // Construir URL del perfil
+    const url = `/asesores/${row.slug}`;
+
+    console.log(`✅ Asesor encontrado: ${row.nombre} ${row.apellido} (${row.slug})`);
+
     return {
       id: row.id,
       slug: row.slug,
+      url, // URL al perfil del asesor
+      usuario_id: row.usuario_id,
       nombre: row.nombre,
       apellido: row.apellido,
+      nombre_completo: `${row.nombre} ${row.apellido}`.trim(),
       cargo: row.cargo || 'Asesor Inmobiliario',
       biografia: row.biografia,
       email: row.email,
@@ -1822,7 +1952,7 @@ async function resolveAsesorSingle(params: DynamicDataParams): Promise<any | nul
       meta_mensual: row.meta_mensual,
       stats: stats,
       propiedades_vendidas: stats.propiedades_vendidas || 0,
-      propiedades_activas: stats.propiedades_activas || 0,
+      propiedades_activas: propiedadesActivas,
       volumen_ventas: stats.volumen_ventas || 0,
       calificacion_promedio: stats.calificacion_promedio || 0,
       total_resenas: stats.total_resenas || 0,

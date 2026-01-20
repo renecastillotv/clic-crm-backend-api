@@ -83,6 +83,15 @@ import {
 } from '../services/usuariosService.js';
 import { getTasasCambio, updateTasasCambio } from '../services/tasasCambioService.js';
 import { query } from '../utils/db.js';
+import { getJoinRequests, getJoinRequestById, createJoinRequest, approveJoinRequest, rejectJoinRequest, getUpgradeRequests, getUpgradeRequestById, approveUpgradeRequest, rejectUpgradeRequest } from '../services/clicConnectSolicitudesService.js';
+import {
+  getAmenidades,
+  getAmenidadesTenant,
+  getCategoriasAmenidades,
+  createAmenidadTenant,
+  updateAmenidadTenant,
+  deleteAmenidadTenant,
+} from '../services/catalogosService.js';
 
 const router = express.Router();
 
@@ -347,107 +356,51 @@ router.get('/:tenantId/paginas', async (req, res) => {
 
 /**
  * POST /api/tenants/:tenantId/paginas
- * 
- * Crea una nueva página
+ * Las páginas son tipos estándar del sistema (tipos_pagina).
  */
-router.post('/:tenantId/paginas', async (req, res) => {
-  try {
-    const { tenantId } = req.params;
-    const pagina = req.body;
-    const { savePagina } = await import('../services/paginasService.js');
-    
-    console.log(`💾 POST /paginas - tenantId: ${tenantId}`, pagina);
-    
-    const saved = await savePagina(tenantId, pagina);
-    
-    console.log(`✅ Página creada:`, saved);
-    res.json(saved);
-  } catch (error: any) {
-    console.error('❌ Error en POST /paginas:', error);
-    res.status(500).json({ 
-      error: 'Error al crear página',
-      message: error.message 
-    });
-  }
+router.post('/:tenantId/paginas', async (_req, res) => {
+  res.status(400).json({
+    error: 'Operación no permitida',
+    message: 'Las páginas son tipos estándar del sistema. Para personalizar componentes de una página, use el endpoint de componentes.'
+  });
 });
 
 /**
  * PUT /api/tenants/:tenantId/paginas/:paginaId
- * 
- * Actualiza una página existente
+ * Las páginas son tipos estándar del sistema (tipos_pagina).
  */
-router.put('/:tenantId/paginas/:paginaId', async (req, res) => {
-  try {
-    const { tenantId, paginaId } = req.params;
-    const pagina = { ...req.body, id: paginaId };
-    const { savePagina } = await import('../services/paginasService.js');
-    
-    console.log(`🔄 PUT /paginas - tenantId: ${tenantId}, paginaId: ${paginaId}`, pagina);
-    
-    const saved = await savePagina(tenantId, pagina);
-    
-    console.log(`✅ Página actualizada:`, saved);
-    res.json(saved);
-  } catch (error: any) {
-    console.error('❌ Error en PUT /paginas:', error);
-    res.status(500).json({ 
-      error: 'Error al actualizar página',
-      message: error.message 
-    });
-  }
+router.put('/:tenantId/paginas/:paginaId', async (_req, res) => {
+  res.status(400).json({
+    error: 'Operación no permitida',
+    message: 'Las páginas son tipos estándar del sistema. Para personalizar componentes de una página, use el endpoint de componentes.'
+  });
 });
 
 /**
  * GET /api/tenants/:tenantId/paginas/:paginaId
- * 
+ *
  * Obtiene una página específica por ID
  */
 router.get('/:tenantId/paginas/:paginaId', async (req, res) => {
   try {
     const { tenantId, paginaId } = req.params;
     const { getPaginaById } = await import('../services/paginasService.js');
-    
+
     const pagina = await getPaginaById(tenantId, paginaId);
-    
+
     if (!pagina) {
-      return res.status(404).json({ 
+      return res.status(404).json({
         error: 'Página no encontrada',
-        message: 'La página solicitada no existe o no pertenece al tenant' 
+        message: 'La página solicitada no existe o no pertenece al tenant'
       });
     }
-    
+
     res.json(pagina);
   } catch (error: any) {
     console.error('Error en GET /paginas/:paginaId:', error);
-    res.status(500).json({ 
+    res.status(500).json({
       error: 'Error al obtener página',
-      message: error.message 
-    });
-  }
-});
-
-/**
- * PUT /api/tenants/:tenantId/paginas/:paginaId
- * 
- * Actualiza una página existente
- */
-router.put('/:tenantId/paginas/:paginaId', async (req, res) => {
-  try {
-    const { tenantId, paginaId } = req.params;
-    const pagina = { ...req.body, id: paginaId };
-    const { savePagina } = await import('../services/paginasService.js');
-    
-    console.log(`🔄 PUT /paginas - tenantId: ${tenantId}, paginaId: ${paginaId}`, pagina);
-    
-    const saved = await savePagina(tenantId, pagina);
-    
-    console.log(`✅ Página actualizada:`, saved);
-    res.json(saved);
-  } catch (error: any) {
-    console.error('❌ Error en PUT /paginas:', error);
-    res.status(500).json({ 
-      error: 'Error al actualizar página',
-      message: error.message 
+      message: error.message
     });
   }
 });
@@ -1489,6 +1442,31 @@ router.delete('/:tenantId/propiedades/:propiedadId', async (req, res) => {
   } catch (error: any) {
     console.error('Error en DELETE /propiedades/:id:', error);
     res.status(500).json({ error: 'Error al eliminar propiedad', message: error.message });
+  }
+});
+
+/**
+ * POST /api/tenants/:tenantId/propiedades/:propiedadId/regenerate-slugs
+ *
+ * Regenera los slugs de una propiedad (afecta SEO si ya está publicada)
+ */
+router.post('/:tenantId/propiedades/:propiedadId/regenerate-slugs', async (req, res) => {
+  try {
+    const { tenantId, propiedadId } = req.params;
+    const { forceRegenerate, nuevoTitulo } = req.body;
+
+    // Importar el servicio dinámicamente para evitar dependencias circulares
+    const { regeneratePropiedadSlugs } = await import('../services/propiedadesCrmService.js');
+
+    const result = await regeneratePropiedadSlugs(tenantId, propiedadId, {
+      forceRegenerate,
+      nuevoTitulo
+    });
+
+    res.json(result);
+  } catch (error: any) {
+    console.error('Error en POST /propiedades/:id/regenerate-slugs:', error);
+    res.status(500).json({ error: 'Error al regenerar slugs', message: error.message });
   }
 });
 
@@ -2781,6 +2759,1694 @@ router.post('/:tenantId/ventas/:ventaId/cancelar', async (req, res) => {
   } catch (error: any) {
     console.error('Error en POST /ventas/:id/cancelar:', error);
     res.status(500).json({ error: 'Error al cancelar venta', message: error.message });
+  }
+});
+
+// ==================== RUTAS: SISTEMA DE FASES ====================
+
+/**
+ * GET /api/tenants/:tenantId/sistema-fases/proyectos
+ * Obtiene los proyectos del Sistema de Fases
+ */
+router.get('/:tenantId/sistema-fases/proyectos', async (req, res) => {
+  try {
+    const { tenantId } = req.params;
+    const sql = `
+      SELECT p.*,
+        prop.titulo as propiedad_nombre
+      FROM sistema_fases_proyectos p
+      LEFT JOIN propiedades prop ON p.propiedad_id = prop.id
+      WHERE p.tenant_id = $1
+      ORDER BY p.created_at DESC
+    `;
+    const result = await query(sql, [tenantId]);
+    res.json({ proyectos: result.rows });
+  } catch (error: any) {
+    console.error('Error en GET /sistema-fases/proyectos:', error);
+    res.status(500).json({ error: 'Error al obtener proyectos', message: error.message });
+  }
+});
+
+/**
+ * POST /api/tenants/:tenantId/sistema-fases/proyectos
+ * Crea un nuevo proyecto del Sistema de Fases
+ */
+router.post('/:tenantId/sistema-fases/proyectos', async (req, res) => {
+  try {
+    const { tenantId } = req.params;
+    const {
+      propiedad_id,
+      porcentaje_comision_asesor = 50,
+      porcentaje_comision_tenant = 50,
+      monto_fase_1 = 100,
+      monto_fase_2 = 150,
+      monto_fase_3 = 200,
+      monto_fase_4 = 250,
+      monto_fase_5 = 300,
+      intentos_fase_1 = 3,
+      meses_solitario = 3,
+      activo = true,
+      fecha_inicio,
+      fecha_fin
+    } = req.body;
+
+    const sql = `
+      INSERT INTO sistema_fases_proyectos (
+        tenant_id, propiedad_id, porcentaje_comision_asesor, porcentaje_comision_tenant,
+        monto_fase_1, monto_fase_2, monto_fase_3, monto_fase_4, monto_fase_5,
+        intentos_fase_1, meses_solitario, activo, fecha_inicio, fecha_fin
+      ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14)
+      RETURNING *
+    `;
+    const result = await query(sql, [
+      tenantId, propiedad_id, porcentaje_comision_asesor, porcentaje_comision_tenant,
+      monto_fase_1, monto_fase_2, monto_fase_3, monto_fase_4, monto_fase_5,
+      intentos_fase_1, meses_solitario, activo, fecha_inicio, fecha_fin
+    ]);
+    res.status(201).json({ proyecto: result.rows[0] });
+  } catch (error: any) {
+    console.error('Error en POST /sistema-fases/proyectos:', error);
+    res.status(500).json({ error: 'Error al crear proyecto', message: error.message });
+  }
+});
+
+/**
+ * PUT /api/tenants/:tenantId/sistema-fases/proyectos/:proyectoId
+ * Actualiza un proyecto del Sistema de Fases
+ */
+router.put('/:tenantId/sistema-fases/proyectos/:proyectoId', async (req, res) => {
+  try {
+    const { tenantId, proyectoId } = req.params;
+    const {
+      propiedad_id,
+      porcentaje_comision_asesor,
+      porcentaje_comision_tenant,
+      monto_fase_1, monto_fase_2, monto_fase_3, monto_fase_4, monto_fase_5,
+      intentos_fase_1, meses_solitario, activo, fecha_inicio, fecha_fin
+    } = req.body;
+
+    const sql = `
+      UPDATE sistema_fases_proyectos SET
+        propiedad_id = COALESCE($3, propiedad_id),
+        porcentaje_comision_asesor = COALESCE($4, porcentaje_comision_asesor),
+        porcentaje_comision_tenant = COALESCE($5, porcentaje_comision_tenant),
+        monto_fase_1 = COALESCE($6, monto_fase_1),
+        monto_fase_2 = COALESCE($7, monto_fase_2),
+        monto_fase_3 = COALESCE($8, monto_fase_3),
+        monto_fase_4 = COALESCE($9, monto_fase_4),
+        monto_fase_5 = COALESCE($10, monto_fase_5),
+        intentos_fase_1 = COALESCE($11, intentos_fase_1),
+        meses_solitario = COALESCE($12, meses_solitario),
+        activo = COALESCE($13, activo),
+        fecha_inicio = COALESCE($14, fecha_inicio),
+        fecha_fin = COALESCE($15, fecha_fin),
+        updated_at = NOW()
+      WHERE tenant_id = $1 AND id = $2
+      RETURNING *
+    `;
+    const result = await query(sql, [
+      tenantId, proyectoId, propiedad_id, porcentaje_comision_asesor, porcentaje_comision_tenant,
+      monto_fase_1, monto_fase_2, monto_fase_3, monto_fase_4, monto_fase_5,
+      intentos_fase_1, meses_solitario, activo, fecha_inicio, fecha_fin
+    ]);
+    if (result.rows.length === 0) {
+      return res.status(404).json({ error: 'Proyecto no encontrado' });
+    }
+    res.json({ proyecto: result.rows[0] });
+  } catch (error: any) {
+    console.error('Error en PUT /sistema-fases/proyectos/:id:', error);
+    res.status(500).json({ error: 'Error al actualizar proyecto', message: error.message });
+  }
+});
+
+/**
+ * DELETE /api/tenants/:tenantId/sistema-fases/proyectos/:proyectoId
+ * Elimina (desactiva) un proyecto del Sistema de Fases
+ */
+router.delete('/:tenantId/sistema-fases/proyectos/:proyectoId', async (req, res) => {
+  try {
+    const { tenantId, proyectoId } = req.params;
+    const sql = 'UPDATE sistema_fases_proyectos SET activo = false, updated_at = NOW() WHERE tenant_id = $1 AND id = $2 RETURNING *';
+    const result = await query(sql, [tenantId, proyectoId]);
+    if (result.rows.length === 0) {
+      return res.status(404).json({ error: 'Proyecto no encontrado' });
+    }
+    res.json({ success: true, message: 'Proyecto eliminado correctamente' });
+  } catch (error: any) {
+    console.error('Error en DELETE /sistema-fases/proyectos/:id:', error);
+    res.status(500).json({ error: 'Error al eliminar proyecto', message: error.message });
+  }
+});
+
+/**
+ * GET /api/tenants/:tenantId/sistema-fases/asesores
+ * Obtiene los asesores del Sistema de Fases
+ */
+router.get('/:tenantId/sistema-fases/asesores', async (req, res) => {
+  try {
+    const { tenantId } = req.params;
+    const { proyectoId } = req.query;
+
+    let sql = `
+      SELECT a.*,
+        u.nombre as usuario_nombre,
+        u.apellido as usuario_apellido,
+        u.email as usuario_email
+      FROM sistema_fases_asesores a
+      JOIN usuarios u ON a.usuario_id = u.id
+      WHERE a.tenant_id = $1
+    `;
+    const params: any[] = [tenantId];
+
+    if (proyectoId) {
+      sql += ' AND a.proyecto_id = $2';
+      params.push(proyectoId);
+    }
+
+    sql += ' ORDER BY a.fase_actual DESC, a.prestige DESC';
+
+    const result = await query(sql, params);
+    res.json({ asesores: result.rows });
+  } catch (error: any) {
+    console.error('Error en GET /sistema-fases/asesores:', error);
+    res.status(500).json({ error: 'Error al obtener asesores', message: error.message });
+  }
+});
+
+/**
+ * POST /api/tenants/:tenantId/sistema-fases/asesores
+ * Agrega un asesor al Sistema de Fases
+ */
+router.post('/:tenantId/sistema-fases/asesores', async (req, res) => {
+  try {
+    const { tenantId } = req.params;
+    const { proyectoId, usuarioId } = req.body;
+
+    if (!proyectoId || !usuarioId) {
+      return res.status(400).json({ error: 'proyectoId y usuarioId son requeridos' });
+    }
+
+    // Obtener configuración de intentos del proyecto
+    const proyectoResult = await query(
+      'SELECT intentos_fase_1 FROM sistema_fases_proyectos WHERE id = $1 AND tenant_id = $2',
+      [proyectoId, tenantId]
+    );
+    const intentosTotales = proyectoResult.rows[0]?.intentos_fase_1 || 3;
+
+    const sql = `
+      INSERT INTO sistema_fases_asesores (
+        tenant_id, usuario_id, proyecto_id, fase_actual, intentos_totales,
+        mes_tracking
+      ) VALUES ($1, $2, $3, 1, $4, date_trunc('month', CURRENT_DATE))
+      ON CONFLICT (tenant_id, usuario_id, proyecto_id)
+      DO UPDATE SET activo = true, updated_at = NOW()
+      RETURNING *
+    `;
+    const result = await query(sql, [tenantId, usuarioId, proyectoId, intentosTotales]);
+    res.status(201).json({ asesor: result.rows[0] });
+  } catch (error: any) {
+    console.error('Error en POST /sistema-fases/asesores:', error);
+    res.status(500).json({ error: 'Error al agregar asesor', message: error.message });
+  }
+});
+
+/**
+ * GET /api/tenants/:tenantId/sistema-fases/leads
+ * Obtiene los leads del Sistema de Fases
+ */
+router.get('/:tenantId/sistema-fases/leads', async (req, res) => {
+  try {
+    const { tenantId } = req.params;
+    const { asesorId, proyectoId } = req.query;
+
+    let sql = `
+      SELECT l.*,
+        c.nombre as contacto_nombre,
+        c.apellido as contacto_apellido,
+        c.email as contacto_email,
+        c.telefono as contacto_telefono
+      FROM sistema_fases_leads l
+      JOIN contactos c ON l.contacto_id = c.id
+      WHERE l.tenant_id = $1
+    `;
+    const params: any[] = [tenantId];
+    let paramIndex = 2;
+
+    if (asesorId) {
+      sql += ` AND l.asesor_id = $${paramIndex}`;
+      params.push(asesorId);
+      paramIndex++;
+    }
+
+    if (proyectoId) {
+      sql += ` AND l.proyecto_id = $${paramIndex}`;
+      params.push(proyectoId);
+      paramIndex++;
+    }
+
+    sql += ' ORDER BY l.created_at DESC';
+
+    const result = await query(sql, params);
+    res.json({ leads: result.rows });
+  } catch (error: any) {
+    console.error('Error en GET /sistema-fases/leads:', error);
+    res.status(500).json({ error: 'Error al obtener leads', message: error.message });
+  }
+});
+
+/**
+ * GET /api/tenants/:tenantId/sistema-fases/estadisticas
+ * Obtiene estadísticas del Sistema de Fases
+ */
+router.get('/:tenantId/sistema-fases/estadisticas', async (req, res) => {
+  try {
+    const { tenantId } = req.params;
+    const { proyectoId } = req.query;
+
+    let whereProyecto = '';
+    const params: any[] = [tenantId];
+
+    if (proyectoId) {
+      whereProyecto = ' AND proyecto_id = $2';
+      params.push(proyectoId);
+    }
+
+    // Total de asesores por fase
+    const asesoresPorFaseResult = await query(`
+      SELECT fase_actual, COUNT(*) as total
+      FROM sistema_fases_asesores
+      WHERE tenant_id = $1 AND activo = true ${whereProyecto}
+      GROUP BY fase_actual
+      ORDER BY fase_actual
+    `, params);
+
+    // Top asesores por PRESTIGE
+    const topPrestigeResult = await query(`
+      SELECT a.*, u.nombre, u.apellido
+      FROM sistema_fases_asesores a
+      JOIN usuarios u ON a.usuario_id = u.id
+      WHERE a.tenant_id = $1 AND a.activo = true ${whereProyecto}
+      ORDER BY a.prestige DESC
+      LIMIT 10
+    `, params);
+
+    // Leads por estado
+    const leadsPorEstadoResult = await query(`
+      SELECT estado, COUNT(*) as total
+      FROM sistema_fases_leads
+      WHERE tenant_id = $1 ${whereProyecto}
+      GROUP BY estado
+    `, params);
+
+    res.json({
+      asesoresPorFase: asesoresPorFaseResult.rows,
+      topPrestige: topPrestigeResult.rows,
+      leadsPorEstado: leadsPorEstadoResult.rows
+    });
+  } catch (error: any) {
+    console.error('Error en GET /sistema-fases/estadisticas:', error);
+    res.status(500).json({ error: 'Error al obtener estadísticas', message: error.message });
+  }
+});
+
+// ==================== RUTAS: CONFIGURACIÓN DE COMISIONES ====================
+
+/**
+ * GET /api/tenants/:tenantId/comision-config
+ *
+ * Obtiene la configuración de comisiones por defecto del tenant
+ */
+router.get('/:tenantId/comision-config', async (req, res) => {
+  try {
+    const { tenantId } = req.params;
+
+    const sql = `
+      SELECT
+        red_global_comision_default,
+        connect_comision_default
+      FROM tenants
+      WHERE id = $1 AND activo = true
+      LIMIT 1
+    `;
+
+    const result = await query(sql, [tenantId]);
+
+    if (result.rows.length === 0) {
+      return res.json({
+        red_global_comision_default: null,
+        connect_comision_default: null
+      });
+    }
+
+    const row = result.rows[0];
+    res.json({
+      red_global_comision_default: row.red_global_comision_default || null,
+      connect_comision_default: row.connect_comision_default || null
+    });
+  } catch (error: any) {
+    console.error('Error al obtener configuración de comisiones:', error);
+    res.status(500).json({ error: 'Error al obtener configuración de comisiones', message: error.message });
+  }
+});
+
+// ==================== RUTAS: CLIC CONNECT JOIN REQUESTS ====================
+
+/**
+ * GET /api/tenants/:tenantId/join-requests
+ *
+ * Obtiene todas las solicitudes de unirse a CLIC Connect para el tenant
+ * Query params:
+ *   - estado: filtrar por estado (pending, approved, rejected)
+ */
+router.get('/:tenantId/join-requests', async (req, res) => {
+  try {
+    const { tenantId } = req.params;
+    const { estado } = req.query;
+
+    let solicitudes = await getJoinRequests(tenantId);
+
+    // Filtrar por estado si se especifica
+    if (estado && typeof estado === 'string') {
+      solicitudes = solicitudes.filter(s => s.estado === estado);
+    }
+
+    res.json({ solicitudes });
+  } catch (error: any) {
+    console.error('Error en GET /join-requests:', error);
+    res.status(500).json({ error: 'Error al obtener solicitudes', message: error.message });
+  }
+});
+
+/**
+ * GET /api/tenants/:tenantId/join-requests/:requestId
+ *
+ * Obtiene una solicitud específica
+ */
+router.get('/:tenantId/join-requests/:requestId', async (req, res) => {
+  try {
+    const { tenantId, requestId } = req.params;
+    const solicitud = await getJoinRequestById(tenantId, requestId);
+
+    if (!solicitud) {
+      return res.status(404).json({ error: 'Solicitud no encontrada' });
+    }
+
+    res.json(solicitud);
+  } catch (error: any) {
+    console.error('Error en GET /join-requests/:requestId:', error);
+    res.status(500).json({ error: 'Error al obtener solicitud', message: error.message });
+  }
+});
+
+/**
+ * POST /api/tenants/:tenantId/join-requests
+ *
+ * Crea una nueva solicitud de unirse a CLIC Connect
+ */
+router.post('/:tenantId/join-requests', async (req, res) => {
+  try {
+    const { tenantId } = req.params;
+    const data = req.body;
+
+    const solicitud = await createJoinRequest(tenantId, data);
+    res.status(201).json(solicitud);
+  } catch (error: any) {
+    console.error('Error en POST /join-requests:', error);
+    res.status(500).json({ error: 'Error al crear solicitud', message: error.message });
+  }
+});
+
+/**
+ * POST /api/tenants/:tenantId/join-requests/:requestId/approve
+ *
+ * Aprueba una solicitud
+ */
+router.post('/:tenantId/join-requests/:requestId/approve', async (req, res) => {
+  try {
+    const { tenantId, requestId } = req.params;
+    const { revisadoPor, notas } = req.body;
+
+    const solicitud = await approveJoinRequest(tenantId, requestId, revisadoPor, notas);
+    res.json(solicitud);
+  } catch (error: any) {
+    console.error('Error en POST /join-requests/:requestId/approve:', error);
+    res.status(500).json({ error: 'Error al aprobar solicitud', message: error.message });
+  }
+});
+
+/**
+ * POST /api/tenants/:tenantId/join-requests/:requestId/reject
+ *
+ * Rechaza una solicitud
+ */
+router.post('/:tenantId/join-requests/:requestId/reject', async (req, res) => {
+  try {
+    const { tenantId, requestId } = req.params;
+    const { revisadoPor, notas } = req.body;
+
+    const solicitud = await rejectJoinRequest(tenantId, requestId, revisadoPor, notas);
+    res.json(solicitud);
+  } catch (error: any) {
+    console.error('Error en POST /join-requests/:requestId/reject:', error);
+    res.status(500).json({ error: 'Error al rechazar solicitud', message: error.message });
+  }
+});
+
+// ==================== RUTAS: CATALOGOS TENANT ====================
+
+/**
+ * GET /api/tenants/:tenantId/catalogos
+ *
+ * Obtiene todos los items de catálogo para el tenant
+ * Incluye items globales (tenant_id = NULL) + items personalizados del tenant
+ * Query params:
+ *   - tipo: filtrar por tipo de catálogo
+ *   - activo: si es 'false' incluye items inactivos (default: solo activos)
+ */
+router.get('/:tenantId/catalogos', async (req, res) => {
+  try {
+    const { tenantId } = req.params;
+    const { tipo, activo } = req.query;
+    const soloActivos = activo !== 'false';
+
+    let sql = `
+      SELECT
+        c.*,
+        CASE
+          WHEN c.tenant_id IS NULL THEN 'global'
+          ELSE 'tenant'
+        END as origen
+      FROM catalogos c
+      WHERE (c.tenant_id IS NULL OR c.tenant_id = $1)
+    `;
+    const params: any[] = [tenantId];
+
+    if (tipo) {
+      sql += ` AND c.tipo = $${params.length + 1}`;
+      params.push(tipo);
+    }
+
+    if (soloActivos) {
+      sql += ` AND c.activo = true`;
+    }
+
+    sql += ` ORDER BY c.tipo, c.orden, c.nombre`;
+
+    const result = await query(sql, params);
+
+    // Agrupar por tipo
+    const catalogos: Record<string, any[]> = {};
+    for (const row of result.rows) {
+      const t = row.tipo;
+      if (!catalogos[t]) {
+        catalogos[t] = [];
+      }
+      catalogos[t].push(row);
+    }
+
+    // El frontend espera { catalogos: { tipo_contacto: [], ... } }
+    res.json({ catalogos });
+  } catch (error: any) {
+    console.error('Error en GET /catalogos:', error);
+    res.status(500).json({ error: 'Error al obtener catálogos', message: error.message });
+  }
+});
+
+/**
+ * POST /api/tenants/:tenantId/catalogos
+ *
+ * Crea un nuevo item de catálogo para el tenant
+ */
+router.post('/:tenantId/catalogos', async (req, res) => {
+  try {
+    const { tenantId } = req.params;
+    const { tipo, codigo, nombre, nombre_plural, descripcion, icono, color, orden, activo, es_default, config, traducciones, metadata } = req.body;
+
+    if (!tipo || !codigo || !nombre) {
+      return res.status(400).json({ error: 'tipo, codigo y nombre son requeridos' });
+    }
+
+    const sql = `
+      INSERT INTO catalogos (tenant_id, tipo, codigo, nombre, nombre_plural, descripcion, icono, color, orden, activo, es_default, config, traducciones, metadata)
+      VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14)
+      RETURNING *
+    `;
+
+    const result = await query(sql, [
+      tenantId,
+      tipo,
+      codigo,
+      nombre,
+      nombre_plural || null,
+      descripcion || null,
+      icono || null,
+      color || null,
+      orden || 0,
+      activo !== false,
+      es_default || false,
+      config ? JSON.stringify(config) : null,
+      traducciones ? JSON.stringify(traducciones) : null,
+      metadata ? JSON.stringify(metadata) : null
+    ]);
+
+    res.status(201).json(result.rows[0]);
+  } catch (error: any) {
+    console.error('Error en POST /catalogos:', error);
+    if (error.code === '23505') {
+      return res.status(409).json({ error: 'Ya existe un item con ese código para este tipo y tenant' });
+    }
+    res.status(500).json({ error: 'Error al crear item de catálogo', message: error.message });
+  }
+});
+
+/**
+ * PUT /api/tenants/:tenantId/catalogos/:itemId
+ *
+ * Actualiza un item de catálogo
+ */
+router.put('/:tenantId/catalogos/:itemId', async (req, res) => {
+  try {
+    const { tenantId, itemId } = req.params;
+    const { nombre, nombre_plural, descripcion, icono, color, orden, activo, es_default, config, traducciones, metadata } = req.body;
+
+    const sql = `
+      UPDATE catalogos
+      SET
+        nombre = COALESCE($1, nombre),
+        nombre_plural = COALESCE($2, nombre_plural),
+        descripcion = COALESCE($3, descripcion),
+        icono = COALESCE($4, icono),
+        color = COALESCE($5, color),
+        orden = COALESCE($6, orden),
+        activo = COALESCE($7, activo),
+        es_default = COALESCE($8, es_default),
+        config = COALESCE($9, config),
+        traducciones = COALESCE($10, traducciones),
+        metadata = COALESCE($11, metadata),
+        updated_at = NOW()
+      WHERE id = $12 AND (tenant_id = $13 OR tenant_id IS NULL)
+      RETURNING *
+    `;
+
+    const result = await query(sql, [
+      nombre || null,
+      nombre_plural || null,
+      descripcion || null,
+      icono || null,
+      color || null,
+      orden !== undefined ? orden : null,
+      activo !== undefined ? activo : null,
+      es_default !== undefined ? es_default : null,
+      config ? JSON.stringify(config) : null,
+      traducciones ? JSON.stringify(traducciones) : null,
+      metadata ? JSON.stringify(metadata) : null,
+      itemId,
+      tenantId
+    ]);
+
+    if (result.rows.length === 0) {
+      return res.status(404).json({ error: 'Item de catálogo no encontrado' });
+    }
+
+    res.json(result.rows[0]);
+  } catch (error: any) {
+    console.error('Error en PUT /catalogos/:itemId:', error);
+    res.status(500).json({ error: 'Error al actualizar item de catálogo', message: error.message });
+  }
+});
+
+/**
+ * DELETE /api/tenants/:tenantId/catalogos/:itemId
+ *
+ * Elimina un item de catálogo (solo items del tenant, no globales)
+ */
+router.delete('/:tenantId/catalogos/:itemId', async (req, res) => {
+  try {
+    const { tenantId, itemId } = req.params;
+
+    // Solo permitir eliminar items del tenant, no globales
+    const sql = `
+      DELETE FROM catalogos
+      WHERE id = $1 AND tenant_id = $2
+      RETURNING *
+    `;
+
+    const result = await query(sql, [itemId, tenantId]);
+
+    if (result.rows.length === 0) {
+      return res.status(404).json({ error: 'Item de catálogo no encontrado o no pertenece al tenant' });
+    }
+
+    res.json({ message: 'Item eliminado correctamente', item: result.rows[0] });
+  } catch (error: any) {
+    console.error('Error en DELETE /catalogos/:itemId:', error);
+    res.status(500).json({ error: 'Error al eliminar item de catálogo', message: error.message });
+  }
+});
+
+/**
+ * POST /api/tenants/:tenantId/catalogos/:tipo/toggle/:codigo
+ *
+ * Activa o desactiva un item de catálogo para el tenant
+ */
+router.post('/:tenantId/catalogos/:tipo/toggle/:codigo', async (req, res) => {
+  try {
+    const { tenantId, tipo, codigo } = req.params;
+    const { activo } = req.body;
+
+    // Primero buscar si existe un override del tenant
+    const existsSql = `
+      SELECT id FROM catalogos
+      WHERE tenant_id = $1 AND tipo = $2 AND codigo = $3
+    `;
+    const existsResult = await query(existsSql, [tenantId, tipo, codigo]);
+
+    if (existsResult.rows.length > 0) {
+      // Actualizar el override existente
+      const updateSql = `
+        UPDATE catalogos
+        SET activo = $1, updated_at = NOW()
+        WHERE tenant_id = $2 AND tipo = $3 AND codigo = $4
+        RETURNING *
+      `;
+      const result = await query(updateSql, [activo, tenantId, tipo, codigo]);
+      return res.json(result.rows[0]);
+    }
+
+    // Si no existe override, crear uno copiando del global
+    const globalSql = `
+      SELECT * FROM catalogos
+      WHERE tenant_id IS NULL AND tipo = $1 AND codigo = $2
+    `;
+    const globalResult = await query(globalSql, [tipo, codigo]);
+
+    if (globalResult.rows.length === 0) {
+      return res.status(404).json({ error: 'Item de catálogo no encontrado' });
+    }
+
+    const global = globalResult.rows[0];
+    const insertSql = `
+      INSERT INTO catalogos (tenant_id, tipo, codigo, nombre, nombre_plural, descripcion, icono, color, orden, activo, es_default, config, traducciones, metadata)
+      VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14)
+      RETURNING *
+    `;
+
+    const insertResult = await query(insertSql, [
+      tenantId,
+      global.tipo,
+      global.codigo,
+      global.nombre,
+      global.nombre_plural,
+      global.descripcion,
+      global.icono,
+      global.color,
+      global.orden,
+      activo,
+      global.es_default,
+      global.config,
+      global.traducciones,
+      global.metadata
+    ]);
+
+    res.json(insertResult.rows[0]);
+  } catch (error: any) {
+    console.error('Error en POST /catalogos/:tipo/toggle/:codigo:', error);
+    res.status(500).json({ error: 'Error al toggle item de catálogo', message: error.message });
+  }
+});
+
+// ==================== RUTAS: CLIC CONNECT UPGRADE REQUESTS ====================
+
+/**
+ * GET /api/tenants/:tenantId/upgrade-requests
+ *
+ * Obtiene todas las solicitudes de upgrade de CLIC Connect para el tenant
+ * Query params:
+ *   - estado: filtrar por estado (pending, approved, rejected)
+ */
+router.get('/:tenantId/upgrade-requests', async (req, res) => {
+  try {
+    const { tenantId } = req.params;
+    const { estado } = req.query;
+
+    let solicitudes = await getUpgradeRequests(tenantId);
+
+    // Filtrar por estado si se especifica
+    if (estado && typeof estado === 'string') {
+      solicitudes = solicitudes.filter(s => s.estado === estado);
+    }
+
+    res.json({ solicitudes });
+  } catch (error: any) {
+    console.error('Error en GET /upgrade-requests:', error);
+    res.status(500).json({ error: 'Error al obtener solicitudes de upgrade', message: error.message });
+  }
+});
+
+/**
+ * GET /api/tenants/:tenantId/upgrade-requests/:requestId
+ *
+ * Obtiene una solicitud de upgrade específica
+ */
+router.get('/:tenantId/upgrade-requests/:requestId', async (req, res) => {
+  try {
+    const { tenantId, requestId } = req.params;
+    const solicitud = await getUpgradeRequestById(tenantId, requestId);
+
+    if (!solicitud) {
+      return res.status(404).json({ error: 'Solicitud no encontrada' });
+    }
+
+    res.json(solicitud);
+  } catch (error: any) {
+    console.error('Error en GET /upgrade-requests/:requestId:', error);
+    res.status(500).json({ error: 'Error al obtener solicitud de upgrade', message: error.message });
+  }
+});
+
+/**
+ * POST /api/tenants/:tenantId/upgrade-requests/:requestId/approve
+ *
+ * Aprueba una solicitud de upgrade
+ */
+router.post('/:tenantId/upgrade-requests/:requestId/approve', async (req, res) => {
+  try {
+    const { tenantId, requestId } = req.params;
+    const { revisadoPor, notas } = req.body;
+
+    const solicitud = await approveUpgradeRequest(tenantId, requestId, revisadoPor, notas);
+    res.json(solicitud);
+  } catch (error: any) {
+    console.error('Error en POST /upgrade-requests/:requestId/approve:', error);
+    res.status(500).json({ error: 'Error al aprobar solicitud de upgrade', message: error.message });
+  }
+});
+
+/**
+ * POST /api/tenants/:tenantId/upgrade-requests/:requestId/reject
+ *
+ * Rechaza una solicitud de upgrade
+ */
+router.post('/:tenantId/upgrade-requests/:requestId/reject', async (req, res) => {
+  try {
+    const { tenantId, requestId } = req.params;
+    const { revisadoPor, notas } = req.body;
+
+    const solicitud = await rejectUpgradeRequest(tenantId, requestId, revisadoPor, notas);
+    res.json(solicitud);
+  } catch (error: any) {
+    console.error('Error en POST /upgrade-requests/:requestId/reject:', error);
+    res.status(500).json({ error: 'Error al rechazar solicitud de upgrade', message: error.message });
+  }
+});
+
+// ==================== RUTAS: AMENIDADES ====================
+
+/**
+ * GET /api/tenants/:tenantId/amenidades
+ *
+ * Obtiene las amenidades del tenant (globales + personalizadas)
+ * Query params:
+ *   - incluirInactivas (boolean, default false)
+ */
+router.get('/:tenantId/amenidades', async (req, res) => {
+  try {
+    const { tenantId } = req.params;
+    const incluirInactivas = req.query.incluirInactivas === 'true';
+
+    // Obtener amenidades globales + del tenant
+    const amenidades = await getAmenidades(!incluirInactivas, tenantId);
+
+    res.json({ amenidades });
+  } catch (error: any) {
+    console.error('Error en GET /amenidades:', error);
+    res.status(500).json({ error: 'Error al obtener amenidades', message: error.message });
+  }
+});
+
+/**
+ * GET /api/tenants/:tenantId/amenidades/categorias
+ *
+ * Obtiene las categorías de amenidades disponibles
+ */
+router.get('/:tenantId/amenidades/categorias', async (req, res) => {
+  try {
+    const categorias = await getCategoriasAmenidades();
+    res.json(categorias);
+  } catch (error: any) {
+    console.error('Error en GET /amenidades/categorias:', error);
+    res.status(500).json({ error: 'Error al obtener categorías', message: error.message });
+  }
+});
+
+/**
+ * POST /api/tenants/:tenantId/amenidades
+ *
+ * Crea una nueva amenidad personalizada para el tenant
+ */
+router.post('/:tenantId/amenidades', async (req, res) => {
+  try {
+    const { tenantId } = req.params;
+    const { nombre, icono, categoria, traducciones } = req.body;
+
+    if (!nombre || typeof nombre !== 'string' || !nombre.trim()) {
+      return res.status(400).json({ error: 'El nombre de la amenidad es requerido' });
+    }
+
+    const amenidad = await createAmenidadTenant(tenantId, {
+      nombre: nombre.trim(),
+      icono,
+      categoria,
+      traducciones
+    });
+
+    res.status(201).json(amenidad);
+  } catch (error: any) {
+    console.error('Error en POST /amenidades:', error);
+    res.status(500).json({ error: 'Error al crear amenidad', message: error.message });
+  }
+});
+
+/**
+ * PUT /api/tenants/:tenantId/amenidades/:amenidadId
+ *
+ * Actualiza una amenidad del tenant
+ */
+router.put('/:tenantId/amenidades/:amenidadId', async (req, res) => {
+  try {
+    const { tenantId, amenidadId } = req.params;
+    const { nombre, icono, categoria, traducciones, activo } = req.body;
+
+    const amenidad = await updateAmenidadTenant(tenantId, amenidadId, {
+      nombre,
+      icono,
+      categoria,
+      traducciones,
+      activo
+    });
+
+    if (!amenidad) {
+      return res.status(404).json({ error: 'Amenidad no encontrada' });
+    }
+
+    res.json(amenidad);
+  } catch (error: any) {
+    console.error('Error en PUT /amenidades/:amenidadId:', error);
+    res.status(500).json({ error: 'Error al actualizar amenidad', message: error.message });
+  }
+});
+
+/**
+ * DELETE /api/tenants/:tenantId/amenidades/:amenidadId
+ *
+ * Elimina una amenidad del tenant
+ */
+router.delete('/:tenantId/amenidades/:amenidadId', async (req, res) => {
+  try {
+    const { tenantId, amenidadId } = req.params;
+
+    const deleted = await deleteAmenidadTenant(tenantId, amenidadId);
+
+    if (!deleted) {
+      return res.status(404).json({ error: 'Amenidad no encontrada' });
+    }
+
+    res.json({ success: true, message: 'Amenidad eliminada correctamente' });
+  } catch (error: any) {
+    console.error('Error en DELETE /amenidades/:amenidadId:', error);
+    res.status(500).json({ error: 'Error al eliminar amenidad', message: error.message });
+  }
+});
+
+// ==================== RUTAS: IDIOMAS ====================
+
+// Idiomas por defecto disponibles en el sistema
+const IDIOMAS_SISTEMA = [
+  { code: 'es', label: 'Spanish', labelNativo: 'Español', flag: 'ES', flagEmoji: '🇪🇸', activo: true },
+  { code: 'en', label: 'English', labelNativo: 'English', flag: 'US', flagEmoji: '🇺🇸', activo: true },
+  { code: 'fr', label: 'French', labelNativo: 'Français', flag: 'FR', flagEmoji: '🇫🇷', activo: true },
+  { code: 'pt', label: 'Portuguese', labelNativo: 'Português', flag: 'BR', flagEmoji: '🇧🇷', activo: true },
+];
+
+/**
+ * GET /api/tenants/:tenantId/idiomas
+ *
+ * Obtiene los idiomas habilitados para un tenant
+ * Si la columna idiomas_habilitados no existe, devuelve español e inglés por defecto
+ */
+router.get('/:tenantId/idiomas', async (req, res) => {
+  try {
+    const { tenantId } = req.params;
+
+    // Verificar si el tenant existe
+    const tenantCheck = await query(`SELECT id FROM tenants WHERE id = $1`, [tenantId]);
+
+    if (tenantCheck.rows.length === 0) {
+      // Si no existe el tenant, devolver idiomas por defecto
+      return res.json(IDIOMAS_SISTEMA.filter(i => i.code === 'es' || i.code === 'en'));
+    }
+
+    // Intentar obtener configuración de idiomas del tenant (puede no existir la columna)
+    let idiomasHabilitados = ['es', 'en'];
+    let idiomaDefault = 'es';
+
+    try {
+      const result = await query(
+        `SELECT idiomas_habilitados, idioma_default FROM tenants WHERE id = $1`,
+        [tenantId]
+      );
+
+      if (result.rows.length > 0 && result.rows[0].idiomas_habilitados) {
+        idiomasHabilitados = result.rows[0].idiomas_habilitados;
+        idiomaDefault = result.rows[0].idioma_default || 'es';
+      }
+    } catch {
+      // Si la columna no existe, usamos los valores por defecto
+      console.log('Columna idiomas_habilitados no existe, usando valores por defecto');
+    }
+
+    // Filtrar idiomas del sistema según los habilitados por el tenant
+    const idiomasTenant = IDIOMAS_SISTEMA
+      .filter(idioma => idiomasHabilitados.includes(idioma.code))
+      .map(idioma => ({
+        ...idioma,
+        activo: true,
+        esDefault: idioma.code === idiomaDefault
+      }));
+
+    // Si no hay idiomas configurados, devolver español e inglés por defecto
+    if (idiomasTenant.length === 0) {
+      return res.json(IDIOMAS_SISTEMA.filter(i => i.code === 'es' || i.code === 'en'));
+    }
+
+    res.json(idiomasTenant);
+  } catch (error: any) {
+    console.error('Error en GET /idiomas:', error);
+    // En caso de error, devolver idiomas por defecto en lugar de fallar
+    res.json(IDIOMAS_SISTEMA.filter(i => i.code === 'es' || i.code === 'en'));
+  }
+});
+
+// ==================== RUTAS: EXTENSIONES DE CONTACTO ====================
+
+/**
+ * GET /api/tenants/:tenantId/extensiones-contacto
+ * Obtiene todas las extensiones de contacto disponibles para el tenant
+ * Query params: activo (boolean, default false = muestra todas)
+ */
+router.get('/:tenantId/extensiones-contacto', async (req, res) => {
+  try {
+    const { tenantId } = req.params;
+    const soloActivas = req.query.activo === 'true';
+
+    // Obtener extensiones globales (tenant_id IS NULL) + extensiones del tenant
+    let queryStr = `
+      SELECT
+        c.*,
+        CASE
+          WHEN c.tenant_id IS NULL THEN 'sistema'
+          ELSE 'tenant'
+        END as origen,
+        COALESCE(p.activo, c.activo) as activo_tenant
+      FROM catalogo_extensiones_contacto c
+      LEFT JOIN tenant_extension_preferencias p
+        ON p.extension_id = c.id AND p.tenant_id = $1
+      WHERE (c.tenant_id IS NULL OR c.tenant_id = $1)
+    `;
+
+    if (soloActivas) {
+      queryStr += ` AND COALESCE(p.activo, c.activo) = true`;
+    }
+
+    queryStr += ` ORDER BY c.orden, c.nombre`;
+
+    const result = await query(queryStr, [tenantId]);
+
+    res.json(result.rows);
+  } catch (error: any) {
+    console.error('Error en GET /extensiones-contacto:', error);
+    res.status(500).json({ error: error.message || 'Error al obtener extensiones de contacto' });
+  }
+});
+
+/**
+ * GET /api/tenants/:tenantId/extensiones-contacto/:extensionId
+ * Obtiene una extensión específica por ID
+ */
+router.get('/:tenantId/extensiones-contacto/:extensionId', async (req, res) => {
+  try {
+    const { tenantId, extensionId } = req.params;
+
+    const result = await query(`
+      SELECT
+        c.*,
+        CASE WHEN c.tenant_id IS NULL THEN 'sistema' ELSE 'tenant' END as origen,
+        COALESCE(p.activo, c.activo) as activo_tenant
+      FROM catalogo_extensiones_contacto c
+      LEFT JOIN tenant_extension_preferencias p
+        ON p.extension_id = c.id AND p.tenant_id = $1
+      WHERE c.id = $2 AND (c.tenant_id IS NULL OR c.tenant_id = $1)
+    `, [tenantId, extensionId]);
+
+    if (result.rows.length === 0) {
+      return res.status(404).json({ error: 'Extensión no encontrada' });
+    }
+
+    res.json(result.rows[0]);
+  } catch (error: any) {
+    console.error('Error en GET /extensiones-contacto/:extensionId:', error);
+    res.status(500).json({ error: error.message || 'Error al obtener extensión' });
+  }
+});
+
+/**
+ * POST /api/tenants/:tenantId/extensiones-contacto
+ * Crea una nueva extensión personalizada para el tenant
+ */
+router.post('/:tenantId/extensiones-contacto', async (req, res) => {
+  try {
+    const { tenantId } = req.params;
+    const { codigo, nombre, descripcion, icono, color, campos_schema, orden } = req.body;
+
+    if (!codigo || !nombre) {
+      return res.status(400).json({ error: 'Código y nombre son requeridos' });
+    }
+
+    const result = await query(`
+      INSERT INTO catalogo_extensiones_contacto (tenant_id, codigo, nombre, descripcion, icono, color, campos_schema, orden, activo, es_sistema)
+      VALUES ($1, $2, $3, $4, $5, $6, $7, $8, true, false)
+      RETURNING *
+    `, [tenantId, codigo, nombre, descripcion || null, icono || null, color || null, JSON.stringify(campos_schema || []), orden || 0]);
+
+    res.status(201).json(result.rows[0]);
+  } catch (error: any) {
+    console.error('Error en POST /extensiones-contacto:', error);
+    if (error.code === '23505') { // Unique violation
+      return res.status(400).json({ error: 'Ya existe una extensión con ese código' });
+    }
+    res.status(500).json({ error: error.message || 'Error al crear extensión' });
+  }
+});
+
+/**
+ * PUT /api/tenants/:tenantId/extensiones-contacto/:extensionId
+ * Actualiza una extensión del tenant
+ */
+router.put('/:tenantId/extensiones-contacto/:extensionId', async (req, res) => {
+  try {
+    const { tenantId, extensionId } = req.params;
+    const { nombre, descripcion, icono, color, campos_schema, orden, activo } = req.body;
+
+    // Solo permitir editar extensiones del tenant (no las de sistema)
+    const checkResult = await query(`
+      SELECT * FROM catalogo_extensiones_contacto WHERE id = $1
+    `, [extensionId]);
+
+    if (checkResult.rows.length === 0) {
+      return res.status(404).json({ error: 'Extensión no encontrada' });
+    }
+
+    const extension = checkResult.rows[0];
+
+    // Si es extensión de sistema, solo permitir toggle de activo via preferencias
+    if (extension.es_sistema || extension.tenant_id === null) {
+      return res.status(403).json({ error: 'No se puede editar extensiones del sistema' });
+    }
+
+    const result = await query(`
+      UPDATE catalogo_extensiones_contacto
+      SET
+        nombre = COALESCE($1, nombre),
+        descripcion = COALESCE($2, descripcion),
+        icono = COALESCE($3, icono),
+        color = COALESCE($4, color),
+        campos_schema = COALESCE($5, campos_schema),
+        orden = COALESCE($6, orden),
+        activo = COALESCE($7, activo),
+        updated_at = NOW()
+      WHERE id = $8 AND tenant_id = $9
+      RETURNING *
+    `, [nombre, descripcion, icono, color, campos_schema ? JSON.stringify(campos_schema) : null, orden, activo, extensionId, tenantId]);
+
+    if (result.rows.length === 0) {
+      return res.status(404).json({ error: 'Extensión no encontrada' });
+    }
+
+    res.json(result.rows[0]);
+  } catch (error: any) {
+    console.error('Error en PUT /extensiones-contacto/:extensionId:', error);
+    res.status(500).json({ error: error.message || 'Error al actualizar extensión' });
+  }
+});
+
+/**
+ * POST /api/tenants/:tenantId/extensiones-contacto/:extensionId/toggle
+ * Activa/desactiva una extensión para el tenant (incluso las de sistema)
+ */
+router.post('/:tenantId/extensiones-contacto/:extensionId/toggle', async (req, res) => {
+  try {
+    const { tenantId, extensionId } = req.params;
+    const { activo } = req.body;
+
+    if (typeof activo !== 'boolean') {
+      return res.status(400).json({ error: 'El campo activo es requerido (boolean)' });
+    }
+
+    // Upsert en tenant_extension_preferencias
+    const result = await query(`
+      INSERT INTO tenant_extension_preferencias (tenant_id, extension_id, activo)
+      VALUES ($1, $2, $3)
+      ON CONFLICT (tenant_id, extension_id)
+      DO UPDATE SET activo = $3
+      RETURNING *
+    `, [tenantId, extensionId, activo]);
+
+    res.json({ success: true, preferencia: result.rows[0] });
+  } catch (error: any) {
+    console.error('Error en POST /extensiones-contacto/:extensionId/toggle:', error);
+    res.status(500).json({ error: error.message || 'Error al toggle extensión' });
+  }
+});
+
+/**
+ * DELETE /api/tenants/:tenantId/extensiones-contacto/:extensionId
+ * Elimina una extensión personalizada del tenant
+ */
+router.delete('/:tenantId/extensiones-contacto/:extensionId', async (req, res) => {
+  try {
+    const { tenantId, extensionId } = req.params;
+
+    // Solo permitir eliminar extensiones del tenant (no las de sistema)
+    const result = await query(`
+      DELETE FROM catalogo_extensiones_contacto
+      WHERE id = $1 AND tenant_id = $2 AND es_sistema = false
+      RETURNING id
+    `, [extensionId, tenantId]);
+
+    if (result.rows.length === 0) {
+      return res.status(404).json({ error: 'Extensión no encontrada o no se puede eliminar' });
+    }
+
+    res.json({ success: true, message: 'Extensión eliminada' });
+  } catch (error: any) {
+    console.error('Error en DELETE /extensiones-contacto/:extensionId:', error);
+    res.status(500).json({ error: error.message || 'Error al eliminar extensión' });
+  }
+});
+
+/**
+ * GET /api/tenants/:tenantId/extensiones-contacto/:extensionId/campo-opciones
+ * Obtiene las opciones de un campo select de una extensión
+ */
+router.get('/:tenantId/extensiones-contacto/:extensionId/campo-opciones', async (req, res) => {
+  try {
+    const { tenantId, extensionId } = req.params;
+    const { campo } = req.query;
+
+    if (!campo) {
+      return res.status(400).json({ error: 'Campo es requerido' });
+    }
+
+    const result = await query(`
+      SELECT campos_schema FROM catalogo_extensiones_contacto
+      WHERE id = $1 AND (tenant_id IS NULL OR tenant_id = $2)
+    `, [extensionId, tenantId]);
+
+    if (result.rows.length === 0) {
+      return res.status(404).json({ error: 'Extensión no encontrada' });
+    }
+
+    const camposSchema = result.rows[0].campos_schema || [];
+    const campoSchema = camposSchema.find((c: any) => c.campo === campo);
+
+    if (!campoSchema) {
+      return res.status(404).json({ error: 'Campo no encontrado' });
+    }
+
+    res.json({ opciones: campoSchema.opciones || [] });
+  } catch (error: any) {
+    console.error('Error en GET /campo-opciones:', error);
+    res.status(500).json({ error: error.message || 'Error al obtener opciones' });
+  }
+});
+
+// ==================== RUTAS: EXTENSIONES DE CONTACTO POR CONTACTO ====================
+
+/**
+ * GET /api/tenants/:tenantId/contactos/:contactoId/extensiones
+ * Obtiene las extensiones asignadas a un contacto específico
+ */
+router.get('/:tenantId/contactos/:contactoId/extensiones', async (req, res) => {
+  try {
+    const { tenantId, contactoId } = req.params;
+
+    const result = await query(`
+      SELECT
+        ce.*,
+        c.codigo as extension_codigo,
+        c.nombre as extension_nombre,
+        c.icono as extension_icono,
+        c.color as extension_color,
+        c.campos_schema
+      FROM contacto_extensiones ce
+      JOIN catalogo_extensiones_contacto c ON c.id = ce.extension_id
+      WHERE ce.tenant_id = $1 AND ce.contacto_id = $2 AND ce.activo = true
+      ORDER BY c.orden, c.nombre
+    `, [tenantId, contactoId]);
+
+    res.json(result.rows);
+  } catch (error: any) {
+    console.error('Error en GET /contactos/:contactoId/extensiones:', error);
+    res.status(500).json({ error: error.message || 'Error al obtener extensiones del contacto' });
+  }
+});
+
+/**
+ * POST /api/tenants/:tenantId/contactos/:contactoId/extensiones
+ * Asigna una extensión a un contacto
+ */
+router.post('/:tenantId/contactos/:contactoId/extensiones', async (req, res) => {
+  try {
+    const { tenantId, contactoId } = req.params;
+    const { extension_id, datos } = req.body;
+
+    if (!extension_id) {
+      return res.status(400).json({ error: 'extension_id es requerido' });
+    }
+
+    const result = await query(`
+      INSERT INTO contacto_extensiones (tenant_id, contacto_id, extension_id, datos, activo)
+      VALUES ($1, $2, $3, $4, true)
+      ON CONFLICT (contacto_id, extension_id)
+      DO UPDATE SET datos = $4, activo = true, updated_at = NOW()
+      RETURNING *
+    `, [tenantId, contactoId, extension_id, JSON.stringify(datos || {})]);
+
+    res.status(201).json(result.rows[0]);
+  } catch (error: any) {
+    console.error('Error en POST /contactos/:contactoId/extensiones:', error);
+    res.status(500).json({ error: error.message || 'Error al asignar extensión' });
+  }
+});
+
+/**
+ * PUT /api/tenants/:tenantId/contactos/:contactoId/extensiones/:extensionId
+ * Actualiza los datos de una extensión de un contacto
+ */
+router.put('/:tenantId/contactos/:contactoId/extensiones/:extensionId', async (req, res) => {
+  try {
+    const { tenantId, contactoId, extensionId } = req.params;
+    const { datos } = req.body;
+
+    const result = await query(`
+      UPDATE contacto_extensiones
+      SET datos = $1, updated_at = NOW()
+      WHERE tenant_id = $2 AND contacto_id = $3 AND extension_id = $4
+      RETURNING *
+    `, [JSON.stringify(datos || {}), tenantId, contactoId, extensionId]);
+
+    if (result.rows.length === 0) {
+      return res.status(404).json({ error: 'Extensión no encontrada para este contacto' });
+    }
+
+    res.json(result.rows[0]);
+  } catch (error: any) {
+    console.error('Error en PUT /contactos/:contactoId/extensiones/:extensionId:', error);
+    res.status(500).json({ error: error.message || 'Error al actualizar extensión' });
+  }
+});
+
+/**
+ * DELETE /api/tenants/:tenantId/contactos/:contactoId/extensiones/:extensionId
+ * Elimina (desactiva) una extensión de un contacto
+ */
+router.delete('/:tenantId/contactos/:contactoId/extensiones/:extensionId', async (req, res) => {
+  try {
+    const { tenantId, contactoId, extensionId } = req.params;
+
+    const result = await query(`
+      UPDATE contacto_extensiones
+      SET activo = false, updated_at = NOW()
+      WHERE tenant_id = $1 AND contacto_id = $2 AND extension_id = $3
+      RETURNING id
+    `, [tenantId, contactoId, extensionId]);
+
+    if (result.rows.length === 0) {
+      return res.status(404).json({ error: 'Extensión no encontrada' });
+    }
+
+    res.json({ success: true, message: 'Extensión removida del contacto' });
+  } catch (error: any) {
+    console.error('Error en DELETE /contactos/:contactoId/extensiones/:extensionId:', error);
+    res.status(500).json({ error: error.message || 'Error al eliminar extensión' });
+  }
+});
+
+// ==================== RUTAS: CATALOGOS SEPARADOS CONTEOS ====================
+
+/**
+ * GET /api/tenants/:tenantId/catalogos-separados/conteos
+ * Obtiene conteos de items en catálogos separados (tablas propias)
+ */
+router.get('/:tenantId/catalogos-separados/conteos', async (req, res) => {
+  try {
+    const { tenantId } = req.params;
+
+    // Obtener conteos de varias tablas en paralelo
+    const [
+      extensionesResult,
+      amenidadesResult,
+      equiposResult,
+      oficinasResult
+    ] = await Promise.all([
+      // Extensiones de contacto (globales + tenant)
+      query(`
+        SELECT COUNT(*) as count FROM catalogo_extensiones_contacto
+        WHERE tenant_id IS NULL OR tenant_id = $1
+      `, [tenantId]).catch(() => ({ rows: [{ count: 0 }] })),
+
+      // Amenidades (globales + tenant)
+      query(`
+        SELECT COUNT(*) as count FROM amenidades
+        WHERE tenant_id IS NULL OR tenant_id = $1
+      `, [tenantId]).catch(() => ({ rows: [{ count: 0 }] })),
+
+      // Equipos del tenant
+      query(`
+        SELECT COUNT(*) as count FROM equipos
+        WHERE tenant_id = $1
+      `, [tenantId]).catch(() => ({ rows: [{ count: 0 }] })),
+
+      // Oficinas del tenant
+      query(`
+        SELECT COUNT(*) as count FROM oficinas
+        WHERE tenant_id = $1
+      `, [tenantId]).catch(() => ({ rows: [{ count: 0 }] }))
+    ]);
+
+    res.json({
+      extensiones_contacto: parseInt(extensionesResult.rows[0]?.count || '0'),
+      amenidades: parseInt(amenidadesResult.rows[0]?.count || '0'),
+      equipos: parseInt(equiposResult.rows[0]?.count || '0'),
+      oficinas: parseInt(oficinasResult.rows[0]?.count || '0')
+    });
+  } catch (error: any) {
+    console.error('Error en GET /catalogos-separados/conteos:', error);
+    res.status(500).json({ error: error.message || 'Error al obtener conteos' });
+  }
+});
+
+// ==================== RUTAS: EQUIPOS ====================
+
+/**
+ * GET /api/tenants/:tenantId/equipos
+ * Lista todos los equipos del tenant
+ */
+router.get('/:tenantId/equipos', async (req, res) => {
+  try {
+    const { tenantId } = req.params;
+    const activo = req.query.activo !== 'false';
+
+    let queryStr = `
+      SELECT e.*
+      FROM equipos e
+      WHERE e.tenant_id = $1
+    `;
+
+    if (activo) {
+      queryStr += ` AND e.activo = true`;
+    }
+
+    queryStr += ` ORDER BY e.nombre`;
+
+    const result = await query(queryStr, [tenantId]);
+    res.json(result.rows);
+  } catch (error: any) {
+    console.error('Error en GET /equipos:', error);
+    // Si la tabla no existe o error de columna, devolver array vacío
+    if (error.code === '42P01' || error.code === '42703') {
+      return res.json([]);
+    }
+    res.status(500).json({ error: error.message || 'Error al obtener equipos' });
+  }
+});
+
+/**
+ * GET /api/tenants/:tenantId/equipos/:equipoId
+ * Obtiene un equipo específico con sus miembros
+ */
+router.get('/:tenantId/equipos/:equipoId', async (req, res) => {
+  try {
+    const { tenantId, equipoId } = req.params;
+
+    const equipoResult = await query(`
+      SELECT * FROM equipos
+      WHERE id = $1 AND tenant_id = $2
+    `, [equipoId, tenantId]);
+
+    if (equipoResult.rows.length === 0) {
+      return res.status(404).json({ error: 'Equipo no encontrado' });
+    }
+
+    res.json(equipoResult.rows[0]);
+  } catch (error: any) {
+    console.error('Error en GET /equipos/:equipoId:', error);
+    if (error.code === '42P01' || error.code === '42703') {
+      return res.status(404).json({ error: 'Equipo no encontrado' });
+    }
+    res.status(500).json({ error: error.message || 'Error al obtener equipo' });
+  }
+});
+
+/**
+ * POST /api/tenants/:tenantId/equipos
+ * Crea un nuevo equipo
+ */
+router.post('/:tenantId/equipos', async (req, res) => {
+  try {
+    const { tenantId } = req.params;
+    const { nombre, descripcion, color, icono } = req.body;
+
+    if (!nombre) {
+      return res.status(400).json({ error: 'El nombre es requerido' });
+    }
+
+    const result = await query(`
+      INSERT INTO equipos (tenant_id, nombre, descripcion, color, icono, activo)
+      VALUES ($1, $2, $3, $4, $5, true)
+      RETURNING *
+    `, [tenantId, nombre, descripcion || null, color || '#3b82f6', icono || 'Users']);
+
+    res.status(201).json(result.rows[0]);
+  } catch (error: any) {
+    console.error('Error en POST /equipos:', error);
+    res.status(500).json({ error: error.message || 'Error al crear equipo' });
+  }
+});
+
+/**
+ * PUT /api/tenants/:tenantId/equipos/:equipoId
+ * Actualiza un equipo
+ */
+router.put('/:tenantId/equipos/:equipoId', async (req, res) => {
+  try {
+    const { tenantId, equipoId } = req.params;
+    const { nombre, descripcion, color, icono, activo } = req.body;
+
+    const result = await query(`
+      UPDATE equipos
+      SET nombre = COALESCE($1, nombre),
+          descripcion = COALESCE($2, descripcion),
+          color = COALESCE($3, color),
+          icono = COALESCE($4, icono),
+          activo = COALESCE($5, activo),
+          updated_at = NOW()
+      WHERE id = $6 AND tenant_id = $7
+      RETURNING *
+    `, [nombre, descripcion, color, icono, activo, equipoId, tenantId]);
+
+    if (result.rows.length === 0) {
+      return res.status(404).json({ error: 'Equipo no encontrado' });
+    }
+
+    res.json(result.rows[0]);
+  } catch (error: any) {
+    console.error('Error en PUT /equipos/:equipoId:', error);
+    res.status(500).json({ error: error.message || 'Error al actualizar equipo' });
+  }
+});
+
+/**
+ * DELETE /api/tenants/:tenantId/equipos/:equipoId
+ * Elimina (desactiva) un equipo
+ */
+router.delete('/:tenantId/equipos/:equipoId', async (req, res) => {
+  try {
+    const { tenantId, equipoId } = req.params;
+
+    const result = await query(`
+      UPDATE equipos
+      SET activo = false, updated_at = NOW()
+      WHERE id = $1 AND tenant_id = $2
+      RETURNING id
+    `, [equipoId, tenantId]);
+
+    if (result.rows.length === 0) {
+      return res.status(404).json({ error: 'Equipo no encontrado' });
+    }
+
+    res.json({ success: true, message: 'Equipo eliminado' });
+  } catch (error: any) {
+    console.error('Error en DELETE /equipos/:equipoId:', error);
+    res.status(500).json({ error: error.message || 'Error al eliminar equipo' });
+  }
+});
+
+// ==================== RUTAS: OFICINAS ====================
+
+/**
+ * GET /api/tenants/:tenantId/oficinas
+ * Lista todas las oficinas del tenant
+ */
+router.get('/:tenantId/oficinas', async (req, res) => {
+  try {
+    const { tenantId } = req.params;
+    const activo = req.query.activo !== 'false';
+
+    let queryStr = `
+      SELECT o.*
+      FROM oficinas o
+      WHERE o.tenant_id = $1
+    `;
+
+    if (activo) {
+      queryStr += ` AND o.activo = true`;
+    }
+
+    queryStr += ` ORDER BY o.nombre`;
+
+    const result = await query(queryStr, [tenantId]);
+    res.json(result.rows);
+  } catch (error: any) {
+    console.error('Error en GET /oficinas:', error);
+    // Si la tabla no existe o error de columna, devolver array vacío
+    if (error.code === '42P01' || error.code === '42703') {
+      return res.json([]);
+    }
+    res.status(500).json({ error: error.message || 'Error al obtener oficinas' });
+  }
+});
+
+/**
+ * GET /api/tenants/:tenantId/oficinas/:oficinaId
+ * Obtiene una oficina específica
+ */
+router.get('/:tenantId/oficinas/:oficinaId', async (req, res) => {
+  try {
+    const { tenantId, oficinaId } = req.params;
+
+    const result = await query(`
+      SELECT o.*
+      FROM oficinas o
+      WHERE o.id = $1 AND o.tenant_id = $2
+    `, [oficinaId, tenantId]);
+
+    if (result.rows.length === 0) {
+      return res.status(404).json({ error: 'Oficina no encontrada' });
+    }
+
+    res.json(result.rows[0]);
+  } catch (error: any) {
+    console.error('Error en GET /oficinas/:oficinaId:', error);
+    if (error.code === '42P01' || error.code === '42703') {
+      return res.status(404).json({ error: 'Oficina no encontrada' });
+    }
+    res.status(500).json({ error: error.message || 'Error al obtener oficina' });
+  }
+});
+
+/**
+ * POST /api/tenants/:tenantId/oficinas
+ * Crea una nueva oficina
+ */
+router.post('/:tenantId/oficinas', async (req, res) => {
+  try {
+    const { tenantId } = req.params;
+    const { nombre, direccion, ciudad, telefono, email } = req.body;
+
+    if (!nombre) {
+      return res.status(400).json({ error: 'El nombre es requerido' });
+    }
+
+    const result = await query(`
+      INSERT INTO oficinas (tenant_id, nombre, direccion, ciudad, telefono, email, activo)
+      VALUES ($1, $2, $3, $4, $5, $6, true)
+      RETURNING *
+    `, [tenantId, nombre, direccion || null, ciudad || null, telefono || null, email || null]);
+
+    res.status(201).json(result.rows[0]);
+  } catch (error: any) {
+    console.error('Error en POST /oficinas:', error);
+    res.status(500).json({ error: error.message || 'Error al crear oficina' });
+  }
+});
+
+/**
+ * PUT /api/tenants/:tenantId/oficinas/:oficinaId
+ * Actualiza una oficina
+ */
+router.put('/:tenantId/oficinas/:oficinaId', async (req, res) => {
+  try {
+    const { tenantId, oficinaId } = req.params;
+    const { nombre, direccion, ciudad, telefono, email, activo } = req.body;
+
+    const result = await query(`
+      UPDATE oficinas
+      SET nombre = COALESCE($1, nombre),
+          direccion = COALESCE($2, direccion),
+          ciudad = COALESCE($3, ciudad),
+          telefono = COALESCE($4, telefono),
+          email = COALESCE($5, email),
+          activo = COALESCE($6, activo),
+          updated_at = NOW()
+      WHERE id = $7 AND tenant_id = $8
+      RETURNING *
+    `, [nombre, direccion, ciudad, telefono, email, activo, oficinaId, tenantId]);
+
+    if (result.rows.length === 0) {
+      return res.status(404).json({ error: 'Oficina no encontrada' });
+    }
+
+    res.json(result.rows[0]);
+  } catch (error: any) {
+    console.error('Error en PUT /oficinas/:oficinaId:', error);
+    res.status(500).json({ error: error.message || 'Error al actualizar oficina' });
+  }
+});
+
+/**
+ * DELETE /api/tenants/:tenantId/oficinas/:oficinaId
+ * Elimina (desactiva) una oficina
+ */
+router.delete('/:tenantId/oficinas/:oficinaId', async (req, res) => {
+  try {
+    const { tenantId, oficinaId } = req.params;
+
+    const result = await query(`
+      UPDATE oficinas
+      SET activo = false, updated_at = NOW()
+      WHERE id = $1 AND tenant_id = $2
+      RETURNING id
+    `, [oficinaId, tenantId]);
+
+    if (result.rows.length === 0) {
+      return res.status(404).json({ error: 'Oficina no encontrada' });
+    }
+
+    res.json({ success: true, message: 'Oficina eliminada' });
+  } catch (error: any) {
+    console.error('Error en DELETE /oficinas/:oficinaId:', error);
+    res.status(500).json({ error: error.message || 'Error al eliminar oficina' });
   }
 });
 

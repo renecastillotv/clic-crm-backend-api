@@ -16,6 +16,8 @@ import {
   syncUsuarioFromClerk,
   getModulosAccesibles,
   updateUsuarioPerfil,
+  upsertPerfilAsesor,
+  getPerfilAsesor,
 } from '../services/usuariosService.js';
 
 // Configurar multer para subida de avatares
@@ -105,10 +107,13 @@ router.post('/sync', requireAuth, async (req, res) => {
  *
  * Obtiene el usuario actual autenticado con todos sus roles y tenants.
  * Requiere token de Clerk en el header Authorization.
+ * Query params opcionales:
+ * - tenantId: Si se proporciona, incluye el perfil de asesor para ese tenant
  */
 router.get('/me', requireAuth, async (req, res) => {
   try {
     const clerkUserId = req.auth?.userId;
+    const { tenantId } = req.query;
 
     if (!clerkUserId) {
       return res.status(401).json({
@@ -129,6 +134,14 @@ router.get('/me', requireAuth, async (req, res) => {
 
     // Obtener usuario completo con roles
     const usuarioCompleto = await getUsuarioConRoles(usuario.id);
+
+    // Si se proporciona tenantId, incluir perfil de asesor
+    if (tenantId && typeof tenantId === 'string') {
+      const perfilAsesor = await getPerfilAsesor(usuario.id, tenantId);
+      if (perfilAsesor) {
+        (usuarioCompleto as any).perfilAsesor = perfilAsesor;
+      }
+    }
 
     res.json(usuarioCompleto);
   } catch (error: any) {
@@ -273,9 +286,16 @@ router.put('/profile', requireAuth, uploadAvatar.single('avatar'), async (req, r
       empresa,
       cargo,
       departamento,
+      // Campos de asesor
+      biografia,
+      especialidades,
+      aniosExperiencia,
+      licencia,
+      redesSociales,
+      tenantId,
     } = req.body;
 
-    // Preparar datos para actualizar en BD local
+    // Preparar datos para actualizar en BD local (tabla usuarios)
     const updateData: any = {};
 
     if (nombre !== undefined) updateData.nombre = nombre;
@@ -308,7 +328,7 @@ router.put('/profile', requireAuth, uploadAvatar.single('avatar'), async (req, r
 
         // Actualizar imagen de perfil en Clerk
         await clerkClient.users.updateUserProfileImage(clerkUserId, {
-          file: dataUrl,
+          file: dataUrl as any, // Clerk SDK acepta data URLs como string
         });
         console.log(`✅ Avatar actualizado en Clerk`);
       } catch (clerkError: any) {
@@ -331,11 +351,51 @@ router.put('/profile', requireAuth, uploadAvatar.single('avatar'), async (req, r
       }
     }
 
-    // Actualizar en BD local
+    // Actualizar en BD local (tabla usuarios)
     const usuarioActualizado = await updateUsuarioPerfil(usuario.id, updateData);
+
+    // Si hay datos de asesor y tenantId, actualizar perfil de asesor
+    const tieneDataAsesor = biografia !== undefined || especialidades !== undefined ||
+                           aniosExperiencia !== undefined || licencia !== undefined ||
+                           redesSociales !== undefined;
+
+    if (tieneDataAsesor && tenantId) {
+      try {
+        // Parsear redesSociales si viene como string (FormData)
+        let redesSocialesObj = redesSociales;
+        if (typeof redesSociales === 'string') {
+          try {
+            redesSocialesObj = JSON.parse(redesSociales);
+          } catch (e) {
+            redesSocialesObj = {};
+          }
+        }
+
+        console.log(`🔄 Actualizando perfil de asesor en tenant: ${tenantId}`);
+        await upsertPerfilAsesor(usuario.id, tenantId, {
+          biografia,
+          especialidades,
+          experienciaAnos: aniosExperiencia,
+          licencia,
+          redesSociales: redesSocialesObj,
+        });
+        console.log(`✅ Perfil de asesor actualizado`);
+      } catch (asesorError: any) {
+        console.error('⚠️ Error al actualizar perfil de asesor:', asesorError.message);
+        // No fallar la operación principal
+      }
+    }
 
     // Obtener usuario completo con roles
     const usuarioCompleto = await getUsuarioConRoles(usuario.id);
+
+    // Agregar datos de perfil asesor si existe
+    if (tenantId) {
+      const perfilAsesor = await getPerfilAsesor(usuario.id, tenantId);
+      if (perfilAsesor) {
+        (usuarioCompleto as any).perfilAsesor = perfilAsesor;
+      }
+    }
 
     console.log(`✅ Perfil actualizado: ${usuario.email}`);
 

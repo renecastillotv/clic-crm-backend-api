@@ -9,9 +9,9 @@
 
 import type { Knex } from 'knex';
 
-// Helper to generate slug
-function generarSlug(texto: string): string {
-  return texto
+// Helper to generate slug with optional suffix
+function generarSlug(texto: string, suffix?: string): string {
+  let slug = texto
     .toLowerCase()
     .normalize('NFD')
     .replace(/[\u0300-\u036f]/g, '')
@@ -21,6 +21,11 @@ function generarSlug(texto: string): string {
     .replace(/-+/g, '-')
     .replace(/^-|-$/g, '')
     .substring(0, 100);
+
+  if (suffix) {
+    slug = `${slug}-${suffix}`;
+  }
+  return slug;
 }
 
 interface SectorData {
@@ -72,6 +77,13 @@ export async function up(knex: Knex): Promise<void> {
     const set = existingNames.get(parentId);
     return set ? set.has(nombre.toLowerCase()) : false;
   };
+
+  // Get existing slugs to check for duplicates
+  const existingSlugs = await knex('ubicaciones').select('slug');
+  const slugSet = new Set(existingSlugs.map(s => s.slug));
+
+  // Helper to check if slug exists
+  const slugExists = (slug: string): boolean => slugSet.has(slug);
 
   // ============================================
   // DISTRITO NACIONAL - Missing sectors (71 total)
@@ -210,17 +222,40 @@ export async function up(knex: Knex): Promise<void> {
     { nombre: 'Villa Aura' },
   ];
 
+  // Helper to get a unique slug
+  const getUniqueSlug = (nombre: string, suffix?: string): string => {
+    let slug = generarSlug(nombre, suffix);
+    if (!slugExists(slug)) {
+      slugSet.add(slug);
+      return slug;
+    }
+    // Try with dn, sde, sdn, sdo suffixes
+    const suffixes = ['dn', 'sde', 'sdn', 'sdo', '2', '3'];
+    for (const s of suffixes) {
+      const newSlug = generarSlug(nombre, s);
+      if (!slugExists(newSlug)) {
+        slugSet.add(newSlug);
+        return newSlug;
+      }
+    }
+    // Fallback: add random suffix
+    const randomSlug = generarSlug(nombre, Date.now().toString());
+    slugSet.add(randomSlug);
+    return randomSlug;
+  };
+
   // Insert sectors for Distrito Nacional
   console.log('Inserting missing sectors for Distrito Nacional...');
   for (const sector of sectoresDN) {
     if (!sectorExists(distritoNacional.id, sector.nombre)) {
       try {
+        const slug = getUniqueSlug(sector.nombre);
         await knex('ubicaciones').insert({
           parent_id: distritoNacional.id,
           tipo: 'sector',
           nivel: 4,
           nombre: sector.nombre,
-          slug: generarSlug(sector.nombre),
+          slug,
           alias: sector.alias ? JSON.stringify(sector.alias) : null,
           latitud: sector.latitud || null,
           longitud: sector.longitud || null,
@@ -230,11 +265,9 @@ export async function up(knex: Knex): Promise<void> {
           activo: true,
           orden: 0,
         });
-        console.log(`  + Added: ${sector.nombre}`);
+        console.log(`  + Added: ${sector.nombre} (slug: ${slug})`);
       } catch (err: any) {
-        if (err.code !== '23505') { // Ignore duplicate key errors
-          console.log(`  ! Error adding ${sector.nombre}: ${err.message}`);
-        }
+        console.log(`  ! Error adding ${sector.nombre}: ${err.message}`);
       }
     }
   }
@@ -245,12 +278,13 @@ export async function up(knex: Knex): Promise<void> {
     for (const sector of sectoresSDE) {
       if (!sectorExists(santoDomingoEste.id, sector.nombre)) {
         try {
+          const slug = getUniqueSlug(sector.nombre);
           await knex('ubicaciones').insert({
             parent_id: santoDomingoEste.id,
             tipo: 'sector',
             nivel: 4,
             nombre: sector.nombre,
-            slug: generarSlug(sector.nombre),
+            slug,
             alias: sector.alias ? JSON.stringify(sector.alias) : null,
             latitud: sector.latitud || null,
             longitud: sector.longitud || null,
@@ -260,11 +294,9 @@ export async function up(knex: Knex): Promise<void> {
             activo: true,
             orden: 0,
           });
-          console.log(`  + Added: ${sector.nombre}`);
+          console.log(`  + Added: ${sector.nombre} (slug: ${slug})`);
         } catch (err: any) {
-          if (err.code !== '23505') {
-            console.log(`  ! Error adding ${sector.nombre}: ${err.message}`);
-          }
+          console.log(`  ! Error adding ${sector.nombre}: ${err.message}`);
         }
       }
     }
@@ -276,12 +308,13 @@ export async function up(knex: Knex): Promise<void> {
     for (const sector of sectoresSDN) {
       if (!sectorExists(santoDomingoNorte.id, sector.nombre)) {
         try {
+          const slug = getUniqueSlug(sector.nombre);
           await knex('ubicaciones').insert({
             parent_id: santoDomingoNorte.id,
             tipo: 'sector',
             nivel: 4,
             nombre: sector.nombre,
-            slug: generarSlug(sector.nombre),
+            slug,
             alias: sector.alias ? JSON.stringify(sector.alias) : null,
             latitud: sector.latitud || null,
             longitud: sector.longitud || null,
@@ -291,11 +324,9 @@ export async function up(knex: Knex): Promise<void> {
             activo: true,
             orden: 0,
           });
-          console.log(`  + Added: ${sector.nombre}`);
+          console.log(`  + Added: ${sector.nombre} (slug: ${slug})`);
         } catch (err: any) {
-          if (err.code !== '23505') {
-            console.log(`  ! Error adding ${sector.nombre}: ${err.message}`);
-          }
+          console.log(`  ! Error adding ${sector.nombre}: ${err.message}`);
         }
       }
     }
@@ -307,12 +338,13 @@ export async function up(knex: Knex): Promise<void> {
     for (const sector of sectoresSDO) {
       if (!sectorExists(santoDomingoOeste.id, sector.nombre)) {
         try {
+          const slug = getUniqueSlug(sector.nombre);
           await knex('ubicaciones').insert({
             parent_id: santoDomingoOeste.id,
             tipo: 'sector',
             nivel: 4,
             nombre: sector.nombre,
-            slug: generarSlug(sector.nombre),
+            slug,
             alias: sector.alias ? JSON.stringify(sector.alias) : null,
             latitud: sector.latitud || null,
             longitud: sector.longitud || null,
@@ -322,11 +354,9 @@ export async function up(knex: Knex): Promise<void> {
             activo: true,
             orden: 0,
           });
-          console.log(`  + Added: ${sector.nombre}`);
+          console.log(`  + Added: ${sector.nombre} (slug: ${slug})`);
         } catch (err: any) {
-          if (err.code !== '23505') {
-            console.log(`  ! Error adding ${sector.nombre}: ${err.message}`);
-          }
+          console.log(`  ! Error adding ${sector.nombre}: ${err.message}`);
         }
       }
     }

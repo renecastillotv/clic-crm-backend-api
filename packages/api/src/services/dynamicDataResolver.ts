@@ -1,26 +1,34 @@
 /**
  * dynamicDataResolver.ts
- * 
+ *
  * Resuelve datos dinámicos para componentes antes de enviarlos al frontend.
  * Esto permite que componentes como property_list, blog_list, etc. tengan datos reales.
- * 
- * Ahora usa el nuevo servicio centralizado dynamicDataService cuando es posible.
+ *
+ * ARQUITECTURA:
+ * - Para datos de componentes individuales: usa resolveDynamicDataType de dynamicDataService
+ * - Para datos completos de página: usa assemblePageDataByCode de pageDataAssembler
+ *
+ * El PageDataAssembler implementa el patrón "buffet" donde las recetas de cada página
+ * definen qué datos necesita, garantizando que siempre se obtengan todos los datos.
  */
 
 import type { DynamicDataConfig } from '../types/componentes.js';
 import { query } from '../utils/db.js';
 import { resolveDynamicDataType, DynamicDataParams } from './dynamicDataService.js';
+import { assemblePageDataByCode, hasRecipeForPage, getRecipeNameForPageCode, type AssembledPageData } from './pageDataAssembler.js';
 
 /**
  * Resuelve los datos dinámicos según la configuración del componente
- * 
+ *
  * @param config - Configuración de dynamic_data
  * @param tenantId - ID del tenant (para filtrado)
+ * @param idioma - Idioma para traducciones (opcional, default 'es')
  * @returns Array de datos resueltos
  */
 export async function resolveDynamicData(
   config: DynamicDataConfig,
-  tenantId: string
+  tenantId: string,
+  idioma: string = 'es'
 ): Promise<any[]> {
   // Si no hay configuración, retornar array vacío
   if (!config || (!config.apiEndpoint && !config.dataType)) {
@@ -35,7 +43,7 @@ export async function resolveDynamicData(
 
     // Si hay dataType, construir endpoint según el tipo
     if (config.dataType) {
-      return await resolveByDataType(config, tenantId);
+      return await resolveByDataType(config, tenantId, idioma);
     }
 
     return [];
@@ -65,23 +73,49 @@ async function resolveCustomEndpoint(
  */
 async function resolveByDataType(
   config: DynamicDataConfig,
-  tenantId: string
+  tenantId: string,
+  idioma: string = 'es'
 ): Promise<any[]> {
   const { dataType, pagination, filters, queryParams } = config;
   const page = pagination?.page || 1;
   const limit = pagination?.limit || 10;
 
   // Mapear tipos antiguos a tipos del nuevo servicio
+  // También incluimos los tipos directos (lista_asesores, lista_videos, etc.)
   const typeMapping: Record<string, string> = {
     'properties': 'propiedades',
+    'propiedades': 'propiedades',
+    'lista_propiedades': 'propiedades',
     'videos': 'lista_videos',
+    'lista_videos': 'lista_videos',
     'articles': 'lista_articulos',
     'articulos': 'lista_articulos',
+    'lista_articulos': 'lista_articulos',
     'testimonials': 'lista_testimonios',
+    'lista_testimonios': 'lista_testimonios',
     'faqs': 'lista_faqs',
+    'lista_faqs': 'lista_faqs',
     'agents': 'lista_asesores',
+    'asesores': 'lista_asesores',
+    'lista_asesores': 'lista_asesores',
     'ubicaciones': 'popular_locations',
     'locations': 'popular_locations',
+    // Categorías de contenido (lista de categorías)
+    'categorias_videos': 'categorias_videos',
+    'categorias_articulos': 'categorias_articulos',
+    'categorias_testimonios': 'categorias_testimonios',
+    'videos_por_categoria': 'videos_por_categoria',
+    'articulos_por_categoria': 'articulos_por_categoria',
+    'testimonios_por_categoria': 'testimonios_por_categoria',
+    // Contenido filtrado por categoría
+    'categoria_videos': 'categoria_videos',
+    'categoria_articulos': 'categoria_articulos',
+    'categoria_testimonios': 'categoria_testimonios',
+    // Singles de contenido
+    'asesor_single': 'asesor_single',
+    'video_single': 'video_single',
+    'articulo_single': 'articulo_single',
+    'testimonio_single': 'testimonio_single',
   };
 
   // Si el tipo tiene un mapeo al nuevo servicio, usarlo
@@ -93,6 +127,7 @@ async function resolveByDataType(
         filters: filters || {},
         pagination: { page, limit },
         queryParams,
+        idioma,
       };
 
       const result = await resolveDynamicDataType(newType, params);
@@ -592,7 +627,7 @@ async function resolveLocations(
   try {
     try {
       const sql = `
-        SELECT 
+        SELECT
           ubicacion as title,
           sector as nombre,
           COUNT(*) as "propertyCount",
@@ -620,5 +655,77 @@ async function resolveLocations(
     return [];
   }
 }
+
+// ============================================================================
+// RESOLUCIÓN DE DATOS A NIVEL DE PÁGINA (SISTEMA "BUFFET")
+// ============================================================================
+
+/**
+ * Resuelve TODOS los datos necesarios para una página completa usando el sistema "buffet"
+ *
+ * Esta función usa el PageDataAssembler que conoce las "recetas" de cada tipo de página
+ * y garantiza que todos los datos necesarios se obtengan en una sola llamada.
+ *
+ * @param pageCode - Código del tipo de página (ej: 'videos_single', 'testimonios_listado')
+ * @param tenantId - ID del tenant
+ * @param options - Opciones adicionales (slug, categoriaSlug, idioma, filters)
+ * @returns Datos completos de la página o null si no hay receta
+ *
+ * @example
+ * const pageData = await resolvePageData('videos_single', 'clic', {
+ *   slug: 'mi-video',
+ *   idioma: 'es'
+ * });
+ * // pageData.primary = { id, titulo, video_url, ... }
+ * // pageData.relacionados = [...]
+ */
+export async function resolvePageData(
+  pageCode: string,
+  tenantId: string,
+  options: {
+    slug?: string;
+    categoriaSlug?: string;
+    idioma?: string;
+    filters?: Record<string, any>;
+    pagination?: { page?: number; limit?: number };
+    queryParams?: Record<string, any>;
+  } = {}
+): Promise<AssembledPageData | null> {
+  // Verificar si hay receta para este tipo de página
+  const recipeName = getRecipeNameForPageCode(pageCode);
+  if (!recipeName) {
+    console.log(`⚠️ [resolvePageData] No hay receta para: ${pageCode}`);
+    return null;
+  }
+
+  console.log(`🍽️ [resolvePageData] Usando receta "${recipeName}" para página: ${pageCode}`);
+
+  try {
+    const pageData = await assemblePageDataByCode(pageCode, {
+      tenantId,
+      slug: options.slug,
+      categoriaSlug: options.categoriaSlug,
+      idioma: options.idioma || 'es',
+      filters: options.filters,
+      pagination: options.pagination,
+      queryParams: options.queryParams,
+    });
+
+    return pageData;
+  } catch (error: any) {
+    console.error(`❌ [resolvePageData] Error ensamblando datos para ${pageCode}:`, error);
+    return null;
+  }
+}
+
+/**
+ * Verifica si un código de página tiene una receta de datos definida
+ */
+export function hasPageDataRecipe(pageCode: string): boolean {
+  return !!getRecipeNameForPageCode(pageCode);
+}
+
+// Re-exportar tipos y funciones del assembler para uso externo
+export { assemblePageDataByCode, hasRecipeForPage, type AssembledPageData };
 
 

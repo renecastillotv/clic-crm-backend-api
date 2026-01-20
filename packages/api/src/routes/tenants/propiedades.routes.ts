@@ -5,7 +5,7 @@
  * Está aislado para que errores aquí NO afecten otros módulos.
  */
 
-import express from 'express';
+import express from 'express'
 import {
   getPropiedades,
   getPropiedadById,
@@ -22,6 +22,12 @@ import {
 } from '../../services/tagsSyncService.js';
 import unidadesRouter from './unidades.routes.js';
 
+// Tipos para params con mergeParams
+interface RouteParams { [key: string]: string | undefined;
+  tenantId: string;
+  propiedadId?: string;
+}
+
 const router = express.Router({ mergeParams: true });
 
 /**
@@ -30,7 +36,7 @@ const router = express.Router({ mergeParams: true });
  */
 router.get('/', async (req, res, next) => {
   try {
-    const { tenantId } = req.params;
+    const { tenantId } = req.params as RouteParams;
     const {
       tipo, operacion, estado_propiedad, ciudad,
       precio_min, precio_max, recamaras_min, banos_min,
@@ -71,7 +77,7 @@ router.get('/', async (req, res, next) => {
  */
 router.get('/stats', async (req, res, next) => {
   try {
-    const { tenantId } = req.params;
+    const { tenantId } = req.params as RouteParams;
     const stats = await getPropiedadesStats(tenantId);
     res.json(stats);
   } catch (error) {
@@ -85,7 +91,7 @@ router.get('/stats', async (req, res, next) => {
  */
 router.get('/:propiedadId', async (req, res, next) => {
   try {
-    const { tenantId, propiedadId } = req.params;
+    const { tenantId, propiedadId } = req.params as RouteParams;
     const propiedad = await getPropiedadById(tenantId, propiedadId);
 
     if (!propiedad) {
@@ -104,7 +110,7 @@ router.get('/:propiedadId', async (req, res, next) => {
  */
 router.post('/', async (req, res, next) => {
   try {
-    const { tenantId } = req.params;
+    const { tenantId } = req.params as RouteParams;
     const propiedad = await createPropiedad(tenantId, req.body);
     res.status(201).json(propiedad);
   } catch (error) {
@@ -118,7 +124,7 @@ router.post('/', async (req, res, next) => {
  */
 router.put('/:propiedadId', async (req, res, next) => {
   try {
-    const { tenantId, propiedadId } = req.params;
+    const { tenantId, propiedadId } = req.params as RouteParams;
     const propiedad = await updatePropiedad(tenantId, propiedadId, req.body);
 
     if (!propiedad) {
@@ -137,7 +143,7 @@ router.put('/:propiedadId', async (req, res, next) => {
  */
 router.delete('/:propiedadId', async (req, res, next) => {
   try {
-    const { tenantId, propiedadId } = req.params;
+    const { tenantId, propiedadId } = req.params as RouteParams;
     const eliminado = await deletePropiedad(tenantId, propiedadId);
 
     if (!eliminado) {
@@ -158,7 +164,7 @@ router.delete('/:propiedadId', async (req, res, next) => {
  */
 router.post('/:propiedadId/sync-tags', async (req, res, next) => {
   try {
-    const { tenantId, propiedadId } = req.params;
+    const { tenantId, propiedadId } = req.params as RouteParams;
     const resultado = await syncTagsForProperty(propiedadId, tenantId);
     res.json(resultado);
   } catch (error) {
@@ -172,7 +178,7 @@ router.post('/:propiedadId/sync-tags', async (req, res, next) => {
  */
 router.get('/:propiedadId/tags', async (req, res, next) => {
   try {
-    const { tenantId, propiedadId } = req.params;
+    const { tenantId, propiedadId } = req.params as RouteParams;
     const tags = await getTagsForProperty(propiedadId, tenantId);
     res.json(tags);
   } catch (error) {
@@ -186,7 +192,7 @@ router.get('/:propiedadId/tags', async (req, res, next) => {
  */
 router.post('/sync-tags/all', async (req, res, next) => {
   try {
-    const { tenantId } = req.params;
+    const { tenantId } = req.params as RouteParams;
     const { batchSize, soloActivas } = req.body;
 
     const resultado = await syncAllPropertiesTags(tenantId, {
@@ -206,7 +212,7 @@ router.post('/sync-tags/all', async (req, res, next) => {
  */
 router.get('/tags/stats', async (req, res, next) => {
   try {
-    const { tenantId } = req.params;
+    const { tenantId } = req.params as RouteParams;
     const stats = await getTagsStats(tenantId);
     res.json(stats);
   } catch (error) {

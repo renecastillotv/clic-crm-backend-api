@@ -110,7 +110,7 @@ export function resolveTranslatedObject<T extends Record<string, any>>(
   // Resolver cada campo
   for (const campo of campos) {
     if (campo in result) {
-      result[campo] = resolveTranslatedField(
+      (result as Record<string, any>)[campo] = resolveTranslatedField(
         result[campo],
         traducciones,
         campo,

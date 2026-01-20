@@ -5,6 +5,7 @@
 import { query, getClient } from '../utils/db.js';
 import bcrypt from 'bcrypt';
 import { createClerkUser, updateClerkUser } from '../middleware/clerkAuth.js';
+import { v4 as uuidv4 } from 'uuid';
 
 export interface AdminUser {
   id: string;
@@ -848,10 +849,60 @@ export async function assignRoleToUser(
     await client.query(
       `INSERT INTO usuarios_roles (usuario_id, tenant_id, rol_id, activo, asignado_en)
        VALUES ($1, $2, $3, true, NOW())
-       ON CONFLICT (usuario_id, tenant_id, rol_id) 
+       ON CONFLICT (usuario_id, tenant_id, rol_id)
        DO UPDATE SET activo = true, asignado_en = NOW()`,
       [userId, tenantId || null, roleId]
     );
+
+    // Si es un rol de asesor y tiene tenantId, crear perfil_asesor automáticamente
+    if (tenantId) {
+      const rolInfo = await client.query(
+        `SELECT nombre FROM roles WHERE id = $1`,
+        [roleId]
+      );
+      const rolNombre = rolInfo.rows[0]?.nombre?.toLowerCase() || '';
+
+      if (rolNombre.includes('asesor')) {
+        // Verificar si ya tiene perfil de asesor
+        const perfilExiste = await client.query(
+          `SELECT id FROM perfiles_asesor WHERE usuario_id = $1 AND tenant_id = $2`,
+          [userId, tenantId]
+        );
+
+        if (perfilExiste.rows.length === 0) {
+          // Obtener datos del usuario para crear el perfil
+          const userData = await client.query(
+            `SELECT nombre, apellido, telefono FROM usuarios WHERE id = $1`,
+            [userId]
+          );
+          const user = userData.rows[0];
+          const nombre = user?.nombre || 'asesor';
+          const apellido = user?.apellido || '';
+          const slug = `${nombre.toLowerCase()}-${apellido.toLowerCase()}`
+            .replace(/\s+/g, '-')
+            .replace(/[^a-z0-9-]/g, '')
+            .substring(0, 100);
+
+          // Crear perfil de asesor
+          await client.query(
+            `INSERT INTO perfiles_asesor (
+              id, tenant_id, usuario_id, slug, titulo_profesional,
+              whatsapp, activo, visible_en_web, destacado, orden, created_at, updated_at
+            ) VALUES ($1, $2, $3, $4, 'Asesor Inmobiliario', $5, true, true, false, 0, NOW(), NOW())`,
+            [uuidv4(), tenantId, userId, slug, user?.telefono || null]
+          );
+          console.log(`✅ Perfil de asesor creado automáticamente para usuario ${userId} en tenant ${tenantId}`);
+        } else {
+          // Reactivar perfil si estaba inactivo
+          await client.query(
+            `UPDATE perfiles_asesor SET activo = true, visible_en_web = true, updated_at = NOW()
+             WHERE usuario_id = $1 AND tenant_id = $2`,
+            [userId, tenantId]
+          );
+          console.log(`✅ Perfil de asesor reactivado para usuario ${userId} en tenant ${tenantId}`);
+        }
+      }
+    }
 
     await client.query('COMMIT');
   } catch (error: any) {
@@ -877,11 +928,45 @@ export async function unassignRoleFromUser(
 
     // Desactivar el rol (soft delete)
     await client.query(
-      `UPDATE usuarios_roles 
-       SET activo = false 
+      `UPDATE usuarios_roles
+       SET activo = false
        WHERE usuario_id = $1 AND tenant_id = $2 AND rol_id = $3`,
       [userId, tenantId || null, roleId]
     );
+
+    // Si es un rol de asesor y tiene tenantId, desactivar perfil_asesor
+    if (tenantId) {
+      const rolInfo = await client.query(
+        `SELECT nombre FROM roles WHERE id = $1`,
+        [roleId]
+      );
+      const rolNombre = rolInfo.rows[0]?.nombre?.toLowerCase() || '';
+
+      if (rolNombre.includes('asesor')) {
+        // Verificar si el usuario tiene otros roles de asesor activos en este tenant
+        const otrosRolesAsesor = await client.query(
+          `SELECT ur.id FROM usuarios_roles ur
+           JOIN roles r ON ur.rol_id = r.id
+           WHERE ur.usuario_id = $1
+             AND ur.tenant_id = $2
+             AND ur.activo = true
+             AND ur.rol_id != $3
+             AND LOWER(r.nombre) LIKE '%asesor%'`,
+          [userId, tenantId, roleId]
+        );
+
+        // Solo desactivar perfil si no tiene otros roles de asesor
+        if (otrosRolesAsesor.rows.length === 0) {
+          await client.query(
+            `UPDATE perfiles_asesor
+             SET activo = false, visible_en_web = false, updated_at = NOW()
+             WHERE usuario_id = $1 AND tenant_id = $2`,
+            [userId, tenantId]
+          );
+          console.log(`⚠️ Perfil de asesor desactivado para usuario ${userId} en tenant ${tenantId}`);
+        }
+      }
+    }
 
     await client.query('COMMIT');
   } catch (error: any) {

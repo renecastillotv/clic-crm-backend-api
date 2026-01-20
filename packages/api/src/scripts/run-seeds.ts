@@ -20,9 +20,9 @@ const db = knex(knexConfig);
 async function runSeeds() {
   try {
     console.log('Running seeds...');
-    const seedFiles = await db.seed.run();
-    
-    if (seedFiles.length === 0) {
+    const [seedFiles] = await db.seed.run();
+
+    if (!seedFiles || seedFiles.length === 0) {
       console.log('✅ No seeds to run');
     } else {
       console.log(`✅ Ran ${seedFiles.length} seed(s):`);

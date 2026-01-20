@@ -406,7 +406,7 @@ export async function updateActividad(
   if (data.estado === 'completada') {
     updates.push(`completada = true`);
     updates.push(`fecha_completada = NOW()`);
-  } else if (data.estado && data.estado !== 'completada') {
+  } else if (data.estado) {
     updates.push(`completada = false`);
     updates.push(`fecha_completada = NULL`);
   }

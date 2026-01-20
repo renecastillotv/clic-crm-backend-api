@@ -12,6 +12,15 @@ if (!GOOGLE_API_KEY) {
   console.warn('⚠️ GOOGLE_API_KEY not configured - Geocoding features will be limited');
 }
 
+// Tipos para respuestas de Google API
+interface GoogleApiResponse {
+  status: string;
+  error_message?: string;
+  predictions?: PlacePrediction[];
+  result?: any;
+  results?: any[];
+}
+
 // Tipos para los resultados de Google
 export interface PlacePrediction {
   place_id: string;
@@ -93,7 +102,7 @@ export async function getPlaceAutocomplete(
       throw new Error(`Google Places API error: ${response.statusText}`);
     }
 
-    const data = await response.json();
+    const data = await response.json() as GoogleApiResponse;
 
     if (data.status !== 'OK' && data.status !== 'ZERO_RESULTS') {
       console.error('Google Places API error:', data.status, data.error_message);
@@ -142,7 +151,7 @@ export async function getPlaceDetails(
       throw new Error(`Google Places API error: ${response.statusText}`);
     }
 
-    const data = await response.json();
+    const data = await response.json() as GoogleApiResponse;
 
     if (data.status !== 'OK') {
       console.error('Google Places API error:', data.status, data.error_message);
@@ -195,7 +204,7 @@ export async function geocodeAddress(address: string): Promise<GeocodedAddress |
       throw new Error(`Google Geocoding API error: ${response.statusText}`);
     }
 
-    const data = await response.json();
+    const data = await response.json() as GoogleApiResponse;
 
     if (data.status !== 'OK') {
       if (data.status === 'ZERO_RESULTS') {
@@ -253,7 +262,7 @@ export async function reverseGeocode(
       throw new Error(`Google Geocoding API error: ${response.statusText}`);
     }
 
-    const data = await response.json();
+    const data = await response.json() as GoogleApiResponse;
 
     if (data.status !== 'OK') {
       console.error('Google Geocoding API error:', data.status, data.error_message);

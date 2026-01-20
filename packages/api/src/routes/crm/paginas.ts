@@ -370,7 +370,6 @@ router.post('/tenants/:tenantId/paginas', async (req: Request, res: Response) =>
       slug,
       titulo,
       descripcion,
-      metadata,
     });
 
     res.status(201).json({
@@ -398,7 +397,6 @@ router.patch('/tenants/:tenantId/paginas/:paginaId', async (req: Request, res: R
       titulo,
       descripcion,
       activo,
-      metadata,
     });
 
     if (!pagina) {

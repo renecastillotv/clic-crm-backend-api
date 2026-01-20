@@ -52,18 +52,18 @@ export async function up(knex: Knex): Promise<void> {
     { from: 'dynamic_faqs', to: 'dynamic-faqs' },
 
     // Normalización de variantes
-    { from: 'hero', fromVariant: 'Default', toVariant: 'default' },
-    { from: 'hero', fromVariant: 'Variant1', toVariant: 'variant1' },
-    { from: 'hero', fromVariant: 'Variant2', toVariant: 'variant2' },
-    { from: 'hero', fromVariant: 'Variant3', toVariant: 'variant3' },
-    { from: 'hero', fromVariant: 'Simple', toVariant: 'simple' },
-    { from: 'hero', fromVariant: 'Search', toVariant: 'search' },
-    { from: 'footer', fromVariant: 'Default', toVariant: 'default' },
-    { from: 'header', fromVariant: 'Default', toVariant: 'default' },
-    { from: 'testimonials', fromVariant: 'Clic', toVariant: 'clic' },
-    { from: 'team-grid', fromVariant: 'Compact', toVariant: 'compact' },
-    { from: 'property-carousel', fromVariant: 'Featured', toVariant: 'featured' },
-    { from: 'property-carousel', fromVariant: 'Clic', toVariant: 'clic' },
+    { from: 'hero', to: 'hero', fromVariant: 'Default', toVariant: 'default' },
+    { from: 'hero', to: 'hero', fromVariant: 'Variant1', toVariant: 'variant1' },
+    { from: 'hero', to: 'hero', fromVariant: 'Variant2', toVariant: 'variant2' },
+    { from: 'hero', to: 'hero', fromVariant: 'Variant3', toVariant: 'variant3' },
+    { from: 'hero', to: 'hero', fromVariant: 'Simple', toVariant: 'simple' },
+    { from: 'hero', to: 'hero', fromVariant: 'Search', toVariant: 'search' },
+    { from: 'footer', to: 'footer', fromVariant: 'Default', toVariant: 'default' },
+    { from: 'header', to: 'header', fromVariant: 'Default', toVariant: 'default' },
+    { from: 'testimonials', to: 'testimonials', fromVariant: 'Clic', toVariant: 'clic' },
+    { from: 'team-grid', to: 'team-grid', fromVariant: 'Compact', toVariant: 'compact' },
+    { from: 'property-carousel', to: 'property-carousel', fromVariant: 'Featured', toVariant: 'featured' },
+    { from: 'property-carousel', to: 'property-carousel', fromVariant: 'Clic', toVariant: 'clic' },
   ];
 
   let totalUpdates = 0;

@@ -26,6 +26,16 @@ function isValidUUID(uuid: string): boolean {
   return uuidRegex.test(uuid);
 }
 
+// Helper function para extraer la primera variante de un array de variantes
+function extractVariante(variantes: any): string {
+  if (!variantes) return 'default';
+  const arr = typeof variantes === 'string' ? JSON.parse(variantes) : variantes;
+  if (Array.isArray(arr) && arr.length > 0) {
+    return arr[0]?.id || arr[0] || 'default';
+  }
+  return 'default';
+}
+
 // Tipos para variantes del catálogo (ahora incluyen descripción)
 export interface VarianteInfo {
   id: string;
@@ -68,16 +78,21 @@ export interface SeccionConfig {
   paginaId: string | null;
   esActivo?: boolean;         // Si esta variante es la activa para renderizar
   configCompleta?: boolean;   // Si tiene todos los campos requeridos llenos
+  componente_key?: string;    // Key del componente para matching
 }
 
 /**
  * Obtiene el catálogo de componentes disponibles
  *
  * @param tenantId - ID del tenant (opcional) para filtrar variantes por features
+ *
+ * Columnas reales de catalogo_componentes:
+ * tipo, nombre, descripcion, icono, categoria, campos_config, active, id, variantes, required_features, componente_key
  */
 export async function getCatalogoComponentes(tenantId?: string): Promise<CatalogoComponente[]> {
   const sql = `
     SELECT
+      id,
       tipo,
       nombre,
       descripcion,
@@ -85,12 +100,11 @@ export async function getCatalogoComponentes(tenantId?: string): Promise<Catalog
       categoria,
       variantes,
       campos_config as "camposConfig",
-      es_global as "esGlobal",
-      disponible,
-      orden
+      active,
+      required_features as "requiredFeatures"
     FROM catalogo_componentes
-    WHERE disponible = true
-    ORDER BY categoria, orden
+    WHERE active = true
+    ORDER BY categoria, tipo
   `;
 
   const result = await query(sql, []);
@@ -107,13 +121,25 @@ export async function getCatalogoComponentes(tenantId?: string): Promise<Catalog
   }
 
   return result.rows.map((row: any) => {
-    let variantes = typeof row.variantes === 'string' ? JSON.parse(row.variantes) : row.variantes;
-    
+    // Parsear variantes y asegurar que sea un array
+    let variantes = row.variantes;
+    if (typeof variantes === 'string') {
+      try {
+        variantes = JSON.parse(variantes);
+      } catch {
+        variantes = [];
+      }
+    }
+    // Asegurar que siempre sea un array
+    if (!Array.isArray(variantes)) {
+      variantes = [];
+    }
+
     // Filtrar variantes que requieren features si tenantId está presente
-    if (tenantId) {
+    if (tenantId && variantes.length > 0) {
       variantes = variantes.filter((v: any) => {
         // Si la variante requiere un feature, verificar que el tenant lo tenga
-        if (v.requiresFeature) {
+        if (v && v.requiresFeature) {
           return tenantFeatures.includes(v.requiresFeature);
         }
         // Si no requiere feature, siempre disponible
@@ -122,18 +148,74 @@ export async function getCatalogoComponentes(tenantId?: string): Promise<Catalog
     }
 
     return {
+      id: row.id, // UUID del componente en el catálogo
       tipo: row.tipo,
       nombre: row.nombre,
       descripcion: row.descripcion,
       icono: row.icono,
       categoria: row.categoria,
-      variantes,
-      camposConfig: typeof row.camposConfig === 'string' ? JSON.parse(row.camposConfig) : row.camposConfig,
-      esGlobal: row.esGlobal,
-      disponible: row.disponible,
-      orden: row.orden,
+      variantes: variantes,
+      camposConfig: typeof row.camposConfig === 'string' ? JSON.parse(row.camposConfig) : (row.camposConfig || []),
+      esGlobal: false, // Esta columna no existe, usar default
+      disponible: row.active,
+      orden: 0, // Esta columna no existe, usar default
     };
   });
+}
+
+/**
+ * Obtiene un componente del catálogo por tipo
+ * Retorna el schema_config (campos_config) para el editor dinámico
+ */
+export async function getComponenteCatalogoPorTipo(tipo: string): Promise<{
+  id: string;
+  tipo: string;
+  nombre: string;
+  descripcion?: string;
+  icono?: string;
+  categoria?: string;
+  schema_config?: {
+    campos?: any[];
+    toggles?: any[];
+  };
+  variantes?: any[];
+} | null> {
+  const sql = `
+    SELECT
+      id,
+      tipo,
+      nombre,
+      descripcion,
+      icono,
+      categoria,
+      campos_config,
+      variantes
+    FROM catalogo_componentes
+    WHERE tipo = $1 AND active = true
+    LIMIT 1
+  `;
+
+  const result = await query(sql, [tipo]);
+
+  if (result.rows.length === 0) {
+    return null;
+  }
+
+  const row = result.rows[0];
+  const camposConfig = typeof row.campos_config === 'string'
+    ? JSON.parse(row.campos_config)
+    : row.campos_config;
+
+  return {
+    id: row.id,
+    tipo: row.tipo,
+    nombre: row.nombre,
+    descripcion: row.descripcion,
+    icono: row.icono,
+    categoria: row.categoria,
+    schema_config: camposConfig,
+    variantes: row.variantes,
+  };
 }
 
 /**
@@ -519,7 +601,7 @@ export async function getSeccionesResueltas(
       c.id,
       c.tenant_id as "tenantId",
       cc.tipo,
-      cc.variante,
+      cc.variantes,
       c.nombre,
       c.datos,
       c.activo,
@@ -539,6 +621,56 @@ export async function getSeccionesResueltas(
   const resultGlobales = await query(sqlGlobales, [tenantId]);
 
   // =========================================================================
+  // 1.5 FALLBACK: Si no hay header/footer globales, buscar en homepage
+  // Algunos tenants (como CLIC) tienen header/footer con tipo_pagina_id='homepage'
+  // en lugar de ser verdaderamente globales (NULL)
+  // =========================================================================
+  let headerFromHomepage = null;
+  let footerFromHomepage = null;
+
+  const hasGlobalHeader = resultGlobales.rows.some((r: any) => r.tipo === 'header');
+  const hasGlobalFooter = resultGlobales.rows.some((r: any) => r.tipo === 'footer');
+
+  if (!hasGlobalHeader || !hasGlobalFooter) {
+    console.log(`📦 [getSeccionesResueltas] Buscando header/footer en homepage como fallback...`);
+
+    const sqlHomepageFallback = `
+      SELECT
+        c.id,
+        c.tenant_id as "tenantId",
+        cc.tipo,
+        cc.variantes,
+        c.nombre,
+        c.datos,
+        c.activo,
+        c.orden
+      FROM componentes_web c
+      INNER JOIN catalogo_componentes cc ON c.componente_catalogo_id = cc.id
+      INNER JOIN tipos_pagina tp ON c.tipo_pagina_id = tp.id
+      WHERE c.tenant_id = $1
+        AND c.activo = true
+        AND tp.codigo = 'homepage'
+        AND cc.tipo IN ('header', 'footer')
+    `;
+
+    const resultHomepageFallback = await query(sqlHomepageFallback, [tenantId]);
+
+    if (!hasGlobalHeader) {
+      headerFromHomepage = resultHomepageFallback.rows.find((r: any) => r.tipo === 'header');
+      if (headerFromHomepage) {
+        console.log(`   ✅ Encontrado header en homepage como fallback`);
+      }
+    }
+
+    if (!hasGlobalFooter) {
+      footerFromHomepage = resultHomepageFallback.rows.find((r: any) => r.tipo === 'footer');
+      if (footerFromHomepage) {
+        console.log(`   ✅ Encontrado footer en homepage como fallback`);
+      }
+    }
+  }
+
+  // =========================================================================
   // 2. Buscar componentes por tipo de pagina (scope='page_type')
   // Estos son componentes con tipo_pagina_id que coincide con el tipo de página
   // =========================================================================
@@ -547,7 +679,7 @@ export async function getSeccionesResueltas(
       c.id,
       c.tenant_id as "tenantId",
       cc.tipo,
-      cc.variante,
+      cc.variantes,
       c.nombre,
       c.datos,
       c.activo,
@@ -586,15 +718,15 @@ export async function getSeccionesResueltas(
   const componentes: SeccionConfig[] = [];
 
   // =========================================================================
-  // 4. Agregar Header y Footer (globales)
+  // 4. Agregar Header y Footer (globales o de homepage como fallback)
   // =========================================================================
-  const header = resultGlobales.rows.find((r: any) => r.tipo === 'header');
+  const header = resultGlobales.rows.find((r: any) => r.tipo === 'header') || headerFromHomepage;
   if (header) {
     componentes.push({
       id: header.id,
       tenantId: header.tenantId,
       tipo: header.tipo,
-      variante: header.variante || 'default',
+      variante: extractVariante(header.variantes),
       nombre: header.nombre,
       datos: typeof header.datos === 'string' ? JSON.parse(header.datos) : header.datos,
       activo: true,
@@ -604,14 +736,14 @@ export async function getSeccionesResueltas(
       paginaId: null,
     });
   }
-  
-  const footer = resultGlobales.rows.find((r: any) => r.tipo === 'footer');
+
+  const footer = resultGlobales.rows.find((r: any) => r.tipo === 'footer') || footerFromHomepage;
   if (footer) {
     componentes.push({
       id: footer.id,
       tenantId: footer.tenantId,
       tipo: footer.tipo,
-      variante: footer.variante || 'default',
+      variante: extractVariante(footer.variantes),
       nombre: footer.nombre,
       datos: typeof footer.datos === 'string' ? JSON.parse(footer.datos) : footer.datos,
       activo: true,
@@ -662,7 +794,7 @@ export async function getSeccionesResueltas(
         id: row.id,
         tenantId: row.tenantId,
         tipo: row.tipo,
-        variante: row.variante || 'default',
+        variante: extractVariante(row.variantes),
         nombre: row.nombre,
         datos: {
           ...datos,
@@ -695,7 +827,7 @@ export async function getSeccionesResueltas(
         id: row.id,
         tenantId: row.tenantId,
         tipo: row.tipo,
-        variante: row.variante || 'default',
+        variante: extractVariante(row.variantes),
         nombre: row.nombre,
         datos: {
           ...datos,
@@ -709,131 +841,110 @@ export async function getSeccionesResueltas(
       });
     }
   } else {
-    // NO hay componentes en BD - usar fallback según el tipo de página
-    console.log(`⚠️ [getSeccionesResueltas] No hay componentes en BD para ${tipoPagina}, usando fallback mejorado`);
+    // NO hay componentes en BD para este tenant/tipoPagina
+    // Buscar en plantillas_pagina los componentes default (solo si includeFallback = true)
+    console.log(`⚠️ [getSeccionesResueltas] No hay componentes en BD para ${tipoPagina}`);
 
-    // Mapeo de tipos de página a sus componentes específicos
-    const fallbackComponentesPorTipo: Record<string, Array<{tipo: string, variante: string, orden: number}>> = {
-      homepage: [
-        { tipo: 'hero', variante: 'default', orden: 1 },
-        { tipo: 'features', variante: 'default', orden: 2 },
-        { tipo: 'testimonials', variante: 'default', orden: 3 },
-      ],
-      listados_propiedades: [
-        { tipo: 'hero', variante: 'simple', orden: 1 },
-        { tipo: 'property_grid', variante: 'default', orden: 2 },
-      ],
-      directorio_asesores: [
-        { tipo: 'hero', variante: 'simple', orden: 1 },
-        { tipo: 'team_grid', variante: 'default', orden: 2, dataType: 'lista_asesores' },
-      ],
-      directorio_articulos: [
-        { tipo: 'hero', variante: 'simple', orden: 1 },
-        { tipo: 'article_grid', variante: 'default', orden: 2 },
-      ],
-      contacto: [
-        { tipo: 'hero', variante: 'simple', orden: 1 },
-        { tipo: 'contact_info', variante: 'default', orden: 2 },
-        { tipo: 'contact_form', variante: 'default', orden: 3 },
-      ],
-      single_property: [
-        { tipo: 'property_detail', variante: 'default', orden: 1 },
-      ],
-      single_asesor: [
-        { tipo: 'agent_profile', variante: 'default', orden: 1, dataType: 'asesor_single' },
-      ],
-      single_articulo: [
-        { tipo: 'article_detail', variante: 'default', orden: 1 },
-      ],
-      testimonios: [
-        { tipo: 'testimonial_hero', variante: 'default', orden: 1, dataType: 'categorias_testimonios' },
-        { tipo: 'testimonial_grid', variante: 'default', orden: 2, dataType: 'lista_testimonios' },
-      ],
-      directorio_testimonios: [
-        { tipo: 'testimonial_hero', variante: 'default', orden: 1, dataType: 'categorias_testimonios' },
-        { tipo: 'testimonial_grid', variante: 'default', orden: 2, dataType: 'lista_testimonios' },
-      ],
-      categoria_testimonios: [
-        { tipo: 'testimonial_category', variante: 'default', orden: 1, dataType: 'categoria_testimonios' },
-      ],
-      single_testimonio: [
-        { tipo: 'testimonial_detail', variante: 'default', orden: 1, dataType: 'testimonio_single' },
-      ],
-      videos: [
-        { tipo: 'video_hero', variante: 'default', orden: 1, dataType: 'categorias_videos' },
-        { tipo: 'video_gallery', variante: 'default', orden: 2, dataType: 'lista_videos' },
-      ],
-      videos_listado: [
-        { tipo: 'video_hero', variante: 'default', orden: 1, dataType: 'categorias_videos' },
-        { tipo: 'video_gallery', variante: 'default', orden: 2, dataType: 'lista_videos' },
-      ],
-      videos_categoria: [
-        { tipo: 'video_category', variante: 'default', orden: 1, dataType: 'categoria_videos' },
-      ],
-      videos_single: [
-        { tipo: 'video_detail', variante: 'default', orden: 1, dataType: 'video_single' },
-      ],
-      single_video: [
-        { tipo: 'video_detail', variante: 'default', orden: 1, dataType: 'video_single' },
-      ],
-      // Artículos - similar a videos
-      articulos_listado: [
-        { tipo: 'article_hero', variante: 'default', orden: 1, dataType: 'categorias_articulos' },
-        { tipo: 'article_grid', variante: 'default', orden: 2, dataType: 'lista_articulos' },
-      ],
-      categoria_articulos: [
-        { tipo: 'article_category', variante: 'default', orden: 1, dataType: 'categoria_articulos' },
-      ],
-      articulos_single: [
-        { tipo: 'article_detail', variante: 'default', orden: 1, dataType: 'articulo_single' },
-      ],
-    };
-
-    // Obtener los componentes fallback para este tipo de página (solo si includeFallback = true)
     if (includeFallback) {
-      const fallbackComponentes = fallbackComponentesPorTipo[tipoPagina] || [
-        { tipo: 'hero', variante: 'simple', orden: 1 },
-      ];
+      console.log(`  📋 Buscando componentes en plantillas_pagina...`);
 
-      // Crear componentes de fallback
-      for (const fallback of fallbackComponentes) {
-      const tituloFormateado = tipoPagina
-        .replace(/_/g, ' ')
-        .split(' ')
-        .map((word: string) => word.charAt(0).toUpperCase() + word.slice(1))
-        .join(' ');
+      // Consultar plantillas_pagina para obtener componentes por defecto
+      const sqlPlantillas = `
+        SELECT
+          pp.id,
+          cc.tipo,
+          cc.nombre,
+          cc.variantes,
+          pp.orden,
+          pp.datos_default as "datosDefault",
+          pp.es_global as "esGlobal"
+        FROM plantillas_pagina pp
+        INNER JOIN tipos_pagina tp ON pp.tipo_pagina_id = tp.id
+        INNER JOIN catalogo_componentes cc ON pp.componente_catalogo_id = cc.id
+        WHERE tp.codigo = $1
+          AND pp.activo = true
+          AND pp.es_global = false
+        ORDER BY pp.orden
+      `;
 
-      // Construir datos con dynamic_data si el fallback tiene dataType
-      const datos: Record<string, any> = {
-        static_data: {
-          titulo: tituloFormateado,
-          subtitulo: '',
-        },
-        tipoPagina,
+      const plantillasResult = await query(sqlPlantillas, [tipoPagina]);
+
+      if (plantillasResult.rows.length > 0) {
+        console.log(`  📦 Usando ${plantillasResult.rows.length} componentes de plantillas_pagina`);
+
+        for (const plantilla of plantillasResult.rows) {
+          const datosDefault = typeof plantilla.datosDefault === 'string'
+            ? JSON.parse(plantilla.datosDefault)
+            : plantilla.datosDefault || {};
+
+          componentes.push({
+            id: `plantilla-${plantilla.id}-${tipoPagina}`,
+            tenantId,
+            tipo: plantilla.tipo,
+            variante: extractVariante(plantilla.variantes),
+            nombre: plantilla.nombre,
+            datos: {
+              ...datosDefault,
+              tipoPagina,
+            },
+            activo: true,
+            orden: plantilla.orden,
+            scope: 'page_type',
+            tipoPagina,
+            paginaId: null,
+          });
+        }
+      } else {
+        console.log(`  ⚠️ No hay plantillas definidas para ${tipoPagina}`);
+      }
+    }
+
+    // =========================================================================
+    // FALLBACK PARA PÁGINAS SINGLE: Si aún no hay componentes de contenido
+    // y es una página single, crear un componente virtual con el tipo correcto
+    // =========================================================================
+    const haContentComponent = componentes.some(c =>
+      !['header', 'footer'].includes(c.tipo)
+    );
+
+    if (!haContentComponent && tipoPagina.endsWith('_single')) {
+      console.log(`  📦 [getSeccionesResueltas] Creando componente virtual para página single: ${tipoPagina}`);
+
+      // Mapeo de tipoPagina a tipo de componente y dataType
+      const singlePageMappings: Record<string, { tipo: string; dataType: string }> = {
+        'asesor_single': { tipo: 'agent_profile', dataType: 'asesor_single' },
+        'videos_single': { tipo: 'video_detail', dataType: 'video_single' },
+        'articulos_single': { tipo: 'article_detail', dataType: 'articulo_single' },
+        'testimonios_single': { tipo: 'testimonial_detail', dataType: 'testimonio_single' },
+        'single_testimonio': { tipo: 'testimonial_detail', dataType: 'testimonio_single' },
+        'single_articulo': { tipo: 'article_detail', dataType: 'articulo_single' },
+        'propiedades_single': { tipo: 'property_detail', dataType: 'propiedad_single' },
+        'single_property': { tipo: 'property_detail', dataType: 'propiedad_single' },
       };
 
-      // Si el fallback tiene dataType, agregar dynamic_data
-      if ((fallback as any).dataType) {
-        datos.dynamic_data = {
-          dataType: (fallback as any).dataType,
-        };
+      const mapping = singlePageMappings[tipoPagina];
+      if (mapping) {
+        componentes.push({
+          id: `auto-single-${tipoPagina}`,
+          tenantId,
+          tipo: mapping.tipo,
+          variante: 'default',
+          nombre: `${tipoPagina} (auto-generado)`,
+          datos: {
+            tipoPagina,
+            dynamic_data: {
+              dataType: mapping.dataType,
+            },
+          },
+          activo: true,
+          orden: 50, // Entre header (0) y footer (100)
+          scope: 'page_type',
+          tipoPagina,
+          paginaId: null,
+        });
+        console.log(`  ✅ Componente virtual creado: ${mapping.tipo} con dataType=${mapping.dataType}`);
       }
-
-      componentes.push({
-        id: `${fallback.tipo}-fallback-${paginaId}-${fallback.orden}`,
-        tenantId,
-        tipo: fallback.tipo,
-        variante: fallback.variante,
-        nombre: `${fallback.tipo} ${tipoPagina}`,
-        datos,
-        activo: true,
-        orden: fallback.orden,
-        scope: 'page',
-        tipoPagina,
-        paginaId,
-      });
     }
-  }
   }
 
   return componentes;
@@ -879,258 +990,227 @@ export async function getComponentesGlobales(
   tenantId: string,
   tipo?: string
 ): Promise<SeccionConfig[]> {
+  // Componentes globales = sin tipo_pagina_id (no asignados a ninguna página específica)
   let sql = `
     SELECT
-      id,
-      tenant_id as "tenantId",
-      tipo,
-      variante,
-      nombre,
-      datos,
-      activo,
-      orden,
-      scope,
-      tipo_pagina as "tipoPagina",
-      pagina_id as "paginaId",
-      COALESCE(es_activo, true) as "esActivo"
-    FROM componentes_web
-    WHERE tenant_id = $1
-      AND scope = 'tenant'
-      AND activo = true
+      c.id,
+      c.tenant_id as "tenantId",
+      cc.tipo,
+      cc.variantes,
+      c.nombre,
+      c.datos,
+      c.activo,
+      c.orden,
+      c.tipo_pagina_id as "tipoPaginaId"
+    FROM componentes_web c
+    LEFT JOIN catalogo_componentes cc ON c.componente_catalogo_id = cc.id
+    WHERE c.tenant_id = $1
+      AND c.tipo_pagina_id IS NULL
+      AND c.activo = true
   `;
 
   const params: any[] = [tenantId];
 
   if (tipo) {
-    sql += ` AND tipo = $2`;
+    sql += ` AND cc.tipo = $2`;
     params.push(tipo);
   }
 
-  sql += ` ORDER BY tipo, nombre, orden ASC`;
+  sql += ` ORDER BY cc.tipo, c.nombre, c.orden ASC`;
 
   const result = await query(sql, params);
 
   return result.rows.map((row: any) => ({
     id: row.id,
     tenantId: row.tenantId,
-    tipo: row.tipo,
-    variante: row.variante,
+    tipo: row.tipo || 'unknown',
+    variante: extractVariante(row.variantes),
     nombre: row.nombre,
-    datos: typeof row.datos === 'string' ? JSON.parse(row.datos) : row.datos,
+    datos: typeof row.datos === 'string' ? JSON.parse(row.datos) : (row.datos || {}),
     activo: row.activo,
     orden: row.orden,
-    scope: row.scope,
-    tipoPagina: row.tipoPagina,
-    paginaId: row.paginaId,
-    esActivo: row.esActivo,
+    scope: 'tenant',
+    tipoPagina: null,
+    paginaId: row.tipoPaginaId,
   }));
 }
 
 /**
  * Obtiene los componentes asignados a una página específica
- * Incluye tanto referencias a componentes globales como componentes propios de la página
+ *
+ * ARQUITECTURA ACTUAL:
+ * - paginaId es el UUID de tipos_pagina (NO paginas_web que no existe)
+ * - Los componentes se vinculan via tipo_pagina_id en componentes_web
+ * - El tipo y variante vienen de catalogo_componentes via componente_catalogo_id
+ * - Header/Footer globales: tipo_pagina_id IS NULL
  */
 export async function getComponentesPagina(
   tenantId: string,
-  paginaId: string
+  paginaIdOrCode: string
 ): Promise<Array<SeccionConfig & { esReferencia: boolean }>> {
-  console.log(`📋 getComponentesPagina: tenantId=${tenantId}, paginaId=${paginaId}`);
-  
-  // Usar la misma lógica que getSeccionesResueltas para consistencia
-  // pero adaptada para devolver también esReferencia
+  console.log(`📋 getComponentesPagina: tenantId=${tenantId}, paginaIdOrCode=${paginaIdOrCode}`);
 
-  const sql = `
-    WITH
-    -- 1. Componentes globales únicos del tenant (header, footer siempre aplican)
-    componentes_globales_unicos AS (
-    SELECT
-      c.id,
-      c.tenant_id as "tenantId",
-        c.tipo,
-        c.variante,
-      c.nombre,
-      c.datos,
-      c.activo,
-        CASE 
-          WHEN c.tipo = 'header' THEN -1000
-          WHEN c.tipo = 'footer' THEN 9999
-          ELSE c.orden
-        END as orden,
-        c.scope,
-        c.tipo_pagina as "tipoPagina",
-        c.pagina_id as "paginaId",
-        false as "esReferencia",
-        3 as prioridad  -- Globales tienen menor prioridad
-      FROM componentes_web c
-      WHERE c.tenant_id = $1
-        AND c.activo = true
-        AND c.scope = 'tenant'
-        AND c.tipo IN ('header', 'footer')
-    ),
-    -- 2. Componentes asignados a esta página específicamente (via paginas_componentes)
-    componentes_pagina_ref AS (
+  // Determinar si es UUID o código de tipo de página
+  let tipoPaginaId: string | null = null;
+  if (isValidUUID(paginaIdOrCode)) {
+    tipoPaginaId = paginaIdOrCode;
+  } else {
+    // Es un código, buscar el UUID en tipos_pagina
+    const tpResult = await query(
+      `SELECT id FROM tipos_pagina WHERE codigo = $1`,
+      [paginaIdOrCode]
+    );
+    if (tpResult.rows.length > 0) {
+      tipoPaginaId = tpResult.rows[0].id;
+    }
+    console.log(`🔄 Código "${paginaIdOrCode}" convertido a tipo_pagina_id: ${tipoPaginaId}`);
+  }
+
+  if (!tipoPaginaId) {
+    console.warn(`⚠️ No se encontró tipo_pagina para: ${paginaIdOrCode}`);
+    // Retornar solo componentes globales (header/footer)
+    const globalSql = `
       SELECT
         c.id,
         c.tenant_id as "tenantId",
-        c.tipo,
-        c.variante,
-        c.nombre,
-        c.datos,
-        c.activo,
-        pc.orden,  -- Usar orden de la relación
-        c.scope,
-        c.tipo_pagina as "tipoPagina",
-        c.pagina_id as "paginaId",
-        true as "esReferencia",
-        1 as prioridad  -- Referencias tienen mayor prioridad
-    FROM paginas_componentes pc
-    INNER JOIN componentes_web c ON c.id = pc.componente_id
-      WHERE pc.pagina_id = $2
-        AND pc.activo = true  -- La relación debe estar activa
-        AND c.activo = true   -- El componente debe estar activo
-    ),
-    -- 3. Componentes específicos de esta página (scope='page')
-    componentes_pagina_especificos AS (
-      SELECT
-        c.id,
-        c.tenant_id as "tenantId",
-        c.tipo,
-        c.variante,
+        cc.tipo,
+        cc.variantes,
+        cc.campos_config as "camposConfig",
+        c.componente_catalogo_id as "componenteCatalogoId",
         c.nombre,
         c.datos,
         c.activo,
         c.orden,
-        c.scope,
-        c.tipo_pagina as "tipoPagina",
-        c.pagina_id as "paginaId",
-        false as "esReferencia",
-        2 as prioridad  -- Específicos tienen prioridad media
+        tp.codigo as "tipoPagina",
+        c.tipo_pagina_id as "tipoPaginaId"
       FROM componentes_web c
+      LEFT JOIN catalogo_componentes cc ON c.componente_catalogo_id = cc.id
+      LEFT JOIN tipos_pagina tp ON c.tipo_pagina_id = tp.id
       WHERE c.tenant_id = $1
-        AND c.pagina_id = $2
-      AND c.activo = true
-        AND c.scope = 'page'
-    ),
-    -- Unión de todas las fuentes
-    todos_componentes AS (
-      SELECT * FROM componentes_globales_unicos
-      UNION ALL
-      SELECT * FROM componentes_pagina_ref
-      UNION ALL
-      SELECT * FROM componentes_pagina_especificos
-    ),
-    -- Para header/footer: si hay una referencia o específico, usar ese; sino usar el global
-    -- Para otros tipos: incluir todos (puede haber múltiples del mismo tipo en una página)
-    componentes_filtrados AS (
-      SELECT DISTINCT ON (
-        CASE
-          WHEN tipo IN ('header', 'footer') THEN tipo  -- Solo un header/footer por página
-          ELSE id::text  -- Otros componentes: todos son únicos por ID (convertir a text)
-        END
-      )
-        id,
-        "tenantId",
-        tipo,
-        variante,
-        nombre,
-        datos,
-        activo,
-        orden,
-        scope,
-        "tipoPagina",
-        "paginaId",
-        "esReferencia"
-      FROM todos_componentes
+        AND c.activo = true
+        AND c.tipo_pagina_id IS NULL
+        AND cc.tipo IN ('header', 'footer')
       ORDER BY
-        CASE
-          WHEN tipo IN ('header', 'footer') THEN tipo
-          ELSE id::text
-        END,
-        prioridad ASC,  -- Prioridad: referencias > específicos > globales
-        orden ASC
-    )
-    SELECT 
-      id,
-      "tenantId",
-      tipo,
+        CASE WHEN cc.tipo = 'header' THEN 0 ELSE 1 END
+    `;
+    const globalResult = await query(globalSql, [tenantId]);
+    return globalResult.rows.map((row: any) => mapComponenteRow(row));
+  }
+
+  // Helper local para mapear filas
+  function mapComponenteRow(row: any) {
+    let variante = 'default';
+    if (row.variantes) {
+      const variantes = typeof row.variantes === 'string' ? JSON.parse(row.variantes) : row.variantes;
+      if (Array.isArray(variantes) && variantes.length > 0) {
+        variante = variantes[0]?.id || variantes[0] || 'default';
+      }
+    }
+    // Parsear camposConfig
+    let camposConfig = null;
+    if (row.camposConfig) {
+      camposConfig = typeof row.camposConfig === 'string' ? JSON.parse(row.camposConfig) : row.camposConfig;
+    }
+    return {
+      id: row.id,
+      tenantId: row.tenantId,
+      tipo: row.tipo || 'unknown',
       variante,
-      nombre,
-      datos,
-      activo,
-      orden,
-      scope,
-      "tipoPagina",
-      "paginaId",
-      "esReferencia"
-    FROM componentes_filtrados
-    ORDER BY 
-      CASE WHEN tipo = 'header' THEN 0 ELSE 1 END,
-      CASE WHEN tipo = 'footer' THEN 999999 ELSE orden END
+      nombre: row.nombre,
+      datos: typeof row.datos === 'string' ? JSON.parse(row.datos) : (row.datos || {}),
+      activo: row.activo,
+      orden: row.orden,
+      scope: row.tipoPaginaId ? 'page_type' as const : 'tenant' as const,
+      tipoPagina: row.tipoPagina,
+      paginaId: row.tipoPaginaId,
+      esReferencia: false,
+      componenteCatalogoId: row.componenteCatalogoId,
+      camposConfig,
+    };
+  }
+
+  // Query usando tipo_pagina_id
+  const sql = `
+    SELECT
+      c.id,
+      c.tenant_id as "tenantId",
+      cc.tipo,
+      cc.variantes,
+      cc.campos_config as "camposConfig",
+      c.componente_catalogo_id as "componenteCatalogoId",
+      c.nombre,
+      c.datos,
+      c.activo,
+      c.orden,
+      tp.codigo as "tipoPagina",
+      c.tipo_pagina_id as "tipoPaginaId"
+    FROM componentes_web c
+    LEFT JOIN catalogo_componentes cc ON c.componente_catalogo_id = cc.id
+    LEFT JOIN tipos_pagina tp ON c.tipo_pagina_id = tp.id
+    WHERE c.tenant_id = $1
+      AND c.activo = true
+      AND (
+        c.tipo_pagina_id = $2  -- Componentes de este tipo de página
+        OR (c.tipo_pagina_id IS NULL AND cc.tipo IN ('header', 'footer'))  -- Header/footer globales
+      )
+    ORDER BY
+      CASE WHEN cc.tipo = 'header' THEN 0 ELSE 1 END,
+      CASE WHEN cc.tipo = 'footer' THEN 999999 ELSE c.orden END
   `;
 
-  const result = await query(sql, [tenantId, paginaId]);
+  const result = await query(sql, [tenantId, tipoPaginaId]);
 
   console.log(`✅ getComponentesPagina: ${result.rows.length} componentes encontrados`);
   result.rows.forEach((row: any, idx: number) => {
-    console.log(`  [${idx}] ${row.tipo} (${row.variante}) - scope: ${row.scope}, esReferencia: ${row.esReferencia}`);
+    console.log(`  [${idx}] ${row.tipo} - tipoPagina: ${row.tipoPagina || 'global'}`);
   });
 
-  const mapRow = (row: any) => ({
-    id: row.id,
-    tenantId: row.tenantId,
-    tipo: row.tipo,
-    variante: row.variante,
-    nombre: row.nombre,
-    datos: typeof row.datos === 'string' ? JSON.parse(row.datos) : row.datos,
-    activo: row.activo,
-    orden: row.orden,
-    scope: row.scope,
-    tipoPagina: row.tipoPagina,
-    paginaId: row.paginaId,
-    esReferencia: row.esReferencia || false,
-  });
-
-  return result.rows.map(mapRow);
+  return result.rows.map((row: any) => mapComponenteRow(row));
 }
 
 /**
- * Agrega un componente global existente a una página (crea referencia)
+ * Agrega un componente a una página asignando tipo_pagina_id
+ *
+ * ARQUITECTURA ACTUAL:
+ * - paginaId es el UUID de tipos_pagina
+ * - Se actualiza tipo_pagina_id en el componente existente
  */
 export async function agregarComponenteAPagina(
   paginaId: string,
   componenteId: string,
   orden?: number
 ): Promise<{ id: string }> {
-  // Obtener el orden máximo actual
+  // Obtener el orden máximo actual de componentes en esta página
   if (orden === undefined) {
     const maxOrden = await query(
-      `SELECT COALESCE(MAX(orden), 0) + 1 as next_orden FROM paginas_componentes WHERE pagina_id = $1`,
+      `SELECT COALESCE(MAX(orden), 0) + 1 as next_orden FROM componentes_web WHERE tipo_pagina_id = $1`,
       [paginaId]
     );
     orden = maxOrden.rows[0]?.next_orden || 1;
   }
 
+  // Actualizar el componente para asignarlo a esta página
   const sql = `
-    INSERT INTO paginas_componentes (pagina_id, componente_id, orden, activo)
-    VALUES ($1, $2, $3, true)
-    ON CONFLICT (pagina_id, componente_id) DO UPDATE SET orden = $3, activo = true
+    UPDATE componentes_web
+    SET tipo_pagina_id = $1, orden = $2, updated_at = NOW()
+    WHERE id = $3
     RETURNING id
   `;
 
-  const result = await query(sql, [paginaId, componenteId, orden]);
-  return { id: result.rows[0].id };
+  const result = await query(sql, [paginaId, orden, componenteId]);
+  return { id: result.rows[0]?.id || componenteId };
 }
 
 /**
- * Remueve un componente de una página (solo elimina la referencia, no el componente)
+ * Remueve un componente de una página (quita el tipo_pagina_id)
  */
 export async function removerComponenteDePagina(
   paginaId: string,
   componenteId: string
 ): Promise<void> {
   await query(
-    `DELETE FROM paginas_componentes WHERE pagina_id = $1 AND componente_id = $2`,
-    [paginaId, componenteId]
+    `UPDATE componentes_web SET tipo_pagina_id = NULL, updated_at = NOW() WHERE id = $1 AND tipo_pagina_id = $2`,
+    [componenteId, paginaId]
   );
 }
 
@@ -1143,14 +1223,18 @@ export async function reordenarComponentesPagina(
 ): Promise<void> {
   for (const item of ordenComponentes) {
     await query(
-      `UPDATE paginas_componentes SET orden = $1 WHERE pagina_id = $2 AND componente_id = $3`,
-      [item.orden, paginaId, item.componenteId]
+      `UPDATE componentes_web SET orden = $1, updated_at = NOW() WHERE id = $2 AND tipo_pagina_id = $3`,
+      [item.orden, item.componenteId, paginaId]
     );
   }
 }
 
 /**
  * Crea un nuevo componente global reutilizable
+ *
+ * ARQUITECTURA ACTUAL:
+ * - tipo y variante se buscan en catalogo_componentes
+ * - Se usa componente_catalogo_id para vincular
  */
 export async function crearComponenteGlobal(
   tenantId: string,
@@ -1162,30 +1246,36 @@ export async function crearComponenteGlobal(
     orden?: number;
   }
 ): Promise<SeccionConfig> {
+  // Primero buscar el componente_catalogo_id por tipo
+  const catalogoResult = await query(
+    `SELECT id FROM catalogo_componentes WHERE tipo = $1 LIMIT 1`,
+    [data.tipo]
+  );
+
+  if (catalogoResult.rows.length === 0) {
+    throw new Error(`Tipo de componente no encontrado en catálogo: ${data.tipo}`);
+  }
+
+  const componenteCatalogoId = catalogoResult.rows[0].id;
+
   const sql = `
     INSERT INTO componentes_web (
-      tenant_id, tipo, variante, nombre, datos, scope, activo, es_activo, orden
+      tenant_id, componente_catalogo_id, nombre, datos, activo, orden
     )
-    VALUES ($1, $2, $3, $4, $5, 'tenant', true, true, $6)
+    VALUES ($1, $2, $3, $4, true, $5)
     RETURNING
       id,
       tenant_id as "tenantId",
-      tipo,
-      variante,
       nombre,
       datos,
       activo,
       orden,
-      scope,
-      tipo_pagina as "tipoPagina",
-      pagina_id as "paginaId",
-      es_activo as "esActivo"
+      tipo_pagina_id as "tipoPaginaId"
   `;
 
   const result = await query(sql, [
     tenantId,
-    data.tipo,
-    data.variante,
+    componenteCatalogoId,
     data.nombre,
     JSON.stringify(data.datos || { static_data: {}, toggles: {} }),
     data.orden || 0
@@ -1195,16 +1285,15 @@ export async function crearComponenteGlobal(
   return {
     id: row.id,
     tenantId: row.tenantId,
-    tipo: row.tipo,
-    variante: row.variante,
+    tipo: data.tipo,
+    variante: data.variante,
     nombre: row.nombre,
     datos: typeof row.datos === 'string' ? JSON.parse(row.datos) : row.datos,
     activo: row.activo,
     orden: row.orden,
-    scope: row.scope,
-    tipoPagina: row.tipoPagina,
-    paginaId: row.paginaId,
-    esActivo: row.esActivo,
+    scope: 'tenant',
+    tipoPagina: null,
+    paginaId: row.tipoPaginaId,
   };
 }
 
@@ -1229,43 +1318,55 @@ export async function duplicarComponenteGlobal(
   nuevoNombre: string
 ): Promise<SeccionConfig> {
   const sql = `
-      INSERT INTO componentes_web (
-      tenant_id, tipo, variante, nombre, datos, scope, activo, es_activo, orden
-      )
-      SELECT
-      tenant_id, tipo, variante, $2, datos, scope, true, false, orden + 1
-      FROM componentes_web
-      WHERE id = $1
+    INSERT INTO componentes_web (
+      tenant_id, componente_catalogo_id, nombre, datos, activo, orden
+    )
+    SELECT
+      tenant_id, componente_catalogo_id, $2, datos, true, orden + 1
+    FROM componentes_web
+    WHERE id = $1
     RETURNING
       id,
       tenant_id as "tenantId",
-      tipo,
-      variante,
       nombre,
       datos,
       activo,
       orden,
-      scope,
-      tipo_pagina as "tipoPagina",
-      pagina_id as "paginaId",
-      es_activo as "esActivo"
+      tipo_pagina_id as "tipoPaginaId",
+      componente_catalogo_id as "componenteCatalogoId"
   `;
 
   const result = await query(sql, [componenteId, nuevoNombre]);
   const row = result.rows[0];
 
+  // Obtener tipo del catálogo
+  let tipo = 'unknown';
+  let variante = 'default';
+  if (row.componenteCatalogoId) {
+    const catResult = await query(
+      `SELECT tipo, variantes FROM catalogo_componentes WHERE id = $1`,
+      [row.componenteCatalogoId]
+    );
+    if (catResult.rows.length > 0) {
+      tipo = catResult.rows[0].tipo;
+      const variantes = catResult.rows[0].variantes;
+      if (Array.isArray(variantes) && variantes.length > 0) {
+        variante = variantes[0]?.id || variantes[0] || 'default';
+      }
+    }
+  }
+
   return {
     id: row.id,
     tenantId: row.tenantId,
-    tipo: row.tipo,
-    variante: row.variante,
+    tipo,
+    variante,
     nombre: row.nombre,
     datos: typeof row.datos === 'string' ? JSON.parse(row.datos) : row.datos,
     activo: row.activo,
     orden: row.orden,
-    scope: row.scope,
-    tipoPagina: row.tipoPagina,
-    paginaId: row.paginaId,
-    esActivo: row.esActivo,
+    scope: 'tenant',
+    tipoPagina: null,
+    paginaId: row.tipoPaginaId,
   };
 }

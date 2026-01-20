@@ -49,7 +49,7 @@ export async function up(knex: Knex): Promise<void> {
   }
 
   // Campos de rangos para proyectos
-  const camposRango = [
+  const camposRango: Array<{ nombre: string; tipo: 'decimal' | 'integer'; precision?: [number, number] }> = [
     { nombre: 'precio_min', tipo: 'decimal', precision: [15, 2] },
     { nombre: 'precio_max', tipo: 'decimal', precision: [15, 2] },
     { nombre: 'm2_min', tipo: 'decimal', precision: [10, 2] },
@@ -66,7 +66,7 @@ export async function up(knex: Knex): Promise<void> {
     const existe = await knex.schema.hasColumn('propiedades', campo.nombre);
     if (!existe) {
       await knex.schema.alterTable('propiedades', (table) => {
-        if (campo.tipo === 'decimal') {
+        if (campo.tipo === 'decimal' && campo.precision) {
           table.decimal(campo.nombre, campo.precision[0], campo.precision[1]).nullable();
         } else {
           table.integer(campo.nombre).nullable();

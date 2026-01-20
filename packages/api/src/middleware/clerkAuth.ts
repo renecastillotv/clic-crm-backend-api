@@ -49,11 +49,13 @@ export async function requireAuth(
 
     const token = authHeader.split('Bearer ')[1];
 
+    console.log('🔐 Verificando token de Clerk...');
     // Verificar token con Clerk
     const payload = await verifyToken(token, {
       secretKey: process.env.CLERK_SECRET_KEY!,
       authorizedParties: ['http://localhost:3000', 'http://localhost:3002', 'http://localhost:4321'],
     });
+    console.log('🔐 Token válido para usuario:', payload.sub);
 
     // Agregar info de auth al request
     req.auth = {
@@ -64,7 +66,7 @@ export async function requireAuth(
 
     next();
   } catch (error: any) {
-    console.error('❌ Error de autenticación:', error.message);
+    console.error('❌ Error de autenticación:', error.message, error);
     res.status(401).json({
       error: 'Token inválido',
       message: 'El token de autenticación es inválido o ha expirado',
