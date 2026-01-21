@@ -32,7 +32,7 @@ import TranslatableInput, { type Traducciones } from '../../components/Translata
 import {
   Save, Loader2,
   Image, Building2, Phone, MapPin, Clock, Share2, FileText, User, UserCheck,
-  Facebook, Instagram, Twitter, Linkedin, Youtube, Check
+  Facebook, Instagram, Twitter, Linkedin, Youtube, Check, Search
 } from 'lucide-react';
 
 // Tabs disponibles
@@ -89,6 +89,18 @@ export default function CrmInfoNegocio() {
   const [asesoresDisponibles, setAsesoresDisponibles] = useState<AsesorDisponible[]>([]);
   const [loadingAsesor, setLoadingAsesor] = useState(false);
   const [savingAsesor, setSavingAsesor] = useState(false);
+  const [busquedaAsesor, setBusquedaAsesor] = useState('');
+
+  // Filtrar asesores por búsqueda
+  const asesoresFiltrados = asesoresDisponibles.filter(asesor => {
+    if (!busquedaAsesor.trim()) return true;
+    const termino = busquedaAsesor.toLowerCase();
+    return (
+      asesor.nombre_completo.toLowerCase().includes(termino) ||
+      asesor.email.toLowerCase().includes(termino) ||
+      (asesor.titulo_profesional?.toLowerCase().includes(termino))
+    );
+  });
 
   // Cargar datos
   useEffect(() => {
@@ -916,9 +928,24 @@ export default function CrmInfoNegocio() {
 
                 {/* Lista de asesores para seleccionar */}
                 <div className="asesores-list">
-                  <label>Selecciona un asesor:</label>
+                  <div className="asesores-list-header">
+                    <label>Selecciona un asesor:</label>
+                    <div className="asesor-search">
+                      <Search size={16} />
+                      <input
+                        type="text"
+                        placeholder="Buscar por nombre o email..."
+                        value={busquedaAsesor}
+                        onChange={(e) => setBusquedaAsesor(e.target.value)}
+                      />
+                    </div>
+                  </div>
                   <div className="asesores-grid">
-                    {asesoresDisponibles.map((asesor) => {
+                    {asesoresFiltrados.length === 0 ? (
+                      <div className="no-results">
+                        No se encontraron asesores con "{busquedaAsesor}"
+                      </div>
+                    ) : asesoresFiltrados.map((asesor) => {
                       const isSelected = asesorDefault?.id === asesor.id;
                       return (
                         <button
@@ -1321,7 +1348,59 @@ export default function CrmInfoNegocio() {
           font-size: 0.875rem;
           font-weight: 600;
           color: #374151;
+        }
+
+        .current-asesor label {
           margin-bottom: 12px;
+        }
+
+        .asesores-list-header {
+          display: flex;
+          align-items: center;
+          justify-content: space-between;
+          gap: 16px;
+          margin-bottom: 16px;
+          flex-wrap: wrap;
+        }
+
+        .asesor-search {
+          display: flex;
+          align-items: center;
+          gap: 8px;
+          padding: 8px 12px;
+          background: white;
+          border: 1px solid #e2e8f0;
+          border-radius: 8px;
+          min-width: 250px;
+          max-width: 320px;
+        }
+
+        .asesor-search svg {
+          color: #94a3b8;
+          flex-shrink: 0;
+        }
+
+        .asesor-search input {
+          border: none;
+          outline: none;
+          background: transparent;
+          font-size: 0.875rem;
+          width: 100%;
+          color: #1e293b;
+        }
+
+        .asesor-search input::placeholder {
+          color: #94a3b8;
+        }
+
+        .no-results {
+          grid-column: 1 / -1;
+          padding: 32px;
+          text-align: center;
+          color: #64748b;
+          background: #f8fafc;
+          border-radius: 8px;
+          font-size: 0.9rem;
         }
 
         .asesores-grid {
