@@ -950,7 +950,7 @@ export default function CrmPropuestaEditar() {
                             {/* Tipo y Captador */}
                             <div className="prop-type-row">
                               <span className="prop-type">
-                                <Building2 className="w-3 h-3" />
+                                <Building2 size={12} />
                                 {getTipoLabel(prop.tipo)}
                               </span>
                               {/* Captador info a la derecha */}
@@ -986,22 +986,22 @@ export default function CrmPropuestaEditar() {
                             </div>
                             {/* Ubicación */}
                             <div className="prop-location">
-                              <MapPin className="w-3 h-3" />
+                              <MapPin size={11} />
                               {[prop.sector, prop.ciudad].filter(Boolean).join(', ') || 'Sin ubicación'}
                             </div>
-                            {/* Características - compactas */}
+                            {/* Características */}
                             <div className="prop-features">
                               {prop.habitaciones != null && prop.habitaciones > 0 && (
-                                <span><Bed size={11} /> {prop.habitaciones}</span>
+                                <span><Bed size={13} /> {prop.habitaciones}</span>
                               )}
                               {prop.banos != null && prop.banos > 0 && (
-                                <span><Bath size={11} /> {prop.banos}</span>
+                                <span><Bath size={13} /> {prop.banos}</span>
                               )}
                               {prop.estacionamientos != null && prop.estacionamientos > 0 && (
-                                <span><Car size={11} /> {prop.estacionamientos}</span>
+                                <span><Car size={13} /> {prop.estacionamientos}</span>
                               )}
                               {prop.m2_construccion != null && (
-                                <span><Maximize size={11} /> {prop.m2_construccion.toLocaleString()}m²</span>
+                                <span><Maximize size={13} /> {prop.m2_construccion.toLocaleString()}m²</span>
                               )}
                             </div>
                           </div>
@@ -2704,7 +2704,7 @@ const styles = `
 
   .badge-destacada {
     position: absolute;
-    top: 8px;
+    bottom: 8px;
     left: 8px;
     background: linear-gradient(135deg, #fbbf24, #f59e0b);
     color: white;
@@ -2839,7 +2839,7 @@ const styles = `
 
   .prop-features {
     display: flex;
-    gap: 6px;
+    gap: 10px;
     padding-top: 8px;
     border-top: 1px solid #f1f5f9;
     flex-shrink: 0;
@@ -2848,8 +2848,8 @@ const styles = `
   .prop-features span {
     display: flex;
     align-items: center;
-    gap: 2px;
-    font-size: 0.7rem;
+    gap: 3px;
+    font-size: 0.75rem;
     color: #64748b;
   }
 
