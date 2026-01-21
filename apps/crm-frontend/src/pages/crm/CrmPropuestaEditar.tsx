@@ -327,16 +327,53 @@ export default function CrmPropuestaEditar() {
     }
   };
 
+  // Auto-guardar como borrador (se usa cuando se agregan/quitan propiedades)
+  const autoSaveAsBorrador = async (propiedadIds: string[]) => {
+    if (!tenantActual?.id || !form.titulo.trim()) return;
+
+    // Solo auto-guardar si ya existe la propuesta (no en nueva)
+    if (isNew) return;
+
+    try {
+      const data = {
+        titulo: form.titulo,
+        descripcion: form.descripcion || undefined,
+        precio_propuesto: form.precio_propuesto ? parseFloat(form.precio_propuesto) : undefined,
+        moneda: form.moneda,
+        condiciones: form.condiciones || undefined,
+        notas_internas: form.notas_internas || undefined,
+        contacto_id: form.contacto_id || undefined,
+        solicitud_id: form.solicitud_id || undefined,
+        fecha_expiracion: form.fecha_expiracion || undefined,
+        estado: 'borrador', // Siempre guardar como borrador en auto-save
+        propiedad_ids: propiedadIds,
+      };
+
+      if (propuestaId) {
+        const updated = await updatePropuesta(tenantActual.id, propuestaId, data);
+        setPropuesta(updated);
+        // Actualizar el estado del form también
+        setForm(prev => ({ ...prev, estado: 'borrador' }));
+      }
+    } catch (err: any) {
+      console.error('Error en auto-guardado:', err);
+    }
+  };
+
   // Toggle selección de propiedad
   const togglePropiedad = (propiedad: Propiedad) => {
     const propId = propiedad.id;
+    let newSelectedIds: string[];
+
     if (selectedPropiedades.includes(propId)) {
       // Remover
-      setSelectedPropiedades(prev => prev.filter(id => id !== propId));
+      newSelectedIds = selectedPropiedades.filter(id => id !== propId);
+      setSelectedPropiedades(newSelectedIds);
       setPropiedadesSeleccionadasData(prev => prev.filter(p => p.propiedad_id !== propId));
     } else {
       // Agregar
-      setSelectedPropiedades(prev => [...prev, propId]);
+      newSelectedIds = [...selectedPropiedades, propId];
+      setSelectedPropiedades(newSelectedIds);
       setPropiedadesSeleccionadasData(prev => [...prev, {
         id: '', // Se asignará en el backend
         propiedad_id: propId,
@@ -354,21 +391,31 @@ export default function CrmPropuestaEditar() {
         orden: prev.length,
       }]);
     }
+
+    // Auto-guardar como borrador cuando se modifica la selección
+    autoSaveAsBorrador(newSelectedIds);
   };
 
   // Remover propiedad de la selección
   const removePropiedad = (propiedadId: string) => {
-    setSelectedPropiedades(prev => prev.filter(id => id !== propiedadId));
+    const newSelectedIds = selectedPropiedades.filter(id => id !== propiedadId);
+    setSelectedPropiedades(newSelectedIds);
     setPropiedadesSeleccionadasData(prev => prev.filter(p => p.propiedad_id !== propiedadId));
+    // Auto-guardar como borrador
+    autoSaveAsBorrador(newSelectedIds);
   };
 
-  // Guardar propuesta
+  // Guardar propuesta - Al guardar manualmente, si está en borrador cambia a "enviada"
   const handleSave = async () => {
     if (!tenantActual?.id || !form.titulo.trim()) return;
 
     try {
       setSaving(true);
       setError(null);
+
+      // Si el estado actual es borrador y el usuario da clic en Guardar,
+      // cambiar automáticamente a "enviada" (lista para compartir)
+      const estadoFinal = form.estado === 'borrador' ? 'enviada' : form.estado;
 
       const data = {
         titulo: form.titulo,
@@ -380,16 +427,20 @@ export default function CrmPropuestaEditar() {
         contacto_id: form.contacto_id || undefined,
         solicitud_id: form.solicitud_id || undefined,
         fecha_expiracion: form.fecha_expiracion || undefined,
-        estado: form.estado,
+        estado: estadoFinal,
         propiedad_ids: selectedPropiedades,
       };
 
       if (isNew) {
+        // Para nuevas propuestas, crearlas directamente como "enviada"
+        data.estado = 'enviada';
         const created = await createPropuesta(tenantActual.id, data);
         navigate(`/crm/${tenantSlug}/propuestas/${created.id}`);
       } else if (propuestaId) {
         const updated = await updatePropuesta(tenantActual.id, propuestaId, data);
         setPropuesta(updated);
+        // Actualizar el formulario con el nuevo estado
+        setForm(prev => ({ ...prev, estado: estadoFinal }));
       }
     } catch (err: any) {
       console.error('Error guardando propuesta:', err);
@@ -463,19 +514,22 @@ export default function CrmPropuestaEditar() {
     }
   };
 
-  // Generar URL pública completa usando el dominio personalizado si existe
+  // Generar URL pública completa usando el dominio web público del tenant
   const getUrlPublicaCompleta = () => {
     if (!propuesta?.url_publica) return null;
 
-    // Si tiene dominio personalizado, usar ese
+    // Si tiene dominio personalizado, usar ese (puede venir con o sin https://)
     if (dominioPersonalizado) {
-      return `https://${dominioPersonalizado}/propuestas/${propuesta.url_publica}`;
+      // Limpiar el dominio: quitar protocolo y trailing slash
+      let dominio = dominioPersonalizado
+        .replace(/^https?:\/\//, '')
+        .replace(/\/$/, '');
+      return `https://${dominio}/propuestas/${propuesta.url_publica}`;
     }
 
-    // Fallback: usar la URL del sitio actual con /tenant/{slug}
+    // Fallback: usar {tenantSlug}.clic.casa
     if (!tenantSlug) return null;
-    const baseUrl = window.location.origin;
-    return `${baseUrl}/tenant/${tenantSlug}/propuestas/${propuesta.url_publica}`;
+    return `https://${tenantSlug}.clic.casa/propuestas/${propuesta.url_publica}`;
   };
 
   // URL de preview (dominio personalizado + ?preview=true)
