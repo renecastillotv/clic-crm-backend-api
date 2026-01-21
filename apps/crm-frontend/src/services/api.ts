@@ -7019,3 +7019,98 @@ export async function calcularDistribucionComision(
   return response.json();
 }
 
+// ==================== UBICACIONES - ADMIN CRUD ====================
+
+/**
+ * Interfaz extendida de Ubicacion para el admin con campos adicionales
+ */
+export interface UbicacionAdmin extends Ubicacion {
+  codigo?: string;
+  latitud?: number;
+  longitud?: number;
+  mostrar_en_menu?: boolean;
+  mostrar_en_filtros?: boolean;
+  children_count?: number;
+  propiedades_count?: number;
+  created_at?: string;
+  updated_at?: string;
+  children?: UbicacionAdmin[];
+  breadcrumb?: Array<{ id: string; nombre: string; slug: string; tipo: string }>;
+}
+
+/**
+ * Datos para crear una ubicación
+ */
+export interface CreateUbicacionData {
+  nombre: string;
+  tipo: 'pais' | 'provincia' | 'ciudad' | 'sector';
+  parent_id?: string | null;
+  slug?: string;
+  codigo?: string;
+  latitud?: number;
+  longitud?: number;
+  destacado?: boolean;
+  mostrar_en_menu?: boolean;
+  mostrar_en_filtros?: boolean;
+  activo?: boolean;
+}
+
+/**
+ * Obtiene una ubicación por ID con breadcrumb
+ */
+export async function getUbicacionById(id: string, token?: string | null): Promise<UbicacionAdmin> {
+  const response = await apiFetch(`/ubicaciones/${id}`, {}, token);
+  const data = await response.json();
+  return data.ubicacion || data;
+}
+
+/**
+ * Obtiene ubicaciones hijas de un parent
+ */
+export async function getUbicacionesHijas(parentId: string, token?: string | null): Promise<UbicacionAdmin[]> {
+  const response = await apiFetch(`/ubicaciones/hijos/${parentId}`, {}, token);
+  const data = await response.json();
+  return data.ubicaciones || data || [];
+}
+
+/**
+ * Crea una nueva ubicación
+ */
+export async function createUbicacion(data: CreateUbicacionData, token?: string | null): Promise<UbicacionAdmin> {
+  const response = await apiFetch('/ubicaciones', {
+    method: 'POST',
+    body: JSON.stringify(data),
+  }, token);
+  const result = await response.json();
+  return result.ubicacion || result;
+}
+
+/**
+ * Actualiza una ubicación existente
+ */
+export async function updateUbicacion(id: string, data: Partial<CreateUbicacionData>, token?: string | null): Promise<UbicacionAdmin> {
+  const response = await apiFetch(`/ubicaciones/${id}`, {
+    method: 'PUT',
+    body: JSON.stringify(data),
+  }, token);
+  const result = await response.json();
+  return result.ubicacion || result;
+}
+
+/**
+ * Elimina una ubicación (soft delete por defecto)
+ */
+export async function deleteUbicacion(id: string, hardDelete: boolean = false, token?: string | null): Promise<void> {
+  const url = hardDelete ? `/ubicaciones/${id}?hard=true` : `/ubicaciones/${id}`;
+  await apiFetch(url, {
+    method: 'DELETE',
+  }, token);
+}
+
+/**
+ * Activa o desactiva una ubicación
+ */
+export async function toggleUbicacionStatus(id: string, activo: boolean, token?: string | null): Promise<UbicacionAdmin> {
+  return updateUbicacion(id, { activo }, token);
+}
+
