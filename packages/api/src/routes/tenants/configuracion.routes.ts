@@ -28,8 +28,7 @@ router.get('/', async (req, res, next) => {
     const result = await query(
       `SELECT
         id, nombre, slug, dominio_personalizado,
-        logo_url, favicon_url, email_contacto, telefono_contacto,
-        configuracion, plan, activo, created_at, updated_at
+        info_negocio, configuracion, plan, activo, created_at, updated_at
       FROM tenants
       WHERE id = $1`,
       [tenantId]
@@ -39,7 +38,17 @@ router.get('/', async (req, res, next) => {
       return res.status(404).json({ error: 'Tenant no encontrado' });
     }
 
-    res.json(result.rows[0]);
+    const tenant = result.rows[0];
+    const infoNegocio = tenant.info_negocio || {};
+
+    // Extraer campos de info_negocio para compatibilidad con el frontend
+    res.json({
+      ...tenant,
+      logo_url: infoNegocio.logo_url || infoNegocio.logo || null,
+      favicon_url: infoNegocio.favicon_url || infoNegocio.favicon || null,
+      email_contacto: infoNegocio.email || infoNegocio.email_contacto || null,
+      telefono_contacto: infoNegocio.telefono || infoNegocio.telefono_contacto || null,
+    });
   } catch (error) {
     next(error);
   }
