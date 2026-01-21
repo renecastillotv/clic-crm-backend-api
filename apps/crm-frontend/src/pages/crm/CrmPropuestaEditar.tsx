@@ -327,16 +327,18 @@ export default function CrmPropuestaEditar() {
     }
   };
 
-  // Auto-guardar como borrador (se usa cuando se agregan/quitan propiedades)
-  const autoSaveAsBorrador = async (propiedadIds: string[]) => {
-    if (!tenantActual?.id || !form.titulo.trim()) return;
-
-    // Solo auto-guardar si ya existe la propuesta (no en nueva)
-    if (isNew) return;
+  // Auto-guardar propiedades inmediatamente
+  // - Para propuestas nuevas: crea la propuesta como borrador
+  // - Para propuestas existentes: actualiza las propiedades y vuelve a borrador
+  const autoSavePropiedades = async (propiedadIds: string[]) => {
+    if (!tenantActual?.id) return;
+    if (propiedadIds.length === 0) return; // No guardar si no hay propiedades
 
     try {
+      console.log('🔄 Auto-guardando propiedades:', propiedadIds);
+
       const data = {
-        titulo: form.titulo,
+        titulo: form.titulo || 'Propuesta sin título',
         descripcion: form.descripcion || undefined,
         precio_propuesto: form.precio_propuesto ? parseFloat(form.precio_propuesto) : undefined,
         moneda: form.moneda,
@@ -345,18 +347,28 @@ export default function CrmPropuestaEditar() {
         contacto_id: form.contacto_id || undefined,
         solicitud_id: form.solicitud_id || undefined,
         fecha_expiracion: form.fecha_expiracion || undefined,
-        estado: 'borrador', // Siempre guardar como borrador en auto-save
+        estado: 'borrador',
         propiedad_ids: propiedadIds,
       };
 
-      if (propuestaId) {
+      if (isNew) {
+        // Crear nueva propuesta como borrador
+        console.log('📝 Creando nueva propuesta como borrador...');
+        const created = await createPropuesta(tenantActual.id, data);
+        setPropuesta(created);
+        setForm(prev => ({ ...prev, estado: 'borrador' }));
+        // Navegar a la propuesta creada (sin recargar)
+        navigate(`/crm/${tenantSlug}/propuestas/${created.id}`, { replace: true });
+        console.log('✅ Propuesta creada como borrador:', created.id);
+      } else if (propuestaId) {
+        // Actualizar propuesta existente
         const updated = await updatePropuesta(tenantActual.id, propuestaId, data);
         setPropuesta(updated);
-        // Actualizar el estado del form también
         setForm(prev => ({ ...prev, estado: 'borrador' }));
+        console.log('✅ Propiedades actualizadas');
       }
     } catch (err: any) {
-      console.error('Error en auto-guardado:', err);
+      console.error('❌ Error en auto-guardado:', err);
     }
   };
 
@@ -392,8 +404,8 @@ export default function CrmPropuestaEditar() {
       }]);
     }
 
-    // Auto-guardar como borrador cuando se modifica la selección
-    autoSaveAsBorrador(newSelectedIds);
+    // Auto-guardar inmediatamente al modificar propiedades
+    autoSavePropiedades(newSelectedIds);
   };
 
   // Remover propiedad de la selección
@@ -401,8 +413,8 @@ export default function CrmPropuestaEditar() {
     const newSelectedIds = selectedPropiedades.filter(id => id !== propiedadId);
     setSelectedPropiedades(newSelectedIds);
     setPropiedadesSeleccionadasData(prev => prev.filter(p => p.propiedad_id !== propiedadId));
-    // Auto-guardar como borrador
-    autoSaveAsBorrador(newSelectedIds);
+    // Auto-guardar inmediatamente
+    autoSavePropiedades(newSelectedIds);
   };
 
   // Guardar propuesta - Al guardar manualmente, si está en borrador cambia a "enviada"
