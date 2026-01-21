@@ -5540,6 +5540,81 @@ export async function patchInfoNegocio(
 }
 
 // ==========================================
+// Asesor Default del Tenant
+// ==========================================
+
+/**
+ * Interfaz del Asesor Default
+ */
+export interface AsesorDefault {
+  id: string;
+  usuario_id: string;
+  slug: string;
+  nombre: string;
+  apellido: string;
+  nombre_completo: string;
+  email: string;
+  titulo_profesional: string | null;
+  foto_url: string | null;
+  whatsapp: string | null;
+  telefono_directo: string | null;
+}
+
+/**
+ * Interfaz de Asesor Disponible (para selector)
+ */
+export interface AsesorDisponible {
+  id: string;
+  slug: string;
+  nombre: string;
+  apellido: string;
+  nombre_completo: string;
+  email: string;
+  titulo_profesional: string | null;
+  foto_url: string | null;
+}
+
+/**
+ * Obtiene el asesor por defecto del tenant
+ */
+export async function getAsesorDefault(
+  tenantId: string,
+  token?: string | null
+): Promise<AsesorDefault | null> {
+  const response = await apiFetch(`/tenants/${tenantId}/info-negocio/asesor-default`, {}, token);
+  const data = await response.json();
+  return data.asesorDefault;
+}
+
+/**
+ * Obtiene la lista de asesores disponibles para seleccionar como default
+ */
+export async function getAsesoresDisponibles(
+  tenantId: string,
+  token?: string | null
+): Promise<AsesorDisponible[]> {
+  const response = await apiFetch(`/tenants/${tenantId}/info-negocio/asesores-disponibles`, {}, token);
+  const data = await response.json();
+  return data.asesores || [];
+}
+
+/**
+ * Actualiza el asesor por defecto del tenant
+ */
+export async function updateAsesorDefault(
+  tenantId: string,
+  asesorId: string,
+  token?: string | null
+): Promise<AsesorDefault> {
+  const response = await apiFetch(`/tenants/${tenantId}/info-negocio/asesor-default`, {
+    method: 'PATCH',
+    body: JSON.stringify({ asesor_id: asesorId }),
+  }, token);
+  const data = await response.json();
+  return data.asesorDefault;
+}
+
+// ==========================================
 // Sistema de Fases
 // ==========================================
 

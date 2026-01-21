@@ -913,14 +913,28 @@ export async function assignRoleToUser(
             .substring(0, 100);
 
           // Crear perfil de asesor
+          const newPerfilId = uuidv4();
           await client.query(
             `INSERT INTO perfiles_asesor (
               id, tenant_id, usuario_id, slug, titulo_profesional,
               whatsapp, activo, visible_en_web, destacado, orden, created_at, updated_at
             ) VALUES ($1, $2, $3, $4, 'Asesor Inmobiliario', $5, true, true, false, 0, NOW(), NOW())`,
-            [uuidv4(), tenantId, userId, slug, user?.telefono || null]
+            [newPerfilId, tenantId, userId, slug, user?.telefono || null]
           );
           console.log(`✅ Perfil de asesor creado automáticamente para usuario ${userId} en tenant ${tenantId}`);
+
+          // Si el tenant no tiene asesor default, asignar este como default
+          const tenantAsesorDefault = await client.query(
+            `SELECT asesor_default_id FROM tenants WHERE id = $1`,
+            [tenantId]
+          );
+          if (!tenantAsesorDefault.rows[0]?.asesor_default_id) {
+            await client.query(
+              `UPDATE tenants SET asesor_default_id = $1, updated_at = NOW() WHERE id = $2`,
+              [newPerfilId, tenantId]
+            );
+            console.log(`✅ Asesor ${newPerfilId} asignado como default para tenant ${tenantId}`);
+          }
         } else {
           // Reactivar perfil si estaba inactivo
           await client.query(

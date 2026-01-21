@@ -20,18 +20,23 @@ import { usePageHeader } from '../../layouts/CrmLayout';
 import {
   getInfoNegocio,
   patchInfoNegocio,
-  type InfoNegocio
+  getAsesorDefault,
+  getAsesoresDisponibles,
+  updateAsesorDefault,
+  type InfoNegocio,
+  type AsesorDefault,
+  type AsesorDisponible
 } from '../../services/api';
 import SingleImageUploader from '../../components/SingleImageUploader';
 import TranslatableInput, { type Traducciones } from '../../components/TranslatableInput';
 import {
   Save, Loader2,
-  Image, Building2, Phone, MapPin, Clock, Share2, FileText, User,
-  Facebook, Instagram, Twitter, Linkedin, Youtube
+  Image, Building2, Phone, MapPin, Clock, Share2, FileText, User, UserCheck,
+  Facebook, Instagram, Twitter, Linkedin, Youtube, Check
 } from 'lucide-react';
 
 // Tabs disponibles
-type TabId = 'identidad' | 'general' | 'contacto' | 'ubicacion' | 'horarios' | 'redes' | 'legal' | 'ceo';
+type TabId = 'identidad' | 'general' | 'contacto' | 'ubicacion' | 'horarios' | 'redes' | 'legal' | 'ceo' | 'asesor-default';
 
 interface Tab {
   id: TabId;
@@ -48,6 +53,7 @@ const TABS: Tab[] = [
   { id: 'redes', label: 'Redes Sociales', icon: <Share2 size={18} /> },
   { id: 'legal', label: 'Información Legal', icon: <FileText size={18} /> },
   { id: 'ceo', label: 'CEO / Director', icon: <User size={18} /> },
+  { id: 'asesor-default', label: 'Asesor por Defecto', icon: <UserCheck size={18} /> },
 ];
 
 // Extensión del tipo InfoNegocio para incluir traducciones
@@ -78,6 +84,12 @@ export default function CrmInfoNegocio() {
   // Estado de la información del negocio
   const [infoNegocio, setInfoNegocio] = useState<InfoNegocioExtendida | null>(null);
 
+  // Estado del asesor default
+  const [asesorDefault, setAsesorDefault] = useState<AsesorDefault | null>(null);
+  const [asesoresDisponibles, setAsesoresDisponibles] = useState<AsesorDisponible[]>([]);
+  const [loadingAsesor, setLoadingAsesor] = useState(false);
+  const [savingAsesor, setSavingAsesor] = useState(false);
+
   // Cargar datos
   useEffect(() => {
     const cargarDatos = async () => {
@@ -88,8 +100,14 @@ export default function CrmInfoNegocio() {
 
       try {
         const token = await getToken();
-        const info = await getInfoNegocio(tenantActual.id, token);
+        const [info, asesor, asesores] = await Promise.all([
+          getInfoNegocio(tenantActual.id, token),
+          getAsesorDefault(tenantActual.id, token),
+          getAsesoresDisponibles(tenantActual.id, token)
+        ]);
         setInfoNegocio(info as InfoNegocioExtendida);
+        setAsesorDefault(asesor);
+        setAsesoresDisponibles(asesores);
       } catch (err: any) {
         console.error('Error al cargar info del negocio:', err);
         // Establecer valores por defecto
@@ -200,6 +218,27 @@ export default function CrmInfoNegocio() {
       setSaving(false);
     }
   }, [tenantActual?.id, infoNegocio, getToken]);
+
+  // Cambiar asesor default
+  const cambiarAsesorDefault = useCallback(async (asesorId: string) => {
+    if (!tenantActual?.id) return;
+
+    setSavingAsesor(true);
+    setError(null);
+
+    try {
+      const token = await getToken();
+      const nuevoAsesor = await updateAsesorDefault(tenantActual.id, asesorId, token);
+      setAsesorDefault(nuevoAsesor);
+      setSuccess(true);
+      setTimeout(() => setSuccess(false), 3000);
+    } catch (err: any) {
+      console.error('Error al cambiar asesor default:', err);
+      setError(err.message || 'Error al cambiar el asesor por defecto');
+    } finally {
+      setSavingAsesor(false);
+    }
+  }, [tenantActual?.id, getToken]);
 
   // Configurar header con acciones
   useEffect(() => {
@@ -828,6 +867,102 @@ export default function CrmInfoNegocio() {
           </div>
         );
 
+      case 'asesor-default':
+        return (
+          <div className="tab-content">
+            <div className="section-intro">
+              <h3>Asesor por Defecto</h3>
+              <p>
+                Selecciona el asesor que se mostrará en las propiedades cuando el asesor original
+                no esté disponible (usuario inactivo o eliminado). Este asesor actúa como respaldo
+                para mantener siempre información de contacto visible.
+              </p>
+            </div>
+
+            {asesoresDisponibles.length === 0 ? (
+              <div className="empty-state">
+                <UserCheck size={48} strokeWidth={1.5} />
+                <h4>No hay asesores disponibles</h4>
+                <p>Crea al menos un usuario con rol de asesor y perfil activo para poder seleccionarlo como asesor por defecto.</p>
+              </div>
+            ) : (
+              <div className="asesor-default-section">
+                {/* Asesor actual */}
+                {asesorDefault && (
+                  <div className="current-asesor">
+                    <label>Asesor actual:</label>
+                    <div className="asesor-card selected">
+                      <div className="asesor-avatar">
+                        {asesorDefault.foto_url ? (
+                          <img src={asesorDefault.foto_url} alt={asesorDefault.nombre_completo} />
+                        ) : (
+                          <div className="avatar-placeholder">
+                            {asesorDefault.nombre?.charAt(0)}{asesorDefault.apellido?.charAt(0)}
+                          </div>
+                        )}
+                      </div>
+                      <div className="asesor-info">
+                        <span className="asesor-name">{asesorDefault.nombre_completo}</span>
+                        <span className="asesor-title">{asesorDefault.titulo_profesional || 'Asesor Inmobiliario'}</span>
+                        <span className="asesor-email">{asesorDefault.email}</span>
+                      </div>
+                      <div className="asesor-badge">
+                        <Check size={16} />
+                        <span>Actual</span>
+                      </div>
+                    </div>
+                  </div>
+                )}
+
+                {/* Lista de asesores para seleccionar */}
+                <div className="asesores-list">
+                  <label>Selecciona un asesor:</label>
+                  <div className="asesores-grid">
+                    {asesoresDisponibles.map((asesor) => {
+                      const isSelected = asesorDefault?.id === asesor.id;
+                      return (
+                        <button
+                          key={asesor.id}
+                          className={`asesor-card ${isSelected ? 'selected' : ''}`}
+                          onClick={() => !isSelected && cambiarAsesorDefault(asesor.id)}
+                          disabled={savingAsesor || isSelected}
+                        >
+                          <div className="asesor-avatar">
+                            {asesor.foto_url ? (
+                              <img src={asesor.foto_url} alt={asesor.nombre_completo} />
+                            ) : (
+                              <div className="avatar-placeholder">
+                                {asesor.nombre?.charAt(0)}{asesor.apellido?.charAt(0)}
+                              </div>
+                            )}
+                          </div>
+                          <div className="asesor-info">
+                            <span className="asesor-name">{asesor.nombre_completo}</span>
+                            <span className="asesor-title">{asesor.titulo_profesional || 'Asesor Inmobiliario'}</span>
+                            <span className="asesor-email">{asesor.email}</span>
+                          </div>
+                          {isSelected && (
+                            <div className="asesor-badge">
+                              <Check size={16} />
+                            </div>
+                          )}
+                        </button>
+                      );
+                    })}
+                  </div>
+                </div>
+
+                {savingAsesor && (
+                  <div className="saving-indicator">
+                    <Loader2 className="spin" size={18} />
+                    <span>Guardando cambio...</span>
+                  </div>
+                )}
+              </div>
+            )}
+          </div>
+        );
+
       default:
         return null;
     }
@@ -1171,6 +1306,157 @@ export default function CrmInfoNegocio() {
 
         .ceo-info {
           flex: 1;
+        }
+
+        /* Asesor Default Section */
+        .asesor-default-section {
+          display: flex;
+          flex-direction: column;
+          gap: 32px;
+        }
+
+        .current-asesor label,
+        .asesores-list label {
+          display: block;
+          font-size: 0.875rem;
+          font-weight: 600;
+          color: #374151;
+          margin-bottom: 12px;
+        }
+
+        .asesores-grid {
+          display: grid;
+          grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+          gap: 16px;
+        }
+
+        .asesor-card {
+          display: flex;
+          align-items: center;
+          gap: 16px;
+          padding: 16px;
+          background: #f8fafc;
+          border: 2px solid #e2e8f0;
+          border-radius: 12px;
+          cursor: pointer;
+          transition: all 0.2s;
+          text-align: left;
+          width: 100%;
+        }
+
+        .asesor-card:hover:not(:disabled) {
+          border-color: #2563eb;
+          background: #f0f7ff;
+        }
+
+        .asesor-card.selected {
+          border-color: #2563eb;
+          background: #eff6ff;
+        }
+
+        .asesor-card:disabled {
+          cursor: default;
+        }
+
+        .asesor-avatar {
+          width: 56px;
+          height: 56px;
+          border-radius: 50%;
+          overflow: hidden;
+          flex-shrink: 0;
+        }
+
+        .asesor-avatar img {
+          width: 100%;
+          height: 100%;
+          object-fit: cover;
+        }
+
+        .avatar-placeholder {
+          width: 100%;
+          height: 100%;
+          background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+          color: white;
+          display: flex;
+          align-items: center;
+          justify-content: center;
+          font-size: 1.1rem;
+          font-weight: 600;
+          text-transform: uppercase;
+        }
+
+        .asesor-info {
+          flex: 1;
+          display: flex;
+          flex-direction: column;
+          gap: 2px;
+          min-width: 0;
+        }
+
+        .asesor-name {
+          font-size: 0.95rem;
+          font-weight: 600;
+          color: #0f172a;
+        }
+
+        .asesor-title {
+          font-size: 0.8rem;
+          color: #64748b;
+        }
+
+        .asesor-email {
+          font-size: 0.75rem;
+          color: #94a3b8;
+          overflow: hidden;
+          text-overflow: ellipsis;
+          white-space: nowrap;
+        }
+
+        .asesor-badge {
+          display: flex;
+          align-items: center;
+          gap: 4px;
+          padding: 4px 10px;
+          background: #2563eb;
+          color: white;
+          border-radius: 20px;
+          font-size: 0.75rem;
+          font-weight: 500;
+        }
+
+        .empty-state {
+          display: flex;
+          flex-direction: column;
+          align-items: center;
+          justify-content: center;
+          padding: 60px 20px;
+          background: #f8fafc;
+          border-radius: 12px;
+          text-align: center;
+          color: #64748b;
+        }
+
+        .empty-state h4 {
+          margin: 16px 0 8px 0;
+          color: #0f172a;
+          font-size: 1.1rem;
+        }
+
+        .empty-state p {
+          margin: 0;
+          max-width: 400px;
+          line-height: 1.5;
+        }
+
+        .saving-indicator {
+          display: flex;
+          align-items: center;
+          gap: 8px;
+          padding: 12px 16px;
+          background: #fef3c7;
+          border-radius: 8px;
+          color: #92400e;
+          font-size: 0.875rem;
         }
 
         /* Responsive */
