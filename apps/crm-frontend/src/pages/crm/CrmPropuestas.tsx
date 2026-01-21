@@ -2,7 +2,7 @@
  * CrmPropuestas - Gestión de propuestas comerciales
  *
  * Módulo para crear y gestionar propuestas a clientes con:
- * - Vista de grid de tarjetas (similar a propiedades)
+ * - Vista de grid de tarjetas y lista (toggle)
  * - Stats por estado en header
  * - Cards de conteo por estado
  * - Iconos Lucide React
@@ -39,6 +39,8 @@ import {
   Pencil,
   User,
   Calendar,
+  LayoutGrid,
+  List,
 } from 'lucide-react';
 
 // Estados de propuesta con iconos
@@ -67,6 +69,7 @@ export default function CrmPropuestas() {
   const [deleteConfirm, setDeleteConfirm] = useState<string | null>(null);
   const [copiedUrl, setCopiedUrl] = useState<string | null>(null);
   const [dominioPersonalizado, setDominioPersonalizado] = useState<string | null>(null);
+  const [vista, setVista] = useState<'grid' | 'list'>('grid');
 
   // Stats calculados
   const countByStatus = Object.keys(ESTADOS).reduce((acc, status) => {
@@ -205,26 +208,44 @@ export default function CrmPropuestas() {
     });
   };
 
-  // Nombre del contacto
+  // Formatear fecha completa
+  const formatDateFull = (dateString: string | null) => {
+    if (!dateString) return '-';
+    return new Date(dateString).toLocaleDateString('es-MX', {
+      day: '2-digit',
+      month: 'short',
+      year: 'numeric',
+    });
+  };
+
+  // Nombre del contacto - verificar también el objeto contacto anidado
   const getContactoNombre = (p: Propuesta) => {
-    return [p.contacto_nombre, p.contacto_apellido].filter(Boolean).join(' ') || 'Sin contacto';
+    // Primero verificar si hay objeto contacto anidado
+    if (p.contacto?.nombre || p.contacto?.apellido) {
+      return [p.contacto.nombre, p.contacto.apellido].filter(Boolean).join(' ');
+    }
+    // Luego verificar campos planos
+    if (p.contacto_nombre || p.contacto_apellido) {
+      return [p.contacto_nombre, p.contacto_apellido].filter(Boolean).join(' ');
+    }
+    return null;
   };
 
   // Iniciales del contacto
   const getContactoIniciales = (p: Propuesta) => {
-    const nombre = p.contacto_nombre?.[0]?.toUpperCase() || '';
-    const apellido = p.contacto_apellido?.[0]?.toUpperCase() || '';
-    return nombre + apellido || '?';
+    const nombre = p.contacto?.nombre?.[0] || p.contacto_nombre?.[0] || '';
+    const apellido = p.contacto?.apellido?.[0] || p.contacto_apellido?.[0] || '';
+    return (nombre + apellido).toUpperCase() || '?';
   };
 
   // Propuestas filtradas
   const propuestasFiltradas = propuestas.filter(p => {
     if (!busqueda) return true;
     const search = busqueda.toLowerCase();
+    const contactoNombre = getContactoNombre(p) || '';
     return (
       p.titulo.toLowerCase().includes(search) ||
-      p.contacto_nombre?.toLowerCase().includes(search) ||
-      p.contacto_apellido?.toLowerCase().includes(search) ||
+      contactoNombre.toLowerCase().includes(search) ||
       p.solicitud_titulo?.toLowerCase().includes(search)
     );
   });
@@ -265,6 +286,24 @@ export default function CrmPropuestas() {
             <option key={key} value={key}>{val.label}</option>
           ))}
         </select>
+
+        {/* Toggle vista */}
+        <div className="view-toggle">
+          <button
+            className={`toggle-btn ${vista === 'grid' ? 'active' : ''}`}
+            onClick={() => setVista('grid')}
+            title="Vista de tarjetas"
+          >
+            <LayoutGrid size={16} />
+          </button>
+          <button
+            className={`toggle-btn ${vista === 'list' ? 'active' : ''}`}
+            onClick={() => setVista('list')}
+            title="Vista de lista"
+          >
+            <List size={16} />
+          </button>
+        </div>
       </div>
 
       {/* Error banner */}
@@ -300,7 +339,7 @@ export default function CrmPropuestas() {
         })}
       </div>
 
-      {/* Grid de propuestas */}
+      {/* Contenido según vista */}
       {propuestasFiltradas.length === 0 ? (
         <div className="empty-state">
           <FileText size={48} />
@@ -317,13 +356,15 @@ export default function CrmPropuestas() {
             </button>
           )}
         </div>
-      ) : (
+      ) : vista === 'grid' ? (
+        /* Vista Grid */
         <div className="propuestas-grid">
           {propuestasFiltradas.map((propuesta) => {
             const estado = ESTADOS[propuesta.estado] || ESTADOS.borrador;
             const StatusIcon = estado.icon;
             const propiedadesCount = propuesta.propiedades_count ?? propuesta.propiedades?.length ?? 0;
             const precio = formatMoney(propuesta.precio_propuesto, propuesta.moneda);
+            const contactoNombre = getContactoNombre(propuesta);
 
             return (
               <div
@@ -356,10 +397,12 @@ export default function CrmPropuestas() {
 
                 {/* Cliente */}
                 <div className="card-cliente">
-                  <div className="cliente-avatar">
+                  <div className={`cliente-avatar ${!contactoNombre ? 'no-contact' : ''}`}>
                     {getContactoIniciales(propuesta)}
                   </div>
-                  <span className="cliente-nombre">{getContactoNombre(propuesta)}</span>
+                  <span className={`cliente-nombre ${!contactoNombre ? 'no-contact' : ''}`}>
+                    {contactoNombre || 'Sin contacto'}
+                  </span>
                 </div>
 
                 {/* Info row: propiedades y fecha */}
@@ -420,6 +463,127 @@ export default function CrmPropuestas() {
             );
           })}
         </div>
+      ) : (
+        /* Vista Lista */
+        <div className="table-container">
+          <table className="propuestas-table">
+            <thead>
+              <tr>
+                <th>Propuesta</th>
+                <th>Cliente</th>
+                <th>Propiedades</th>
+                <th>Vistas</th>
+                <th>Estado</th>
+                <th>Creada</th>
+                <th>Acciones</th>
+              </tr>
+            </thead>
+            <tbody>
+              {propuestasFiltradas.map((propuesta) => {
+                const estado = ESTADOS[propuesta.estado] || ESTADOS.borrador;
+                const StatusIcon = estado.icon;
+                const propiedadesCount = propuesta.propiedades_count ?? propuesta.propiedades?.length ?? 0;
+                const contactoNombre = getContactoNombre(propuesta);
+
+                return (
+                  <tr key={propuesta.id} onClick={() => navigate(`/crm/${tenantSlug}/propuestas/${propuesta.id}`)}>
+                    <td>
+                      <div className="propuesta-info">
+                        <span className="propuesta-titulo">{propuesta.titulo}</span>
+                        {propuesta.precio_propuesto && (
+                          <span className="propuesta-monto">
+                            {formatMoney(propuesta.precio_propuesto, propuesta.moneda)}
+                          </span>
+                        )}
+                      </div>
+                    </td>
+                    <td>
+                      <div className="cliente-info">
+                        <div className={`cliente-avatar ${!contactoNombre ? 'no-contact' : ''}`}>
+                          {getContactoIniciales(propuesta)}
+                        </div>
+                        <span className={`cliente-nombre ${!contactoNombre ? 'no-contact' : ''}`}>
+                          {contactoNombre || 'Sin contacto'}
+                        </span>
+                      </div>
+                    </td>
+                    <td>
+                      {propiedadesCount > 0 ? (
+                        <span className="badge badge-blue">
+                          <Building2 size={11} />
+                          {propiedadesCount}
+                        </span>
+                      ) : (
+                        <span className="text-muted">-</span>
+                      )}
+                    </td>
+                    <td>
+                      <span className="badge badge-purple">
+                        <Eye size={11} />
+                        {propuesta.veces_vista || 0}
+                      </span>
+                    </td>
+                    <td>
+                      <span
+                        className="estado-badge"
+                        style={{ backgroundColor: estado.bgColor, color: estado.color }}
+                      >
+                        <StatusIcon size={10} />
+                        {estado.label}
+                      </span>
+                    </td>
+                    <td>
+                      <span className="fecha-text">{formatDateFull(propuesta.created_at)}</span>
+                    </td>
+                    <td>
+                      <div className="actions-cell" onClick={(e) => e.stopPropagation()}>
+                        <button
+                          className="action-btn"
+                          onClick={() => navigate(`/crm/${tenantSlug}/propuestas/${propuesta.id}`)}
+                          title="Editar"
+                        >
+                          <Pencil size={12} />
+                        </button>
+                        {propuesta.url_publica && (
+                          <>
+                            <button
+                              className="action-btn"
+                              onClick={(e) => handleCopyUrl(propuesta.url_publica!, propuesta.id, e)}
+                              title="Copiar enlace"
+                            >
+                              {copiedUrl === propuesta.id ? (
+                                <CheckCircle size={12} className="text-green" />
+                              ) : (
+                                <Copy size={12} />
+                              )}
+                            </button>
+                            <a
+                              href={getUrlPublicaCompleta(propuesta.url_publica!)}
+                              target="_blank"
+                              rel="noopener noreferrer"
+                              className="action-btn"
+                              title="Ver propuesta pública"
+                              onClick={(e) => e.stopPropagation()}
+                            >
+                              <ExternalLink size={12} />
+                            </a>
+                          </>
+                        )}
+                        <button
+                          className="action-btn danger"
+                          onClick={(e) => { e.stopPropagation(); setDeleteConfirm(propuesta.id); }}
+                          title="Eliminar"
+                        >
+                          <Trash2 size={12} />
+                        </button>
+                      </div>
+                    </td>
+                  </tr>
+                );
+              })}
+            </tbody>
+          </table>
+        </div>
       )}
 
       {/* Modal de confirmación de eliminación */}
@@ -474,6 +638,7 @@ const styles = `
     gap: 12px;
     margin-bottom: 16px;
     flex-wrap: wrap;
+    align-items: center;
   }
 
   .search-box {
@@ -514,6 +679,41 @@ const styles = `
     background: white;
     cursor: pointer;
     min-width: 160px;
+  }
+
+  /* View Toggle */
+  .view-toggle {
+    display: flex;
+    border: 1px solid #e2e8f0;
+    border-radius: 8px;
+    overflow: hidden;
+  }
+
+  .toggle-btn {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 38px;
+    height: 38px;
+    border: none;
+    background: white;
+    color: #64748b;
+    cursor: pointer;
+    transition: all 0.15s;
+  }
+
+  .toggle-btn:first-child {
+    border-right: 1px solid #e2e8f0;
+  }
+
+  .toggle-btn:hover {
+    background: #f8fafc;
+    color: #0f172a;
+  }
+
+  .toggle-btn.active {
+    background: #2563eb;
+    color: white;
   }
 
   /* Error Banner */
@@ -702,12 +902,22 @@ const styles = `
     flex-shrink: 0;
   }
 
+  .cliente-avatar.no-contact {
+    background: #e2e8f0;
+    color: #94a3b8;
+  }
+
   .cliente-nombre {
     font-size: 0.8rem;
     color: #374151;
     overflow: hidden;
     text-overflow: ellipsis;
     white-space: nowrap;
+  }
+
+  .cliente-nombre.no-contact {
+    color: #94a3b8;
+    font-style: italic;
   }
 
   .card-info-row {
@@ -757,6 +967,106 @@ const styles = `
 
   .text-green {
     color: #16a34a;
+  }
+
+  /* Table View */
+  .table-container {
+    background: white;
+    border-radius: 10px;
+    border: 1px solid #e2e8f0;
+    overflow: hidden;
+  }
+
+  .propuestas-table {
+    width: 100%;
+    border-collapse: collapse;
+  }
+
+  .propuestas-table th {
+    text-align: left;
+    padding: 10px 14px;
+    font-size: 0.7rem;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+    color: #64748b;
+    background: #f8fafc;
+    border-bottom: 1px solid #e2e8f0;
+  }
+
+  .propuestas-table td {
+    padding: 10px 14px;
+    border-bottom: 1px solid #f1f5f9;
+    vertical-align: middle;
+  }
+
+  .propuestas-table tr {
+    cursor: pointer;
+    transition: background 0.15s;
+  }
+
+  .propuestas-table tbody tr:hover {
+    background: #f8fafc;
+  }
+
+  .propuesta-info {
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+  }
+
+  .propuesta-titulo {
+    font-weight: 500;
+    color: #0f172a;
+    font-size: 0.85rem;
+  }
+
+  .propuesta-monto {
+    font-size: 0.75rem;
+    color: #059669;
+    font-weight: 600;
+  }
+
+  .cliente-info {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+  }
+
+  .badge {
+    display: inline-flex;
+    align-items: center;
+    gap: 3px;
+    padding: 3px 8px;
+    border-radius: 5px;
+    font-size: 0.7rem;
+    font-weight: 600;
+  }
+
+  .badge-blue {
+    background: #dbeafe;
+    color: #1d4ed8;
+  }
+
+  .badge-purple {
+    background: #f3e8ff;
+    color: #7c3aed;
+  }
+
+  .text-muted {
+    color: #94a3b8;
+    font-size: 0.8rem;
+  }
+
+  .fecha-text {
+    font-size: 0.8rem;
+    color: #64748b;
+    white-space: nowrap;
+  }
+
+  .actions-cell {
+    display: flex;
+    gap: 4px;
   }
 
   /* Empty state */
@@ -916,6 +1226,14 @@ const styles = `
 
     .propuestas-grid {
       grid-template-columns: 1fr;
+    }
+
+    .table-container {
+      overflow-x: auto;
+    }
+
+    .propuestas-table {
+      min-width: 700px;
     }
   }
 `;
