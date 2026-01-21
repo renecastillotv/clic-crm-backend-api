@@ -193,7 +193,7 @@ export async function getAsesoresList(params: AsesoresListParams): Promise<Aseso
 
     // Filtros
     if (filters?.activo !== false) {
-      sql += ' AND pa.activo = true AND pa.visible_en_web = true';
+      sql += ' AND pa.activo = true AND pa.visible_en_web = true AND u.activo = true';
     }
 
     if (filters?.destacado !== undefined) {
@@ -258,7 +258,7 @@ export async function getAsesorSingle(params: AsesorSingleParams): Promise<Aseso
         WHERE tenant_id = $2 AND activo = true
         GROUP BY COALESCE(perfil_asesor_id, agente_id)
       ) prop_count ON prop_count.asesor_ref = pa.id OR prop_count.asesor_ref = u.id
-      WHERE pa.tenant_id = $2 AND ${searchField}::text = $1 AND pa.activo = true
+      WHERE pa.tenant_id = $2 AND ${searchField}::text = $1 AND pa.activo = true AND u.activo = true
       LIMIT 1
     `;
 
