@@ -659,45 +659,34 @@ export default function CrmPropuestaEditar() {
           </label>
         </div>
 
-        {/* Botón Vista Previa - Abre en web pública con ?preview=true si ya está guardada */}
-        <button
-          className="btn-preview"
-          onClick={propuesta?.url_publica ? handleOpenPreview : () => setShowPreview(true)}
-          disabled={!form.titulo.trim()}
-          title={propuesta?.url_publica ? 'Ver en web pública (modo preview)' : 'Vista previa interna'}
-        >
-          {propuesta?.url_publica ? <ExternalLink className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
-          Vista Previa
-        </button>
-
-        {/* URL pública (solo si existe) */}
-        {propuesta?.url_publica && getUrlPublicaCompleta() && (
-          <div className="url-inline">
-            <Link2 className="w-4 h-4" />
-            <span className="url-text" title={getUrlPublicaCompleta() || ''}>
-              {dominioPersonalizado
-                ? `${dominioPersonalizado}/propuestas/${propuesta.url_publica.substring(0, 8)}...`
-                : `/tenant/${tenantSlug}/propuestas/${propuesta.url_publica.substring(0, 8)}...`}
-            </span>
-            <button className="btn-icon-sm" onClick={handleCopyUrl} title="Copiar enlace">
-              {copiedUrl ? <CheckCircle className="w-4 h-4 text-green-500" /> : <Copy className="w-4 h-4" />}
-            </button>
-            <a
-              href={getUrlPublicaCompleta() || '#'}
-              target="_blank"
-              rel="noopener noreferrer"
-              className="btn-icon-sm"
-              title="Ver propuesta publicada"
-            >
-              <Eye className="w-4 h-4" />
-            </a>
-            {propuesta.veces_vista !== undefined && propuesta.veces_vista > 0 && (
-              <span className="views-badge">
-                <Eye className="w-3 h-3" /> {propuesta.veces_vista}
-              </span>
-            )}
-          </div>
-        )}
+        {/* Botón Vista Previa + Copiar enlace */}
+        <div className="preview-actions">
+          <button
+            className="btn-preview"
+            onClick={propuesta?.url_publica ? handleOpenPreview : () => setShowPreview(true)}
+            disabled={!form.titulo.trim()}
+            title={propuesta?.url_publica ? 'Ver en web pública (modo preview)' : 'Vista previa interna'}
+          >
+            {propuesta?.url_publica ? <ExternalLink className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+            Vista Previa
+          </button>
+          {propuesta?.url_publica && getUrlPublicaCompleta() && (
+            <>
+              <button
+                className="btn-copy-link"
+                onClick={handleCopyUrl}
+                title={copiedUrl ? 'Enlace copiado' : 'Copiar enlace público'}
+              >
+                {copiedUrl ? <CheckCircle className="w-4 h-4" /> : <Copy className="w-4 h-4" />}
+              </button>
+              {propuesta.veces_vista !== undefined && propuesta.veces_vista > 0 && (
+                <span className="views-badge-mini" title={`${propuesta.veces_vista} visitas`}>
+                  <Eye className="w-3 h-3" /> {propuesta.veces_vista}
+                </span>
+              )}
+            </>
+          )}
+        </div>
       </div>
 
       {/* Tab Content: Información */}
@@ -891,20 +880,9 @@ export default function CrmPropuestaEditar() {
 
       {/* Tab Content: Propiedades */}
       {activeTab === 'propiedades' && (
-        <div className="tab-content propiedades-tab">
-          <div className="propiedades-layout-full">
-            {/* Panel único: Grid de propiedades disponibles */}
-            <div className="catalog-panel-full">
-              <div className="panel-header">
-                <h3>
-                  <Building2 className="w-4 h-4" />
-                  Catálogo de Propiedades
-                </h3>
-                <span className="count-badge">{totalProps} encontradas</span>
-              </div>
-
-              {/* Filtros completos como en CrmPropiedades */}
-              <div className="props-filters">
+        <div className="tab-content propiedades-tab-full">
+          {/* Filtros integrados directamente */}
+          <div className="props-filters-inline">
                 <div className="search-box">
                   <Search className="search-icon w-4 h-4" />
                   <input
@@ -956,21 +934,21 @@ export default function CrmPropuestaEditar() {
                     <option key={key} value={key}>{val.label}</option>
                   ))}
                 </select>
-              </div>
+          </div>
 
-              {/* Grid */}
-              <div className="props-scroll-area">
-                {loadingProps ? (
-                  <div className="loading-small">
-                    <Loader2 className="w-6 h-6 animate-spin" />
-                  </div>
-                ) : propiedades.length === 0 ? (
-                  <div className="empty-catalog">
-                    <Building2 className="w-12 h-12 text-gray-300" />
-                    <p>No se encontraron propiedades con los filtros aplicados</p>
-                  </div>
-                ) : (
-                  <div className="props-grid">
+          {/* Grid con scroll */}
+          <div className="props-scroll-full">
+            {loadingProps ? (
+              <div className="loading-small">
+                <Loader2 className="w-6 h-6 animate-spin" />
+              </div>
+            ) : propiedades.length === 0 ? (
+              <div className="empty-catalog">
+                <Building2 className="w-12 h-12 text-gray-300" />
+                <p>No se encontraron propiedades con los filtros aplicados</p>
+              </div>
+            ) : (
+              <div className="props-grid">
                     {/* Ordenar: 1) Seleccionadas, 2) Destacadas, 3) Resto */}
                     {[...propiedades].sort((a, b) => {
                       const aSelected = selectedPropiedades.includes(a.id) ? 1 : 0;
@@ -1084,31 +1062,29 @@ export default function CrmPropuestaEditar() {
                           </div>
                         </div>
                       );
-                    })}
-                  </div>
-                )}
-
-                {/* Paginación */}
-                {totalProps > 12 && (
-                  <div className="pagination">
-                    <button
-                      disabled={pageProps === 1}
-                      onClick={() => setPageProps(p => Math.max(1, p - 1))}
-                    >
-                      Anterior
-                    </button>
-                    <span>Página {pageProps} de {Math.ceil(totalProps / 12)}</span>
-                    <button
-                      disabled={pageProps * 12 >= totalProps}
-                      onClick={() => setPageProps(p => p + 1)}
-                    >
-                      Siguiente
-                    </button>
-                  </div>
-                )}
+                })}
               </div>
-            </div>
+            )}
           </div>
+
+          {/* Paginación */}
+          {totalProps > 12 && (
+            <div className="pagination-inline">
+              <button
+                disabled={pageProps === 1}
+                onClick={() => setPageProps(p => Math.max(1, p - 1))}
+              >
+                Anterior
+              </button>
+              <span>Página {pageProps} de {Math.ceil(totalProps / 12)}</span>
+              <button
+                disabled={pageProps * 12 >= totalProps}
+                onClick={() => setPageProps(p => p + 1)}
+              >
+                Siguiente
+              </button>
+            </div>
+          )}
         </div>
       )}
 
@@ -2259,53 +2235,45 @@ const styles = `
     transition: all 0.2s ease;
   }
 
-  .url-inline {
+  /* Preview actions - botón vista previa + copiar + vistas */
+  .preview-actions {
     display: flex;
     align-items: center;
-    gap: 8px;
-    padding: 8px 14px;
-    background: #f0f9ff;
-    border: 1px solid #bae6fd;
-    border-radius: 8px;
-    font-size: 0.85rem;
+    gap: 6px;
   }
 
-  .url-inline .url-text {
-    color: #2563eb;
-    max-width: 300px;
-    overflow: hidden;
-    text-overflow: ellipsis;
-    white-space: nowrap;
-  }
-
-  .btn-icon-sm {
+  .btn-copy-link {
     display: flex;
     align-items: center;
     justify-content: center;
-    width: 28px;
-    height: 28px;
-    border: none;
-    background: transparent;
+    width: 36px;
+    height: 36px;
+    border: 1px solid #e2e8f0;
+    background: white;
     color: #64748b;
     cursor: pointer;
-    border-radius: 6px;
+    border-radius: 8px;
     transition: all 0.15s;
-    text-decoration: none;
   }
 
-  .btn-icon-sm:hover {
-    background: rgba(0, 0, 0, 0.05);
-    color: #0f172a;
+  .btn-copy-link:hover {
+    background: #f8fafc;
+    border-color: #cbd5e1;
+    color: #2563eb;
   }
 
-  .views-badge {
+  .btn-copy-link svg.text-green-500 {
+    color: #22c55e;
+  }
+
+  .views-badge-mini {
     display: flex;
     align-items: center;
     gap: 4px;
-    padding: 4px 8px;
-    background: #dbeafe;
-    color: #2563eb;
-    border-radius: 4px;
+    padding: 6px 10px;
+    background: #f1f5f9;
+    color: #64748b;
+    border-radius: 6px;
     font-size: 0.75rem;
     font-weight: 500;
   }
@@ -2477,49 +2445,63 @@ const styles = `
     padding: 4px;
   }
 
-  /* Propiedades Tab Layout - Full Width */
-  .propiedades-layout-full {
+  /* Propiedades Tab - Full Width Layout */
+  .propiedades-tab-full {
     display: flex;
     flex-direction: column;
-    height: calc(100vh - 240px);
-    min-height: 600px;
+    height: calc(100vh - 200px);
+    min-height: 500px;
   }
 
-  .catalog-panel-full {
-    background: white;
-    border-radius: 12px;
-    border: 1px solid #e2e8f0;
+  .props-filters-inline {
     display: flex;
-    flex-direction: column;
-    flex: 1;
-    overflow: hidden;
-  }
-
-  .panel-header {
-    display: flex;
-    align-items: center;
-    justify-content: space-between;
-    padding: 16px 20px;
-    background: #f8fafc;
+    flex-wrap: wrap;
+    gap: 12px;
+    padding: 12px 0;
+    margin-bottom: 12px;
     border-bottom: 1px solid #e2e8f0;
   }
 
-  .panel-header h3 {
-    margin: 0;
-    font-size: 0.95rem;
-    font-weight: 600;
-    color: #0f172a;
-    display: flex;
-    align-items: center;
-    gap: 8px;
+  .props-scroll-full {
+    flex: 1;
+    overflow-y: auto;
+    padding: 4px;
   }
 
-  .count-badge {
-    font-size: 0.8rem;
+  .pagination-inline {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 16px;
+    padding: 16px 0 8px;
+    border-top: 1px solid #e2e8f0;
+    margin-top: 12px;
+  }
+
+  .pagination-inline button {
+    padding: 8px 16px;
+    border: 1px solid #e2e8f0;
+    background: white;
+    color: #475569;
+    border-radius: 6px;
+    font-size: 0.875rem;
+    cursor: pointer;
+    transition: all 0.15s;
+  }
+
+  .pagination-inline button:hover:not(:disabled) {
+    background: #f8fafc;
+    border-color: #cbd5e1;
+  }
+
+  .pagination-inline button:disabled {
+    opacity: 0.5;
+    cursor: not-allowed;
+  }
+
+  .pagination-inline span {
     color: #64748b;
-    background: #e2e8f0;
-    padding: 4px 10px;
-    border-radius: 20px;
+    font-size: 0.875rem;
   }
 
   /* Selected Panel List */
@@ -2979,12 +2961,12 @@ const styles = `
   }
 
   @media (max-width: 900px) {
-    .propiedades-layout-full {
+    .propiedades-tab-full {
       height: auto;
-      min-height: 500px;
+      min-height: 400px;
     }
 
-    .props-filters {
+    .props-filters-inline {
       flex-direction: column;
     }
 
@@ -2997,10 +2979,6 @@ const styles = `
     .tabs-container {
       flex-direction: column;
       align-items: stretch;
-    }
-
-    .url-inline {
-      justify-content: center;
     }
 
     .form-row {
