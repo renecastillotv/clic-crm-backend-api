@@ -971,7 +971,18 @@ export default function CrmPropuestaEditar() {
                   </div>
                 ) : (
                   <div className="props-grid">
-                    {propiedades.map((prop) => {
+                    {/* Ordenar: 1) Seleccionadas, 2) Destacadas, 3) Resto */}
+                    {[...propiedades].sort((a, b) => {
+                      const aSelected = selectedPropiedades.includes(a.id) ? 1 : 0;
+                      const bSelected = selectedPropiedades.includes(b.id) ? 1 : 0;
+                      if (aSelected !== bSelected) return bSelected - aSelected;
+
+                      const aDestacada = a.destacada ? 1 : 0;
+                      const bDestacada = b.destacada ? 1 : 0;
+                      if (aDestacada !== bDestacada) return bDestacada - aDestacada;
+
+                      return 0;
+                    }).map((prop) => {
                       const isSelected = selectedPropiedades.includes(prop.id);
                       const estado = ESTADOS_PROPIEDAD[prop.estado_propiedad] || ESTADOS_PROPIEDAD.disponible;
 
