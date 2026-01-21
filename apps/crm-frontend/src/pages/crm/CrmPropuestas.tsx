@@ -2,7 +2,7 @@
  * CrmPropuestas - Gestión de propuestas comerciales
  *
  * Módulo para crear y gestionar propuestas a clientes con:
- * - Vista de tabla como CRM de referencia
+ * - Vista de grid de tarjetas (similar a propiedades)
  * - Stats por estado en header
  * - Cards de conteo por estado
  * - Iconos Lucide React
@@ -37,6 +37,8 @@ import {
   Loader2,
   TrendingUp,
   Pencil,
+  User,
+  Calendar,
 } from 'lucide-react';
 
 // Estados de propuesta con iconos
@@ -166,15 +168,14 @@ export default function CrmPropuestas() {
 
   // Generar URL pública completa usando el dominio personalizado si existe
   const getUrlPublicaCompleta = (token: string) => {
-    // Si tiene dominio personalizado, usar ese
     if (dominioPersonalizado) {
       return `https://${dominioPersonalizado}/propuestas/${token}`;
     }
-    // Fallback: usar subdominio
     return `https://${tenantSlug}.clic.casa/propuestas/${token}`;
   };
 
-  const handleCopyUrl = async (token: string, propuestaId: string) => {
+  const handleCopyUrl = async (token: string, propuestaId: string, e: React.MouseEvent) => {
+    e.stopPropagation();
     try {
       const urlCompleta = getUrlPublicaCompleta(token);
       await navigator.clipboard.writeText(urlCompleta);
@@ -187,7 +188,7 @@ export default function CrmPropuestas() {
 
   // Formatear moneda
   const formatMoney = (value: number | null, moneda: string = 'USD') => {
-    if (!value) return '-';
+    if (!value) return null;
     return new Intl.NumberFormat('es-MX', {
       style: 'currency',
       currency: moneda,
@@ -195,19 +196,25 @@ export default function CrmPropuestas() {
     }).format(value);
   };
 
-  // Formatear fecha
+  // Formatear fecha corta
   const formatDate = (dateString: string | null) => {
     if (!dateString) return '-';
     return new Date(dateString).toLocaleDateString('es-MX', {
       day: '2-digit',
       month: 'short',
-      year: 'numeric',
     });
   };
 
   // Nombre del contacto
   const getContactoNombre = (p: Propuesta) => {
     return [p.contacto_nombre, p.contacto_apellido].filter(Boolean).join(' ') || 'Sin contacto';
+  };
+
+  // Iniciales del contacto
+  const getContactoIniciales = (p: Propuesta) => {
+    const nombre = p.contacto_nombre?.[0]?.toUpperCase() || '';
+    const apellido = p.contacto_apellido?.[0]?.toUpperCase() || '';
+    return nombre + apellido || '?';
   };
 
   // Propuestas filtradas
@@ -239,7 +246,7 @@ export default function CrmPropuestas() {
       {/* Toolbar */}
       <div className="toolbar">
         <div className="search-box">
-          <Search className="search-icon w-4 h-4" />
+          <Search className="search-icon" size={16} />
           <input
             type="text"
             placeholder="Buscar propuestas..."
@@ -265,7 +272,7 @@ export default function CrmPropuestas() {
         <div className="error-banner">
           <span>{error}</span>
           <button onClick={() => setError(null)}>
-            <X className="w-4 h-4" />
+            <X size={16} />
           </button>
         </div>
       )}
@@ -282,7 +289,7 @@ export default function CrmPropuestas() {
               onClick={() => setEstadoFiltro(estadoFiltro === status ? '' : status)}
             >
               <div className="status-card-icon" style={{ backgroundColor: config.bgColor, color: config.color }}>
-                <Icon className="w-5 h-5" />
+                <Icon size={16} />
               </div>
               <div className="status-card-info">
                 <span className="status-card-count">{count}</span>
@@ -293,10 +300,10 @@ export default function CrmPropuestas() {
         })}
       </div>
 
-      {/* Tabla de propuestas */}
+      {/* Grid de propuestas */}
       {propuestasFiltradas.length === 0 ? (
         <div className="empty-state">
-          <FileText className="w-16 h-16 text-gray-300" />
+          <FileText size={48} />
           <h3>No hay propuestas</h3>
           <p>
             {busqueda || estadoFiltro
@@ -305,131 +312,113 @@ export default function CrmPropuestas() {
           </p>
           {!busqueda && !estadoFiltro && (
             <button className="btn-primary" onClick={() => navigate(`/crm/${tenantSlug}/propuestas/nueva`)}>
-              <Plus className="w-4 h-4" />
+              <Plus size={16} />
               Nueva Propuesta
             </button>
           )}
         </div>
       ) : (
-        <div className="table-container">
-          <table className="propuestas-table">
-            <thead>
-              <tr>
-                <th>Propuesta</th>
-                <th>Cliente</th>
-                <th>Solicitud</th>
-                <th>Propiedades</th>
-                <th>Vistas</th>
-                <th>Estado</th>
-                <th>Creada</th>
-                <th>Acciones</th>
-              </tr>
-            </thead>
-            <tbody>
-              {propuestasFiltradas.map((propuesta) => {
-                const estado = ESTADOS[propuesta.estado] || ESTADOS.borrador;
-                const StatusIcon = estado.icon;
+        <div className="propuestas-grid">
+          {propuestasFiltradas.map((propuesta) => {
+            const estado = ESTADOS[propuesta.estado] || ESTADOS.borrador;
+            const StatusIcon = estado.icon;
+            const propiedadesCount = propuesta.propiedades_count ?? propuesta.propiedades?.length ?? 0;
+            const precio = formatMoney(propuesta.precio_propuesto, propuesta.moneda);
 
-                return (
-                  <tr key={propuesta.id} onClick={() => navigate(`/crm/${tenantSlug}/propuestas/${propuesta.id}`)}>
-                    <td>
-                      <div className="propuesta-info">
-                        <span className="propuesta-titulo">{propuesta.titulo}</span>
-                        {propuesta.precio_propuesto && (
-                          <span className="propuesta-monto">
-                            {formatMoney(propuesta.precio_propuesto, propuesta.moneda)}
-                          </span>
-                        )}
-                      </div>
-                    </td>
-                    <td>
-                      <div className="cliente-info">
-                        <div className="cliente-avatar">
-                          {propuesta.contacto_nombre?.[0]?.toUpperCase() || '?'}
-                        </div>
-                        <span className="cliente-nombre">{getContactoNombre(propuesta)}</span>
-                      </div>
-                    </td>
-                    <td>
-                      <span className="solicitud-text">
-                        {propuesta.solicitud_titulo || '-'}
-                      </span>
-                    </td>
-                    <td>
-                      {(propuesta.propiedades_count ?? propuesta.propiedades?.length ?? 0) > 0 ? (
-                        <span className="badge badge-blue">
-                          <Building2 className="w-3 h-3" />
-                          {propuesta.propiedades_count ?? propuesta.propiedades?.length ?? 0}
-                        </span>
-                      ) : (
-                        <span className="text-muted">-</span>
-                      )}
-                    </td>
-                    <td>
-                      <span className="badge badge-purple">
-                        <Eye className="w-3 h-3" />
-                        {propuesta.veces_vista || 0}
-                      </span>
-                    </td>
-                    <td>
-                      <span
-                        className="estado-badge"
-                        style={{ backgroundColor: estado.bgColor, color: estado.color }}
+            return (
+              <div
+                key={propuesta.id}
+                className="propuesta-card"
+                onClick={() => navigate(`/crm/${tenantSlug}/propuestas/${propuesta.id}`)}
+              >
+                {/* Header con estado */}
+                <div className="card-header">
+                  <span
+                    className="estado-badge"
+                    style={{ backgroundColor: estado.bgColor, color: estado.color }}
+                  >
+                    <StatusIcon size={10} />
+                    {estado.label}
+                  </span>
+                  {propuesta.veces_vista > 0 && (
+                    <span className="vistas-badge">
+                      <Eye size={10} />
+                      {propuesta.veces_vista}
+                    </span>
+                  )}
+                </div>
+
+                {/* Título y precio */}
+                <div className="card-title-row">
+                  <h3 className="card-title">{propuesta.titulo}</h3>
+                  {precio && <span className="card-price">{precio}</span>}
+                </div>
+
+                {/* Cliente */}
+                <div className="card-cliente">
+                  <div className="cliente-avatar">
+                    {getContactoIniciales(propuesta)}
+                  </div>
+                  <span className="cliente-nombre">{getContactoNombre(propuesta)}</span>
+                </div>
+
+                {/* Info row: propiedades y fecha */}
+                <div className="card-info-row">
+                  <div className="info-item">
+                    <Building2 size={11} />
+                    <span>{propiedadesCount} prop.</span>
+                  </div>
+                  <div className="info-item">
+                    <Calendar size={11} />
+                    <span>{formatDate(propuesta.created_at)}</span>
+                  </div>
+                </div>
+
+                {/* Footer con acciones */}
+                <div className="card-footer" onClick={(e) => e.stopPropagation()}>
+                  <button
+                    className="action-btn"
+                    onClick={() => navigate(`/crm/${tenantSlug}/propuestas/${propuesta.id}`)}
+                    title="Editar"
+                  >
+                    <Pencil size={12} />
+                  </button>
+                  {propuesta.url_publica && (
+                    <>
+                      <button
+                        className="action-btn"
+                        onClick={(e) => handleCopyUrl(propuesta.url_publica!, propuesta.id, e)}
+                        title="Copiar enlace"
                       >
-                        <StatusIcon className="w-3 h-3" />
-                        {estado.label}
-                      </span>
-                    </td>
-                    <td>
-                      <span className="fecha-text">{formatDate(propuesta.created_at)}</span>
-                    </td>
-                    <td>
-                      <div className="actions-cell" onClick={(e) => e.stopPropagation()}>
-                        <button
-                          className="action-btn"
-                          onClick={() => navigate(`/crm/${tenantSlug}/propuestas/${propuesta.id}`)}
-                          title="Editar"
-                        >
-                          <Pencil className="w-4 h-4" />
-                        </button>
-                        {propuesta.url_publica && (
-                          <>
-                            <button
-                              className="action-btn"
-                              onClick={() => handleCopyUrl(propuesta.url_publica!, propuesta.id)}
-                              title="Copiar enlace"
-                            >
-                              {copiedUrl === propuesta.id ? (
-                                <CheckCircle className="w-4 h-4 text-green-500" />
-                              ) : (
-                                <Copy className="w-4 h-4" />
-                              )}
-                            </button>
-                            <a
-                              href={getUrlPublicaCompleta(propuesta.url_publica!)}
-                              target="_blank"
-                              rel="noopener noreferrer"
-                              className="action-btn"
-                              title="Ver propuesta pública"
-                            >
-                              <ExternalLink className="w-4 h-4" />
-                            </a>
-                          </>
+                        {copiedUrl === propuesta.id ? (
+                          <CheckCircle size={12} className="text-green" />
+                        ) : (
+                          <Copy size={12} />
                         )}
-                        <button
-                          className="action-btn danger"
-                          onClick={() => setDeleteConfirm(propuesta.id)}
-                          title="Eliminar"
-                        >
-                          <Trash2 className="w-4 h-4" />
-                        </button>
-                      </div>
-                    </td>
-                  </tr>
-                );
-              })}
-            </tbody>
-          </table>
+                      </button>
+                      <a
+                        href={getUrlPublicaCompleta(propuesta.url_publica!)}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="action-btn"
+                        title="Ver propuesta pública"
+                        onClick={(e) => e.stopPropagation()}
+                      >
+                        <ExternalLink size={12} />
+                      </a>
+                    </>
+                  )}
+                  <button
+                    className="action-btn danger"
+                    onClick={(e) => { e.stopPropagation(); setDeleteConfirm(propuesta.id); }}
+                    title="Eliminar"
+                  >
+                    <Trash2 size={12} />
+                  </button>
+                </div>
+              </div>
+            );
+          })}
         </div>
       )}
 
@@ -440,7 +429,7 @@ export default function CrmPropuestas() {
             <div className="modal-header">
               <h3>Eliminar propuesta</h3>
               <button className="modal-close-btn" onClick={() => setDeleteConfirm(null)}>
-                <X className="w-5 h-5" />
+                <X size={18} />
               </button>
             </div>
             <p className="modal-text">
@@ -479,7 +468,7 @@ const styles = `
     gap: 16px;
   }
 
-  /* Toolbar - Compact */
+  /* Toolbar */
   .toolbar {
     display: flex;
     gap: 12px;
@@ -534,10 +523,11 @@ const styles = `
     align-items: center;
     background: #fef2f2;
     border: 1px solid #fecaca;
-    padding: 12px 16px;
-    border-radius: 10px;
-    margin-bottom: 20px;
+    padding: 10px 14px;
+    border-radius: 8px;
+    margin-bottom: 16px;
     color: #dc2626;
+    font-size: 0.85rem;
   }
 
   .error-banner button {
@@ -546,9 +536,10 @@ const styles = `
     color: #dc2626;
     cursor: pointer;
     padding: 4px;
+    display: flex;
   }
 
-  /* Status Stats - Compact */
+  /* Status Stats */
   .status-stats {
     display: grid;
     grid-template-columns: repeat(6, 1fr);
@@ -560,17 +551,16 @@ const styles = `
     display: flex;
     align-items: center;
     gap: 10px;
-    padding: 12px 14px;
+    padding: 10px 12px;
     background: white;
     border: 1px solid #e2e8f0;
-    border-radius: 10px;
+    border-radius: 8px;
     cursor: pointer;
     transition: all 0.2s;
   }
 
   .status-card:hover {
     border-color: #94a3b8;
-    transform: translateY(-1px);
   }
 
   .status-card.active {
@@ -579,18 +569,13 @@ const styles = `
   }
 
   .status-card-icon {
-    width: 34px;
-    height: 34px;
-    border-radius: 8px;
+    width: 32px;
+    height: 32px;
+    border-radius: 6px;
     display: flex;
     align-items: center;
     justify-content: center;
     flex-shrink: 0;
-  }
-
-  .status-card-icon svg {
-    width: 18px;
-    height: 18px;
   }
 
   .status-card-info {
@@ -600,189 +585,164 @@ const styles = `
   }
 
   .status-card-count {
-    font-size: 1.25rem;
+    font-size: 1.1rem;
     font-weight: 700;
     color: #0f172a;
     line-height: 1;
   }
 
   .status-card-label {
-    font-size: 0.7rem;
+    font-size: 0.65rem;
     color: #64748b;
     margin-top: 2px;
     white-space: nowrap;
-    overflow: hidden;
-    text-overflow: ellipsis;
-  }
-
-  /* Table Container - Compact */
-  .table-container {
-    background: white;
-    border-radius: 10px;
-    border: 1px solid #e2e8f0;
-    overflow: hidden;
-  }
-
-  .propuestas-table {
-    width: 100%;
-    border-collapse: collapse;
-  }
-
-  .propuestas-table th {
-    text-align: left;
-    padding: 10px 14px;
-    font-size: 0.7rem;
-    font-weight: 600;
     text-transform: uppercase;
-    letter-spacing: 0.05em;
-    color: #64748b;
-    background: #f8fafc;
-    border-bottom: 1px solid #e2e8f0;
+    letter-spacing: 0.02em;
   }
 
-  .propuestas-table td {
-    padding: 10px 14px;
-    border-bottom: 1px solid #f1f5f9;
-    vertical-align: middle;
+  /* Grid de propuestas */
+  .propuestas-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+    gap: 16px;
   }
 
-  .propuestas-table tr {
+  /* Card de propuesta */
+  .propuesta-card {
+    background: white;
+    border: 1px solid #e2e8f0;
+    border-radius: 10px;
+    padding: 12px;
     cursor: pointer;
-    transition: background 0.15s;
-  }
-
-  .propuestas-table tbody tr:hover {
-    background: #f8fafc;
-  }
-
-  /* Table cells - Compact */
-  .propuesta-info {
+    transition: all 0.2s;
     display: flex;
     flex-direction: column;
-    gap: 1px;
+    gap: 10px;
   }
 
-  .propuesta-titulo {
-    font-weight: 500;
-    color: #0f172a;
-    font-size: 0.875rem;
+  .propuesta-card:hover {
+    border-color: #94a3b8;
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.06);
   }
 
-  .propuesta-monto {
-    font-size: 0.75rem;
-    color: #059669;
-    font-weight: 600;
-  }
-
-  .cliente-info {
+  .card-header {
     display: flex;
+    justify-content: space-between;
     align-items: center;
-    gap: 8px;
-  }
-
-  .cliente-avatar {
-    width: 28px;
-    height: 28px;
-    border-radius: 50%;
-    background: linear-gradient(135deg, #f59e0b, #f97316);
-    color: white;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    font-size: 0.75rem;
-    font-weight: 600;
-    flex-shrink: 0;
-  }
-
-  .cliente-nombre {
-    font-size: 0.85rem;
-    color: #0f172a;
-  }
-
-  .solicitud-text {
-    font-size: 0.8rem;
-    color: #64748b;
-    max-width: 140px;
-    overflow: hidden;
-    text-overflow: ellipsis;
-    white-space: nowrap;
-  }
-
-  .badge {
-    display: inline-flex;
-    align-items: center;
-    gap: 3px;
-    padding: 3px 8px;
-    border-radius: 6px;
-    font-size: 0.7rem;
-    font-weight: 600;
-  }
-
-  .badge svg {
-    width: 12px;
-    height: 12px;
-  }
-
-  .badge-blue {
-    background: #dbeafe;
-    color: #1d4ed8;
-  }
-
-  .badge-purple {
-    background: #f3e8ff;
-    color: #7c3aed;
-  }
-
-  .text-muted {
-    color: #94a3b8;
-    font-size: 0.8rem;
   }
 
   .estado-badge {
     display: inline-flex;
     align-items: center;
     gap: 4px;
-    padding: 4px 10px;
-    border-radius: 6px;
-    font-size: 0.7rem;
+    padding: 3px 8px;
+    border-radius: 4px;
+    font-size: 0.65rem;
     font-weight: 600;
-    white-space: nowrap;
+    text-transform: uppercase;
+    letter-spacing: 0.02em;
   }
 
-  .estado-badge svg {
-    width: 12px;
-    height: 12px;
+  .vistas-badge {
+    display: inline-flex;
+    align-items: center;
+    gap: 3px;
+    padding: 3px 6px;
+    border-radius: 4px;
+    font-size: 0.65rem;
+    font-weight: 600;
+    background: #f3e8ff;
+    color: #7c3aed;
   }
 
-  .fecha-text {
-    font-size: 0.8rem;
-    color: #64748b;
-    white-space: nowrap;
-  }
-
-  .actions-cell {
+  .card-title-row {
     display: flex;
-    gap: 4px;
+    justify-content: space-between;
+    align-items: flex-start;
+    gap: 8px;
+  }
+
+  .card-title {
+    margin: 0;
+    font-size: 0.9rem;
+    font-weight: 600;
+    color: #0f172a;
+    line-height: 1.3;
+    flex: 1;
+    display: -webkit-box;
+    -webkit-line-clamp: 2;
+    -webkit-box-orient: vertical;
+    overflow: hidden;
+  }
+
+  .card-price {
+    font-size: 0.8rem;
+    font-weight: 600;
+    color: #059669;
+    white-space: nowrap;
+  }
+
+  .card-cliente {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+  }
+
+  .cliente-avatar {
+    width: 24px;
+    height: 24px;
+    border-radius: 50%;
+    background: linear-gradient(135deg, #f59e0b, #f97316);
+    color: white;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 0.65rem;
+    font-weight: 600;
+    flex-shrink: 0;
+  }
+
+  .cliente-nombre {
+    font-size: 0.8rem;
+    color: #374151;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+
+  .card-info-row {
+    display: flex;
+    gap: 12px;
+  }
+
+  .info-item {
+    display: flex;
+    align-items: center;
+    gap: 3px;
+    font-size: 0.7rem;
+    color: #64748b;
+  }
+
+  .card-footer {
+    display: flex;
+    gap: 6px;
+    padding-top: 8px;
+    border-top: 1px solid #f1f5f9;
   }
 
   .action-btn {
     display: flex;
     align-items: center;
     justify-content: center;
-    width: 28px;
-    height: 28px;
+    width: 26px;
+    height: 26px;
     border: none;
     background: #f1f5f9;
-    border-radius: 6px;
+    border-radius: 5px;
     color: #64748b;
     cursor: pointer;
     transition: all 0.15s;
     text-decoration: none;
-  }
-
-  .action-btn svg {
-    width: 14px;
-    height: 14px;
   }
 
   .action-btn:hover {
@@ -795,7 +755,11 @@ const styles = `
     color: #dc2626;
   }
 
-  /* Empty state - Compact */
+  .text-green {
+    color: #16a34a;
+  }
+
+  /* Empty state */
   .empty-state {
     display: flex;
     flex-direction: column;
@@ -806,11 +770,6 @@ const styles = `
     border: 1px dashed #e2e8f0;
     border-radius: 10px;
     text-align: center;
-  }
-
-  .empty-state svg {
-    width: 48px;
-    height: 48px;
     color: #cbd5e1;
   }
 
@@ -844,9 +803,9 @@ const styles = `
 
   .modal-content {
     background: white;
-    border-radius: 16px;
-    padding: 24px;
-    max-width: 400px;
+    border-radius: 12px;
+    padding: 20px;
+    max-width: 380px;
     width: 90%;
   }
 
@@ -854,12 +813,12 @@ const styles = `
     display: flex;
     justify-content: space-between;
     align-items: center;
-    margin-bottom: 16px;
+    margin-bottom: 12px;
   }
 
   .modal-header h3 {
     margin: 0;
-    font-size: 1.125rem;
+    font-size: 1rem;
     color: #0f172a;
   }
 
@@ -867,11 +826,11 @@ const styles = `
     display: flex;
     align-items: center;
     justify-content: center;
-    width: 32px;
-    height: 32px;
+    width: 28px;
+    height: 28px;
     border: none;
     background: #f1f5f9;
-    border-radius: 8px;
+    border-radius: 6px;
     color: #64748b;
     cursor: pointer;
   }
@@ -882,24 +841,24 @@ const styles = `
   }
 
   .modal-text {
-    margin: 0 0 24px 0;
+    margin: 0 0 20px 0;
     color: #64748b;
-    font-size: 0.9rem;
+    font-size: 0.85rem;
     line-height: 1.5;
   }
 
   .modal-actions {
     display: flex;
-    gap: 12px;
+    gap: 10px;
     justify-content: flex-end;
   }
 
   .btn-cancel {
-    padding: 10px 20px;
+    padding: 8px 16px;
     background: #f1f5f9;
     border: none;
-    border-radius: 8px;
-    font-size: 0.9rem;
+    border-radius: 6px;
+    font-size: 0.85rem;
     color: #64748b;
     cursor: pointer;
     transition: all 0.15s;
@@ -910,11 +869,11 @@ const styles = `
   }
 
   .btn-danger {
-    padding: 10px 20px;
+    padding: 8px 16px;
     background: #dc2626;
     border: none;
-    border-radius: 8px;
-    font-size: 0.9rem;
+    border-radius: 6px;
+    font-size: 0.85rem;
     color: white;
     cursor: pointer;
     transition: all 0.15s;
@@ -928,13 +887,13 @@ const styles = `
   .btn-primary {
     display: flex;
     align-items: center;
-    gap: 8px;
-    padding: 10px 20px;
+    gap: 6px;
+    padding: 8px 16px;
     background: #2563eb;
     color: white;
     border: none;
-    border-radius: 8px;
-    font-size: 0.9rem;
+    border-radius: 6px;
+    font-size: 0.85rem;
     font-weight: 500;
     cursor: pointer;
     transition: background 0.2s;
@@ -942,158 +901,6 @@ const styles = `
 
   .btn-primary:hover {
     background: #1d4ed8;
-  }
-
-  .btn-primary:disabled {
-    background: #94a3b8;
-    cursor: not-allowed;
-  }
-
-  /* Form Modal */
-  .modal-form {
-    max-width: 520px;
-    max-height: 90vh;
-    overflow-y: auto;
-  }
-
-  .form-row {
-    display: flex;
-    gap: 16px;
-    margin-bottom: 16px;
-  }
-
-  .form-row .form-group {
-    flex: 1;
-    margin-bottom: 0;
-  }
-
-  .form-group {
-    margin-bottom: 16px;
-  }
-
-  .form-group label {
-    display: block;
-    font-size: 0.875rem;
-    font-weight: 500;
-    color: #374151;
-    margin-bottom: 6px;
-  }
-
-  .form-group input,
-  .form-group select,
-  .form-group textarea {
-    width: 100%;
-    padding: 10px 14px;
-    border: 1px solid #e2e8f0;
-    border-radius: 8px;
-    font-size: 0.9rem;
-    transition: all 0.2s;
-    background: white;
-  }
-
-  .form-group input:focus,
-  .form-group select:focus,
-  .form-group textarea:focus {
-    outline: none;
-    border-color: #2563eb;
-    box-shadow: 0 0 0 3px rgba(37, 99, 235, 0.1);
-  }
-
-  .form-group textarea {
-    resize: vertical;
-    min-height: 80px;
-  }
-
-  .form-group input::placeholder,
-  .form-group textarea::placeholder {
-    color: #94a3b8;
-  }
-
-  /* Contacto Selector */
-  .contacto-selector {
-    position: relative;
-  }
-
-  .contacto-selector input {
-    width: 100%;
-    padding: 10px 14px;
-    padding-right: 36px;
-    border: 1px solid #e2e8f0;
-    border-radius: 8px;
-    font-size: 0.9rem;
-  }
-
-  .contacto-dropdown {
-    position: absolute;
-    top: 100%;
-    left: 0;
-    right: 0;
-    background: white;
-    border: 1px solid #e2e8f0;
-    border-radius: 8px;
-    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
-    z-index: 10;
-    max-height: 200px;
-    overflow-y: auto;
-    margin-top: 4px;
-  }
-
-  .dropdown-item {
-    padding: 10px 14px;
-    cursor: pointer;
-    border-bottom: 1px solid #f1f5f9;
-    transition: background 0.15s;
-  }
-
-  .dropdown-item:last-child {
-    border-bottom: none;
-  }
-
-  .dropdown-item:hover {
-    background: #f8fafc;
-  }
-
-  .dropdown-name {
-    display: block;
-    font-weight: 500;
-    color: #0f172a;
-  }
-
-  .dropdown-email {
-    display: block;
-    font-size: 0.8rem;
-    color: #64748b;
-    margin-top: 2px;
-  }
-
-  .dropdown-loading,
-  .dropdown-empty {
-    padding: 12px 14px;
-    color: #64748b;
-    font-size: 0.875rem;
-    text-align: center;
-  }
-
-  .clear-selection {
-    position: absolute;
-    right: 8px;
-    top: 50%;
-    transform: translateY(-50%);
-    width: 24px;
-    height: 24px;
-    border: none;
-    background: #e2e8f0;
-    border-radius: 50%;
-    color: #64748b;
-    cursor: pointer;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-  }
-
-  .clear-selection:hover {
-    background: #cbd5e1;
-    color: #0f172a;
   }
 
   @media (max-width: 1200px) {
@@ -1107,12 +914,8 @@ const styles = `
       grid-template-columns: repeat(2, 1fr);
     }
 
-    .table-container {
-      overflow-x: auto;
-    }
-
-    .propuestas-table {
-      min-width: 800px;
+    .propuestas-grid {
+      grid-template-columns: 1fr;
     }
   }
 `;
