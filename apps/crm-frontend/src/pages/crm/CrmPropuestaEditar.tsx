@@ -880,9 +880,9 @@ export default function CrmPropuestaEditar() {
 
       {/* Tab Content: Propiedades */}
       {activeTab === 'propiedades' && (
-        <div className="tab-content propiedades-tab-full">
-          {/* Filtros integrados directamente */}
-          <div className="props-filters-inline">
+        <div className="tab-content">
+          {/* Filtros */}
+          <div className="propiedades-filters">
                 <div className="search-box">
                   <Search className="search-icon w-4 h-4" />
                   <input
@@ -936,19 +936,18 @@ export default function CrmPropuestaEditar() {
                 </select>
           </div>
 
-          {/* Grid con scroll */}
-          <div className="props-scroll-full">
-            {loadingProps ? (
-              <div className="loading-small">
-                <Loader2 className="w-6 h-6 animate-spin" />
-              </div>
-            ) : propiedades.length === 0 ? (
-              <div className="empty-catalog">
-                <Building2 className="w-12 h-12 text-gray-300" />
-                <p>No se encontraron propiedades con los filtros aplicados</p>
-              </div>
-            ) : (
-              <div className="props-grid">
+          {/* Grid de propiedades */}
+          {loadingProps ? (
+            <div className="loading-state">
+              <Loader2 className="w-6 h-6 animate-spin" />
+            </div>
+          ) : propiedades.length === 0 ? (
+            <div className="empty-state-props">
+              <Building2 className="w-12 h-12 text-gray-300" />
+              <p>No se encontraron propiedades con los filtros aplicados</p>
+            </div>
+          ) : (
+            <div className="propiedades-grid">
                     {/* Ordenar: 1) Seleccionadas, 2) Destacadas, 3) Resto */}
                     {[...propiedades].sort((a, b) => {
                       const aSelected = selectedPropiedades.includes(a.id) ? 1 : 0;
@@ -1063,13 +1062,12 @@ export default function CrmPropuestaEditar() {
                         </div>
                       );
                 })}
-              </div>
-            )}
-          </div>
+            </div>
+          )}
 
           {/* Paginación */}
           {totalProps > 12 && (
-            <div className="pagination-inline">
+            <div className="propiedades-pagination">
               <button
                 disabled={pageProps === 1}
                 onClick={() => setPageProps(p => Math.max(1, p - 1))}
@@ -2445,63 +2443,77 @@ const styles = `
     padding: 4px;
   }
 
-  /* Propiedades Tab - Full Width Layout */
-  .propiedades-tab-full {
-    display: flex;
-    flex-direction: column;
-    height: calc(100vh - 200px);
-    min-height: 500px;
-  }
-
-  .props-filters-inline {
+  /* Propiedades Tab - Filtros */
+  .propiedades-filters {
     display: flex;
     flex-wrap: wrap;
     gap: 12px;
-    padding: 12px 0;
-    margin-bottom: 12px;
-    border-bottom: 1px solid #e2e8f0;
+    margin-bottom: 20px;
   }
 
-  .props-scroll-full {
-    flex: 1;
-    overflow-y: auto;
-    padding: 4px;
+  /* Grid de propiedades - fluido como CrmPropiedades */
+  .propiedades-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(240px, 1fr));
+    gap: 16px;
+    margin-bottom: 24px;
   }
 
-  .pagination-inline {
+  .loading-state {
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    padding: 60px 20px;
+    color: #64748b;
+  }
+
+  .empty-state-props {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    padding: 60px 20px;
+    color: #94a3b8;
+    text-align: center;
+    gap: 12px;
+  }
+
+  /* Paginación - al final del contenido */
+  .propiedades-pagination {
     display: flex;
     align-items: center;
     justify-content: center;
-    gap: 16px;
-    padding: 16px 0 8px;
+    gap: 20px;
+    padding: 24px 0;
     border-top: 1px solid #e2e8f0;
-    margin-top: 12px;
+    margin-top: 8px;
   }
 
-  .pagination-inline button {
-    padding: 8px 16px;
-    border: 1px solid #e2e8f0;
-    background: white;
-    color: #475569;
-    border-radius: 6px;
+  .propiedades-pagination button {
+    padding: 10px 20px;
+    background: #2563eb;
+    color: white;
+    border: none;
+    border-radius: 8px;
     font-size: 0.875rem;
+    font-weight: 500;
     cursor: pointer;
     transition: all 0.15s;
   }
 
-  .pagination-inline button:hover:not(:disabled) {
-    background: #f8fafc;
-    border-color: #cbd5e1;
+  .propiedades-pagination button:hover:not(:disabled) {
+    background: #1d4ed8;
   }
 
-  .pagination-inline button:disabled {
-    opacity: 0.5;
+  .propiedades-pagination button:disabled {
+    background: #e2e8f0;
+    color: #94a3b8;
     cursor: not-allowed;
   }
 
-  .pagination-inline span {
+  .propiedades-pagination span {
     color: #64748b;
-    font-size: 0.875rem;
+    font-size: 0.9rem;
   }
 
   /* Selected Panel List */
@@ -2680,13 +2692,7 @@ const styles = `
     color: #64748b;
   }
 
-  /* Props Grid - Tarjetas compactas */
-  .props-grid {
-    display: grid;
-    grid-template-columns: repeat(auto-fill, minmax(240px, 1fr));
-    gap: 14px;
-  }
-
+  /* Tarjetas de propiedades */
   .prop-card {
     background: white;
     border: 2px solid #e2e8f0;
@@ -2949,8 +2955,8 @@ const styles = `
   }
 
   @media (max-width: 1400px) {
-    .props-grid {
-      grid-template-columns: repeat(auto-fill, minmax(250px, 1fr));
+    .propiedades-grid {
+      grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));
     }
   }
 
@@ -2961,12 +2967,7 @@ const styles = `
   }
 
   @media (max-width: 900px) {
-    .propiedades-tab-full {
-      height: auto;
-      min-height: 400px;
-    }
-
-    .props-filters-inline {
+    .propiedades-filters {
       flex-direction: column;
     }
 
@@ -2985,7 +2986,7 @@ const styles = `
       flex-direction: column;
     }
 
-    .props-grid {
+    .propiedades-grid {
       grid-template-columns: 1fr;
     }
 
