@@ -1654,20 +1654,22 @@ export async function getPropuesta(tenantId: string, propuestaId: string): Promi
  * Crea una nueva propuesta
  */
 export async function createPropuesta(tenantId: string, data: Partial<Propuesta>): Promise<Propuesta> {
-  return apiFetch(`/tenants/${tenantId}/propuestas`, {
+  const response = await apiFetch(`/tenants/${tenantId}/propuestas`, {
     method: 'POST',
     body: JSON.stringify(data),
   });
+  return response.json();
 }
 
 /**
  * Actualiza una propuesta
  */
 export async function updatePropuesta(tenantId: string, propuestaId: string, data: Partial<Propuesta>): Promise<Propuesta> {
-  return apiFetch(`/tenants/${tenantId}/propuestas/${propuestaId}`, {
+  const response = await apiFetch(`/tenants/${tenantId}/propuestas/${propuestaId}`, {
     method: 'PUT',
     body: JSON.stringify(data),
   });
+  return response.json();
 }
 
 /**
