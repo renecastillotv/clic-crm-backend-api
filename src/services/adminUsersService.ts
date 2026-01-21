@@ -4,7 +4,7 @@
 
 import { query, getClient } from '../utils/db.js';
 import bcrypt from 'bcrypt';
-import { createClerkUser, updateClerkUser } from '../middleware/clerkAuth.js';
+import { createClerkUser, updateClerkUser, deleteClerkUser } from '../middleware/clerkAuth.js';
 import { v4 as uuidv4 } from 'uuid';
 
 export interface AdminUser {
@@ -772,11 +772,22 @@ export async function toggleUserStatus(userId: string, activo: boolean): Promise
 
 /**
  * Elimina un usuario (soft delete - marca como inactivo)
+ * - Desactiva el usuario en la BD
+ * - Desactiva relaciones con tenants y roles
+ * - Desactiva perfil de asesor si existe
+ * - Elimina el usuario de Clerk para evitar re-sincronización
  */
 export async function deleteUser(userId: string): Promise<void> {
   const client = await getClient();
   try {
     await client.query('BEGIN');
+
+    // Obtener datos del usuario antes de desactivar (necesitamos clerk_id)
+    const userResult = await client.query(
+      `SELECT clerk_id FROM usuarios WHERE id = $1`,
+      [userId]
+    );
+    const clerkId = userResult.rows[0]?.clerk_id;
 
     // Marcar usuario como inactivo
     await client.query(
@@ -784,18 +795,36 @@ export async function deleteUser(userId: string): Promise<void> {
       [userId]
     );
 
-    // Desactivar todas las relaciones del usuario
+    // Desactivar todas las relaciones del usuario con tenants
     await client.query(
       `UPDATE usuarios_tenants SET activo = false WHERE usuario_id = $1`,
       [userId]
     );
 
+    // Desactivar todos los roles del usuario
     await client.query(
       `UPDATE usuarios_roles SET activo = false WHERE usuario_id = $1`,
       [userId]
     );
 
+    // Desactivar perfil de asesor si existe
+    await client.query(
+      `UPDATE perfiles_asesor SET activo = false, updated_at = NOW() WHERE usuario_id = $1`,
+      [userId]
+    );
+
     await client.query('COMMIT');
+
+    // Eliminar usuario de Clerk (fuera de la transacción para no bloquear si falla)
+    if (clerkId) {
+      try {
+        await deleteClerkUser(clerkId);
+        console.log(`✅ Usuario ${userId} eliminado de Clerk`);
+      } catch (clerkError) {
+        // Log pero no fallar - el usuario ya está desactivado en BD
+        console.error(`⚠️ No se pudo eliminar usuario de Clerk:`, clerkError);
+      }
+    }
   } catch (error: any) {
     await client.query('ROLLBACK');
     console.error('Error al eliminar usuario:', error);

@@ -553,6 +553,8 @@ export async function getUsuariosByTenant(tenantId: string): Promise<UsuarioTena
     FROM usuarios_tenants ut
     JOIN usuarios u ON ut.usuario_id = u.id
     WHERE ut.tenant_id = $1
+      AND ut.activo = true
+      AND u.activo = true
     ORDER BY ut.created_at DESC
   `;
 

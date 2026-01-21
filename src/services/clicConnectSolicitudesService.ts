@@ -96,10 +96,11 @@ export interface CreateUpgradeRequestData {
 
 /**
  * Obtiene todas las solicitudes de unirse a CLIC Connect
+ * Solo incluye solicitudes donde el referidor (si existe) está activo
  */
 export async function getJoinRequests(tenantId: string): Promise<JoinRequest[]> {
   const sql = `
-    SELECT 
+    SELECT
       jr.*,
       u_referidor.nombre as referidor_nombre,
       u_referidor.apellido as referidor_apellido,
@@ -109,10 +110,13 @@ export async function getJoinRequests(tenantId: string): Promise<JoinRequest[]> 
       u_revisor.email as revisor_email
     FROM clic_connect_join_requests jr
     LEFT JOIN usuarios u_referidor ON u_referidor.id = (
-      SELECT ut.usuario_id 
+      SELECT ut.usuario_id
       FROM usuarios_tenants ut
       JOIN usuarios u ON u.id = ut.usuario_id
-      WHERE u.email = jr.codigo_referido AND ut.tenant_id = jr.tenant_id
+      WHERE u.email = jr.codigo_referido
+        AND ut.tenant_id = jr.tenant_id
+        AND u.activo = true
+        AND ut.activo = true
       LIMIT 1
     )
     LEFT JOIN usuarios u_revisor ON u_revisor.id = jr.revisado_por
@@ -120,7 +124,7 @@ export async function getJoinRequests(tenantId: string): Promise<JoinRequest[]> 
     ORDER BY jr.created_at DESC
   `;
   const result = await query(sql, [tenantId]);
-  
+
   return result.rows.map(formatJoinRequest);
 }
 
@@ -285,10 +289,11 @@ export async function rejectJoinRequest(
 
 /**
  * Obtiene todas las solicitudes de upgrade
+ * Solo incluye solicitudes de usuarios activos
  */
 export async function getUpgradeRequests(tenantId: string): Promise<UpgradeRequest[]> {
   const sql = `
-    SELECT 
+    SELECT
       ur.*,
       u_usuario.nombre as usuario_nombre,
       u_usuario.apellido as usuario_apellido,
@@ -297,22 +302,23 @@ export async function getUpgradeRequests(tenantId: string): Promise<UpgradeReque
       u_revisor.apellido as revisor_apellido,
       u_revisor.email as revisor_email
     FROM clic_connect_upgrade_requests ur
-    JOIN usuarios u_usuario ON u_usuario.id = ur.usuario_id
+    JOIN usuarios u_usuario ON u_usuario.id = ur.usuario_id AND u_usuario.activo = true
     LEFT JOIN usuarios u_revisor ON u_revisor.id = ur.revisado_por
     WHERE ur.tenant_id = $1
     ORDER BY ur.created_at DESC
   `;
   const result = await query(sql, [tenantId]);
-  
+
   return result.rows.map(formatUpgradeRequest);
 }
 
 /**
  * Obtiene una solicitud de upgrade por ID
+ * Solo si el usuario está activo
  */
 export async function getUpgradeRequestById(tenantId: string, requestId: string): Promise<UpgradeRequest | null> {
   const sql = `
-    SELECT 
+    SELECT
       ur.*,
       u_usuario.nombre as usuario_nombre,
       u_usuario.apellido as usuario_apellido,
@@ -321,7 +327,7 @@ export async function getUpgradeRequestById(tenantId: string, requestId: string)
       u_revisor.apellido as revisor_apellido,
       u_revisor.email as revisor_email
     FROM clic_connect_upgrade_requests ur
-    JOIN usuarios u_usuario ON u_usuario.id = ur.usuario_id
+    JOIN usuarios u_usuario ON u_usuario.id = ur.usuario_id AND u_usuario.activo = true
     LEFT JOIN usuarios u_revisor ON u_revisor.id = ur.revisado_por
     WHERE ur.id = $1 AND ur.tenant_id = $2
   `;
