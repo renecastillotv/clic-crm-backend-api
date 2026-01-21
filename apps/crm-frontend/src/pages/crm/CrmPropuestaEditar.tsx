@@ -935,12 +935,9 @@ export default function CrmPropuestaEditar() {
                               />
                               {isSelected && <Check className="w-3 h-3" />}
                             </label>
-                            {/* Destacada */}
+                            {/* Destacada - círculo con estrella */}
                             {prop.destacada && (
-                              <div className="badge-destacada">
-                                <Star className="w-2.5 h-2.5" />
-                                Destacada
-                              </div>
+                              <span className="badge-destacada"><Star size={9} fill="currentColor" /></span>
                             )}
                             {/* Badge de operación */}
                             {prop.operacion && (
@@ -992,19 +989,19 @@ export default function CrmPropuestaEditar() {
                               <MapPin className="w-3 h-3" />
                               {[prop.sector, prop.ciudad].filter(Boolean).join(', ') || 'Sin ubicación'}
                             </div>
-                            {/* Características */}
+                            {/* Características - compactas */}
                             <div className="prop-features">
-                              {prop.habitaciones !== undefined && prop.habitaciones > 0 && (
-                                <span><Bed className="w-3 h-3" /> {prop.habitaciones}</span>
+                              {prop.habitaciones != null && prop.habitaciones > 0 && (
+                                <span><Bed size={11} /> {prop.habitaciones}</span>
                               )}
-                              {prop.banos !== undefined && prop.banos > 0 && (
-                                <span><Bath className="w-3 h-3" /> {prop.banos}</span>
+                              {prop.banos != null && prop.banos > 0 && (
+                                <span><Bath size={11} /> {prop.banos}</span>
                               )}
-                              {prop.estacionamientos !== undefined && prop.estacionamientos > 0 && (
-                                <span><Car className="w-3 h-3" /> {prop.estacionamientos}</span>
+                              {prop.estacionamientos != null && prop.estacionamientos > 0 && (
+                                <span><Car size={11} /> {prop.estacionamientos}</span>
                               )}
-                              {prop.m2_construccion && (
-                                <span><Maximize className="w-3 h-3" /> {prop.m2_construccion}m²</span>
+                              {prop.m2_construccion != null && (
+                                <span><Maximize size={11} /> {prop.m2_construccion.toLocaleString()}m²</span>
                               )}
                             </div>
                           </div>
@@ -2707,17 +2704,17 @@ const styles = `
 
   .badge-destacada {
     position: absolute;
-    bottom: 8px;
+    top: 8px;
     left: 8px;
+    background: linear-gradient(135deg, #fbbf24, #f59e0b);
+    color: white;
+    width: 20px;
+    height: 20px;
+    border-radius: 50%;
     display: flex;
     align-items: center;
-    gap: 3px;
-    padding: 2px 6px;
-    background: #fbbf24;
-    color: #78350f;
-    border-radius: 3px;
-    font-size: 0.6rem;
-    font-weight: 600;
+    justify-content: center;
+    box-shadow: 0 1px 3px rgba(0, 0, 0, 0.2);
   }
 
   .prop-body {
@@ -2842,17 +2839,18 @@ const styles = `
 
   .prop-features {
     display: flex;
-    gap: 12px;
+    gap: 6px;
     padding-top: 8px;
     border-top: 1px solid #f1f5f9;
-    font-size: 0.75rem;
-    color: #64748b;
+    flex-shrink: 0;
   }
 
   .prop-features span {
     display: flex;
     align-items: center;
-    gap: 5px;
+    gap: 2px;
+    font-size: 0.7rem;
+    color: #64748b;
   }
 
   /* Pagination */
