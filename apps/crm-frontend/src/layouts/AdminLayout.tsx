@@ -62,6 +62,13 @@ const IconRoles = () => (
   </svg>
 );
 
+const IconPermisos = () => (
+  <svg width="22" height="22" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+    <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
+    <path d="M9 12l2 2 4-4" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
+  </svg>
+);
+
 const IconSettings = () => (
   <svg width="22" height="22" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
     <circle cx="12" cy="12" r="3" stroke="currentColor" strokeWidth="2"/>
@@ -119,6 +126,7 @@ export default function AdminLayout() {
     { path: '/admin/paginas', label: 'Páginas', icon: IconPaginas },
     { path: '/admin/plantillas', label: 'Plantillas', icon: IconPlantillas },
     { path: '/admin/roles', label: 'Roles', icon: IconRoles },
+    { path: '/admin/roles/permisos', label: 'Permisos', icon: IconPermisos },
     { path: '/admin/facturacion', label: 'Facturación', icon: IconBilling },
     { path: '/admin/ubicaciones', label: 'Ubicaciones', icon: IconUbicaciones },
     { path: '/admin/tags-global', label: 'Tags Global', icon: IconTags },

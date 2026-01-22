@@ -895,11 +895,11 @@ export async function deleteRole(roleId: string, token?: string | null): Promise
   const response = await apiFetch(`/admin/roles/${roleId}`, {
     method: 'DELETE',
   }, token);
-  
+
   if (response.status === 204) {
     return;
   }
-  
+
   const text = await response.text();
   if (text) {
     try {
@@ -908,6 +908,164 @@ export async function deleteRole(roleId: string, token?: string | null): Promise
       return;
     }
   }
+}
+
+// ==================== ADMIN MODULOS Y PERMISOS API ====================
+
+export interface Modulo {
+  id: string;
+  codigo: string;
+  nombre: string;
+  descripcion: string | null;
+  icono: string | null;
+  ruta: string | null;
+  orden: number;
+  activo: boolean;
+  padre_id: string | null;
+  visible_en_menu: boolean;
+}
+
+export interface RolModulo {
+  id: string;
+  rolId: string;
+  moduloId: string;
+  puedeVer: boolean;
+  puedeCrear: boolean;
+  puedeEditar: boolean;
+  puedeEliminar: boolean;
+  alcanceVer: 'all' | 'team' | 'own';
+  alcanceEditar: 'all' | 'team' | 'own';
+  alcanceEliminar: 'all' | 'team' | 'own';
+  moduloCodigo?: string;
+  moduloNombre?: string;
+  moduloDescripcion?: string;
+}
+
+export interface RolModuloInput {
+  moduloId: string;
+  puedeVer: boolean;
+  puedeCrear: boolean;
+  puedeEditar: boolean;
+  puedeEliminar: boolean;
+  alcanceVer?: 'all' | 'team' | 'own';
+  alcanceEditar?: 'all' | 'team' | 'own';
+  alcanceEliminar?: 'all' | 'team' | 'own';
+}
+
+export interface ModuloConPermisos extends Modulo {
+  permisos: RolModulo | null;
+}
+
+export interface RolModulosMatrix {
+  rol: { id: string; nombre: string; codigo: string; tipo: string };
+  modulos: ModuloConPermisos[];
+}
+
+export interface RolModuloStats {
+  rolId: string;
+  rolNombre: string;
+  rolCodigo: string;
+  rolTipo: string;
+  totalModulos: number;
+  modulosConVer: number;
+  modulosConCrear: number;
+  modulosConEditar: number;
+  modulosConEliminar: number;
+}
+
+/**
+ * Obtiene todos los módulos del sistema
+ */
+export async function getAllModulos(token?: string | null): Promise<Modulo[]> {
+  const response = await apiFetch('/admin/modulos', {}, token);
+  const data = await response.json();
+  return data.modulos || [];
+}
+
+/**
+ * Obtiene estadísticas de permisos por rol
+ */
+export async function getRolesModulosStats(token?: string | null): Promise<RolModuloStats[]> {
+  const response = await apiFetch('/admin/roles-modulos/stats', {}, token);
+  const data = await response.json();
+  return data.stats || [];
+}
+
+/**
+ * Obtiene los módulos asignados a un rol
+ */
+export async function getModulosByRol(roleId: string, token?: string | null): Promise<RolModulo[]> {
+  const response = await apiFetch(`/admin/roles/${roleId}/modulos`, {}, token);
+  const data = await response.json();
+  return data.modulos || [];
+}
+
+/**
+ * Obtiene la matriz completa de módulos y permisos para un rol
+ */
+export async function getRolModulosMatrix(roleId: string, token?: string | null): Promise<RolModulosMatrix> {
+  const response = await apiFetch(`/admin/roles/${roleId}/modulos/matrix`, {}, token);
+  return response.json();
+}
+
+/**
+ * Actualiza todos los permisos de módulos para un rol
+ */
+export async function updateRolModulos(
+  roleId: string,
+  modulos: RolModuloInput[],
+  token?: string | null
+): Promise<{ modulos: RolModulo[]; message: string }> {
+  const response = await apiFetch(`/admin/roles/${roleId}/modulos`, {
+    method: 'PUT',
+    body: JSON.stringify({ modulos }),
+  }, token);
+  return response.json();
+}
+
+/**
+ * Actualiza permisos de un módulo específico para un rol
+ */
+export async function updateRolModulo(
+  roleId: string,
+  moduloId: string,
+  permisos: Partial<RolModuloInput>,
+  token?: string | null
+): Promise<RolModulo> {
+  const response = await apiFetch(`/admin/roles/${roleId}/modulos/${moduloId}`, {
+    method: 'PUT',
+    body: JSON.stringify(permisos),
+  }, token);
+  const data = await response.json();
+  return data.permiso;
+}
+
+/**
+ * Elimina un permiso de módulo de un rol
+ */
+export async function removeModuloFromRol(
+  roleId: string,
+  moduloId: string,
+  token?: string | null
+): Promise<void> {
+  await apiFetch(`/admin/roles/${roleId}/modulos/${moduloId}`, {
+    method: 'DELETE',
+  }, token);
+}
+
+/**
+ * Copia los permisos de un rol a otro
+ */
+export async function copyRolPermisos(
+  targetRoleId: string,
+  sourceRoleId: string,
+  token?: string | null
+): Promise<{ success: boolean; permisosCopiados: number }> {
+  const response = await apiFetch(`/admin/roles/${targetRoleId}/copy-permisos`, {
+    method: 'POST',
+    body: JSON.stringify({ sourceRoleId }),
+  }, token);
+  return response.json();
 }
 
 /**

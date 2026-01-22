@@ -43,6 +43,17 @@ import {
   getTagsGlobalStats,
   getTagTipos
 } from '../services/adminTagsGlobalService.js';
+import {
+  getAllModulos,
+  getModulosByRol,
+  getRolModulosMatrix,
+  updateRolModulo,
+  updateAllRolModulos,
+  removeModuloFromRol,
+  copyRolPermisos,
+  getRolesModulosStats,
+  RolModuloInput
+} from '../services/adminRolesModulosService.js';
 
 const router = express.Router();
 
@@ -1512,6 +1523,203 @@ router.post('/tags-global/:id/toggle', async (req, res) => {
     console.error('Error en POST /admin/tags-global/:id/toggle:', error);
     res.status(400).json({
       error: 'Error al cambiar estado',
+      message: error.message
+    });
+  }
+});
+
+// ==================== ROLES-MÓDULOS (PERMISOS) ====================
+
+/**
+ * GET /api/admin/modulos
+ * Lista todos los módulos del sistema
+ */
+router.get('/modulos', async (req, res) => {
+  try {
+    const modulos = await getAllModulos();
+    res.json({ modulos });
+  } catch (error: any) {
+    console.error('Error en GET /admin/modulos:', error);
+    res.status(500).json({
+      error: 'Error al obtener módulos',
+      message: error.message
+    });
+  }
+});
+
+/**
+ * GET /api/admin/roles-modulos/stats
+ * Estadísticas de permisos por rol
+ */
+router.get('/roles-modulos/stats', async (req, res) => {
+  try {
+    const stats = await getRolesModulosStats();
+    res.json({ stats });
+  } catch (error: any) {
+    console.error('Error en GET /admin/roles-modulos/stats:', error);
+    res.status(500).json({
+      error: 'Error al obtener estadísticas',
+      message: error.message
+    });
+  }
+});
+
+/**
+ * GET /api/admin/roles/:roleId/modulos
+ * Obtiene los módulos asignados a un rol
+ */
+router.get('/roles/:roleId/modulos', async (req, res) => {
+  try {
+    const { roleId } = req.params;
+    const modulos = await getModulosByRol(roleId);
+    res.json({ modulos });
+  } catch (error: any) {
+    console.error('Error en GET /admin/roles/:roleId/modulos:', error);
+    res.status(500).json({
+      error: 'Error al obtener módulos del rol',
+      message: error.message
+    });
+  }
+});
+
+/**
+ * GET /api/admin/roles/:roleId/modulos/matrix
+ * Obtiene la matriz completa de módulos y permisos para un rol
+ */
+router.get('/roles/:roleId/modulos/matrix', async (req, res) => {
+  try {
+    const { roleId } = req.params;
+    const matrix = await getRolModulosMatrix(roleId);
+    res.json(matrix);
+  } catch (error: any) {
+    console.error('Error en GET /admin/roles/:roleId/modulos/matrix:', error);
+    if (error.message === 'Rol no encontrado') {
+      res.status(404).json({
+        error: 'Rol no encontrado',
+        message: error.message
+      });
+    } else {
+      res.status(500).json({
+        error: 'Error al obtener matriz de permisos',
+        message: error.message
+      });
+    }
+  }
+});
+
+/**
+ * PUT /api/admin/roles/:roleId/modulos
+ * Actualiza todos los permisos de módulos para un rol
+ */
+router.put('/roles/:roleId/modulos', async (req, res) => {
+  try {
+    const { roleId } = req.params;
+    const { modulos } = req.body;
+
+    if (!modulos || !Array.isArray(modulos)) {
+      return res.status(400).json({
+        error: 'Datos inválidos',
+        message: 'Se requiere un array de módulos con permisos'
+      });
+    }
+
+    const result = await updateAllRolModulos(roleId, modulos as RolModuloInput[]);
+    res.json({ modulos: result, message: 'Permisos actualizados correctamente' });
+  } catch (error: any) {
+    console.error('Error en PUT /admin/roles/:roleId/modulos:', error);
+    if (error.message === 'Rol no encontrado') {
+      res.status(404).json({
+        error: 'Rol no encontrado',
+        message: error.message
+      });
+    } else {
+      res.status(400).json({
+        error: 'Error al actualizar permisos',
+        message: error.message
+      });
+    }
+  }
+});
+
+/**
+ * PUT /api/admin/roles/:roleId/modulos/:moduloId
+ * Actualiza permisos de un módulo específico para un rol
+ */
+router.put('/roles/:roleId/modulos/:moduloId', async (req, res) => {
+  try {
+    const { roleId, moduloId } = req.params;
+    const permisos = req.body;
+
+    const result = await updateRolModulo(roleId, moduloId, permisos);
+    res.json({ permiso: result });
+  } catch (error: any) {
+    console.error('Error en PUT /admin/roles/:roleId/modulos/:moduloId:', error);
+    if (error.message.includes('no encontrado')) {
+      res.status(404).json({
+        error: 'No encontrado',
+        message: error.message
+      });
+    } else {
+      res.status(400).json({
+        error: 'Error al actualizar permiso',
+        message: error.message
+      });
+    }
+  }
+});
+
+/**
+ * DELETE /api/admin/roles/:roleId/modulos/:moduloId
+ * Elimina un permiso de módulo de un rol
+ */
+router.delete('/roles/:roleId/modulos/:moduloId', async (req, res) => {
+  try {
+    const { roleId, moduloId } = req.params;
+    const deleted = await removeModuloFromRol(roleId, moduloId);
+
+    if (deleted) {
+      res.json({ success: true, message: 'Permiso eliminado' });
+    } else {
+      res.status(404).json({
+        error: 'Permiso no encontrado',
+        message: 'No se encontró el permiso a eliminar'
+      });
+    }
+  } catch (error: any) {
+    console.error('Error en DELETE /admin/roles/:roleId/modulos/:moduloId:', error);
+    res.status(400).json({
+      error: 'Error al eliminar permiso',
+      message: error.message
+    });
+  }
+});
+
+/**
+ * POST /api/admin/roles/:roleId/copy-permisos
+ * Copia los permisos de otro rol
+ */
+router.post('/roles/:roleId/copy-permisos', async (req, res) => {
+  try {
+    const { roleId } = req.params;
+    const { sourceRoleId } = req.body;
+
+    if (!sourceRoleId) {
+      return res.status(400).json({
+        error: 'Datos inválidos',
+        message: 'Se requiere sourceRoleId (ID del rol origen)'
+      });
+    }
+
+    const copied = await copyRolPermisos(sourceRoleId, roleId);
+    res.json({
+      success: true,
+      message: `Se copiaron ${copied} permisos al rol`,
+      permisosCopiados: copied
+    });
+  } catch (error: any) {
+    console.error('Error en POST /admin/roles/:roleId/copy-permisos:', error);
+    res.status(400).json({
+      error: 'Error al copiar permisos',
       message: error.message
     });
   }

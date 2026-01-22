@@ -37,6 +37,7 @@ import AdminFeatures from './pages/admin/AdminFeatures';
 import AdminFacturacion from './pages/admin/AdminFacturacion';
 import AdminConfiguracion from './pages/admin/AdminConfiguracion';
 import AdminRoles from './pages/admin/AdminRoles';
+import AdminRolPermisos from './pages/admin/AdminRolPermisos';
 import AdminUbicaciones from './pages/admin/AdminUbicaciones';
 import AdminTagsGlobal from './pages/admin/AdminTagsGlobal';
 
@@ -279,6 +280,7 @@ function AppRoutes() {
                 <Route path="facturacion" element={<AdminFacturacion />} />
                 <Route path="configuracion" element={<AdminConfiguracion />} />
                 <Route path="roles" element={<AdminRoles />} />
+                <Route path="roles/permisos" element={<AdminRolPermisos />} />
                 <Route path="ubicaciones" element={<AdminUbicaciones />} />
                 <Route path="tags-global" element={<AdminTagsGlobal />} />
       </Route>
