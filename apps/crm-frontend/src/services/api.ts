@@ -913,16 +913,13 @@ export async function deleteRole(roleId: string, token?: string | null): Promise
 // ==================== ADMIN MODULOS Y PERMISOS API ====================
 
 export interface Modulo {
-  id: string;
-  codigo: string;
+  id: string;          // El ID es el código/slug del módulo
   nombre: string;
   descripcion: string | null;
   icono: string | null;
-  ruta: string | null;
+  categoria: string;   // crm, web, admin, tools
   orden: number;
   activo: boolean;
-  padre_id: string | null;
-  visible_en_menu: boolean;
 }
 
 export interface RolModulo {
@@ -936,9 +933,9 @@ export interface RolModulo {
   alcanceVer: 'all' | 'team' | 'own';
   alcanceEditar: 'all' | 'team' | 'own';
   alcanceEliminar: 'all' | 'team' | 'own';
-  moduloCodigo?: string;
   moduloNombre?: string;
   moduloDescripcion?: string;
+  moduloCategoria?: string;
 }
 
 export interface RolModuloInput {

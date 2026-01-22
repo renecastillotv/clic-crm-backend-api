@@ -443,7 +443,10 @@ export default function AdminRolPermisos() {
                       <td className="module-col">
                         <div className="module-info">
                           <span className="module-name">{modulo.nombre}</span>
-                          <span className="module-code">{modulo.codigo}</span>
+                          <span className="module-code">{modulo.id}</span>
+                          {modulo.categoria && (
+                            <span className="module-category">{modulo.categoria}</span>
+                          )}
                         </div>
                       </td>
                       <td className="perm-col">
@@ -888,6 +891,16 @@ const styles = `
     font-size: 0.75rem;
     color: #94A3B8;
     font-family: monospace;
+  }
+
+  .module-category {
+    font-size: 0.65rem;
+    color: white;
+    background: #64748B;
+    padding: 2px 6px;
+    border-radius: 4px;
+    text-transform: uppercase;
+    margin-left: 6px;
   }
 
   .matrix-table tr.has-access {
