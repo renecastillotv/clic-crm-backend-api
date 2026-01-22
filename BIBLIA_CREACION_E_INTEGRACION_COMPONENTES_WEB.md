@@ -1305,3 +1305,8 @@ Después de crear un componente:
 
 
 
+
+
+
+
+

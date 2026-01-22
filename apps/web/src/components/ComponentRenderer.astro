@@ -10,6 +10,9 @@ import HeroDefault from './hero/HeroDefault.astro';
 import HeroVariant1 from './hero/HeroVariant1.astro';
 import HeroVariant2 from './hero/HeroVariant2.astro';
 import HeroVariant3 from './hero/HeroVariant3.astro';
+import HeroClic from './hero/HeroClic.astro';
+import HeroSimple from './hero/HeroSimple.astro';
+import HeroSearch from './hero/HeroSearch.astro';
 
 import FooterDefault from './footer/FooterDefault.astro';
 import HeaderDefault from './header/HeaderDefault.astro';
@@ -34,10 +37,35 @@ import BlogListDefault from './blog-list/BlogListDefault.astro';
 
 // Componentes CLIC Premium
 import PropertyCarouselClic from './property-carousel/PropertyCarouselClic.astro';
+import PropertyCarouselFeatured from './property-carousel/PropertyCarouselFeatured.astro';
 import VideoGalleryClic from './video-gallery/VideoGalleryClic.astro';
+import VideoGalleryDefault from './video-gallery/VideoGalleryDefault.astro';
 import RelatedArticlesClic from './related-articles/RelatedArticlesClic.astro';
 import PopularLocationsClic from './popular-locations/PopularLocationsClic.astro';
 import DynamicFAQsClic from './dynamic-faqs/DynamicFAQsClic.astro';
+
+// Componentes de Homepage
+import FounderStoryClic from './founder-story/FounderStoryClic.astro';
+import HomepageCTAClic from './homepage-cta/HomepageCTAClic.astro';
+
+// Componentes de Listados/Grids
+import TeamGridDefault from './team-grid/TeamGridDefault.astro';
+import TestimonialGridDefault from './testimonial-grid/TestimonialGridDefault.astro';
+import ArticleGridDefault from './article-grid/ArticleGridDefault.astro';
+import PropertyGridDefault from './property-grid/PropertyGridDefault.astro';
+
+// Componentes de Categorías
+import VideoCategoryListDefault from './category-list/VideoCategoryListDefault.astro';
+import ArticleCategoryListDefault from './category-list/ArticleCategoryListDefault.astro';
+import VideoCategoryDefault from './video-category/VideoCategoryDefault.astro';
+import ArticleCategoryDefault from './article-category/ArticleCategoryDefault.astro';
+import TestimonialCategoryDefault from './testimonial-category/TestimonialCategoryDefault.astro';
+
+// Componentes de Detalle/Single
+import AsesorDetailDefault from './asesor-detail/AsesorDetailDefault.astro';
+import VideoDetailDefault from './video-detail/VideoDetailDefault.astro';
+import ArticleDetailDefault from './article-detail/ArticleDetailDefault.astro';
+import TestimonialDetailDefault from './testimonial-detail/TestimonialDetailDefault.astro';
 
 // Placeholders para componentes no implementados aún
 import Placeholder from './placeholder/Placeholder.astro';
@@ -66,6 +94,9 @@ function getComponent(tipo: TipoComponente, variante: VarianteComponente) {
     'hero-variant1': HeroVariant1,
     'hero-variant2': HeroVariant2,
     'hero-variant3': HeroVariant3,
+    'hero-clic': HeroClic,
+    'hero-simple': HeroSimple,
+    'hero-search': HeroSearch,
     
     // Display
     'property_list-default': PropertyListDefault,
@@ -89,10 +120,38 @@ function getComponent(tipo: TipoComponente, variante: VarianteComponente) {
     
     // CLIC Premium Components
     'property_carousel-clic': PropertyCarouselClic,
+    'property_carousel-default': PropertyCarouselFeatured,
+    'property_carousel-featured': PropertyCarouselFeatured,
     'video_gallery-clic': VideoGalleryClic,
+    'video_gallery-default': VideoGalleryDefault,
     'related_articles-clic': RelatedArticlesClic,
     'popular_locations-clic': PopularLocationsClic,
     'dynamic_faqs-clic': DynamicFAQsClic,
+
+    // Homepage Components
+    'founder_story-default': FounderStoryClic,
+    'founder_story-clic': FounderStoryClic,
+    'homepage_cta-default': HomepageCTAClic,
+    'homepage_cta-clic': HomepageCTAClic,
+
+    // Grid/Listing Components
+    'team_grid-default': TeamGridDefault,
+    'testimonial_grid-default': TestimonialGridDefault,
+    'article_grid-default': ArticleGridDefault,
+    'property_grid-default': PropertyGridDefault,
+
+    // Detail/Single Components
+    'agent_profile-default': AsesorDetailDefault,
+    'asesor_detail-default': AsesorDetailDefault,
+    'asesor-detail-default': AsesorDetailDefault,
+    'video_detail-default': VideoDetailDefault,
+    'article_detail-default': ArticleDetailDefault,
+    'testimonial_detail-default': TestimonialDetailDefault,
+    'testimonio_detail-default': TestimonialDetailDefault,
+
+    // Content component - mapea según dataType al componente adecuado
+    // Por ahora usa TeamGrid como fallback para asesores
+    'content-default': TeamGridDefault,
   };
 
   const key = `${tipo}-${variante}`;
@@ -113,8 +172,51 @@ function getComponent(tipo: TipoComponente, variante: VarianteComponente) {
   return component || null;
 }
 
-const Component = getComponent(componente.tipo, componente.variante);
+// Para componentes de tipo 'content', elegir el componente según el dataType
+function getContentComponent(dataType: string | undefined) {
+  const contentComponentMap: Record<string, any> = {
+    // Listados principales
+    'lista_asesores': TeamGridDefault,
+    'lista_videos': VideoGalleryDefault,
+    'lista_articulos': ArticleGridDefault,
+    'lista_propiedades': PropertyGridDefault,
+    'lista_testimonios': TestimonialGridDefault,
+
+    // Singles/Detalle
+    'asesor_single': AsesorDetailDefault,
+    'video_single': VideoDetailDefault,
+    'articulo_single': ArticleDetailDefault,
+    'testimonio_single': TestimonialDetailDefault,
+
+    // Lista de categorías (muestra todas las categorías)
+    'categorias_videos': VideoCategoryListDefault,
+    'categorias_articulos': ArticleCategoryListDefault,
+    'videos_por_categoria': VideoCategoryListDefault,  // Alias usado en plantillas
+    'articulos_por_categoria': ArticleCategoryListDefault,  // Alias usado en plantillas
+
+    // Categoría específica (muestra items de UNA categoría)
+    'categoria_videos': VideoCategoryDefault,
+    'categoria_articulos': ArticleCategoryDefault,
+    'categoria_testimonios': TestimonialCategoryDefault,
+  };
+  return contentComponentMap[dataType || ''] || null;
+}
+
+let Component = getComponent(componente.tipo, componente.variante);
 const isCustom = componente.tipo === 'custom';
+
+// Si es un componente content, usar el componente específico según dataType
+if (componente.tipo === 'content') {
+  const dataType = componente.datos?.dynamic_data?.dataType;
+  console.log(`🔍 [ComponentRenderer] content dataType: ${dataType}`);
+  const contentComponent = getContentComponent(dataType);
+  if (contentComponent) {
+    console.log(`✅ [ComponentRenderer] Usando componente específico para ${dataType}`);
+    Component = contentComponent;
+  } else {
+    console.log(`⚠️ [ComponentRenderer] No hay componente específico para ${dataType}, usando fallback`);
+  }
+}
 
 // Debug: Verificar que tenemos datos
 if (!componente.datos) {
@@ -125,7 +227,6 @@ if (!componente.datos) {
 if (!isCustom && !Component) {
   console.warn(`⚠️ Componente ${componente.tipo}-${componente.variante} no está mapeado`);
   console.warn(`🔍 Clave buscada: ${componente.tipo}-${componente.variante}`);
-  console.warn(`🔍 Claves disponibles:`, Object.keys(componentMap));
 }
 
 ---

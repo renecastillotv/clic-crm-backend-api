@@ -25,8 +25,23 @@ const mostrarRating = toggles?.mostrarRating ?? true;
 const mostrarFoto = toggles?.mostrarFoto ?? true;
 const mostrarCategoria = toggles?.mostrarCategoria ?? true;
 
-// Testimonios dinamicos
-const testimonios = dynamicData?.resolved || datos?.testimonios || [];
+// Testimonios dinamicos - el assembler puede devolver { primary: [...], categorias: [...] }
+const resolvedData = dynamicData?.resolved;
+let testimonios: any[] = [];
+let categorias: any[] = [];
+
+if (resolvedData) {
+  if (Array.isArray(resolvedData)) {
+    testimonios = resolvedData;
+  } else if (resolvedData.primary) {
+    testimonios = Array.isArray(resolvedData.primary) ? resolvedData.primary : [resolvedData.primary];
+    categorias = resolvedData.categorias || [];
+  } else {
+    testimonios = [resolvedData];
+  }
+} else {
+  testimonios = datos?.testimonios || [];
+}
 
 // Colores del tema
 const primaryColor = tema?.primary || '#667eea';
@@ -58,6 +73,27 @@ function getStars(rating: number): string {
       <div class="section-header">
         {titulo && <h2 class="section-title">{titulo}</h2>}
         {subtitulo && <p class="section-subtitle">{subtitulo}</p>}
+      </div>
+    )}
+
+    {/* Categorías de testimonios */}
+    {categorias.length > 0 && (
+      <div class="categories-section">
+        <h3 class="categories-title">Explorar por categoría</h3>
+        <div class="categories-list">
+          <a href={`${baseUrl}/testimonios`} class="category-pill active">
+            Todos
+          </a>
+          {categorias.map((cat: any) => (
+            <a
+              href={`${baseUrl}/testimonios/${cat.slug}`}
+              class="category-pill"
+            >
+              {cat.nombre}
+              {cat.total && <span class="category-count">{cat.total}</span>}
+            </a>
+          ))}
+        </div>
       </div>
     )}
 
@@ -168,6 +204,67 @@ function getStars(rating: number): string {
     font-size: 1.1rem;
     color: var(--text-secondary, #718096);
     margin: 0;
+  }
+
+  /* Categorías */
+  .categories-section {
+    margin-bottom: 2rem;
+    padding: 1.5rem;
+    background: white;
+    border-radius: 12px;
+    box-shadow: 0 2px 8px rgba(0,0,0,0.05);
+  }
+
+  .categories-title {
+    font-size: 1rem;
+    font-weight: 600;
+    color: #4a5568;
+    margin: 0 0 1rem 0;
+  }
+
+  .categories-list {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.5rem;
+  }
+
+  .category-pill {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.5rem;
+    padding: 0.5rem 1rem;
+    background: #f7fafc;
+    border: 1px solid #e2e8f0;
+    border-radius: 999px;
+    font-size: 0.9rem;
+    color: #4a5568;
+    text-decoration: none;
+    transition: all 0.2s;
+  }
+
+  .category-pill:hover {
+    background: var(--primary);
+    color: white;
+    border-color: var(--primary);
+  }
+
+  .category-pill.active {
+    background: var(--primary);
+    color: white;
+    border-color: var(--primary);
+  }
+
+  .category-count {
+    background: rgba(255,255,255,0.2);
+    padding: 0.1rem 0.5rem;
+    border-radius: 999px;
+    font-size: 0.75rem;
+    font-weight: 600;
+  }
+
+  .category-pill:not(.active) .category-count {
+    background: #e2e8f0;
+    color: #718096;
   }
 
   .testimonials-grid {

@@ -2,6 +2,7 @@
 /**
  * TestimonialDetailDefault.astro
  * Pagina de detalle de un testimonio individual
+ * Muestra el testimonio completo con propiedad y asesor vinculados
  */
 
 import type { ComponenteDataEstructurado } from '../../types/componentesEstructurado';
@@ -19,11 +20,19 @@ const staticData = datos?.static_data || {};
 const dynamicData = datos?.dynamic_data || {};
 const styles = datos?.styles || {};
 
-// El testimonio puede venir como array o como objeto single
-let testimonio = dynamicData?.resolved || null;
+// El assembler devuelve: { primary: testimonio, propiedad: {...}, asesor: {...}, relacionados: [...] }
+const resolvedData = dynamicData?.resolved;
+
+// El testimonio puede venir como primary del assembler, como array o como objeto single
+let testimonio = resolvedData?.primary || resolvedData || null;
 if (Array.isArray(testimonio)) {
   testimonio = testimonio[0] || null;
 }
+
+// Datos secundarios del assembler
+const propiedadVinculada = resolvedData?.propiedad || null;
+const asesorVinculado = resolvedData?.asesor || null;
+const testimoniosRelacionados = resolvedData?.relacionados || [];
 
 // Si no hay testimonio resuelto, usar datos estaticos
 if (!testimonio) {
@@ -168,6 +177,91 @@ const breadcrumbItems = [
         <a href={`${baseUrl}/contacto`} class="btn btn-primary">Contactanos</a>
       </div>
     </article>
+
+    <!-- Propiedad vinculada -->
+    {propiedadVinculada && (
+      <section class="linked-section">
+        <h3 class="section-title">🏠 Propiedad Relacionada</h3>
+        <a href={`${baseUrl}/propiedades/${propiedadVinculada.slug || propiedadVinculada.id}`} class="property-card">
+          <div class="property-image">
+            {propiedadVinculada.imagen_principal ? (
+              <img src={propiedadVinculada.imagen_principal} alt={propiedadVinculada.titulo} loading="lazy" />
+            ) : (
+              <div class="no-image">🏠</div>
+            )}
+            {propiedadVinculada.operacion && (
+              <span class={`operation-badge ${propiedadVinculada.operacion.toLowerCase()}`}>
+                {propiedadVinculada.operacion}
+              </span>
+            )}
+          </div>
+          <div class="property-info">
+            <h4>{propiedadVinculada.titulo}</h4>
+            <p class="property-location">{propiedadVinculada.ciudad || propiedadVinculada.sector || propiedadVinculada.ubicacion}</p>
+            {propiedadVinculada.precio && (
+              <span class="property-price">
+                {new Intl.NumberFormat('es-DO', { style: 'currency', currency: 'USD', maximumFractionDigits: 0 }).format(propiedadVinculada.precio)}
+              </span>
+            )}
+            <div class="property-features">
+              {propiedadVinculada.habitaciones && <span>🛏️ {propiedadVinculada.habitaciones}</span>}
+              {propiedadVinculada.banos && <span>🚿 {propiedadVinculada.banos}</span>}
+              {propiedadVinculada.metros_construidos && <span>📐 {propiedadVinculada.metros_construidos}m²</span>}
+            </div>
+          </div>
+        </a>
+      </section>
+    )}
+
+    <!-- Asesor vinculado -->
+    {asesorVinculado && (
+      <section class="linked-section">
+        <h3 class="section-title">👤 Asesor que atendió</h3>
+        <a href={`${baseUrl}/asesores/${asesorVinculado.slug}`} class="asesor-card">
+          <div class="asesor-avatar">
+            {asesorVinculado.foto_url || asesorVinculado.avatar_url ? (
+              <img src={asesorVinculado.foto_url || asesorVinculado.avatar_url} alt={asesorVinculado.nombre_completo} />
+            ) : (
+              <div class="avatar-placeholder">
+                {(asesorVinculado.nombre_completo || asesorVinculado.nombre || 'A').charAt(0).toUpperCase()}
+              </div>
+            )}
+          </div>
+          <div class="asesor-info">
+            <h4>{asesorVinculado.nombre_completo || `${asesorVinculado.nombre} ${asesorVinculado.apellido}`.trim()}</h4>
+            {asesorVinculado.cargo && <p class="asesor-cargo">{asesorVinculado.cargo}</p>}
+            {asesorVinculado.calificacion_promedio > 0 && (
+              <div class="asesor-rating">
+                <span class="stars">{'★'.repeat(Math.round(asesorVinculado.calificacion_promedio))}</span>
+                <span>{Number(asesorVinculado.calificacion_promedio).toFixed(1)}</span>
+              </div>
+            )}
+            <span class="view-profile">Ver perfil completo →</span>
+          </div>
+        </a>
+      </section>
+    )}
+
+    <!-- Testimonios relacionados -->
+    {testimoniosRelacionados.length > 0 && (
+      <section class="linked-section">
+        <h3 class="section-title">💬 Otros testimonios</h3>
+        <div class="related-grid">
+          {testimoniosRelacionados.map((rel: any) => (
+            <a href={`${baseUrl}/testimonios/${rel.categoria_slug || 'general'}/${rel.slug}`} class="related-card">
+              <div class="related-rating">
+                {'★'.repeat(rel.rating || 5)}
+              </div>
+              <p class="related-content">"{(rel.contenido || rel.testimonio || '').substring(0, 120)}..."</p>
+              <div class="related-author">
+                <strong>{rel.cliente_nombre || rel.nombre_cliente}</strong>
+                {rel.cliente_cargo && <span>{rel.cliente_cargo}</span>}
+              </div>
+            </a>
+          ))}
+        </div>
+      </section>
+    )}
   </div>
 </section>
 
@@ -413,6 +507,252 @@ const breadcrumbItems = [
     border: 2px solid var(--primary);
   }
 
+  /* Linked sections */
+  .linked-section {
+    background: white;
+    border-radius: 16px;
+    padding: 1.5rem 2rem;
+    margin-top: 1.5rem;
+    box-shadow: 0 4px 20px rgba(0,0,0,0.08);
+  }
+
+  .section-title {
+    font-size: 1.25rem;
+    font-weight: 700;
+    color: #1a202c;
+    margin: 0 0 1.25rem 0;
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+  }
+
+  /* Property card */
+  .property-card {
+    display: flex;
+    gap: 1.25rem;
+    text-decoration: none;
+    color: inherit;
+    background: #f7fafc;
+    border-radius: 12px;
+    overflow: hidden;
+    transition: transform 0.2s, box-shadow 0.2s;
+  }
+
+  .property-card:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 8px 24px rgba(0,0,0,0.12);
+  }
+
+  .property-image {
+    width: 180px;
+    height: 130px;
+    flex-shrink: 0;
+    position: relative;
+    overflow: hidden;
+  }
+
+  .property-image img {
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+  }
+
+  .property-image .no-image {
+    width: 100%;
+    height: 100%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    background: linear-gradient(135deg, #e2e8f0 0%, #cbd5e0 100%);
+    font-size: 2.5rem;
+  }
+
+  .operation-badge {
+    position: absolute;
+    top: 8px;
+    left: 8px;
+    padding: 4px 10px;
+    border-radius: 4px;
+    font-size: 0.7rem;
+    font-weight: 700;
+    text-transform: uppercase;
+    color: white;
+  }
+
+  .operation-badge.venta { background: #38a169; }
+  .operation-badge.alquiler, .operation-badge.renta { background: #3182ce; }
+
+  .property-info {
+    padding: 1rem;
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+  }
+
+  .property-info h4 {
+    font-size: 1.1rem;
+    font-weight: 600;
+    color: #1a202c;
+    margin: 0 0 0.25rem 0;
+  }
+
+  .property-location {
+    font-size: 0.9rem;
+    color: #718096;
+    margin: 0 0 0.5rem 0;
+  }
+
+  .property-price {
+    font-size: 1.25rem;
+    font-weight: 700;
+    color: var(--primary);
+    margin-bottom: 0.5rem;
+  }
+
+  .property-features {
+    display: flex;
+    gap: 1rem;
+    font-size: 0.85rem;
+    color: #4a5568;
+  }
+
+  /* Asesor card */
+  .asesor-card {
+    display: flex;
+    gap: 1.25rem;
+    padding: 1rem;
+    text-decoration: none;
+    color: inherit;
+    background: #f7fafc;
+    border-radius: 12px;
+    transition: transform 0.2s, box-shadow 0.2s;
+  }
+
+  .asesor-card:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 8px 24px rgba(0,0,0,0.12);
+  }
+
+  .asesor-avatar {
+    width: 80px;
+    height: 80px;
+    flex-shrink: 0;
+    border-radius: 50%;
+    overflow: hidden;
+  }
+
+  .asesor-avatar img {
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+  }
+
+  .asesor-avatar .avatar-placeholder {
+    width: 100%;
+    height: 100%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    background: linear-gradient(135deg, var(--primary) 0%, var(--secondary) 100%);
+    color: white;
+    font-size: 2rem;
+    font-weight: 600;
+  }
+
+  .asesor-info {
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+  }
+
+  .asesor-info h4 {
+    font-size: 1.1rem;
+    font-weight: 600;
+    color: #1a202c;
+    margin: 0 0 0.25rem 0;
+  }
+
+  .asesor-cargo {
+    font-size: 0.9rem;
+    color: #718096;
+    margin: 0 0 0.5rem 0;
+  }
+
+  .asesor-rating {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    font-size: 0.9rem;
+    margin-bottom: 0.5rem;
+  }
+
+  .asesor-rating .stars {
+    color: #fbbf24;
+    font-size: 1rem;
+    letter-spacing: 1px;
+  }
+
+  .view-profile {
+    font-size: 0.9rem;
+    color: var(--primary);
+    font-weight: 500;
+  }
+
+  /* Related testimonials grid */
+  .related-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+    gap: 1rem;
+  }
+
+  .related-card {
+    display: flex;
+    flex-direction: column;
+    padding: 1.25rem;
+    background: #f7fafc;
+    border-radius: 12px;
+    text-decoration: none;
+    color: inherit;
+    transition: transform 0.2s, box-shadow 0.2s;
+  }
+
+  .related-card:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 8px 24px rgba(0,0,0,0.12);
+  }
+
+  .related-rating {
+    color: #fbbf24;
+    font-size: 1rem;
+    letter-spacing: 2px;
+    margin-bottom: 0.75rem;
+  }
+
+  .related-content {
+    font-size: 0.95rem;
+    color: #4a5568;
+    line-height: 1.5;
+    margin: 0 0 1rem 0;
+    font-style: italic;
+  }
+
+  .related-author {
+    display: flex;
+    flex-direction: column;
+    gap: 0.1rem;
+    margin-top: auto;
+  }
+
+  .related-author strong {
+    color: #1a202c;
+    font-size: 0.9rem;
+  }
+
+  .related-author span {
+    color: #718096;
+    font-size: 0.8rem;
+  }
+
   @media (max-width: 768px) {
     .testimonial-hero {
       padding: 1.5rem 1rem 2rem;
@@ -452,6 +792,29 @@ const breadcrumbItems = [
     .btn {
       width: 100%;
       text-align: center;
+    }
+
+    .linked-section {
+      padding: 1.25rem;
+    }
+
+    .property-card {
+      flex-direction: column;
+    }
+
+    .property-image {
+      width: 100%;
+      height: 160px;
+    }
+
+    .asesor-card {
+      flex-direction: column;
+      text-align: center;
+      align-items: center;
+    }
+
+    .related-grid {
+      grid-template-columns: 1fr;
     }
   }
 </style>

@@ -2,7 +2,7 @@
 /**
  * AsesorDetailDefault.astro
  * Vista detallada de un asesor individual
- * Muestra el perfil completo del asesor o un mensaje si no se encuentra
+ * Muestra el perfil completo del asesor con propiedades, artículos, videos y testimonios
  */
 
 interface Props {
@@ -17,27 +17,39 @@ const { datos, asesor, tema = {}, baseUrl = '' } = Astro.props;
 const staticData = datos?.static_data || {};
 const toggles = datos?.toggles || {};
 
-// El asesor puede venir desde resolvedData o desde datos del componente
-// dynamic_data.resolved puede ser un array (de un solo elemento) o un objeto
+// El asesor puede venir desde resolvedData (primary) o desde datos del componente
+// El assembler devuelve: { primary: asesor, propiedades: [], testimonios: [], articulos: [], videos: [] }
 const resolvedData = datos?.dynamic_data?.resolved;
-const rawAsesorData = asesor || datos?.asesor || (Array.isArray(resolvedData) ? resolvedData[0] : resolvedData);
+const rawAsesorData = asesor || datos?.asesor || resolvedData?.primary || (Array.isArray(resolvedData) ? resolvedData[0] : resolvedData);
+
+// Datos secundarios del assembler (propiedades, testimonios, artículos, videos del asesor)
+const propiedadesAsesor = resolvedData?.propiedades || datos?.propiedades || rawAsesorData?.propiedades || [];
+const testimoniosAsesor = resolvedData?.testimonios || datos?.testimonios || [];
+const articulosAsesor = resolvedData?.articulos || datos?.articulos || [];
+const videosAsesor = resolvedData?.videos || datos?.videos || [];
 
 // Normalizar datos del asesor para compatibilidad con la vista
 const asesorData = rawAsesorData ? {
   ...rawAsesorData,
   // Nombre completo
-  nombreCompleto: `${rawAsesorData.nombre || ''} ${rawAsesorData.apellido || ''}`.trim() || 'Asesor',
+  nombreCompleto: rawAsesorData.nombre_completo || `${rawAsesorData.nombre || ''} ${rawAsesorData.apellido || ''}`.trim() || 'Asesor',
   // Foto (varios alias posibles)
   foto: rawAsesorData.foto_url || rawAsesorData.foto || rawAsesorData.avatar_url || rawAsesorData.avatar || null,
   // Especialidad (primer elemento del array o valor directo)
   especialidad: Array.isArray(rawAsesorData.especialidades) && rawAsesorData.especialidades.length > 0
     ? rawAsesorData.especialidades.join(', ')
-    : (rawAsesorData.especialidad || rawAsesorData.cargo || null),
+    : (rawAsesorData.especialidad || null),
+  // Zonas de trabajo
+  zonas: Array.isArray(rawAsesorData.zonas) ? rawAsesorData.zonas : [],
+  // Idiomas
+  idiomas: Array.isArray(rawAsesorData.idiomas) ? rawAsesorData.idiomas : [],
   // Rating
   rating: rawAsesorData.calificacion_promedio || rawAsesorData.rating || rawAsesorData.stats?.calificacion_promedio || null,
   num_reviews: rawAsesorData.total_resenas || rawAsesorData.num_reviews || rawAsesorData.stats?.total_resenas || null,
-  // Propiedades
-  propiedades_activas: rawAsesorData.propiedades_activas || rawAsesorData.stats?.propiedades_activas || 0,
+  // Propiedades activas
+  propiedades_activas: rawAsesorData.propiedades_activas || rawAsesorData.stats?.propiedades_activas || propiedadesAsesor.length || 0,
+  propiedades_vendidas: rawAsesorData.propiedades_vendidas || rawAsesorData.stats?.propiedades_vendidas || 0,
+  volumen_ventas: rawAsesorData.volumen_ventas || rawAsesorData.stats?.volumen_ventas || 0,
 } : null;
 
 // Colores del tema
@@ -46,6 +58,12 @@ const secondaryColor = tema?.secondary || '#764ba2';
 
 // Si no hay asesor, mostrar mensaje
 const hasAsesor = asesorData && (asesorData.id || asesorData.nombre);
+
+// Formatear moneda
+const formatCurrency = (value: number) => {
+  if (!value) return null;
+  return new Intl.NumberFormat('es-DO', { style: 'currency', currency: 'USD', maximumFractionDigits: 0 }).format(value);
+};
 ---
 
 <section class="asesor-detail-section" style={`--primary: ${primaryColor}; --secondary: ${secondaryColor};`}>
@@ -74,14 +92,14 @@ const hasAsesor = asesorData && (asesorData.id || asesorData.nombre);
             {asesorData.especialidad && (
               <p class="asesor-specialty">{asesorData.especialidad}</p>
             )}
-            {asesorData.rating !== undefined && (
+            {asesorData.rating != null && asesorData.rating > 0 && (
               <div class="asesor-rating">
                 <span class="stars">
                   {[1, 2, 3, 4, 5].map((star) => (
                     <span class={`star ${star <= Math.round(asesorData.rating) ? 'filled' : ''}`}>★</span>
                   ))}
                 </span>
-                <span class="rating-value">{asesorData.rating.toFixed(1)}</span>
+                <span class="rating-value">{Number(asesorData.rating).toFixed(1)}</span>
                 {asesorData.num_reviews && (
                   <span class="reviews-count">({asesorData.num_reviews} reseñas)</span>
                 )}
@@ -127,32 +145,77 @@ const hasAsesor = asesorData && (asesorData.id || asesorData.nombre);
 
         {/* Estadísticas */}
         <div class="asesor-stats">
-          {asesorData.propiedades_activas !== undefined && (
+          <div class="stat-card">
+            <span class="stat-value">{asesorData.propiedades_activas}</span>
+            <span class="stat-label">Propiedades Activas</span>
+          </div>
+          {asesorData.propiedades_vendidas > 0 && (
             <div class="stat-card">
-              <span class="stat-value">{asesorData.propiedades_activas}</span>
-              <span class="stat-label">Propiedades Activas</span>
+              <span class="stat-value">{asesorData.propiedades_vendidas}</span>
+              <span class="stat-label">Propiedades Vendidas</span>
             </div>
           )}
-          {asesorData.ventas_totales !== undefined && (
+          {asesorData.experiencia_anos > 0 && (
             <div class="stat-card">
-              <span class="stat-value">{asesorData.ventas_totales}</span>
-              <span class="stat-label">Ventas Realizadas</span>
-            </div>
-          )}
-          {asesorData.anos_experiencia !== undefined && (
-            <div class="stat-card">
-              <span class="stat-value">{asesorData.anos_experiencia}</span>
+              <span class="stat-value">{asesorData.experiencia_anos}</span>
               <span class="stat-label">Años de Experiencia</span>
+            </div>
+          )}
+          {asesorData.num_reviews > 0 && (
+            <div class="stat-card">
+              <span class="stat-value">{asesorData.num_reviews}</span>
+              <span class="stat-label">Reseñas</span>
             </div>
           )}
         </div>
 
+        {/* Información adicional: Zonas e Idiomas */}
+        {(asesorData.zonas.length > 0 || asesorData.idiomas.length > 0) && (
+          <div class="asesor-extra-info">
+            {asesorData.zonas.length > 0 && (
+              <div class="info-block">
+                <h3>📍 Zonas de Trabajo</h3>
+                <div class="tags-list">
+                  {asesorData.zonas.map((zona: string) => (
+                    <span class="tag">{zona}</span>
+                  ))}
+                </div>
+              </div>
+            )}
+            {asesorData.idiomas.length > 0 && (
+              <div class="info-block">
+                <h3>🌐 Idiomas</h3>
+                <div class="tags-list">
+                  {asesorData.idiomas.map((idioma: string) => (
+                    <span class="tag">{idioma}</span>
+                  ))}
+                </div>
+              </div>
+            )}
+          </div>
+        )}
+
+        {/* Video de presentación */}
+        {asesorData.video_presentacion_url && (
+          <div class="asesor-video-presentacion">
+            <h2>🎬 Video de Presentación</h2>
+            <div class="video-container">
+              <iframe
+                src={asesorData.video_presentacion_url.replace('watch?v=', 'embed/')}
+                frameborder="0"
+                allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
+                allowfullscreen
+              ></iframe>
+            </div>
+          </div>
+        )}
+
         {/* Propiedades del asesor */}
-        {asesorData.propiedades && asesorData.propiedades.length > 0 && (
-          <div class="asesor-properties">
-            <h2>Mis Propiedades</h2>
+        {propiedadesAsesor.length > 0 && (
+          <div class="asesor-section">
+            <h2>🏠 Mis Propiedades ({propiedadesAsesor.length})</h2>
             <div class="properties-mini-grid">
-              {asesorData.propiedades.slice(0, 4).map((prop: any) => (
+              {propiedadesAsesor.slice(0, 6).map((prop: any) => (
                 <a href={`${baseUrl}/propiedades/${prop.slug || prop.id}`} class="property-mini-card">
                   <div class="mini-image">
                     {prop.imagen_principal ? (
@@ -160,23 +223,150 @@ const hasAsesor = asesorData && (asesorData.id || asesorData.nombre);
                     ) : (
                       <div class="no-image">🏠</div>
                     )}
+                    {prop.operacion && (
+                      <span class={`operation-badge ${prop.operacion.toLowerCase()}`}>
+                        {prop.operacion}
+                      </span>
+                    )}
                   </div>
                   <div class="mini-info">
                     <h4>{prop.titulo}</h4>
+                    <p class="mini-location">{prop.ciudad || prop.sector}</p>
                     {prop.precio && (
-                      <span class="mini-price">
-                        {new Intl.NumberFormat('es-DO', { style: 'currency', currency: 'USD' }).format(prop.precio)}
+                      <span class="mini-price">{formatCurrency(prop.precio)}</span>
+                    )}
+                  </div>
+                </a>
+              ))}
+            </div>
+            {propiedadesAsesor.length > 6 && (
+              <a href={`${baseUrl}/propiedades?asesor=${asesorData.id}`} class="view-all-link">
+                Ver todas mis propiedades ({propiedadesAsesor.length}) →
+              </a>
+            )}
+          </div>
+        )}
+
+        {/* Videos del asesor */}
+        {videosAsesor.length > 0 && (
+          <div class="asesor-section">
+            <h2>🎥 Mis Videos ({videosAsesor.length})</h2>
+            <div class="content-grid">
+              {videosAsesor.slice(0, 4).map((video: any) => (
+                <a href={`${baseUrl}/videos/${video.categoria_slug || 'general'}/${video.slug}`} class="content-card">
+                  <div class="content-image">
+                    {video.thumbnail ? (
+                      <img src={video.thumbnail} alt={video.titulo} loading="lazy" />
+                    ) : (
+                      <div class="no-image">🎬</div>
+                    )}
+                    <span class="play-icon">▶</span>
+                  </div>
+                  <div class="content-info">
+                    <h4>{video.titulo || video.title}</h4>
+                    {video.duracion_segundos && (
+                      <span class="duration">
+                        {Math.floor(video.duracion_segundos / 60)}:{String(video.duracion_segundos % 60).padStart(2, '0')}
                       </span>
                     )}
                   </div>
                 </a>
               ))}
             </div>
-            {asesorData.propiedades.length > 4 && (
-              <a href={`${baseUrl}/propiedades?asesor=${asesorData.id}`} class="view-all-link">
-                Ver todas las propiedades ({asesorData.propiedades.length})
-              </a>
-            )}
+          </div>
+        )}
+
+        {/* Artículos del asesor */}
+        {articulosAsesor.length > 0 && (
+          <div class="asesor-section">
+            <h2>📝 Mis Artículos ({articulosAsesor.length})</h2>
+            <div class="content-grid">
+              {articulosAsesor.slice(0, 4).map((articulo: any) => (
+                <a href={`${baseUrl}/articulos/${articulo.categoria_slug || 'general'}/${articulo.slug}`} class="content-card">
+                  <div class="content-image">
+                    {articulo.imagen_principal ? (
+                      <img src={articulo.imagen_principal} alt={articulo.titulo} loading="lazy" />
+                    ) : (
+                      <div class="no-image">📄</div>
+                    )}
+                  </div>
+                  <div class="content-info">
+                    <h4>{articulo.titulo || articulo.title}</h4>
+                    {articulo.extracto && (
+                      <p class="excerpt">{articulo.extracto.substring(0, 100)}...</p>
+                    )}
+                  </div>
+                </a>
+              ))}
+            </div>
+          </div>
+        )}
+
+        {/* Testimonios del asesor */}
+        {testimoniosAsesor.length > 0 && (
+          <div class="asesor-section">
+            <h2>💬 Lo que dicen mis clientes ({testimoniosAsesor.length})</h2>
+            <div class="testimonials-list">
+              {testimoniosAsesor.slice(0, 4).map((testimonio: any) => (
+                <div class="testimonial-card">
+                  <div class="testimonial-header">
+                    <div class="client-avatar">
+                      {testimonio.cliente_foto || testimonio.foto_url ? (
+                        <img src={testimonio.cliente_foto || testimonio.foto_url} alt={testimonio.cliente_nombre || testimonio.nombre_cliente} />
+                      ) : (
+                        <span>{(testimonio.cliente_nombre || testimonio.nombre_cliente || 'C').charAt(0)}</span>
+                      )}
+                    </div>
+                    <div class="client-info">
+                      <strong>{testimonio.cliente_nombre || testimonio.nombre_cliente}</strong>
+                      {testimonio.cliente_cargo && <span>{testimonio.cliente_cargo}</span>}
+                    </div>
+                    {testimonio.rating && (
+                      <div class="testimonial-rating">
+                        {[1,2,3,4,5].map((star) => (
+                          <span class={star <= testimonio.rating ? 'star filled' : 'star'}>★</span>
+                        ))}
+                      </div>
+                    )}
+                  </div>
+                  <p class="testimonial-content">"{testimonio.contenido || testimonio.testimonio}"</p>
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
+
+        {/* Redes sociales */}
+        {asesorData.redes_sociales && Object.keys(asesorData.redes_sociales).length > 0 && (
+          <div class="asesor-section social-section">
+            <h2>🔗 Sígueme en redes</h2>
+            <div class="social-links">
+              {asesorData.redes_sociales.facebook && (
+                <a href={asesorData.redes_sociales.facebook} target="_blank" rel="noopener" class="social-link facebook">
+                  Facebook
+                </a>
+              )}
+              {asesorData.redes_sociales.instagram && (
+                <a href={asesorData.redes_sociales.instagram} target="_blank" rel="noopener" class="social-link instagram">
+                  Instagram
+                </a>
+              )}
+              {asesorData.redes_sociales.linkedin && (
+                <a href={asesorData.redes_sociales.linkedin} target="_blank" rel="noopener" class="social-link linkedin">
+                  LinkedIn
+                </a>
+              )}
+              {asesorData.redes_sociales.youtube && (
+                <a href={asesorData.redes_sociales.youtube} target="_blank" rel="noopener" class="social-link youtube">
+                  YouTube
+                </a>
+              )}
+              {asesorData.redes_sociales.tiktok && (
+                <a href={asesorData.redes_sociales.tiktok} target="_blank" rel="noopener" class="social-link tiktok">
+                  TikTok
+                </a>
+              )}
+            </div>
           </div>
         )}
 
@@ -515,6 +705,303 @@ const hasAsesor = asesorData && (asesorData.id || asesorData.nombre);
     transform: translateY(-2px);
   }
 
+  /* Nuevos estilos para secciones adicionales */
+  .asesor-section {
+    background: white;
+    padding: 1.5rem;
+    border-radius: 12px;
+    margin-bottom: 2rem;
+  }
+
+  .asesor-section h2 {
+    font-size: 1.25rem;
+    margin: 0 0 1rem 0;
+    color: var(--text-color, #1a202c);
+  }
+
+  .asesor-extra-info {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+    gap: 1rem;
+    margin-bottom: 2rem;
+  }
+
+  .info-block {
+    background: white;
+    padding: 1.25rem;
+    border-radius: 12px;
+  }
+
+  .info-block h3 {
+    font-size: 1rem;
+    margin: 0 0 0.75rem 0;
+    color: var(--text-color, #1a202c);
+  }
+
+  .tags-list {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.5rem;
+  }
+
+  .tag {
+    display: inline-block;
+    padding: 0.35rem 0.75rem;
+    background: linear-gradient(135deg, var(--primary), var(--secondary));
+    color: white;
+    border-radius: 20px;
+    font-size: 0.8rem;
+    font-weight: 500;
+  }
+
+  .asesor-video-presentacion {
+    background: white;
+    padding: 1.5rem;
+    border-radius: 12px;
+    margin-bottom: 2rem;
+  }
+
+  .asesor-video-presentacion h2 {
+    font-size: 1.25rem;
+    margin: 0 0 1rem 0;
+  }
+
+  .video-container {
+    position: relative;
+    padding-bottom: 56.25%;
+    height: 0;
+    border-radius: 8px;
+    overflow: hidden;
+  }
+
+  .video-container iframe {
+    position: absolute;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+  }
+
+  .mini-location {
+    font-size: 0.8rem;
+    color: #718096;
+    margin: 0 0 0.25rem 0;
+  }
+
+  .operation-badge {
+    position: absolute;
+    top: 8px;
+    left: 8px;
+    padding: 0.25rem 0.5rem;
+    font-size: 0.7rem;
+    font-weight: 600;
+    text-transform: uppercase;
+    border-radius: 4px;
+    color: white;
+  }
+
+  .operation-badge.venta {
+    background: #e53e3e;
+  }
+
+  .operation-badge.alquiler {
+    background: #3182ce;
+  }
+
+  .mini-image {
+    position: relative;
+  }
+
+  .content-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));
+    gap: 1rem;
+  }
+
+  .content-card {
+    background: #f8f9fa;
+    border-radius: 8px;
+    overflow: hidden;
+    text-decoration: none;
+    color: inherit;
+    transition: transform 0.2s, box-shadow 0.2s;
+  }
+
+  .content-card:hover {
+    transform: translateY(-4px);
+    box-shadow: 0 4px 12px rgba(0,0,0,0.1);
+  }
+
+  .content-image {
+    height: 140px;
+    background: #e2e8f0;
+    position: relative;
+    overflow: hidden;
+  }
+
+  .content-image img {
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+  }
+
+  .content-image .no-image {
+    width: 100%;
+    height: 100%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 2.5rem;
+  }
+
+  .play-icon {
+    position: absolute;
+    top: 50%;
+    left: 50%;
+    transform: translate(-50%, -50%);
+    width: 50px;
+    height: 50px;
+    background: rgba(0,0,0,0.7);
+    border-radius: 50%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    color: white;
+    font-size: 1.5rem;
+  }
+
+  .content-info {
+    padding: 0.75rem;
+  }
+
+  .content-info h4 {
+    font-size: 0.9rem;
+    margin: 0 0 0.5rem 0;
+    line-height: 1.3;
+    display: -webkit-box;
+    -webkit-line-clamp: 2;
+    -webkit-box-orient: vertical;
+    overflow: hidden;
+  }
+
+  .duration {
+    font-size: 0.75rem;
+    color: #718096;
+    background: #e2e8f0;
+    padding: 0.2rem 0.5rem;
+    border-radius: 4px;
+  }
+
+  .excerpt {
+    font-size: 0.8rem;
+    color: #718096;
+    margin: 0;
+    line-height: 1.4;
+  }
+
+  .testimonials-list {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+    gap: 1rem;
+  }
+
+  .testimonial-card {
+    background: #f8f9fa;
+    padding: 1.25rem;
+    border-radius: 8px;
+    border-left: 4px solid var(--primary);
+  }
+
+  .testimonial-header {
+    display: flex;
+    align-items: center;
+    gap: 0.75rem;
+    margin-bottom: 0.75rem;
+  }
+
+  .client-avatar {
+    width: 40px;
+    height: 40px;
+    border-radius: 50%;
+    overflow: hidden;
+    background: linear-gradient(135deg, var(--primary), var(--secondary));
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    color: white;
+    font-weight: 600;
+    flex-shrink: 0;
+  }
+
+  .client-avatar img {
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+  }
+
+  .client-info {
+    flex: 1;
+  }
+
+  .client-info strong {
+    display: block;
+    font-size: 0.9rem;
+  }
+
+  .client-info span {
+    font-size: 0.8rem;
+    color: #718096;
+  }
+
+  .testimonial-rating {
+    display: flex;
+  }
+
+  .testimonial-rating .star {
+    font-size: 0.9rem;
+  }
+
+  .testimonial-content {
+    font-size: 0.9rem;
+    color: #4a5568;
+    line-height: 1.5;
+    margin: 0;
+    font-style: italic;
+  }
+
+  .social-section {
+    text-align: center;
+  }
+
+  .social-links {
+    display: flex;
+    justify-content: center;
+    gap: 0.75rem;
+    flex-wrap: wrap;
+  }
+
+  .social-link {
+    display: inline-flex;
+    align-items: center;
+    padding: 0.6rem 1.25rem;
+    border-radius: 8px;
+    font-weight: 500;
+    text-decoration: none;
+    color: white;
+    transition: transform 0.2s, box-shadow 0.2s;
+  }
+
+  .social-link:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 4px 12px rgba(0,0,0,0.2);
+  }
+
+  .social-link.facebook { background: #1877f2; }
+  .social-link.instagram { background: linear-gradient(45deg, #f09433, #e6683c, #dc2743, #cc2366, #bc1888); }
+  .social-link.linkedin { background: #0077b5; }
+  .social-link.youtube { background: #ff0000; }
+  .social-link.tiktok { background: #000000; }
+
   @media (max-width: 768px) {
     .asesor-header {
       flex-direction: column;
@@ -541,6 +1028,14 @@ const hasAsesor = asesorData && (asesorData.id || asesorData.nombre);
 
     .asesor-rating {
       justify-content: center;
+    }
+
+    .content-grid {
+      grid-template-columns: 1fr;
+    }
+
+    .testimonials-list {
+      grid-template-columns: 1fr;
     }
   }
 </style>

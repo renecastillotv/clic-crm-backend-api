@@ -72,9 +72,9 @@ const temaFinal: TemaColores = {
   error: coloresApi.error || defaultTema.error,
 };
 
-// Los componentes ya vienen filtrados y ordenados desde el backend
-// No es necesario filtrar ni ordenar aquí
-const componentesBase = componentes || [];
+// Los componentes ya vienen filtrados desde el backend
+// Pero necesitamos ordenarlos por su propiedad 'orden' para que header (0) y footer (999) queden en su lugar
+const componentesBase = (componentes || []).sort((a, b) => (a.orden ?? 0) - (b.orden ?? 0));
 
 // Calcular totalItems desde componentes con datos dinámicos (team_grid, property_grid, etc.)
 // para poder pasarlo al hero

@@ -2,7 +2,7 @@
  * Servicio de Administración de Tags Globales
  *
  * CRUD completo para la tabla tags_global
- * Tags globales son aquellos con tenant_id = NULL
+ * Administra TODOS los tags de la tabla (sin filtrar por tenant_id)
  */
 
 import { query } from '../utils/db.js';
@@ -71,13 +71,13 @@ export interface TagGlobalStats {
 }
 
 /**
- * Obtiene todos los tags globales (tenant_id IS NULL)
+ * Obtiene todos los tags de la tabla tags_global
  */
 export async function getTagsGlobal(filters?: TagGlobalFilters): Promise<TagGlobal[]> {
   let sql = `
     SELECT *
     FROM tags_global
-    WHERE tenant_id IS NULL
+    WHERE 1=1
   `;
   const params: any[] = [];
   let paramIndex = 1;
@@ -114,28 +114,28 @@ export async function getTagsGlobal(filters?: TagGlobalFilters): Promise<TagGlob
 }
 
 /**
- * Obtiene un tag global por ID
+ * Obtiene un tag por ID
  */
 export async function getTagGlobalById(id: string): Promise<TagGlobal | null> {
   const result = await query(
-    'SELECT * FROM tags_global WHERE id = $1 AND tenant_id IS NULL',
+    'SELECT * FROM tags_global WHERE id = $1',
     [id]
   );
   return result.rows[0] || null;
 }
 
 /**
- * Crea un nuevo tag global
+ * Crea un nuevo tag
  */
 export async function createTagGlobal(data: CreateTagGlobalData): Promise<TagGlobal> {
   // Verificar que el slug no exista
   const existing = await query(
-    'SELECT id FROM tags_global WHERE slug = $1 AND tenant_id IS NULL',
+    'SELECT id FROM tags_global WHERE slug = $1',
     [data.slug]
   );
 
   if (existing.rows.length > 0) {
-    throw new Error(`Ya existe un tag global con el slug "${data.slug}"`);
+    throw new Error(`Ya existe un tag con el slug "${data.slug}"`);
   }
 
   const result = await query(
@@ -175,11 +175,11 @@ export async function updateTagGlobal(id: string, data: UpdateTagGlobalData): Pr
   // Si cambia el slug, verificar que no exista otro con ese slug
   if (data.slug && data.slug !== existing.slug) {
     const duplicate = await query(
-      'SELECT id FROM tags_global WHERE slug = $1 AND tenant_id IS NULL AND id != $2',
+      'SELECT id FROM tags_global WHERE slug = $1 AND id != $2',
       [data.slug, id]
     );
     if (duplicate.rows.length > 0) {
-      throw new Error(`Ya existe un tag global con el slug "${data.slug}"`);
+      throw new Error(`Ya existe un tag con el slug "${data.slug}"`);
     }
   }
 
@@ -271,7 +271,7 @@ export async function toggleTagGlobalStatus(id: string, activo: boolean): Promis
 }
 
 /**
- * Obtiene estadísticas de tags globales
+ * Obtiene estadísticas de tags
  */
 export async function getTagsGlobalStats(): Promise<TagGlobalStats> {
   // Total y activos/inactivos
@@ -281,14 +281,12 @@ export async function getTagsGlobalStats(): Promise<TagGlobalStats> {
       COUNT(*) FILTER (WHERE activo = true) as activos,
       COUNT(*) FILTER (WHERE activo = false) as inactivos
     FROM tags_global
-    WHERE tenant_id IS NULL
   `);
 
   // Por tipo
   const tipoResult = await query(`
     SELECT tipo, COUNT(*) as count
     FROM tags_global
-    WHERE tenant_id IS NULL
     GROUP BY tipo
     ORDER BY tipo
   `);
@@ -297,7 +295,6 @@ export async function getTagsGlobalStats(): Promise<TagGlobalStats> {
   const paisResult = await query(`
     SELECT pais, COUNT(*) as count
     FROM tags_global
-    WHERE tenant_id IS NULL
     GROUP BY pais
     ORDER BY pais
   `);
@@ -326,7 +323,7 @@ export async function getTagTipos(): Promise<string[]> {
   const result = await query(`
     SELECT DISTINCT tipo
     FROM tags_global
-    WHERE tenant_id IS NULL AND tipo IS NOT NULL
+    WHERE tipo IS NOT NULL
     ORDER BY tipo
   `);
   return result.rows.map((row: any) => row.tipo);

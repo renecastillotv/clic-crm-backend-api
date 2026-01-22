@@ -33,13 +33,15 @@ const asesoresRaw = dynamicData?.resolved || datos?.asesores || [];
 // Normalizar datos de asesores para compatibilidad
 const asesores = asesoresRaw.map((a: any) => ({
   ...a,
-  nombreCompleto: `${a.nombre || ''} ${a.apellido || ''}`.trim() || 'Asesor',
+  nombreCompleto: a.nombre_completo || `${a.nombre || ''} ${a.apellido || ''}`.trim() || 'Asesor',
   foto: a.foto_url || a.foto || a.avatar_url || a.avatar || null,
   especialidad: Array.isArray(a.especialidades) && a.especialidades.length > 0
     ? a.especialidades[0]
     : (a.cargo || a.especialidad || null),
   rating: a.calificacion_promedio || a.rating || null,
   num_reviews: a.total_resenas || a.num_reviews || null,
+  // URL al perfil individual del asesor (usar /asesores/ como prefijo)
+  perfilUrl: a.slug ? `${baseUrl}/asesores/${a.slug}` : null,
 }));
 
 // Colores del tema
@@ -55,47 +57,79 @@ const secondaryColor = tema?.secondary || '#764ba2';
       {subtitulo && <p class="section-subtitle">{subtitulo}</p>}
     </div>
 
-    {/* Grid de asesores - VERSIÓN SIMPLIFICADA */}
+    {/* Grid de asesores */}
     {asesores.length > 0 ? (
-      <div style="display: grid; grid-template-columns: repeat(auto-fill, minmax(300px, 1fr)); gap: 2rem; padding: 2rem 0;">
+      <div class="team-grid">
         {asesores.map((asesor: any) => (
-          <div style="background: white; border-radius: 12px; padding: 1.5rem; box-shadow: 0 2px 8px rgba(0,0,0,0.1);">
+          <div class="team-card">
+            {/* Link overlay para hacer toda la card clickeable */}
+            {asesor.perfilUrl && (
+              <a href={asesor.perfilUrl} class="card-link-overlay" aria-label={`Ver perfil de ${asesor.nombreCompleto}`}></a>
+            )}
+
             {/* Avatar */}
-            <div style="width: 80px; height: 80px; border-radius: 50%; background: linear-gradient(135deg, #e63946, #1d3557); display: flex; align-items: center; justify-content: center; color: white; font-size: 2rem; font-weight: bold; margin-bottom: 1rem;">
-              {asesor.nombreCompleto.charAt(0).toUpperCase()}
+            <div class="team-avatar">
+              {asesor.foto ? (
+                <img src={asesor.foto} alt={asesor.nombreCompleto} loading="lazy" />
+              ) : (
+                <div class="avatar-placeholder">
+                  {asesor.nombreCompleto.charAt(0).toUpperCase()}
+                </div>
+              )}
             </div>
 
-            {/* Info */}
-            <h3 style="margin: 0 0 0.5rem 0; font-size: 1.25rem; font-weight: 600;">{asesor.nombreCompleto}</h3>
-            <p style="margin: 0 0 0.25rem 0; color: #4a5568; font-size: 0.9rem;">{asesor.cargo}</p>
-            {asesor.especialidad && (
-              <p style="margin: 0 0 0.5rem 0; color: #e63946; font-size: 0.9rem; font-weight: 500;">{asesor.especialidad}</p>
-            )}
+            <div class="team-info">
+              {/* Info */}
+              <h3 class="team-name">{asesor.nombreCompleto}</h3>
+              {asesor.cargo && <p class="team-role">{asesor.cargo}</p>}
+              {mostrarEspecialidad && asesor.especialidad && (
+                <p class="team-specialty">{asesor.especialidad}</p>
+              )}
 
-            {/* Rating */}
-            {asesor.rating !== undefined && (
-              <div style="display: flex; align-items: center; gap: 0.5rem; margin: 0.5rem 0;">
-                <span style="color: #f6ad55;">★★★★★</span>
-                <span style="font-weight: 600;">{asesor.rating.toFixed(1)}</span>
-                {asesor.num_reviews && (
-                  <span style="font-size: 0.85rem; color: #718096;">({asesor.num_reviews} reseñas)</span>
-                )}
-              </div>
-            )}
+              {/* Rating */}
+              {mostrarRating && asesor.rating != null && (
+                <div class="team-rating">
+                  <div class="stars">
+                    {[1,2,3,4,5].map((star) => (
+                      <span class={`star ${star <= Math.round(asesor.rating) ? 'filled' : ''}`}>★</span>
+                    ))}
+                  </div>
+                  <span class="rating-value">{Number(asesor.rating || 0).toFixed(1)}</span>
+                  {asesor.num_reviews && (
+                    <span class="reviews-count">({asesor.num_reviews} reseñas)</span>
+                  )}
+                </div>
+              )}
 
-            {/* Email */}
-            {asesor.email && (
-              <a href={`mailto:${asesor.email}`} style="display: inline-block; margin-top: 0.5rem; padding: 0.5rem 1rem; background: #f7fafc; border-radius: 8px; color: #e63946; text-decoration: none; font-size: 0.85rem; font-weight: 500;">
-                📧 Email
-              </a>
-            )}
+              {/* Contacto rápido */}
+              {mostrarContacto && (asesor.email || asesor.whatsapp) && (
+                <div class="team-contact">
+                  {asesor.email && (
+                    <a href={`mailto:${asesor.email}`} class="contact-link" onclick="event.stopPropagation();">
+                      📧 Email
+                    </a>
+                  )}
+                  {asesor.whatsapp && (
+                    <a href={`https://wa.me/${asesor.whatsapp.replace(/\D/g, '')}`} class="contact-link" target="_blank" rel="noopener" onclick="event.stopPropagation();">
+                      💬 WhatsApp
+                    </a>
+                  )}
+                </div>
+              )}
 
-            {/* Stats */}
-            {asesor.propiedades_activas !== undefined && (
-              <p style="margin: 0.5rem 0 0 0; font-size: 0.85rem; color: #718096;">
-                {asesor.propiedades_activas} propiedades activas
+              {/* Stats */}
+              <p class="team-stats">
+                {asesor.propiedades_activas > 0
+                  ? `${asesor.propiedades_activas} propiedades activas`
+                  : 'Sin propiedades activas'}
+                {asesor.experiencia_anos > 0 && ` • ${asesor.experiencia_anos} años de experiencia`}
               </p>
-            )}
+
+              {/* CTA Ver perfil */}
+              {asesor.perfilUrl && (
+                <span class="view-profile-link">Ver perfil completo →</span>
+              )}
+            </div>
           </div>
         ))}
       </div>
@@ -153,15 +187,14 @@ const secondaryColor = tema?.secondary || '#764ba2';
   }
 
   .team-card {
-    display: flex !important;
-    flex-direction: row !important;
-    align-items: flex-start !important;
-    gap: 1.25rem !important;
+    position: relative;
+    display: flex;
+    flex-direction: row;
+    align-items: flex-start;
+    gap: 1.25rem;
     background: white;
     border-radius: 16px;
     padding: 1.5rem;
-    text-decoration: none;
-    color: inherit;
     box-shadow: 0 4px 12px rgba(0,0,0,0.08);
     transition: transform 0.2s, box-shadow 0.2s;
   }
@@ -169,6 +202,22 @@ const secondaryColor = tema?.secondary || '#764ba2';
   .team-card:hover {
     transform: translateY(-4px);
     box-shadow: 0 8px 24px rgba(0,0,0,0.12);
+  }
+
+  /* Link overlay para hacer la card clickeable */
+  .card-link-overlay {
+    position: absolute;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    z-index: 1;
+  }
+
+  /* Los links de contacto deben estar por encima del overlay */
+  .team-contact {
+    position: relative;
+    z-index: 2;
   }
 
   .team-avatar {
@@ -284,6 +333,19 @@ const secondaryColor = tema?.secondary || '#764ba2';
     font-size: 0.85rem;
     color: #718096;
     margin: 0.5rem 0 0 0;
+  }
+
+  .view-profile-link {
+    display: inline-block;
+    margin-top: 0.75rem;
+    color: var(--primary);
+    font-weight: 600;
+    font-size: 0.9rem;
+    transition: transform 0.2s;
+  }
+
+  .team-card:hover .view-profile-link {
+    transform: translateX(4px);
   }
 
   .empty-state {
