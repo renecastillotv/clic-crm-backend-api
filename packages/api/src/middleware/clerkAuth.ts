@@ -219,7 +219,7 @@ export async function updateClerkUser(clerkUserId: string, data: {
 }
 
 /**
- * Eliminar usuario de Clerk
+ * Eliminar usuario de Clerk (hard delete)
  */
 export async function deleteClerkUser(userId: string) {
   try {
@@ -227,6 +227,35 @@ export async function deleteClerkUser(userId: string) {
     return true;
   } catch (error) {
     console.error('Error al eliminar usuario de Clerk:', error);
+    return false;
+  }
+}
+
+/**
+ * Desactivar usuario en Clerk (soft delete - banned)
+ * El usuario no podrá loguearse pero su cuenta sigue existiendo
+ */
+export async function deactivateClerkUser(clerkUserId: string) {
+  try {
+    await clerkClient.users.banUser(clerkUserId);
+    console.log(`✅ Usuario baneado en Clerk: ${clerkUserId}`);
+    return true;
+  } catch (error: any) {
+    console.error('Error al desactivar usuario en Clerk:', error);
+    return false;
+  }
+}
+
+/**
+ * Reactivar usuario en Clerk (quitar ban)
+ */
+export async function reactivateClerkUser(clerkUserId: string) {
+  try {
+    await clerkClient.users.unbanUser(clerkUserId);
+    console.log(`✅ Usuario desbaneado en Clerk: ${clerkUserId}`);
+    return true;
+  } catch (error: any) {
+    console.error('Error al reactivar usuario en Clerk:', error);
     return false;
   }
 }
