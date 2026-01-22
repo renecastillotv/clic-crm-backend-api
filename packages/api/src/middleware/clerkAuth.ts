@@ -131,7 +131,8 @@ export async function getClerkUser(userId: string) {
 }
 
 /**
- * Crear usuario en Clerk
+ * Crear usuario en Clerk con contraseña y email pre-verificado
+ * El admin puede crear usuarios con contraseña temporal que pueden loguearse inmediatamente
  */
 export async function createClerkUser(data: {
   email: string;
@@ -140,12 +141,32 @@ export async function createClerkUser(data: {
   lastName?: string;
 }) {
   try {
-    return await clerkClient.users.createUser({
+    // Crear usuario con email pre-verificado para que pueda loguearse inmediatamente
+    const user = await clerkClient.users.createUser({
       emailAddress: [data.email],
       password: data.password,
       firstName: data.firstName,
       lastName: data.lastName,
+      skipPasswordChecks: false, // Validar que la contraseña cumpla requisitos
     });
+
+    // Si el email no está verificado, verificarlo automáticamente
+    const primaryEmail = user.emailAddresses.find(e => e.emailAddress === data.email);
+    if (primaryEmail && primaryEmail.verification?.status !== 'verified') {
+      try {
+        // Usar la API de Clerk para preparar la verificación
+        // y luego actualizar el usuario para marcar el email como verificado
+        await clerkClient.emailAddresses.updateEmailAddress(primaryEmail.id, {
+          verified: true,
+        });
+        console.log(`✅ Email ${data.email} verificado automáticamente para usuario creado por admin`);
+      } catch (verifyError: any) {
+        // Si falla la verificación, loguear pero no fallar la creación
+        console.warn(`⚠️ No se pudo verificar automáticamente el email: ${verifyError.message}`);
+      }
+    }
+
+    return user;
   } catch (error: any) {
     console.error('Error al crear usuario en Clerk:', error);
     throw new Error(`Error al crear usuario: ${error.message}`);
