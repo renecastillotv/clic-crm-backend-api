@@ -33,6 +33,16 @@ import {
   searchTags,
   getIndexStats
 } from '../services/meilisearchTagsService.js';
+import {
+  getTagsGlobal,
+  getTagGlobalById,
+  createTagGlobal,
+  updateTagGlobal,
+  deleteTagGlobal,
+  toggleTagGlobalStatus,
+  getTagsGlobalStats,
+  getTagTipos
+} from '../services/adminTagsGlobalService.js';
 
 const router = express.Router();
 
@@ -1348,6 +1358,160 @@ router.get('/meilisearch/tags/search', async (req, res) => {
     console.error('Error en GET /admin/meilisearch/tags/search:', error);
     res.status(500).json({
       error: 'Error al buscar tags',
+      message: error.message
+    });
+  }
+});
+
+// ==================== TAGS GLOBAL ====================
+
+/**
+ * GET /api/admin/tags-global
+ * Lista todos los tags globales (tenant_id IS NULL)
+ */
+router.get('/tags-global', async (req, res) => {
+  try {
+    const { tipo, pais, activo, search } = req.query;
+    const filters: any = {};
+
+    if (tipo) filters.tipo = String(tipo);
+    if (pais) filters.pais = String(pais);
+    if (activo !== undefined) filters.activo = activo === 'true';
+    if (search) filters.search = String(search);
+
+    const tags = await getTagsGlobal(filters);
+    res.json({ tags });
+  } catch (error: any) {
+    console.error('Error en GET /admin/tags-global:', error);
+    res.status(500).json({
+      error: 'Error al obtener tags globales',
+      message: error.message
+    });
+  }
+});
+
+/**
+ * GET /api/admin/tags-global/stats
+ * Estadísticas de tags globales
+ */
+router.get('/tags-global/stats', async (req, res) => {
+  try {
+    const stats = await getTagsGlobalStats();
+    res.json(stats);
+  } catch (error: any) {
+    console.error('Error en GET /admin/tags-global/stats:', error);
+    res.status(500).json({
+      error: 'Error al obtener estadísticas',
+      message: error.message
+    });
+  }
+});
+
+/**
+ * GET /api/admin/tags-global/tipos
+ * Lista los tipos de tags existentes
+ */
+router.get('/tags-global/tipos', async (req, res) => {
+  try {
+    const tipos = await getTagTipos();
+    res.json({ tipos });
+  } catch (error: any) {
+    console.error('Error en GET /admin/tags-global/tipos:', error);
+    res.status(500).json({
+      error: 'Error al obtener tipos',
+      message: error.message
+    });
+  }
+});
+
+/**
+ * GET /api/admin/tags-global/:id
+ * Obtiene un tag global por ID
+ */
+router.get('/tags-global/:id', async (req, res) => {
+  try {
+    const tag = await getTagGlobalById(req.params.id);
+    if (!tag) {
+      return res.status(404).json({ error: 'Tag no encontrado' });
+    }
+    res.json({ tag });
+  } catch (error: any) {
+    console.error('Error en GET /admin/tags-global/:id:', error);
+    res.status(500).json({
+      error: 'Error al obtener tag',
+      message: error.message
+    });
+  }
+});
+
+/**
+ * POST /api/admin/tags-global
+ * Crea un nuevo tag global
+ */
+router.post('/tags-global', async (req, res) => {
+  try {
+    const tag = await createTagGlobal(req.body);
+    res.status(201).json({ tag });
+  } catch (error: any) {
+    console.error('Error en POST /admin/tags-global:', error);
+    res.status(400).json({
+      error: 'Error al crear tag',
+      message: error.message
+    });
+  }
+});
+
+/**
+ * PUT /api/admin/tags-global/:id
+ * Actualiza un tag global
+ */
+router.put('/tags-global/:id', async (req, res) => {
+  try {
+    const tag = await updateTagGlobal(req.params.id, req.body);
+    res.json({ tag });
+  } catch (error: any) {
+    console.error('Error en PUT /admin/tags-global/:id:', error);
+    res.status(400).json({
+      error: 'Error al actualizar tag',
+      message: error.message
+    });
+  }
+});
+
+/**
+ * DELETE /api/admin/tags-global/:id
+ * Elimina un tag global (soft delete por defecto)
+ */
+router.delete('/tags-global/:id', async (req, res) => {
+  try {
+    const hardDelete = req.query.hard === 'true';
+    await deleteTagGlobal(req.params.id, hardDelete);
+    res.json({ success: true, message: 'Tag eliminado correctamente' });
+  } catch (error: any) {
+    console.error('Error en DELETE /admin/tags-global/:id:', error);
+    res.status(400).json({
+      error: 'Error al eliminar tag',
+      message: error.message
+    });
+  }
+});
+
+/**
+ * POST /api/admin/tags-global/:id/toggle
+ * Activa o desactiva un tag global
+ */
+router.post('/tags-global/:id/toggle', async (req, res) => {
+  try {
+    const { activo } = req.body;
+    if (activo === undefined) {
+      return res.status(400).json({ error: 'El campo "activo" es requerido' });
+    }
+    const tag = await toggleTagGlobalStatus(req.params.id, activo);
+    res.json({ tag });
+  } catch (error: any) {
+    console.error('Error en POST /admin/tags-global/:id/toggle:', error);
+    res.status(400).json({
+      error: 'Error al cambiar estado',
       message: error.message
     });
   }

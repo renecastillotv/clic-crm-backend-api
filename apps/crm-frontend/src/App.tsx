@@ -38,6 +38,7 @@ import AdminFacturacion from './pages/admin/AdminFacturacion';
 import AdminConfiguracion from './pages/admin/AdminConfiguracion';
 import AdminRoles from './pages/admin/AdminRoles';
 import AdminUbicaciones from './pages/admin/AdminUbicaciones';
+import AdminTagsGlobal from './pages/admin/AdminTagsGlobal';
 
 // Páginas CRM
 import CrmDashboard from './pages/crm/CrmDashboard';
@@ -279,6 +280,7 @@ function AppRoutes() {
                 <Route path="configuracion" element={<AdminConfiguracion />} />
                 <Route path="roles" element={<AdminRoles />} />
                 <Route path="ubicaciones" element={<AdminUbicaciones />} />
+                <Route path="tags-global" element={<AdminTagsGlobal />} />
       </Route>
 
       {/* ========== CRM POR TENANT ========== */}

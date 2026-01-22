@@ -7114,3 +7114,151 @@ export async function toggleUbicacionStatus(id: string, activo: boolean, token?:
   return updateUbicacion(id, { activo }, token);
 }
 
+// ==================== TAGS GLOBAL - ADMIN ====================
+
+/**
+ * Interfaz para tag global
+ */
+export interface TagGlobal {
+  id: string;
+  slug: string;
+  tipo: string;
+  valor: string | null;
+  campo_query: string | null;
+  operador: string;
+  alias_idiomas: Record<string, string>;
+  nombre_idiomas: Record<string, string>;
+  pais: string;
+  orden: number;
+  activo: boolean;
+  created_at: string;
+  updated_at: string;
+}
+
+/**
+ * Datos para crear un tag global
+ */
+export interface CreateTagGlobalData {
+  slug: string;
+  tipo: string;
+  valor?: string | null;
+  campo_query?: string | null;
+  operador?: string;
+  alias_idiomas?: Record<string, string>;
+  nombre_idiomas?: Record<string, string>;
+  pais?: string;
+  orden?: number;
+  activo?: boolean;
+}
+
+/**
+ * Estadísticas de tags globales
+ */
+export interface TagGlobalStats {
+  total: number;
+  activos: number;
+  inactivos: number;
+  por_tipo: Record<string, number>;
+  por_pais: Record<string, number>;
+}
+
+/**
+ * Filtros para listar tags globales
+ */
+export interface TagGlobalFilters {
+  tipo?: string;
+  pais?: string;
+  activo?: boolean;
+  search?: string;
+}
+
+/**
+ * Obtiene todos los tags globales
+ */
+export async function getTagsGlobal(filters?: TagGlobalFilters, token?: string | null): Promise<TagGlobal[]> {
+  let url = '/admin/tags-global';
+  if (filters) {
+    const params: string[] = [];
+    if (filters.tipo) params.push(`tipo=${filters.tipo}`);
+    if (filters.pais) params.push(`pais=${filters.pais}`);
+    if (filters.activo !== undefined) params.push(`activo=${filters.activo}`);
+    if (filters.search) params.push(`search=${encodeURIComponent(filters.search)}`);
+    if (params.length > 0) url += `?${params.join('&')}`;
+  }
+  const response = await apiFetch(url, {}, token);
+  const data = await response.json();
+  return data.tags || [];
+}
+
+/**
+ * Obtiene un tag global por ID
+ */
+export async function getTagGlobalById(id: string, token?: string | null): Promise<TagGlobal> {
+  const response = await apiFetch(`/admin/tags-global/${id}`, {}, token);
+  const data = await response.json();
+  return data.tag;
+}
+
+/**
+ * Crea un nuevo tag global
+ */
+export async function createTagGlobal(data: CreateTagGlobalData, token?: string | null): Promise<TagGlobal> {
+  const response = await apiFetch('/admin/tags-global', {
+    method: 'POST',
+    body: JSON.stringify(data),
+  }, token);
+  const result = await response.json();
+  return result.tag;
+}
+
+/**
+ * Actualiza un tag global
+ */
+export async function updateTagGlobal(id: string, data: Partial<CreateTagGlobalData>, token?: string | null): Promise<TagGlobal> {
+  const response = await apiFetch(`/admin/tags-global/${id}`, {
+    method: 'PUT',
+    body: JSON.stringify(data),
+  }, token);
+  const result = await response.json();
+  return result.tag;
+}
+
+/**
+ * Elimina un tag global
+ */
+export async function deleteTagGlobal(id: string, hardDelete: boolean = false, token?: string | null): Promise<void> {
+  const url = hardDelete ? `/admin/tags-global/${id}?hard=true` : `/admin/tags-global/${id}`;
+  await apiFetch(url, {
+    method: 'DELETE',
+  }, token);
+}
+
+/**
+ * Activa o desactiva un tag global
+ */
+export async function toggleTagGlobalStatus(id: string, activo: boolean, token?: string | null): Promise<TagGlobal> {
+  const response = await apiFetch(`/admin/tags-global/${id}/toggle`, {
+    method: 'POST',
+    body: JSON.stringify({ activo }),
+  }, token);
+  const result = await response.json();
+  return result.tag;
+}
+
+/**
+ * Obtiene estadísticas de tags globales
+ */
+export async function getTagsGlobalStats(token?: string | null): Promise<TagGlobalStats> {
+  const response = await apiFetch('/admin/tags-global/stats', {}, token);
+  return response.json();
+}
+
+/**
+ * Obtiene los tipos de tags existentes
+ */
+export async function getTagGlobalTipos(token?: string | null): Promise<string[]> {
+  const response = await apiFetch('/admin/tags-global/tipos', {}, token);
+  const data = await response.json();
+  return data.tipos || [];
+}
+
