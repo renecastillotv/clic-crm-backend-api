@@ -5,7 +5,7 @@
  */
 
 import { query } from '../utils/db.js';
-import { createClerkUser, createClerkUserWithoutPassword } from '../middleware/clerkAuth.js';
+import { createClerkUser, createClerkUserWithoutPassword, deleteClerkUser } from '../middleware/clerkAuth.js';
 import { v4 as uuidv4 } from 'uuid';
 
 export interface Usuario {
@@ -1121,12 +1121,20 @@ export async function actualizarUsuarioTenant(
 }
 
 /**
- * Eliminar usuario de un tenant (no elimina el usuario, solo la relación)
+ * Eliminar usuario de un tenant
+ * Si el usuario no pertenece a otros tenants, también se elimina de Clerk y de la BD
  */
 export async function eliminarUsuarioDeTenant(
   tenantId: string,
   usuarioId: string
 ): Promise<boolean> {
+  // Obtener información del usuario antes de eliminar
+  const usuarioResult = await query(
+    `SELECT clerk_id, email FROM usuarios WHERE id = $1`,
+    [usuarioId]
+  );
+  const usuario = usuarioResult.rows[0];
+
   // Eliminar relación tenant-usuario
   const deleteSql = `
     DELETE FROM usuarios_tenants
@@ -1139,6 +1147,58 @@ export async function eliminarUsuarioDeTenant(
     `DELETE FROM usuarios_roles WHERE usuario_id = $1 AND tenant_id = $2`,
     [usuarioId, tenantId]
   );
+
+  // Desactivar perfil de asesor si existe
+  await query(
+    `UPDATE perfiles_asesor SET activo = false, visible_en_web = false, updated_at = NOW()
+     WHERE usuario_id = $1 AND tenant_id = $2`,
+    [usuarioId, tenantId]
+  );
+
+  // Verificar si el usuario tiene otros tenants
+  const otrosTenants = await query(
+    `SELECT COUNT(*) as count FROM usuarios_tenants WHERE usuario_id = $1`,
+    [usuarioId]
+  );
+  const tieneOtrosTenants = parseInt(otrosTenants.rows[0].count) > 0;
+
+  // Si no tiene otros tenants, eliminar completamente (de Clerk y BD)
+  if (!tieneOtrosTenants && usuario) {
+    console.log(`🗑️ Usuario ${usuario.email} no tiene otros tenants, eliminando completamente...`);
+
+    // Eliminar de Clerk si tiene clerk_id
+    if (usuario.clerk_id) {
+      try {
+        await deleteClerkUser(usuario.clerk_id);
+        console.log(`✅ Usuario eliminado de Clerk: ${usuario.email}`);
+      } catch (clerkError: any) {
+        console.error(`⚠️ Error eliminando de Clerk: ${clerkError.message}`);
+        // Continuamos con la eliminación local aunque falle Clerk
+      }
+    }
+
+    // Eliminar documentos del usuario
+    await query(
+      `DELETE FROM usuarios_documentos WHERE usuario_id = $1`,
+      [usuarioId]
+    );
+
+    // Eliminar roles de plataforma
+    await query(
+      `DELETE FROM usuarios_roles WHERE usuario_id = $1`,
+      [usuarioId]
+    );
+
+    // Eliminar usuario de la BD
+    await query(
+      `DELETE FROM usuarios WHERE id = $1`,
+      [usuarioId]
+    );
+
+    console.log(`✅ Usuario eliminado completamente de la BD: ${usuario.email}`);
+  } else if (usuario) {
+    console.log(`ℹ️ Usuario ${usuario.email} tiene otros tenants, solo se eliminó de este tenant`);
+  }
 
   return (result.rowCount ?? 0) > 0;
 }
