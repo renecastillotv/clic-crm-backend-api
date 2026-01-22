@@ -1,7 +1,7 @@
 /**
  * Servicio de Administración de Tags Globales
  *
- * CRUD completo para la tabla tags_global
+ * CRUD completo para la tabla tags_propiedades
  * Tags globales son aquellos con tenant_id = NULL
  */
 
@@ -76,7 +76,7 @@ export interface TagGlobalStats {
 export async function getTagsGlobal(filters?: TagGlobalFilters): Promise<TagGlobal[]> {
   let sql = `
     SELECT *
-    FROM tags_global
+    FROM tags_propiedades
     WHERE tenant_id IS NULL
   `;
   const params: any[] = [];
@@ -118,7 +118,7 @@ export async function getTagsGlobal(filters?: TagGlobalFilters): Promise<TagGlob
  */
 export async function getTagGlobalById(id: string): Promise<TagGlobal | null> {
   const result = await query(
-    'SELECT * FROM tags_global WHERE id = $1 AND tenant_id IS NULL',
+    'SELECT * FROM tags_propiedades WHERE id = $1 AND tenant_id IS NULL',
     [id]
   );
   return result.rows[0] || null;
@@ -130,7 +130,7 @@ export async function getTagGlobalById(id: string): Promise<TagGlobal | null> {
 export async function createTagGlobal(data: CreateTagGlobalData): Promise<TagGlobal> {
   // Verificar que el slug no exista
   const existing = await query(
-    'SELECT id FROM tags_global WHERE slug = $1 AND tenant_id IS NULL',
+    'SELECT id FROM tags_propiedades WHERE slug = $1 AND tenant_id IS NULL',
     [data.slug]
   );
 
@@ -139,7 +139,7 @@ export async function createTagGlobal(data: CreateTagGlobalData): Promise<TagGlo
   }
 
   const result = await query(
-    `INSERT INTO tags_global (
+    `INSERT INTO tags_propiedades (
       slug, tipo, valor, campo_query, operador,
       alias_idiomas, nombre_idiomas, pais, orden, activo,
       tenant_id
@@ -175,7 +175,7 @@ export async function updateTagGlobal(id: string, data: UpdateTagGlobalData): Pr
   // Si cambia el slug, verificar que no exista otro con ese slug
   if (data.slug && data.slug !== existing.slug) {
     const duplicate = await query(
-      'SELECT id FROM tags_global WHERE slug = $1 AND tenant_id IS NULL AND id != $2',
+      'SELECT id FROM tags_propiedades WHERE slug = $1 AND tenant_id IS NULL AND id != $2',
       [data.slug, id]
     );
     if (duplicate.rows.length > 0) {
@@ -237,7 +237,7 @@ export async function updateTagGlobal(id: string, data: UpdateTagGlobalData): Pr
   params.push(id);
 
   const result = await query(
-    `UPDATE tags_global SET ${updates.join(', ')} WHERE id = $${paramIndex} RETURNING *`,
+    `UPDATE tags_propiedades SET ${updates.join(', ')} WHERE id = $${paramIndex} RETURNING *`,
     params
   );
 
@@ -254,10 +254,10 @@ export async function deleteTagGlobal(id: string, hardDelete: boolean = false): 
   }
 
   if (hardDelete) {
-    await query('DELETE FROM tags_global WHERE id = $1', [id]);
+    await query('DELETE FROM tags_propiedades WHERE id = $1', [id]);
   } else {
     await query(
-      'UPDATE tags_global SET activo = false, updated_at = CURRENT_TIMESTAMP WHERE id = $1',
+      'UPDATE tags_propiedades SET activo = false, updated_at = CURRENT_TIMESTAMP WHERE id = $1',
       [id]
     );
   }
@@ -280,14 +280,14 @@ export async function getTagsGlobalStats(): Promise<TagGlobalStats> {
       COUNT(*) as total,
       COUNT(*) FILTER (WHERE activo = true) as activos,
       COUNT(*) FILTER (WHERE activo = false) as inactivos
-    FROM tags_global
+    FROM tags_propiedades
     WHERE tenant_id IS NULL
   `);
 
   // Por tipo
   const tipoResult = await query(`
     SELECT tipo, COUNT(*) as count
-    FROM tags_global
+    FROM tags_propiedades
     WHERE tenant_id IS NULL
     GROUP BY tipo
     ORDER BY tipo
@@ -296,7 +296,7 @@ export async function getTagsGlobalStats(): Promise<TagGlobalStats> {
   // Por país
   const paisResult = await query(`
     SELECT pais, COUNT(*) as count
-    FROM tags_global
+    FROM tags_propiedades
     WHERE tenant_id IS NULL
     GROUP BY pais
     ORDER BY pais
@@ -325,7 +325,7 @@ export async function getTagsGlobalStats(): Promise<TagGlobalStats> {
 export async function getTagTipos(): Promise<string[]> {
   const result = await query(`
     SELECT DISTINCT tipo
-    FROM tags_global
+    FROM tags_propiedades
     WHERE tenant_id IS NULL AND tipo IS NOT NULL
     ORDER BY tipo
   `);
@@ -338,7 +338,7 @@ export async function getTagTipos(): Promise<string[]> {
 export async function reorderTags(tipo: string, orderedIds: string[]): Promise<void> {
   for (let i = 0; i < orderedIds.length; i++) {
     await query(
-      'UPDATE tags_global SET orden = $1, updated_at = CURRENT_TIMESTAMP WHERE id = $2 AND tipo = $3',
+      'UPDATE tags_propiedades SET orden = $1, updated_at = CURRENT_TIMESTAMP WHERE id = $2 AND tipo = $3',
       [i, orderedIds[i], tipo]
     );
   }
