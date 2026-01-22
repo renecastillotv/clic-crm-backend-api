@@ -15,6 +15,7 @@ import {
   getUsuarioConRoles,
   syncUsuarioFromClerk,
   getModulosAccesibles,
+  getPermisosVersion,
   updateUsuarioPerfil,
   upsertPerfilAsesor,
   getPerfilAsesor,
@@ -186,6 +187,23 @@ router.get('/modulos/:tenantId', requireAuth, async (req, res) => {
       error: 'Error al obtener módulos',
       message: error.message,
     });
+  }
+});
+
+/**
+ * GET /api/auth/permissions/version/:tenantId
+ *
+ * Retorna la versión actual de permisos del tenant (para cache invalidation).
+ * El frontend compara con su versión cacheada para decidir si refetch.
+ */
+router.get('/permissions/version/:tenantId', requireAuth, async (req, res) => {
+  try {
+    const { tenantId } = req.params;
+    const version = await getPermisosVersion(tenantId);
+    res.json({ version });
+  } catch (error: any) {
+    console.error('❌ Error en /auth/permissions/version:', error);
+    res.status(500).json({ error: 'Error al obtener versión de permisos' });
   }
 });
 

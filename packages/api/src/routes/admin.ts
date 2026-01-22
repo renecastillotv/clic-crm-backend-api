@@ -54,6 +54,22 @@ import {
   getRolesModulosStats,
   RolModuloInput
 } from '../services/adminRolesModulosService.js';
+import {
+  getAllTemplates,
+  getTemplateById,
+  createTemplate,
+  updateTemplate,
+  toggleTemplate,
+  deleteTemplate,
+  getTemplateModulos,
+  getTemplateMatrix,
+  upsertTemplateModulo,
+  removeTemplateModulo,
+  updateAllTemplateModulos,
+  propagateModuloToRoles,
+  getTemplatesStats,
+  TemplateModuloInput,
+} from '../services/templatesService.js';
 
 const router = express.Router();
 
@@ -1722,6 +1738,195 @@ router.post('/roles/:roleId/copy-permisos', async (req, res) => {
       error: 'Error al copiar permisos',
       message: error.message
     });
+  }
+});
+
+// ============================================
+// TEMPLATES DE ROLES
+// ============================================
+
+/**
+ * GET /api/admin/templates
+ * Lista todos los templates con estadísticas
+ */
+router.get('/templates', async (req, res) => {
+  try {
+    const templates = await getTemplatesStats();
+    res.json({ templates });
+  } catch (error: any) {
+    console.error('Error en GET /admin/templates:', error);
+    res.status(500).json({ error: 'Error al obtener templates', message: error.message });
+  }
+});
+
+/**
+ * GET /api/admin/templates/:id
+ * Obtener template por ID
+ */
+router.get('/templates/:id', async (req, res) => {
+  try {
+    const template = await getTemplateById(req.params.id);
+    if (!template) {
+      return res.status(404).json({ error: 'Template no encontrado' });
+    }
+    res.json({ template });
+  } catch (error: any) {
+    console.error('Error en GET /admin/templates/:id:', error);
+    res.status(500).json({ error: 'Error al obtener template', message: error.message });
+  }
+});
+
+/**
+ * POST /api/admin/templates
+ * Crear nuevo template
+ */
+router.post('/templates', async (req, res) => {
+  try {
+    const { codigo, nombre, descripcion, categoria, icono, color, visibleParaTenants } = req.body;
+    if (!codigo || !nombre) {
+      return res.status(400).json({ error: 'Código y nombre son requeridos' });
+    }
+    const template = await createTemplate({ codigo, nombre, descripcion, categoria, icono, color, visibleParaTenants });
+    res.status(201).json({ template, message: 'Template creado correctamente' });
+  } catch (error: any) {
+    console.error('Error en POST /admin/templates:', error);
+    res.status(400).json({ error: 'Error al crear template', message: error.message });
+  }
+});
+
+/**
+ * PUT /api/admin/templates/:id
+ * Actualizar template
+ */
+router.put('/templates/:id', async (req, res) => {
+  try {
+    const template = await updateTemplate(req.params.id, req.body);
+    res.json({ template, message: 'Template actualizado correctamente' });
+  } catch (error: any) {
+    console.error('Error en PUT /admin/templates/:id:', error);
+    res.status(400).json({ error: 'Error al actualizar template', message: error.message });
+  }
+});
+
+/**
+ * PATCH /api/admin/templates/:id/toggle
+ * Activar/desactivar template
+ */
+router.patch('/templates/:id/toggle', async (req, res) => {
+  try {
+    const { esActivo } = req.body;
+    const template = await toggleTemplate(req.params.id, esActivo);
+    res.json({ template });
+  } catch (error: any) {
+    console.error('Error en PATCH /admin/templates/:id/toggle:', error);
+    res.status(400).json({ error: 'Error al cambiar estado', message: error.message });
+  }
+});
+
+/**
+ * DELETE /api/admin/templates/:id
+ * Eliminar template (si no tiene roles asociados)
+ */
+router.delete('/templates/:id', async (req, res) => {
+  try {
+    await deleteTemplate(req.params.id);
+    res.json({ message: 'Template eliminado correctamente' });
+  } catch (error: any) {
+    console.error('Error en DELETE /admin/templates/:id:', error);
+    res.status(400).json({ error: 'Error al eliminar template', message: error.message });
+  }
+});
+
+/**
+ * GET /api/admin/templates/:id/modulos
+ * Obtener módulos asignados a un template
+ */
+router.get('/templates/:id/modulos', async (req, res) => {
+  try {
+    const modulos = await getTemplateModulos(req.params.id);
+    res.json({ modulos });
+  } catch (error: any) {
+    console.error('Error en GET /admin/templates/:id/modulos:', error);
+    res.status(500).json({ error: 'Error al obtener módulos del template', message: error.message });
+  }
+});
+
+/**
+ * GET /api/admin/templates/:id/matrix
+ * Obtener la matriz completa (todos los módulos con permisos del template)
+ */
+router.get('/templates/:id/matrix', async (req, res) => {
+  try {
+    const data = await getTemplateMatrix(req.params.id);
+    res.json(data);
+  } catch (error: any) {
+    console.error('Error en GET /admin/templates/:id/matrix:', error);
+    res.status(400).json({ error: 'Error al obtener matriz', message: error.message });
+  }
+});
+
+/**
+ * PUT /api/admin/templates/:id/modulos
+ * Actualizar todos los módulos de un template
+ */
+router.put('/templates/:id/modulos', async (req, res) => {
+  try {
+    const { modulos } = req.body;
+    if (!modulos || !Array.isArray(modulos)) {
+      return res.status(400).json({ error: 'Se requiere un array de módulos' });
+    }
+    const result = await updateAllTemplateModulos(req.params.id, modulos as TemplateModuloInput[]);
+    res.json({ modulos: result, message: 'Módulos del template actualizados' });
+  } catch (error: any) {
+    console.error('Error en PUT /admin/templates/:id/modulos:', error);
+    res.status(400).json({ error: 'Error al actualizar módulos', message: error.message });
+  }
+});
+
+/**
+ * PUT /api/admin/templates/:id/modulos/:moduloId
+ * Agregar o actualizar un módulo en el template
+ */
+router.put('/templates/:id/modulos/:moduloId', async (req, res) => {
+  try {
+    const data = { ...req.body, moduloId: req.params.moduloId };
+    const result = await upsertTemplateModulo(req.params.id, data);
+    res.json({ modulo: result });
+  } catch (error: any) {
+    console.error('Error en PUT /admin/templates/:id/modulos/:moduloId:', error);
+    res.status(400).json({ error: 'Error al actualizar módulo', message: error.message });
+  }
+});
+
+/**
+ * DELETE /api/admin/templates/:id/modulos/:moduloId
+ * Eliminar un módulo del template
+ */
+router.delete('/templates/:id/modulos/:moduloId', async (req, res) => {
+  try {
+    const removed = await removeTemplateModulo(req.params.id, req.params.moduloId);
+    if (!removed) {
+      return res.status(404).json({ error: 'Módulo no encontrado en el template' });
+    }
+    res.json({ message: 'Módulo removido del template' });
+  } catch (error: any) {
+    console.error('Error en DELETE /admin/templates/:id/modulos/:moduloId:', error);
+    res.status(400).json({ error: 'Error al remover módulo', message: error.message });
+  }
+});
+
+/**
+ * POST /api/admin/templates/:id/propagate/:moduloId
+ * Propagar un módulo a todos los roles herederos del template
+ */
+router.post('/templates/:id/propagate/:moduloId', async (req, res) => {
+  try {
+    const permisos = req.body;
+    const count = await propagateModuloToRoles(req.params.id, req.params.moduloId, permisos);
+    res.json({ propagatedCount: count, message: `Módulo propagado a ${count} roles` });
+  } catch (error: any) {
+    console.error('Error en POST /admin/templates/:id/propagate/:moduloId:', error);
+    res.status(400).json({ error: 'Error al propagar módulo', message: error.message });
   }
 });
 

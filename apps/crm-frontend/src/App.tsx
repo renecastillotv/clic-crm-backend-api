@@ -40,6 +40,8 @@ import AdminRoles from './pages/admin/AdminRoles';
 import AdminRolPermisos from './pages/admin/AdminRolPermisos';
 import AdminUbicaciones from './pages/admin/AdminUbicaciones';
 import AdminTagsGlobal from './pages/admin/AdminTagsGlobal';
+import AdminTemplates from './pages/admin/AdminTemplates';
+import AdminTemplatePermisos from './pages/admin/AdminTemplatePermisos';
 
 // Páginas CRM
 import CrmDashboard from './pages/crm/CrmDashboard';
@@ -283,6 +285,8 @@ function AppRoutes() {
                 <Route path="roles/permisos" element={<AdminRolPermisos />} />
                 <Route path="ubicaciones" element={<AdminUbicaciones />} />
                 <Route path="tags-global" element={<AdminTagsGlobal />} />
+                <Route path="templates" element={<AdminTemplates />} />
+                <Route path="templates/:templateId/permisos" element={<AdminTemplatePermisos />} />
       </Route>
 
       {/* ========== CRM POR TENANT ========== */}

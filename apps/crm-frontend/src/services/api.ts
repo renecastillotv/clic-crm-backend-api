@@ -1063,6 +1063,173 @@ export async function copyRolPermisos(
   return response.json();
 }
 
+// ============================================
+// TEMPLATES DE ROLES
+// ============================================
+
+export interface RolTemplate {
+  id: string;
+  codigo: string;
+  nombre: string;
+  descripcion: string | null;
+  categoria: string;
+  icono: string | null;
+  color: string | null;
+  esActivo: boolean;
+  visibleParaTenants: boolean;
+  createdAt: string;
+  updatedAt: string;
+  totalRoles?: number;
+  totalTenants?: number;
+}
+
+export interface TemplateModulo {
+  id: string;
+  templateId: string;
+  moduloId: string;
+  puedeVer: boolean;
+  puedeCrear: boolean;
+  puedeEditar: boolean;
+  puedeEliminar: boolean;
+  alcanceVer: 'all' | 'team' | 'own';
+  alcanceEditar: 'all' | 'team' | 'own';
+  permisosCampos: Record<string, any>;
+  moduloNombre?: string;
+  moduloCategoria?: string;
+  moduloOrden?: number;
+  moduloEsSubmenu?: boolean;
+  moduloPadreId?: string | null;
+}
+
+export interface TemplateModuloInput {
+  moduloId: string;
+  puedeVer: boolean;
+  puedeCrear: boolean;
+  puedeEditar: boolean;
+  puedeEliminar: boolean;
+  alcanceVer?: 'all' | 'team' | 'own';
+  alcanceEditar?: 'all' | 'team' | 'own';
+  permisosCampos?: Record<string, any>;
+}
+
+export interface TemplateMatrix {
+  template: RolTemplate;
+  modulos: Array<{
+    id: string;
+    nombre: string;
+    categoria: string;
+    orden: number;
+    esSubmenu: boolean;
+    moduloPadreId: string | null;
+    permisos: TemplateModulo | null;
+  }>;
+}
+
+export async function getAllTemplates(token?: string | null): Promise<RolTemplate[]> {
+  const response = await apiFetch('/admin/templates', {}, token);
+  const data = await response.json();
+  return data.templates;
+}
+
+export async function getTemplateById(id: string, token?: string | null): Promise<RolTemplate> {
+  const response = await apiFetch(`/admin/templates/${id}`, {}, token);
+  const data = await response.json();
+  return data.template;
+}
+
+export async function createTemplate(
+  data: { codigo: string; nombre: string; descripcion?: string; categoria?: string; icono?: string; color?: string; visibleParaTenants?: boolean },
+  token?: string | null
+): Promise<RolTemplate> {
+  const response = await apiFetch('/admin/templates', {
+    method: 'POST',
+    body: JSON.stringify(data),
+  }, token);
+  const result = await response.json();
+  return result.template;
+}
+
+export async function updateTemplate(
+  id: string,
+  data: Partial<{ nombre: string; descripcion: string; categoria: string; icono: string; color: string; visibleParaTenants: boolean }>,
+  token?: string | null
+): Promise<RolTemplate> {
+  const response = await apiFetch(`/admin/templates/${id}`, {
+    method: 'PUT',
+    body: JSON.stringify(data),
+  }, token);
+  const result = await response.json();
+  return result.template;
+}
+
+export async function toggleTemplateStatus(id: string, esActivo: boolean, token?: string | null): Promise<RolTemplate> {
+  const response = await apiFetch(`/admin/templates/${id}/toggle`, {
+    method: 'PATCH',
+    body: JSON.stringify({ esActivo }),
+  }, token);
+  const data = await response.json();
+  return data.template;
+}
+
+export async function deleteTemplate(id: string, token?: string | null): Promise<void> {
+  await apiFetch(`/admin/templates/${id}`, { method: 'DELETE' }, token);
+}
+
+export async function getTemplateModulos(templateId: string, token?: string | null): Promise<TemplateModulo[]> {
+  const response = await apiFetch(`/admin/templates/${templateId}/modulos`, {}, token);
+  const data = await response.json();
+  return data.modulos;
+}
+
+export async function getTemplateMatrix(templateId: string, token?: string | null): Promise<TemplateMatrix> {
+  const response = await apiFetch(`/admin/templates/${templateId}/matrix`, {}, token);
+  return response.json();
+}
+
+export async function updateTemplateModulos(
+  templateId: string,
+  modulos: TemplateModuloInput[],
+  token?: string | null
+): Promise<TemplateModulo[]> {
+  const response = await apiFetch(`/admin/templates/${templateId}/modulos`, {
+    method: 'PUT',
+    body: JSON.stringify({ modulos }),
+  }, token);
+  const data = await response.json();
+  return data.modulos;
+}
+
+export async function upsertTemplateModulo(
+  templateId: string,
+  moduloId: string,
+  permisos: Partial<TemplateModuloInput>,
+  token?: string | null
+): Promise<TemplateModulo> {
+  const response = await apiFetch(`/admin/templates/${templateId}/modulos/${moduloId}`, {
+    method: 'PUT',
+    body: JSON.stringify(permisos),
+  }, token);
+  const data = await response.json();
+  return data.modulo;
+}
+
+export async function removeTemplateModulo(templateId: string, moduloId: string, token?: string | null): Promise<void> {
+  await apiFetch(`/admin/templates/${templateId}/modulos/${moduloId}`, { method: 'DELETE' }, token);
+}
+
+export async function propagateTemplateModulo(
+  templateId: string,
+  moduloId: string,
+  permisos: Partial<TemplateModuloInput>,
+  token?: string | null
+): Promise<{ propagatedCount: number }> {
+  const response = await apiFetch(`/admin/templates/${templateId}/propagate/${moduloId}`, {
+    method: 'POST',
+    body: JSON.stringify(permisos),
+  }, token);
+  return response.json();
+}
+
 /**
  * Activa o desactiva un usuario
  */

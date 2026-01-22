@@ -618,6 +618,7 @@ export default function CrmLayout() {
               </div>
 
               {/* Mensajería */}
+              {tieneAcceso('mensajeria') && (
               <NavLink
                 to={`${basePath}/mensajeria`}
                 className={({ isActive }) => `nav-item ${isActive ? 'active' : ''}`}
@@ -625,8 +626,10 @@ export default function CrmLayout() {
                 <span className="nav-icon">{Icons.mensajeria}</span>
                 <span className="nav-label">Mensajería</span>
               </NavLink>
+              )}
 
               {/* Marketing */}
+              {tieneAcceso('marketing') && (
               <NavLink
                 to={`${basePath}/marketing`}
                 className={({ isActive }) => `nav-item ${isActive ? 'active' : ''}`}
@@ -634,6 +637,7 @@ export default function CrmLayout() {
                 <span className="nav-icon">{Icons.marketing}</span>
                 <span className="nav-label">Marketing</span>
               </NavLink>
+              )}
             </div>
 
             {/* ==================== FEATURES ==================== */}

@@ -402,20 +402,36 @@ export async function getModulosAccesibles(
   usuarioId: string,
   tenantId: string
 ): Promise<any[]> {
+  // Aggregate permissions across multiple roles (most permissive wins)
   const sql = `
-    SELECT DISTINCT
+    SELECT
       m.id,
       m.nombre,
       m.descripcion,
       m.icono,
       m.categoria,
       m.orden,
-      rm.puede_ver as "puedeVer",
-      rm.puede_crear as "puedeCrear",
-      rm.puede_editar as "puedeEditar",
-      rm.puede_eliminar as "puedeEliminar",
-      rm.alcance_ver as "alcanceVer",
-      rm.alcance_editar as "alcanceEditar"
+      m.es_submenu as "esSubmenu",
+      m.modulo_padre_id as "moduloPadreId",
+      m.ruta,
+      BOOL_OR(rm.puede_ver) as "puedeVer",
+      BOOL_OR(rm.puede_crear) as "puedeCrear",
+      BOOL_OR(rm.puede_editar) as "puedeEditar",
+      BOOL_OR(rm.puede_eliminar) as "puedeEliminar",
+      CASE MAX(CASE rm.alcance_ver WHEN 'all' THEN 2 WHEN 'team' THEN 1 ELSE 0 END)
+        WHEN 2 THEN 'all'
+        WHEN 1 THEN 'team'
+        ELSE 'own'
+      END as "alcanceVer",
+      CASE MAX(CASE rm.alcance_editar WHEN 'all' THEN 2 WHEN 'team' THEN 1 ELSE 0 END)
+        WHEN 2 THEN 'all'
+        WHEN 1 THEN 'team'
+        ELSE 'own'
+      END as "alcanceEditar",
+      COALESCE(
+        jsonb_object_agg(ur.rol_id, rm.permisos_campos) FILTER (WHERE rm.permisos_campos IS NOT NULL AND rm.permisos_campos != '{}'::jsonb),
+        '{}'::jsonb
+      ) as "permisosCampos"
     FROM usuarios_roles ur
     JOIN roles_modulos rm ON ur.rol_id = rm.rol_id
     JOIN modulos m ON rm.modulo_id = m.id
@@ -424,11 +440,38 @@ export async function getModulosAccesibles(
       AND ur.activo = true
       AND rm.puede_ver = true
       AND m.activo = true
+    GROUP BY m.id, m.nombre, m.descripcion, m.icono, m.categoria, m.orden,
+             m.es_submenu, m.modulo_padre_id, m.ruta
     ORDER BY m.categoria, m.orden
   `;
 
   const result = await query(sql, [usuarioId, tenantId]);
   return result.rows;
+}
+
+/**
+ * Obtiene la versión actual de permisos de un tenant (para cache invalidation)
+ */
+export async function getPermisosVersion(tenantId: string): Promise<number> {
+  const result = await query(
+    'SELECT version FROM permisos_version WHERE tenant_id = $1',
+    [tenantId]
+  );
+  return result.rows[0]?.version || 1;
+}
+
+/**
+ * Incrementa la versión de permisos de un tenant (invalida caché de clientes)
+ */
+export async function incrementPermisosVersion(tenantId: string): Promise<number> {
+  const result = await query(`
+    INSERT INTO permisos_version (tenant_id, version, updated_at)
+    VALUES ($1, 1, CURRENT_TIMESTAMP)
+    ON CONFLICT (tenant_id)
+    DO UPDATE SET version = permisos_version.version + 1, updated_at = CURRENT_TIMESTAMP
+    RETURNING version
+  `, [tenantId]);
+  return result.rows[0]?.version || 1;
 }
 
 /**

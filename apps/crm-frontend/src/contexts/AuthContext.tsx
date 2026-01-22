@@ -17,6 +17,8 @@ const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:3001/api';
 
 // Key para persistir el tenant seleccionado en localStorage
 const TENANT_STORAGE_KEY = 'clic_selected_tenant_id';
+const PERMISOS_CACHE_PREFIX = 'clic_permisos_cache_';
+const PERMISOS_CACHE_TTL = 15 * 60 * 1000; // 15 minutes
 
 // Tipos
 export interface Tenant {
@@ -34,6 +36,13 @@ export interface Role {
   color: string | null;
 }
 
+export interface PermisosCampos {
+  hide?: string[];
+  readonly?: string[];
+  hideTabs?: string[];
+  hideActions?: string[];
+}
+
 export interface Modulo {
   id: string;
   nombre: string;
@@ -41,12 +50,16 @@ export interface Modulo {
   icono: string;
   categoria: string;
   orden: number;
+  esSubmenu?: boolean;
+  moduloPadreId?: string | null;
+  ruta?: string | null;
   puedeVer: boolean;
   puedeCrear: boolean;
   puedeEditar: boolean;
   puedeEliminar: boolean;
   alcanceVer: 'all' | 'own' | 'team';
   alcanceEditar: 'all' | 'own' | 'team';
+  permisosCampos?: Record<string, PermisosCampos>;
 }
 
 export interface User {
@@ -217,19 +230,65 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       try {
         if (isMounted) setLoadingModulos(true);
         const token = await getTokenStable();
+        const cacheKey = `${PERMISOS_CACHE_PREFIX}${tenantId}_${userId}`;
 
+        // 1. Check localStorage cache
+        const cached = localStorage.getItem(cacheKey);
+        if (cached) {
+          try {
+            const cacheData = JSON.parse(cached);
+            const isExpired = Date.now() - cacheData.timestamp > PERMISOS_CACHE_TTL;
+
+            if (!isExpired) {
+              // 2. Check version against server
+              const versionRes = await fetch(
+                `${API_URL}/auth/permissions/version/${tenantId}`,
+                { headers: { Authorization: `Bearer ${token}` } }
+              );
+              if (versionRes.ok) {
+                const { version } = await versionRes.json();
+                if (version === cacheData.version) {
+                  // Cache is valid - use it
+                  if (isMounted) setModulos(cacheData.modulos);
+                  return;
+                }
+              }
+            }
+          } catch {
+            // Cache corrupted, continue with fresh fetch
+          }
+        }
+
+        // 3. Fetch fresh data
         const response = await fetch(
           `${API_URL}/auth/modulos/${tenantId}`,
-          {
-            headers: {
-              Authorization: `Bearer ${token}`,
-            },
-          }
+          { headers: { Authorization: `Bearer ${token}` } }
         );
 
         if (response.ok && isMounted) {
           const data = await response.json();
           setModulos(data);
+
+          // 4. Get current version and cache
+          try {
+            const versionRes = await fetch(
+              `${API_URL}/auth/permissions/version/${tenantId}`,
+              { headers: { Authorization: `Bearer ${token}` } }
+            );
+            const { version } = versionRes.ok ? await versionRes.json() : { version: 1 };
+            localStorage.setItem(cacheKey, JSON.stringify({
+              modulos: data,
+              version,
+              timestamp: Date.now(),
+            }));
+          } catch {
+            // Version fetch failed, cache without version
+            localStorage.setItem(cacheKey, JSON.stringify({
+              modulos: data,
+              version: 0,
+              timestamp: Date.now(),
+            }));
+          }
         }
       } catch (err) {
         console.error('Error cargando módulos:', err);
@@ -252,8 +311,12 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     setUser(null);
     setTenantActual(null);
     setModulos([]);
-    // Limpiar tenant persistido
+    // Limpiar tenant persistido y caché de permisos
     localStorage.removeItem(TENANT_STORAGE_KEY);
+    // Clear all permission caches
+    Object.keys(localStorage)
+      .filter(k => k.startsWith(PERMISOS_CACHE_PREFIX))
+      .forEach(k => localStorage.removeItem(k));
   };
 
   // Wrapper para setTenantActual que persiste en localStorage
