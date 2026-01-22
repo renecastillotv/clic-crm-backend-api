@@ -9,16 +9,13 @@ import { query } from '../utils/db.js';
 
 // Interfaces
 export interface Modulo {
-  id: string;
-  codigo: string;
+  id: string;          // El ID es el código/slug del módulo
   nombre: string;
   descripcion: string | null;
   icono: string | null;
-  ruta: string | null;
+  categoria: string;   // crm, web, admin, tools
   orden: number;
   activo: boolean;
-  padre_id: string | null;
-  visible_en_menu: boolean;
 }
 
 export interface RolModulo {
@@ -33,9 +30,9 @@ export interface RolModulo {
   alcanceEditar: 'all' | 'team' | 'own';
   alcanceEliminar: 'all' | 'team' | 'own';
   // Datos del módulo (para mostrar en UI)
-  moduloCodigo?: string;
   moduloNombre?: string;
   moduloDescripcion?: string;
+  moduloCategoria?: string;
 }
 
 export interface RolModuloInput {
@@ -56,30 +53,24 @@ export async function getAllModulos(): Promise<Modulo[]> {
   const result = await query(`
     SELECT
       id,
-      codigo,
       nombre,
       descripcion,
       icono,
-      ruta,
+      categoria,
       orden,
-      activo,
-      padre_id,
-      visible_en_menu
+      activo
     FROM modulos
-    ORDER BY orden ASC, nombre ASC
+    ORDER BY categoria ASC, orden ASC, nombre ASC
   `);
 
   return result.rows.map(row => ({
     id: row.id,
-    codigo: row.codigo,
     nombre: row.nombre,
     descripcion: row.descripcion,
     icono: row.icono,
-    ruta: row.ruta,
+    categoria: row.categoria,
     orden: row.orden,
     activo: row.activo,
-    padre_id: row.padre_id,
-    visible_en_menu: row.visible_en_menu,
   }));
 }
 
@@ -99,13 +90,13 @@ export async function getModulosByRol(rolId: string): Promise<RolModulo[]> {
       rm.alcance_ver,
       rm.alcance_editar,
       rm.alcance_eliminar,
-      m.codigo as modulo_codigo,
       m.nombre as modulo_nombre,
-      m.descripcion as modulo_descripcion
+      m.descripcion as modulo_descripcion,
+      m.categoria as modulo_categoria
     FROM roles_modulos rm
     JOIN modulos m ON m.id = rm.modulo_id
     WHERE rm.rol_id = $1
-    ORDER BY m.orden ASC, m.nombre ASC
+    ORDER BY m.categoria ASC, m.orden ASC, m.nombre ASC
   `, [rolId]);
 
   return result.rows.map(row => ({
@@ -119,9 +110,9 @@ export async function getModulosByRol(rolId: string): Promise<RolModulo[]> {
     alcanceVer: row.alcance_ver || 'own',
     alcanceEditar: row.alcance_editar || 'own',
     alcanceEliminar: row.alcance_eliminar || 'own',
-    moduloCodigo: row.modulo_codigo,
     moduloNombre: row.modulo_nombre,
     moduloDescripcion: row.modulo_descripcion,
+    moduloCategoria: row.modulo_categoria,
   }));
 }
 
@@ -150,15 +141,12 @@ export async function getRolModulosMatrix(rolId: string): Promise<{
   const result = await query(`
     SELECT
       m.id,
-      m.codigo,
       m.nombre,
       m.descripcion,
       m.icono,
-      m.ruta,
+      m.categoria,
       m.orden,
       m.activo,
-      m.padre_id,
-      m.visible_en_menu,
       rm.id as permiso_id,
       rm.puede_ver,
       rm.puede_crear,
@@ -170,20 +158,17 @@ export async function getRolModulosMatrix(rolId: string): Promise<{
     FROM modulos m
     LEFT JOIN roles_modulos rm ON rm.modulo_id = m.id AND rm.rol_id = $1
     WHERE m.activo = true
-    ORDER BY m.orden ASC, m.nombre ASC
+    ORDER BY m.categoria ASC, m.orden ASC, m.nombre ASC
   `, [rolId]);
 
   const modulos = result.rows.map(row => ({
     id: row.id,
-    codigo: row.codigo,
     nombre: row.nombre,
     descripcion: row.descripcion,
     icono: row.icono,
-    ruta: row.ruta,
+    categoria: row.categoria,
     orden: row.orden,
     activo: row.activo,
-    padre_id: row.padre_id,
-    visible_en_menu: row.visible_en_menu,
     permisos: row.permiso_id ? {
       id: row.permiso_id,
       rolId: rolId,
