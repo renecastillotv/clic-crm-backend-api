@@ -38,7 +38,6 @@ export default function AdminRolPermisos() {
     puedeEliminar: boolean;
     alcanceVer: 'all' | 'team' | 'own';
     alcanceEditar: 'all' | 'team' | 'own';
-    alcanceEliminar: 'all' | 'team' | 'own';
   }>>(new Map());
 
   // Modal para copiar permisos
@@ -94,7 +93,6 @@ export default function AdminRolPermisos() {
           puedeEliminar: modulo.permisos?.puedeEliminar ?? false,
           alcanceVer: modulo.permisos?.alcanceVer ?? 'own',
           alcanceEditar: modulo.permisos?.alcanceEditar ?? 'own',
-          alcanceEliminar: modulo.permisos?.alcanceEliminar ?? 'own',
         });
       });
       setEditedPermisos(permisos);
@@ -120,7 +118,6 @@ export default function AdminRolPermisos() {
         puedeEliminar: false,
         alcanceVer: 'own' as const,
         alcanceEditar: 'own' as const,
-        alcanceEliminar: 'own' as const,
       };
 
       // Si se desmarca "Ver", desmarcar los demás también
@@ -154,7 +151,7 @@ export default function AdminRolPermisos() {
   // Manejar cambio de alcance
   const handleAlcanceChange = (
     moduloId: string,
-    campo: 'alcanceVer' | 'alcanceEditar' | 'alcanceEliminar',
+    campo: 'alcanceVer' | 'alcanceEditar',
     valor: 'all' | 'team' | 'own'
   ) => {
     setEditedPermisos(prev => {
@@ -432,7 +429,6 @@ export default function AdminRolPermisos() {
                   </th>
                   <th className="scope-col">Alcance Ver</th>
                   <th className="scope-col">Alcance Editar</th>
-                  <th className="scope-col">Alcance Eliminar</th>
                 </tr>
               </thead>
               <tbody>
@@ -498,18 +494,6 @@ export default function AdminRolPermisos() {
                           value={permisos?.alcanceEditar ?? 'own'}
                           onChange={(e) => handleAlcanceChange(modulo.id, 'alcanceEditar', e.target.value as any)}
                           disabled={saving || !permisos?.puedeEditar}
-                          className="scope-select"
-                        >
-                          <option value="own">Propios</option>
-                          <option value="team">Equipo</option>
-                          <option value="all">Todos</option>
-                        </select>
-                      </td>
-                      <td className="scope-col">
-                        <select
-                          value={permisos?.alcanceEliminar ?? 'own'}
-                          onChange={(e) => handleAlcanceChange(modulo.id, 'alcanceEliminar', e.target.value as any)}
-                          disabled={saving || !permisos?.puedeEliminar}
                           className="scope-select"
                         >
                           <option value="own">Propios</option>

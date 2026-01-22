@@ -932,7 +932,6 @@ export interface RolModulo {
   puedeEliminar: boolean;
   alcanceVer: 'all' | 'team' | 'own';
   alcanceEditar: 'all' | 'team' | 'own';
-  alcanceEliminar: 'all' | 'team' | 'own';
   moduloNombre?: string;
   moduloDescripcion?: string;
   moduloCategoria?: string;
@@ -946,7 +945,6 @@ export interface RolModuloInput {
   puedeEliminar: boolean;
   alcanceVer?: 'all' | 'team' | 'own';
   alcanceEditar?: 'all' | 'team' | 'own';
-  alcanceEliminar?: 'all' | 'team' | 'own';
 }
 
 export interface ModuloConPermisos extends Modulo {
