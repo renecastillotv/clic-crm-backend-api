@@ -28,7 +28,6 @@ export interface RolModulo {
   puedeEliminar: boolean;
   alcanceVer: 'all' | 'team' | 'own';
   alcanceEditar: 'all' | 'team' | 'own';
-  alcanceEliminar: 'all' | 'team' | 'own';
   // Datos del módulo (para mostrar en UI)
   moduloNombre?: string;
   moduloDescripcion?: string;
@@ -43,7 +42,6 @@ export interface RolModuloInput {
   puedeEliminar: boolean;
   alcanceVer?: 'all' | 'team' | 'own';
   alcanceEditar?: 'all' | 'team' | 'own';
-  alcanceEliminar?: 'all' | 'team' | 'own';
 }
 
 /**
@@ -89,7 +87,6 @@ export async function getModulosByRol(rolId: string): Promise<RolModulo[]> {
       rm.puede_eliminar,
       rm.alcance_ver,
       rm.alcance_editar,
-      rm.alcance_eliminar,
       m.nombre as modulo_nombre,
       m.descripcion as modulo_descripcion,
       m.categoria as modulo_categoria
@@ -109,7 +106,6 @@ export async function getModulosByRol(rolId: string): Promise<RolModulo[]> {
     puedeEliminar: row.puede_eliminar,
     alcanceVer: row.alcance_ver || 'own',
     alcanceEditar: row.alcance_editar || 'own',
-    alcanceEliminar: row.alcance_eliminar || 'own',
     moduloNombre: row.modulo_nombre,
     moduloDescripcion: row.modulo_descripcion,
     moduloCategoria: row.modulo_categoria,
@@ -153,8 +149,7 @@ export async function getRolModulosMatrix(rolId: string): Promise<{
       rm.puede_editar,
       rm.puede_eliminar,
       rm.alcance_ver,
-      rm.alcance_editar,
-      rm.alcance_eliminar
+      rm.alcance_editar
     FROM modulos m
     LEFT JOIN roles_modulos rm ON rm.modulo_id = m.id AND rm.rol_id = $1
     WHERE m.activo = true
@@ -179,7 +174,6 @@ export async function getRolModulosMatrix(rolId: string): Promise<{
       puedeEliminar: row.puede_eliminar,
       alcanceVer: row.alcance_ver || 'own',
       alcanceEditar: row.alcance_editar || 'own',
-      alcanceEliminar: row.alcance_eliminar || 'own',
     } : null,
   }));
 
@@ -226,7 +220,6 @@ export async function updateRolModulo(
         puede_eliminar = COALESCE($6, puede_eliminar),
         alcance_ver = COALESCE($7, alcance_ver),
         alcance_editar = COALESCE($8, alcance_editar),
-        alcance_eliminar = COALESCE($9, alcance_eliminar),
         updated_at = CURRENT_TIMESTAMP
       WHERE rol_id = $1 AND modulo_id = $2
       RETURNING *
@@ -239,7 +232,6 @@ export async function updateRolModulo(
       permisos.puedeEliminar,
       permisos.alcanceVer,
       permisos.alcanceEditar,
-      permisos.alcanceEliminar,
     ]);
   } else {
     // Crear nuevo
@@ -247,8 +239,8 @@ export async function updateRolModulo(
       INSERT INTO roles_modulos (
         rol_id, modulo_id,
         puede_ver, puede_crear, puede_editar, puede_eliminar,
-        alcance_ver, alcance_editar, alcance_eliminar
-      ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)
+        alcance_ver, alcance_editar
+      ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
       RETURNING *
     `, [
       rolId,
@@ -259,7 +251,6 @@ export async function updateRolModulo(
       permisos.puedeEliminar ?? false,
       permisos.alcanceVer ?? 'own',
       permisos.alcanceEditar ?? 'own',
-      permisos.alcanceEliminar ?? 'own',
     ]);
   }
 
@@ -274,7 +265,6 @@ export async function updateRolModulo(
     puedeEliminar: row.puede_eliminar,
     alcanceVer: row.alcance_ver || 'own',
     alcanceEditar: row.alcance_editar || 'own',
-    alcanceEliminar: row.alcance_eliminar || 'own',
   };
 }
 
@@ -305,8 +295,8 @@ export async function updateAllRolModulos(
         INSERT INTO roles_modulos (
           rol_id, modulo_id,
           puede_ver, puede_crear, puede_editar, puede_eliminar,
-          alcance_ver, alcance_editar, alcance_eliminar
-        ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)
+          alcance_ver, alcance_editar
+        ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
         RETURNING *
       `, [
         rolId,
@@ -317,7 +307,6 @@ export async function updateAllRolModulos(
         modulo.puedeEliminar,
         modulo.alcanceVer ?? 'own',
         modulo.alcanceEditar ?? 'own',
-        modulo.alcanceEliminar ?? 'own',
       ]);
 
       const row = result.rows[0];
@@ -331,7 +320,6 @@ export async function updateAllRolModulos(
         puedeEliminar: row.puede_eliminar,
         alcanceVer: row.alcance_ver || 'own',
         alcanceEditar: row.alcance_editar || 'own',
-        alcanceEliminar: row.alcance_eliminar || 'own',
       });
     }
   }
@@ -371,12 +359,12 @@ export async function copyRolPermisos(sourceRolId: string, targetRolId: string):
     INSERT INTO roles_modulos (
       rol_id, modulo_id,
       puede_ver, puede_crear, puede_editar, puede_eliminar,
-      alcance_ver, alcance_editar, alcance_eliminar
+      alcance_ver, alcance_editar
     )
     SELECT
       $2, modulo_id,
       puede_ver, puede_crear, puede_editar, puede_eliminar,
-      alcance_ver, alcance_editar, alcance_eliminar
+      alcance_ver, alcance_editar
     FROM roles_modulos
     WHERE rol_id = $1
   `, [sourceRolId, targetRolId]);
