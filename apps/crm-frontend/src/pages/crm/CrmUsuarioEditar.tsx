@@ -81,6 +81,8 @@ export default function CrmUsuarioEditar() {
   // Formulario
   const [form, setForm] = useState({
     email: '',
+    password: '',
+    confirmPassword: '',
     nombre: '',
     apellido: '',
     telefono: '',
@@ -196,6 +198,18 @@ export default function CrmUsuarioEditar() {
       return;
     }
 
+    // Validar contraseñas solo en creación
+    if (!isEditing && form.password) {
+      if (form.password.length < 8) {
+        setError('La contraseña debe tener al menos 8 caracteres');
+        return;
+      }
+      if (form.password !== form.confirmPassword) {
+        setError('Las contraseñas no coinciden');
+        return;
+      }
+    }
+
     try {
       setSaving(true);
       setError(null);
@@ -225,6 +239,7 @@ export default function CrmUsuarioEditar() {
       } else {
         await createUsuarioTenant(tenantActual.id, {
           email: form.email,
+          password: form.password || undefined, // Contraseña temporal opcional
           nombre: form.nombre || undefined,
           apellido: form.apellido || undefined,
           telefono: form.telefono || undefined,
@@ -364,6 +379,37 @@ export default function CrmUsuarioEditar() {
                       )}
                     </div>
                   </div>
+
+                  {/* Campos de contraseña solo en creación */}
+                  {!isEditing && (
+                    <div className="form-row">
+                      <div className="form-group">
+                        <label>Contraseña Temporal</label>
+                        <input
+                          type="password"
+                          value={form.password}
+                          onChange={(e) => setForm(prev => ({ ...prev, password: e.target.value }))}
+                          placeholder="Mínimo 8 caracteres"
+                          minLength={8}
+                        />
+                        <p className="form-hint">
+                          Si asignas una contraseña, el usuario podrá loguearse inmediatamente.
+                          Si la dejas vacía, recibirá un email para configurar su contraseña.
+                        </p>
+                      </div>
+                      <div className="form-group">
+                        <label>Confirmar Contraseña</label>
+                        <input
+                          type="password"
+                          value={form.confirmPassword}
+                          onChange={(e) => setForm(prev => ({ ...prev, confirmPassword: e.target.value }))}
+                          placeholder="Repite la contraseña"
+                          minLength={8}
+                          disabled={!form.password}
+                        />
+                      </div>
+                    </div>
+                  )}
 
                   <div className="form-row">
                     <div className="form-group">
@@ -1059,7 +1105,8 @@ const styles = `
 
   .form-group input[type="text"],
   .form-group input[type="email"],
-  .form-group input[type="tel"] {
+  .form-group input[type="tel"],
+  .form-group input[type="password"] {
     width: 100%;
     padding: 12px 14px;
     border: 1px solid #e2e8f0;

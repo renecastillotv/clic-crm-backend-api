@@ -5,7 +5,7 @@
  */
 
 import { query } from '../utils/db.js';
-import { createClerkUserWithoutPassword } from '../middleware/clerkAuth.js';
+import { createClerkUser, createClerkUserWithoutPassword } from '../middleware/clerkAuth.js';
 import { v4 as uuidv4 } from 'uuid';
 
 export interface Usuario {
@@ -695,6 +695,7 @@ export async function agregarUsuarioATenant(
   tenantId: string,
   data: {
     email: string;
+    password?: string; // Contraseña temporal opcional - si se proporciona, el usuario puede loguearse inmediatamente
     nombre?: string;
     apellido?: string;
     telefono?: string;
@@ -723,15 +724,28 @@ export async function agregarUsuarioATenant(
     let clerkId: string | null = null;
 
     try {
-      // Crear usuario en Clerk sin contraseña (recibirá email para configurar)
       console.log(`🔄 Creando usuario en Clerk: ${data.email}`);
-      const clerkUser = await createClerkUserWithoutPassword({
-        email: data.email,
-        firstName: data.nombre,
-        lastName: data.apellido,
-      });
-      clerkId = clerkUser.id;
-      console.log(`✅ Usuario creado en Clerk: ${data.email} (ID: ${clerkId})`);
+
+      if (data.password && data.password.trim()) {
+        // Si se proporciona contraseña, crear usuario con contraseña (puede loguearse inmediatamente)
+        const clerkUser = await createClerkUser({
+          email: data.email,
+          password: data.password,
+          firstName: data.nombre,
+          lastName: data.apellido,
+        });
+        clerkId = clerkUser.id;
+        console.log(`✅ Usuario creado en Clerk CON contraseña: ${data.email} (ID: ${clerkId})`);
+      } else {
+        // Sin contraseña - recibirá email para configurar
+        const clerkUser = await createClerkUserWithoutPassword({
+          email: data.email,
+          firstName: data.nombre,
+          lastName: data.apellido,
+        });
+        clerkId = clerkUser.id;
+        console.log(`✅ Usuario creado en Clerk SIN contraseña: ${data.email} (ID: ${clerkId})`);
+      }
     } catch (clerkError: any) {
       // Si falla Clerk, verificar si el usuario ya existe en Clerk
       console.error(`⚠️ Error creando usuario en Clerk: ${clerkError.message}`);

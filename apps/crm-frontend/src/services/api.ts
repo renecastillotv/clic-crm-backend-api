@@ -5101,12 +5101,12 @@ export async function getUsuarioTenant(
 /**
  * Crea un nuevo usuario en el tenant
  * @param tenantId - ID del tenant
- * @param usuario - Datos del usuario
+ * @param usuario - Datos del usuario (incluye password opcional para contraseña temporal)
  * @param token - Token de autenticación opcional
  */
 export async function createUsuarioTenant(
   tenantId: string,
-  usuario: Partial<UsuarioTenant> & { roleIds?: string[] },
+  usuario: Partial<UsuarioTenant> & { roleIds?: string[]; password?: string },
   token?: string | null
 ): Promise<UsuarioTenant> {
   const response = await apiFetch(`/tenants/${tenantId}/usuarios`, {
