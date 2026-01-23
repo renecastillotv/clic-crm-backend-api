@@ -503,8 +503,12 @@ export default function CrmLayout() {
   );
 
   const visibleConfigItems = configSubItems.filter(
-    (item) => tieneAcceso(item.id) || item.id === 'configuracion'
+    (item) => tieneAcceso(item.id) || tieneAcceso('configuracion')
   );
+
+  const hasVisibleFeatures = tieneAcceso('contenido') || tieneAcceso('clic-connect') ||
+    tieneAcceso('university') || tieneAcceso('mi-entrenamiento') ||
+    visibleSistemaFasesItems.length > 0;
 
   const isCrmActive = location.pathname.includes('/contactos') ||
                       location.pathname.includes('/pipeline') ||
@@ -557,6 +561,8 @@ export default function CrmLayout() {
               </NavLink>
 
               {/* CRM con submenú */}
+              {visibleCrmItems.length > 0 && (
+              <>
               <button
                 className={`nav-item nav-expandable ${isCrmActive ? 'active' : ''}`}
                 onClick={() => toggleSubmenu('crm')}
@@ -580,6 +586,8 @@ export default function CrmLayout() {
                   </NavLink>
                 ))}
               </div>
+              </>
+              )}
 
               {/* Propiedades */}
               {tieneAcceso('propiedades') && (
@@ -593,6 +601,8 @@ export default function CrmLayout() {
               )}
 
               {/* Finanzas con submenú */}
+              {visibleFinanzasItems.length > 0 && (
+              <>
               <button
                 className={`nav-item nav-expandable ${isFinanzasActive ? 'active' : ''}`}
                 onClick={() => toggleSubmenu('finanzas')}
@@ -616,6 +626,8 @@ export default function CrmLayout() {
                   </NavLink>
                 ))}
               </div>
+              </>
+              )}
 
               {/* Mensajería */}
               {tieneAcceso('mensajeria') && (
@@ -641,6 +653,7 @@ export default function CrmLayout() {
             </div>
 
             {/* ==================== FEATURES ==================== */}
+            {hasVisibleFeatures && (
             <div className="nav-section">
               <span className="nav-section-title">Features</span>
 
@@ -689,6 +702,8 @@ export default function CrmLayout() {
               )}
 
               {/* Rendimiento (Fases + Productividad) */}
+              {visibleSistemaFasesItems.length > 0 && (
+              <>
               <button
                 className={`nav-item nav-expandable ${isSistemaFasesActive ? 'active' : ''}`}
                 onClick={() => toggleSubmenu('sistemaFases')}
@@ -712,9 +727,13 @@ export default function CrmLayout() {
                   </NavLink>
                 ))}
               </div>
+              </>
+              )}
             </div>
+            )}
 
             {/* ==================== AJUSTES ==================== */}
+            {(tieneAcceso('usuarios') || visibleConfigItems.length > 0) && (
             <div className="nav-section">
               <span className="nav-section-title">Ajustes</span>
 
@@ -730,6 +749,8 @@ export default function CrmLayout() {
               )}
 
               {/* Configuración con submenú */}
+              {visibleConfigItems.length > 0 && (
+              <>
               <button
                 className={`nav-item nav-expandable ${isConfigActive ? 'active' : ''}`}
                 onClick={() => toggleSubmenu('config')}
@@ -753,7 +774,10 @@ export default function CrmLayout() {
                   </NavLink>
                 ))}
               </div>
+              </>
+              )}
             </div>
+            )}
           </nav>
 
         </aside>

@@ -61,6 +61,7 @@ export interface ActividadFiltros {
   contacto_id?: string;
   solicitud_id?: string;
   propuesta_id?: string;
+  usuario_id?: string;
   completada?: boolean;
   busqueda?: string;
   fecha_desde?: string;
@@ -98,6 +99,7 @@ export async function getActividades(
     contacto_id,
     solicitud_id,
     propuesta_id,
+    usuario_id,
     completada,
     busqueda,
     fecha_desde,
@@ -144,6 +146,12 @@ export async function getActividades(
   if (propuesta_id) {
     whereClause += ` AND a.propuesta_id = $${paramIndex}`;
     params.push(propuesta_id);
+    paramIndex++;
+  }
+
+  if (usuario_id) {
+    whereClause += ` AND a.usuario_id = $${paramIndex}`;
+    params.push(usuario_id);
     paramIndex++;
   }
 

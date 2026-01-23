@@ -21,6 +21,7 @@ import {
   getTagsStats,
 } from '../../services/tagsSyncService.js';
 import unidadesRouter from './unidades.routes.js';
+import { getOwnFilter } from '../../middleware/scopeResolver.js';
 
 // Tipos para params con mergeParams
 interface RouteParams { [key: string]: string | undefined;
@@ -45,6 +46,9 @@ router.get('/', async (req, res, next) => {
       page, limit
     } = req.query;
 
+    // Apply scope filter: if alcance_ver = 'own', force user's own properties
+    const ownUserId = getOwnFilter(req, 'propiedades');
+
     const filtros = {
       tipo: tipo as string | undefined,
       operacion: operacion as string | undefined,
@@ -58,7 +62,7 @@ router.get('/', async (req, res, next) => {
       m2_max: m2_max ? parseFloat(m2_max as string) : undefined,
       destacada: destacada === 'true' ? true : destacada === 'false' ? false : undefined,
       busqueda: busqueda as string | undefined,
-      agente_id: agente_id as string | undefined,
+      agente_id: ownUserId || (agente_id as string | undefined),
       include_red_global: include_red_global === 'true' ? true : undefined,
       page: page ? parseInt(page as string) : 1,
       limit: limit ? parseInt(limit as string) : 24,

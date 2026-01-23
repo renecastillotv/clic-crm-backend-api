@@ -15,6 +15,7 @@ import {
   cambiarEtapaSolicitud,
 } from '../../services/solicitudesService.js';
 import { getActividadesBySolicitud } from '../../services/actividadesService.js';
+import { getOwnFilter } from '../../middleware/scopeResolver.js';
 
 // Tipos para params con mergeParams
 interface RouteParams { [key: string]: string | undefined;
@@ -33,11 +34,14 @@ router.get('/', async (req, res, next) => {
     const { tenantId } = req.params as RouteParams;
     const { etapa, etapas, contacto_id, usuario_asignado_id, busqueda, page, limit } = req.query;
 
+    // Apply scope filter: if alcance_ver = 'own', force user's own pipeline items
+    const ownUserId = getOwnFilter(req, 'pipeline');
+
     const filtros = {
       etapa: etapa as string | undefined,
       etapas: etapas ? (etapas as string).split(',') : undefined,
       contacto_id: contacto_id as string | undefined,
-      usuario_asignado_id: usuario_asignado_id as string | undefined,
+      usuario_asignado_id: ownUserId || (usuario_asignado_id as string | undefined),
       busqueda: busqueda as string | undefined,
       page: page ? parseInt(page as string) : 1,
       limit: limit ? parseInt(limit as string) : 100,

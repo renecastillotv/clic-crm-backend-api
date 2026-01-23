@@ -21,6 +21,7 @@ import {
   getActividadesPendientes,
   getActividadesStats,
 } from '../../services/actividadesService.js';
+import { getOwnFilter } from '../../middleware/scopeResolver.js';
 
 const router = express.Router({ mergeParams: true });
 
@@ -33,6 +34,9 @@ router.get('/', async (req, res, next) => {
     const { tenantId } = req.params as RouteParams;
     const { tipo, estado, prioridad, contacto_id, solicitud_id, propuesta_id, completada, busqueda, fecha_desde, fecha_hasta, page, limit } = req.query;
 
+    // Apply scope filter: if alcance_ver = 'own', force user's own activities
+    const ownUserId = getOwnFilter(req, 'actividades');
+
     const filtros = {
       tipo: tipo as string | undefined,
       estado: estado as any,
@@ -40,6 +44,7 @@ router.get('/', async (req, res, next) => {
       contacto_id: contacto_id as string | undefined,
       solicitud_id: solicitud_id as string | undefined,
       propuesta_id: propuesta_id as string | undefined,
+      usuario_id: ownUserId || undefined,
       completada: completada === 'true' ? true : completada === 'false' ? false : undefined,
       busqueda: busqueda as string | undefined,
       fecha_desde: fecha_desde as string | undefined,
