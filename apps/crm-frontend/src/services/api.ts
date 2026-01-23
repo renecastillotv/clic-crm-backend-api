@@ -59,9 +59,9 @@ export async function apiFetch(url: string, options: RequestInit = {}, token?: s
     console.log(`🌐 Fetching: ${options.method || 'GET'} ${fullUrl}`);
   }
 
-  const headers: HeadersInit = {
+  const headers: Record<string, string> = {
     'Content-Type': 'application/json',
-    ...options.headers,
+    ...(options.headers as Record<string, string>),
   };
 
   // Obtener token de autenticación (del parámetro o automáticamente de Clerk)
@@ -69,13 +69,8 @@ export async function apiFetch(url: string, options: RequestInit = {}, token?: s
 
   if (authToken) {
     headers['Authorization'] = `Bearer ${authToken}`;
-    if (import.meta.env.DEV) {
-      console.log('🔑 Token incluido en la petición');
-    }
   } else {
-    if (import.meta.env.DEV) {
-      console.warn('⚠️ No hay token de autenticación disponible para la petición a:', fullUrl);
-    }
+    console.warn('[apiFetch] ⚠️ NO TOKEN for:', fullUrl);
   }
 
   try {
@@ -83,6 +78,12 @@ export async function apiFetch(url: string, options: RequestInit = {}, token?: s
       ...options,
       headers,
     });
+
+    // Log scope status for debugging (temporary)
+    const scopeStatus = response.headers.get('x-scope-status');
+    if (scopeStatus) {
+      console.log(`[apiFetch] Scope: ${scopeStatus} | ${options.method || 'GET'} ${url}`);
+    }
 
     if (!response.ok) {
       const errorData = await response.json().catch(() => ({ message: 'Error desconocido' }));
