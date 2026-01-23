@@ -1522,16 +1522,19 @@ export interface ContactoFiltros {
  * Obtiene los contactos de un tenant con filtros y paginación
  */
 export async function getContactos(tenantId: string, filtros?: ContactoFiltros): Promise<ContactosResponse> {
-  const url = new URL(`${API_BASE_URL}/tenants/${tenantId}/contactos`, window.location.origin);
+  const params = new URLSearchParams();
 
-  if (filtros?.busqueda) url.searchParams.append('busqueda', filtros.busqueda);
-  if (filtros?.tipo) url.searchParams.append('tipo', filtros.tipo);
-  if (filtros?.favoritos) url.searchParams.append('favoritos', 'true');
-  if (filtros?.todos) url.searchParams.append('todos', 'true');
-  if (filtros?.page) url.searchParams.append('page', String(filtros.page));
-  if (filtros?.limit) url.searchParams.append('limit', String(filtros.limit));
+  if (filtros?.busqueda) params.append('busqueda', filtros.busqueda);
+  if (filtros?.tipo) params.append('tipo', filtros.tipo);
+  if (filtros?.favoritos) params.append('favoritos', 'true');
+  if (filtros?.todos) params.append('todos', 'true');
+  if (filtros?.page) params.append('page', String(filtros.page));
+  if (filtros?.limit) params.append('limit', String(filtros.limit));
 
-  const response = await fetch(url.toString());
+  const queryString = params.toString();
+  const url = `/tenants/${tenantId}/contactos${queryString ? `?${queryString}` : ''}`;
+
+  const response = await apiFetch(url);
   if (!response.ok) {
     throw new Error('Error al obtener contactos');
   }
@@ -1542,7 +1545,7 @@ export async function getContactos(tenantId: string, filtros?: ContactoFiltros):
  * Obtiene un contacto por ID
  */
 export async function getContacto(tenantId: string, contactoId: string): Promise<Contacto> {
-  const response = await fetch(`${API_BASE_URL}/tenants/${tenantId}/contactos/${contactoId}`);
+  const response = await apiFetch(`/tenants/${tenantId}/contactos/${contactoId}`);
   if (!response.ok) {
     throw new Error('Error al obtener contacto');
   }
@@ -1553,9 +1556,8 @@ export async function getContacto(tenantId: string, contactoId: string): Promise
  * Crea un nuevo contacto
  */
 export async function createContacto(tenantId: string, data: Partial<Contacto>): Promise<Contacto> {
-  const response = await fetch(`${API_BASE_URL}/tenants/${tenantId}/contactos`, {
+  const response = await apiFetch(`/tenants/${tenantId}/contactos`, {
     method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify(data),
   });
 
@@ -1571,9 +1573,8 @@ export async function createContacto(tenantId: string, data: Partial<Contacto>):
  * Actualiza un contacto
  */
 export async function updateContacto(tenantId: string, contactoId: string, data: Partial<Contacto>): Promise<Contacto> {
-  const response = await fetch(`${API_BASE_URL}/tenants/${tenantId}/contactos/${contactoId}`, {
+  const response = await apiFetch(`/tenants/${tenantId}/contactos/${contactoId}`, {
     method: 'PUT',
-    headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify(data),
   });
 
@@ -1589,7 +1590,7 @@ export async function updateContacto(tenantId: string, contactoId: string, data:
  * Elimina un contacto
  */
 export async function deleteContacto(tenantId: string, contactoId: string): Promise<void> {
-  const response = await fetch(`${API_BASE_URL}/tenants/${tenantId}/contactos/${contactoId}`, {
+  const response = await apiFetch(`/tenants/${tenantId}/contactos/${contactoId}`, {
     method: 'DELETE',
   });
 
@@ -1603,7 +1604,7 @@ export async function deleteContacto(tenantId: string, contactoId: string): Prom
  * Toggle favorito de un contacto
  */
 export async function toggleContactoFavorito(tenantId: string, contactoId: string): Promise<Contacto> {
-  const response = await fetch(`${API_BASE_URL}/tenants/${tenantId}/contactos/${contactoId}/favorito`, {
+  const response = await apiFetch(`/tenants/${tenantId}/contactos/${contactoId}/favorito`, {
     method: 'POST',
   });
 
@@ -1633,7 +1634,7 @@ export interface ContactoRelacion {
  * Obtiene las relaciones de un contacto
  */
 export async function getRelacionesContacto(tenantId: string, contactoId: string): Promise<ContactoRelacion[]> {
-  const response = await fetch(`${API_BASE_URL}/tenants/${tenantId}/contactos/${contactoId}/relaciones`);
+  const response = await apiFetch(`/tenants/${tenantId}/contactos/${contactoId}/relaciones`);
   if (!response.ok) {
     throw new Error('Error al obtener relaciones');
   }
@@ -1652,9 +1653,8 @@ export async function createRelacionContacto(
     notas?: string;
   }
 ): Promise<ContactoRelacion> {
-  const response = await fetch(`${API_BASE_URL}/tenants/${tenantId}/contactos/${contactoOrigenId}/relaciones`, {
+  const response = await apiFetch(`/tenants/${tenantId}/contactos/${contactoOrigenId}/relaciones`, {
     method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify(data),
   });
 
@@ -1674,7 +1674,7 @@ export async function deleteRelacionContacto(
   contactoId: string,
   relacionId: string
 ): Promise<void> {
-  const response = await fetch(`${API_BASE_URL}/tenants/${tenantId}/contactos/${contactoId}/relaciones/${relacionId}`, {
+  const response = await apiFetch(`/tenants/${tenantId}/contactos/${contactoId}/relaciones/${relacionId}`, {
     method: 'DELETE',
   });
 
@@ -1749,7 +1749,6 @@ export interface SolicitudFiltros {
  * Obtiene las solicitudes de un tenant
  */
 export async function getSolicitudes(tenantId: string, filtros?: SolicitudFiltros): Promise<SolicitudesResponse> {
-  let url = `${API_BASE_URL}/tenants/${tenantId}/solicitudes`;
   const params = new URLSearchParams();
 
   if (filtros?.busqueda) params.append('busqueda', filtros.busqueda);
@@ -1760,11 +1759,9 @@ export async function getSolicitudes(tenantId: string, filtros?: SolicitudFiltro
   if (filtros?.contacto_id) params.append('contacto_id', filtros.contacto_id);
 
   const queryString = params.toString();
-  if (queryString) {
-    url += `?${queryString}`;
-  }
+  const url = `/tenants/${tenantId}/solicitudes${queryString ? `?${queryString}` : ''}`;
 
-  const response = await fetch(url);
+  const response = await apiFetch(url);
   if (!response.ok) {
     throw new Error('Error al obtener solicitudes');
   }
@@ -1775,7 +1772,7 @@ export async function getSolicitudes(tenantId: string, filtros?: SolicitudFiltro
  * Obtiene una solicitud por ID
  */
 export async function getSolicitud(tenantId: string, solicitudId: string): Promise<Solicitud> {
-  const response = await fetch(`${API_BASE_URL}/tenants/${tenantId}/solicitudes/${solicitudId}`);
+  const response = await apiFetch(`/tenants/${tenantId}/solicitudes/${solicitudId}`);
   if (!response.ok) {
     throw new Error('Error al obtener solicitud');
   }
@@ -1786,9 +1783,8 @@ export async function getSolicitud(tenantId: string, solicitudId: string): Promi
  * Crea una nueva solicitud
  */
 export async function createSolicitud(tenantId: string, data: Partial<Solicitud>): Promise<Solicitud> {
-  const response = await fetch(`${API_BASE_URL}/tenants/${tenantId}/solicitudes`, {
+  const response = await apiFetch(`/tenants/${tenantId}/solicitudes`, {
     method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify(data),
   });
 
@@ -1804,9 +1800,8 @@ export async function createSolicitud(tenantId: string, data: Partial<Solicitud>
  * Actualiza una solicitud
  */
 export async function updateSolicitud(tenantId: string, solicitudId: string, data: Partial<Solicitud>): Promise<Solicitud> {
-  const response = await fetch(`${API_BASE_URL}/tenants/${tenantId}/solicitudes/${solicitudId}`, {
+  const response = await apiFetch(`/tenants/${tenantId}/solicitudes/${solicitudId}`, {
     method: 'PUT',
-    headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify(data),
   });
 
@@ -1828,9 +1823,8 @@ export async function cambiarEtapaSolicitud(
   nuevaEtapa: string,
   razonPerdida?: string
 ): Promise<Solicitud> {
-  const response = await fetch(`${API_BASE_URL}/tenants/${tenantId}/solicitudes/${solicitudId}/etapa`, {
+  const response = await apiFetch(`/tenants/${tenantId}/solicitudes/${solicitudId}/etapa`, {
     method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({
       etapa: nuevaEtapa,
       razonPerdida: razonPerdida || undefined,
@@ -1849,7 +1843,7 @@ export async function cambiarEtapaSolicitud(
  * Elimina una solicitud
  */
 export async function deleteSolicitud(tenantId: string, solicitudId: string): Promise<void> {
-  const response = await fetch(`${API_BASE_URL}/tenants/${tenantId}/solicitudes/${solicitudId}`, {
+  const response = await apiFetch(`/tenants/${tenantId}/solicitudes/${solicitudId}`, {
     method: 'DELETE',
   });
 
@@ -1945,14 +1939,17 @@ export interface PropuestaFiltros {
  * Obtiene las propuestas de un tenant
  */
 export async function getPropuestas(tenantId: string, filtros?: PropuestaFiltros): Promise<PropuestasResponse> {
-  const url = new URL(`${API_BASE_URL}/tenants/${tenantId}/propuestas`, window.location.origin);
+  const params = new URLSearchParams();
 
-  if (filtros?.busqueda) url.searchParams.append('busqueda', filtros.busqueda);
-  if (filtros?.estado) url.searchParams.append('estado', filtros.estado);
-  if (filtros?.solicitud_id) url.searchParams.append('solicitud_id', filtros.solicitud_id);
-  if (filtros?.contacto_id) url.searchParams.append('contacto_id', filtros.contacto_id);
+  if (filtros?.busqueda) params.append('busqueda', filtros.busqueda);
+  if (filtros?.estado) params.append('estado', filtros.estado);
+  if (filtros?.solicitud_id) params.append('solicitud_id', filtros.solicitud_id);
+  if (filtros?.contacto_id) params.append('contacto_id', filtros.contacto_id);
 
-  const response = await fetch(url.toString());
+  const queryString = params.toString();
+  const url = `/tenants/${tenantId}/propuestas${queryString ? `?${queryString}` : ''}`;
+
+  const response = await apiFetch(url);
   if (!response.ok) {
     throw new Error('Error al obtener propuestas');
   }
@@ -1963,7 +1960,7 @@ export async function getPropuestas(tenantId: string, filtros?: PropuestaFiltros
  * Obtiene una propuesta por ID
  */
 export async function getPropuesta(tenantId: string, propuestaId: string): Promise<Propuesta> {
-  const response = await fetch(`${API_BASE_URL}/tenants/${tenantId}/propuestas/${propuestaId}`);
+  const response = await apiFetch(`/tenants/${tenantId}/propuestas/${propuestaId}`);
   if (!response.ok) {
     throw new Error('Error al obtener propuesta');
   }
@@ -1996,9 +1993,8 @@ export async function updatePropuesta(tenantId: string, propuestaId: string, dat
  * Cambia el estado de una propuesta
  */
 export async function cambiarEstadoPropuesta(tenantId: string, propuestaId: string, nuevoEstado: string): Promise<Propuesta> {
-  const response = await fetch(`${API_BASE_URL}/tenants/${tenantId}/propuestas/${propuestaId}/estado`, {
+  const response = await apiFetch(`/tenants/${tenantId}/propuestas/${propuestaId}/estado`, {
     method: 'PUT',
-    headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({ estado: nuevoEstado }),
   });
 
@@ -2014,7 +2010,7 @@ export async function cambiarEstadoPropuesta(tenantId: string, propuestaId: stri
  * Elimina una propuesta
  */
 export async function deletePropuesta(tenantId: string, propuestaId: string): Promise<void> {
-  const response = await fetch(`${API_BASE_URL}/tenants/${tenantId}/propuestas/${propuestaId}`, {
+  const response = await apiFetch(`/tenants/${tenantId}/propuestas/${propuestaId}`, {
     method: 'DELETE',
   });
 
@@ -2028,7 +2024,7 @@ export async function deletePropuesta(tenantId: string, propuestaId: string): Pr
  * Obtiene las propiedades de una propuesta
  */
 export async function getPropiedadesDePropuesta(tenantId: string, propuestaId: string): Promise<PropuestaPropiedadResumen[]> {
-  const response = await fetch(`${API_BASE_URL}/tenants/${tenantId}/propuestas/${propuestaId}/propiedades`);
+  const response = await apiFetch(`/tenants/${tenantId}/propuestas/${propuestaId}/propiedades`);
   if (!response.ok) {
     throw new Error('Error al obtener propiedades de la propuesta');
   }
@@ -2043,9 +2039,8 @@ export async function sincronizarPropiedadesPropuesta(
   propuestaId: string,
   propiedadIds: string[]
 ): Promise<PropuestaPropiedadResumen[]> {
-  const response = await fetch(`${API_BASE_URL}/tenants/${tenantId}/propuestas/${propuestaId}/propiedades`, {
+  const response = await apiFetch(`/tenants/${tenantId}/propuestas/${propuestaId}/propiedades`, {
     method: 'PUT',
-    headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({ propiedad_ids: propiedadIds }),
   });
 
@@ -2067,9 +2062,8 @@ export async function agregarPropiedadAPropuesta(
   notas?: string,
   precioEspecial?: number
 ): Promise<PropuestaPropiedadResumen[]> {
-  const response = await fetch(`${API_BASE_URL}/tenants/${tenantId}/propuestas/${propuestaId}/propiedades`, {
+  const response = await apiFetch(`/tenants/${tenantId}/propuestas/${propuestaId}/propiedades`, {
     method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({ propiedad_id: propiedadId, notas, precio_especial: precioEspecial }),
   });
 
@@ -2089,7 +2083,7 @@ export async function eliminarPropiedadDePropuesta(
   propuestaId: string,
   propiedadId: string
 ): Promise<PropuestaPropiedadResumen[]> {
-  const response = await fetch(`${API_BASE_URL}/tenants/${tenantId}/propuestas/${propuestaId}/propiedades/${propiedadId}`, {
+  const response = await apiFetch(`/tenants/${tenantId}/propuestas/${propuestaId}/propiedades/${propiedadId}`, {
     method: 'DELETE',
   });
 
@@ -2105,7 +2099,7 @@ export async function eliminarPropiedadDePropuesta(
  * Regenera la URL pública de una propuesta
  */
 export async function regenerarUrlPublicaPropuesta(tenantId: string, propuestaId: string): Promise<Propuesta> {
-  const response = await fetch(`${API_BASE_URL}/tenants/${tenantId}/propuestas/${propuestaId}/regenerar-url`, {
+  const response = await apiFetch(`/tenants/${tenantId}/propuestas/${propuestaId}/regenerar-url`, {
     method: 'POST',
   });
 
@@ -2194,22 +2188,25 @@ export interface ActividadFiltros {
  * Obtiene las actividades de un tenant
  */
 export async function getActividades(tenantId: string, filtros?: ActividadFiltros): Promise<ActividadesResponse> {
-  const url = new URL(`${API_BASE_URL}/tenants/${tenantId}/actividades`, window.location.origin);
+  const params = new URLSearchParams();
 
-  if (filtros?.tipo) url.searchParams.append('tipo', filtros.tipo);
-  if (filtros?.estado) url.searchParams.append('estado', filtros.estado);
-  if (filtros?.prioridad) url.searchParams.append('prioridad', filtros.prioridad);
-  if (filtros?.contacto_id) url.searchParams.append('contacto_id', filtros.contacto_id);
-  if (filtros?.solicitud_id) url.searchParams.append('solicitud_id', filtros.solicitud_id);
-  if (filtros?.propuesta_id) url.searchParams.append('propuesta_id', filtros.propuesta_id);
-  if (filtros?.completada !== undefined) url.searchParams.append('completada', String(filtros.completada));
-  if (filtros?.busqueda) url.searchParams.append('busqueda', filtros.busqueda);
-  if (filtros?.fecha_desde) url.searchParams.append('fecha_desde', filtros.fecha_desde);
-  if (filtros?.fecha_hasta) url.searchParams.append('fecha_hasta', filtros.fecha_hasta);
-  if (filtros?.page) url.searchParams.append('page', String(filtros.page));
-  if (filtros?.limit) url.searchParams.append('limit', String(filtros.limit));
+  if (filtros?.tipo) params.append('tipo', filtros.tipo);
+  if (filtros?.estado) params.append('estado', filtros.estado);
+  if (filtros?.prioridad) params.append('prioridad', filtros.prioridad);
+  if (filtros?.contacto_id) params.append('contacto_id', filtros.contacto_id);
+  if (filtros?.solicitud_id) params.append('solicitud_id', filtros.solicitud_id);
+  if (filtros?.propuesta_id) params.append('propuesta_id', filtros.propuesta_id);
+  if (filtros?.completada !== undefined) params.append('completada', String(filtros.completada));
+  if (filtros?.busqueda) params.append('busqueda', filtros.busqueda);
+  if (filtros?.fecha_desde) params.append('fecha_desde', filtros.fecha_desde);
+  if (filtros?.fecha_hasta) params.append('fecha_hasta', filtros.fecha_hasta);
+  if (filtros?.page) params.append('page', String(filtros.page));
+  if (filtros?.limit) params.append('limit', String(filtros.limit));
 
-  const response = await fetch(url.toString());
+  const queryString = params.toString();
+  const url = `/tenants/${tenantId}/actividades${queryString ? `?${queryString}` : ''}`;
+
+  const response = await apiFetch(url);
   if (!response.ok) {
     throw new Error('Error al obtener actividades');
   }
@@ -2220,7 +2217,7 @@ export async function getActividades(tenantId: string, filtros?: ActividadFiltro
  * Obtiene una actividad por ID
  */
 export async function getActividad(tenantId: string, actividadId: string): Promise<Actividad> {
-  const response = await fetch(`${API_BASE_URL}/tenants/${tenantId}/actividades/${actividadId}`);
+  const response = await apiFetch(`/tenants/${tenantId}/actividades/${actividadId}`);
   if (!response.ok) {
     throw new Error('Error al obtener actividad');
   }
@@ -2231,10 +2228,11 @@ export async function getActividad(tenantId: string, actividadId: string): Promi
  * Obtiene las actividades de un contacto
  */
 export async function getActividadesByContacto(tenantId: string, contactoId: string, limit?: number): Promise<Actividad[]> {
-  const url = new URL(`${API_BASE_URL}/tenants/${tenantId}/contactos/${contactoId}/actividades`, window.location.origin);
-  if (limit) url.searchParams.append('limit', String(limit));
+  const params = new URLSearchParams();
+  if (limit) params.append('limit', String(limit));
+  const queryString = params.toString();
 
-  const response = await fetch(url.toString());
+  const response = await apiFetch(`/tenants/${tenantId}/contactos/${contactoId}/actividades${queryString ? `?${queryString}` : ''}`);
   if (!response.ok) {
     throw new Error('Error al obtener actividades del contacto');
   }
@@ -2245,10 +2243,11 @@ export async function getActividadesByContacto(tenantId: string, contactoId: str
  * Obtiene las actividades de una solicitud
  */
 export async function getActividadesBySolicitud(tenantId: string, solicitudId: string, limit?: number): Promise<Actividad[]> {
-  const url = new URL(`${API_BASE_URL}/tenants/${tenantId}/solicitudes/${solicitudId}/actividades`, window.location.origin);
-  if (limit) url.searchParams.append('limit', String(limit));
+  const params = new URLSearchParams();
+  if (limit) params.append('limit', String(limit));
+  const queryString = params.toString();
 
-  const response = await fetch(url.toString());
+  const response = await apiFetch(`/tenants/${tenantId}/solicitudes/${solicitudId}/actividades${queryString ? `?${queryString}` : ''}`);
   if (!response.ok) {
     throw new Error('Error al obtener actividades de la solicitud');
   }
@@ -2259,11 +2258,12 @@ export async function getActividadesBySolicitud(tenantId: string, solicitudId: s
  * Obtiene actividades pendientes
  */
 export async function getActividadesPendientes(tenantId: string, usuarioId?: string, limit?: number): Promise<Actividad[]> {
-  const url = new URL(`${API_BASE_URL}/tenants/${tenantId}/actividades/pendientes`, window.location.origin);
-  if (usuarioId) url.searchParams.append('usuario_id', usuarioId);
-  if (limit) url.searchParams.append('limit', String(limit));
+  const params = new URLSearchParams();
+  if (usuarioId) params.append('usuario_id', usuarioId);
+  if (limit) params.append('limit', String(limit));
+  const queryString = params.toString();
 
-  const response = await fetch(url.toString());
+  const response = await apiFetch(`/tenants/${tenantId}/actividades/pendientes${queryString ? `?${queryString}` : ''}`);
   if (!response.ok) {
     throw new Error('Error al obtener actividades pendientes');
   }
@@ -2274,9 +2274,8 @@ export async function getActividadesPendientes(tenantId: string, usuarioId?: str
  * Crea una nueva actividad
  */
 export async function createActividad(tenantId: string, data: Partial<Actividad>): Promise<Actividad> {
-  const response = await fetch(`${API_BASE_URL}/tenants/${tenantId}/actividades`, {
+  const response = await apiFetch(`/tenants/${tenantId}/actividades`, {
     method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify(data),
   });
 
@@ -2292,9 +2291,8 @@ export async function createActividad(tenantId: string, data: Partial<Actividad>
  * Actualiza una actividad
  */
 export async function updateActividad(tenantId: string, actividadId: string, data: Partial<Actividad>): Promise<Actividad> {
-  const response = await fetch(`${API_BASE_URL}/tenants/${tenantId}/actividades/${actividadId}`, {
+  const response = await apiFetch(`/tenants/${tenantId}/actividades/${actividadId}`, {
     method: 'PUT',
-    headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify(data),
   });
 
@@ -2315,9 +2313,8 @@ export async function completarActividad(
   completada: boolean = true,
   nota?: string
 ): Promise<Actividad> {
-  const response = await fetch(`${API_BASE_URL}/tenants/${tenantId}/actividades/${actividadId}/completar`, {
+  const response = await apiFetch(`/tenants/${tenantId}/actividades/${actividadId}/completar`, {
     method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({ completada, nota }),
   });
 
@@ -2338,9 +2335,8 @@ export async function cambiarEstadoActividad(
   estado: EstadoActividad,
   nota?: string
 ): Promise<Actividad> {
-  const response = await fetch(`${API_BASE_URL}/tenants/${tenantId}/actividades/${actividadId}/estado`, {
+  const response = await apiFetch(`/tenants/${tenantId}/actividades/${actividadId}/estado`, {
     method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({ estado, nota }),
   });
 
@@ -2365,7 +2361,7 @@ export async function getActividadesStats(tenantId: string): Promise<{
   esteAno: number;
   porTipo: Record<TipoActividad, number>;
 }> {
-  const response = await fetch(`${API_BASE_URL}/tenants/${tenantId}/actividades/stats`);
+  const response = await apiFetch(`/tenants/${tenantId}/actividades/stats`);
   if (!response.ok) {
     throw new Error('Error al obtener estadísticas');
   }
@@ -2376,7 +2372,7 @@ export async function getActividadesStats(tenantId: string): Promise<{
  * Elimina una actividad
  */
 export async function deleteActividad(tenantId: string, actividadId: string): Promise<void> {
-  const response = await fetch(`${API_BASE_URL}/tenants/${tenantId}/actividades/${actividadId}`, {
+  const response = await apiFetch(`/tenants/${tenantId}/actividades/${actividadId}`, {
     method: 'DELETE',
   });
 
@@ -2737,17 +2733,17 @@ export interface MetasResumen {
  * Obtiene las metas de un tenant
  */
 export async function getMetas(tenantId: string, filtros?: MetaFiltros): Promise<MetasResponse> {
-  const url = new URL(`${API_BASE_URL}/tenants/${tenantId}/metas`, window.location.origin);
+  const params = new URLSearchParams();
+  if (filtros?.tipo_meta) params.append('tipo_meta', filtros.tipo_meta);
+  if (filtros?.estado) params.append('estado', filtros.estado);
+  if (filtros?.origen) params.append('origen', filtros.origen);
+  if (filtros?.usuario_id) params.append('usuario_id', filtros.usuario_id);
+  if (filtros?.periodo) params.append('periodo', filtros.periodo);
+  if (filtros?.page) params.append('page', String(filtros.page));
+  if (filtros?.limit) params.append('limit', String(filtros.limit));
 
-  if (filtros?.tipo_meta) url.searchParams.append('tipo_meta', filtros.tipo_meta);
-  if (filtros?.estado) url.searchParams.append('estado', filtros.estado);
-  if (filtros?.origen) url.searchParams.append('origen', filtros.origen);
-  if (filtros?.usuario_id) url.searchParams.append('usuario_id', filtros.usuario_id);
-  if (filtros?.periodo) url.searchParams.append('periodo', filtros.periodo);
-  if (filtros?.page) url.searchParams.append('page', String(filtros.page));
-  if (filtros?.limit) url.searchParams.append('limit', String(filtros.limit));
-
-  const response = await fetch(url.toString());
+  const qs = params.toString();
+  const response = await apiFetch(`/tenants/${tenantId}/metas${qs ? '?' + qs : ''}`);
   if (!response.ok) {
     throw new Error('Error al obtener metas');
   }
@@ -2758,7 +2754,7 @@ export async function getMetas(tenantId: string, filtros?: MetaFiltros): Promise
  * Obtiene una meta por ID
  */
 export async function getMetaCrm(tenantId: string, metaId: string): Promise<Meta> {
-  const response = await fetch(`${API_BASE_URL}/tenants/${tenantId}/metas/${metaId}`);
+  const response = await apiFetch(`/tenants/${tenantId}/metas/${metaId}`);
   if (!response.ok) {
     throw new Error('Error al obtener meta');
   }
@@ -2769,10 +2765,11 @@ export async function getMetaCrm(tenantId: string, metaId: string): Promise<Meta
  * Obtiene el resumen de metas
  */
 export async function getMetasResumen(tenantId: string, usuarioId?: string): Promise<MetasResumen> {
-  const url = new URL(`${API_BASE_URL}/tenants/${tenantId}/metas/resumen`, window.location.origin);
-  if (usuarioId) url.searchParams.append('usuario_id', usuarioId);
+  const params = new URLSearchParams();
+  if (usuarioId) params.append('usuario_id', usuarioId);
+  const qs = params.toString();
 
-  const response = await fetch(url.toString());
+  const response = await apiFetch(`/tenants/${tenantId}/metas/resumen${qs ? '?' + qs : ''}`);
   if (!response.ok) {
     throw new Error('Error al obtener resumen');
   }
@@ -2783,7 +2780,7 @@ export async function getMetasResumen(tenantId: string, usuarioId?: string): Pro
  * Crea una nueva meta
  */
 export async function createMeta(tenantId: string, data: Partial<Meta>): Promise<Meta> {
-  const response = await fetch(`${API_BASE_URL}/tenants/${tenantId}/metas`, {
+  const response = await apiFetch(`/tenants/${tenantId}/metas`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify(data),
@@ -2801,7 +2798,7 @@ export async function createMeta(tenantId: string, data: Partial<Meta>): Promise
  * Actualiza una meta
  */
 export async function updateMeta(tenantId: string, metaId: string, data: Partial<Meta>): Promise<Meta> {
-  const response = await fetch(`${API_BASE_URL}/tenants/${tenantId}/metas/${metaId}`, {
+  const response = await apiFetch(`/tenants/${tenantId}/metas/${metaId}`, {
     method: 'PUT',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify(data),
@@ -2819,7 +2816,7 @@ export async function updateMeta(tenantId: string, metaId: string, data: Partial
  * Actualiza el progreso de una meta
  */
 export async function actualizarProgresoMeta(tenantId: string, metaId: string, valor: number, nota?: string): Promise<Meta> {
-  const response = await fetch(`${API_BASE_URL}/tenants/${tenantId}/metas/${metaId}/progreso`, {
+  const response = await apiFetch(`/tenants/${tenantId}/metas/${metaId}/progreso`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({ valor, nota }),
@@ -2837,7 +2834,7 @@ export async function actualizarProgresoMeta(tenantId: string, metaId: string, v
  * Elimina una meta
  */
 export async function deleteMeta(tenantId: string, metaId: string): Promise<void> {
-  const response = await fetch(`${API_BASE_URL}/tenants/${tenantId}/metas/${metaId}`, {
+  const response = await apiFetch(`/tenants/${tenantId}/metas/${metaId}`, {
     method: 'DELETE',
   });
 
