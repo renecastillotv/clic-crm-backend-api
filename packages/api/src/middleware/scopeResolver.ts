@@ -53,12 +53,6 @@ export async function resolveUserScope(
       try {
         const payload = await verifyToken(token, {
           secretKey: process.env.CLERK_SECRET_KEY!,
-          authorizedParties: [
-            'http://localhost:3000',
-            'http://localhost:3002',
-            'http://localhost:4321',
-            'https://clic-crm-frontend.vercel.app',
-          ],
         });
         clerkId = payload.sub;
       } catch (tokenError: any) {
