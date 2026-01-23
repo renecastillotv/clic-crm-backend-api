@@ -120,7 +120,14 @@ router.get('/:actividadId', async (req, res, next) => {
 router.post('/', async (req, res, next) => {
   try {
     const { tenantId } = req.params as RouteParams;
-    const actividad = await createActividad(tenantId, req.body);
+    const data = { ...req.body };
+
+    // Auto-assign the creating user as owner if not explicitly set
+    if (!data.usuario_id && req.scope?.dbUserId) {
+      data.usuario_id = req.scope.dbUserId;
+    }
+
+    const actividad = await createActividad(tenantId, data);
     res.status(201).json(actividad);
   } catch (error) {
     next(error);
