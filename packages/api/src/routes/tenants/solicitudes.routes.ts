@@ -80,7 +80,14 @@ router.get('/:solicitudId', async (req, res, next) => {
 router.post('/', async (req, res, next) => {
   try {
     const { tenantId } = req.params as RouteParams;
-    const solicitud = await createSolicitud(tenantId, req.body);
+    const data = { ...req.body };
+
+    // Auto-assign the creating user as owner if not explicitly set
+    if (!data.usuario_asignado_id && req.scope?.dbUserId) {
+      data.usuario_asignado_id = req.scope.dbUserId;
+    }
+
+    const solicitud = await createSolicitud(tenantId, data);
     res.status(201).json(solicitud);
   } catch (error) {
     next(error);
