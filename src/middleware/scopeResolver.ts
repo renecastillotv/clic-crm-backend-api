@@ -7,6 +7,7 @@
  */
 
 import { Request, Response, NextFunction } from 'express';
+import { verifyToken } from '@clerk/backend';
 import { query } from '../utils/db.js';
 
 // Extender Request para incluir scope info
@@ -25,7 +26,7 @@ declare global {
 
 /**
  * Middleware que resuelve el alcance del usuario para el tenant actual.
- * Debe usarse después de requireAuth.
+ * Verifica el token de Clerk y resuelve permisos del usuario.
  * Agrega req.scope con: dbUserId, tenantId, isPlatformAdmin, alcances
  */
 export async function resolveUserScope(
@@ -34,9 +35,35 @@ export async function resolveUserScope(
   next: NextFunction
 ): Promise<void> {
   try {
-    const clerkId = req.auth?.userId;
+    // Try to get clerkId from existing auth or verify token directly
+    let clerkId = req.auth?.userId;
+
     if (!clerkId) {
-      // No auth - skip scope resolution
+      const authHeader = req.headers.authorization;
+      if (!authHeader || !authHeader.startsWith('Bearer ')) {
+        next();
+        return;
+      }
+      const token = authHeader.split('Bearer ')[1];
+      try {
+        const payload = await verifyToken(token, {
+          secretKey: process.env.CLERK_SECRET_KEY!,
+          authorizedParties: [
+            'http://localhost:3000',
+            'http://localhost:3002',
+            'http://localhost:4321',
+            'https://clic-crm-frontend.vercel.app',
+          ],
+        });
+        clerkId = payload.sub;
+      } catch {
+        // Invalid token - skip scope resolution
+        next();
+        return;
+      }
+    }
+
+    if (!clerkId) {
       next();
       return;
     }
