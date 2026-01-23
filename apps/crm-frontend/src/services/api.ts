@@ -69,9 +69,8 @@ export async function apiFetch(url: string, options: RequestInit = {}, token?: s
 
   if (authToken) {
     headers['Authorization'] = `Bearer ${authToken}`;
-    console.log(`[apiFetch] ✅ Token sent | ${options.method || 'GET'} ${url}`);
-  } else {
-    console.warn(`[apiFetch] ⚠️ NO TOKEN | ${options.method || 'GET'} ${url}`);
+  } else if (import.meta.env.DEV) {
+    console.warn(`[apiFetch] NO TOKEN | ${options.method || 'GET'} ${url}`);
   }
 
   try {
@@ -79,12 +78,6 @@ export async function apiFetch(url: string, options: RequestInit = {}, token?: s
       ...options,
       headers,
     });
-
-    // Log scope status for debugging (temporary)
-    const scopeStatus = response.headers.get('x-scope-status');
-    if (scopeStatus) {
-      console.log(`[apiFetch] Scope: ${scopeStatus} | ${options.method || 'GET'} ${url}`);
-    }
 
     if (!response.ok) {
       const errorData = await response.json().catch(() => ({ message: 'Error desconocido' }));
