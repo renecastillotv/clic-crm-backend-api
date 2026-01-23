@@ -21,7 +21,7 @@ import {
 } from '../../services/propuestasService.js';
 import { requireAuth } from '../../middleware/clerkAuth.js';
 import { getUsuarioByClerkId } from '../../services/usuariosService.js';
-import { getOwnFilter } from '../../middleware/scopeResolver.js';
+import { resolveUserScope, getOwnFilter } from '../../middleware/scopeResolver.js';
 
 // Tipos para params con mergeParams
 interface RouteParams { [key: string]: string | undefined;
@@ -31,6 +31,9 @@ interface RouteParams { [key: string]: string | undefined;
 }
 
 const router = express.Router({ mergeParams: true });
+
+// Apply scope resolution inside sub-router where mergeParams ensures tenantId is available
+router.use(resolveUserScope);
 
 /**
  * GET /api/tenants/:tenantId/propuestas

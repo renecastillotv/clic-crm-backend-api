@@ -70,12 +70,12 @@ const router = express.Router();
 // MÓDULOS ACTIVOS - Rutas aisladas
 // ============================================================================
 
-// CRM Core Modules (with scope resolution for data filtering)
-router.use('/:tenantId/contactos', resolveUserScope, contactosRouter);
-router.use('/:tenantId/propiedades', resolveUserScope, propiedadesRouter);
-router.use('/:tenantId/solicitudes', resolveUserScope, solicitudesRouter);
-router.use('/:tenantId/actividades', resolveUserScope, actividadesRouter);
-router.use('/:tenantId/propuestas', resolveUserScope, propuestasRouter);
+// CRM Core Modules (scope resolution handled inside each sub-router via mergeParams)
+router.use('/:tenantId/contactos', contactosRouter);
+router.use('/:tenantId/propiedades', propiedadesRouter);
+router.use('/:tenantId/solicitudes', solicitudesRouter);
+router.use('/:tenantId/actividades', actividadesRouter);
+router.use('/:tenantId/propuestas', propuestasRouter);
 router.use('/:tenantId/metas', metasRouter);
 
 // Ventas Module (incluye ventas-stats)

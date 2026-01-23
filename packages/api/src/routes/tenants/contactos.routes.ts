@@ -18,10 +18,13 @@ import {
   deleteRelacionContacto,
 } from '../../services/contactosService.js';
 import { getActividadesByContacto } from '../../services/actividadesService.js';
-import { getOwnFilter, canEdit } from '../../middleware/scopeResolver.js';
+import { resolveUserScope, getOwnFilter, canEdit } from '../../middleware/scopeResolver.js';
 import { query } from '../../utils/db.js';
 
 const router = express.Router({ mergeParams: true });
+
+// Apply scope resolution inside sub-router where mergeParams ensures tenantId is available
+router.use(resolveUserScope);
 
 // Tipo para request con tenantId del parent router
 interface TenantParams {

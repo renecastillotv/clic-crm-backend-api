@@ -21,7 +21,7 @@ import {
   getTagsStats,
 } from '../../services/tagsSyncService.js';
 import unidadesRouter from './unidades.routes.js';
-import { getOwnFilter, canEdit } from '../../middleware/scopeResolver.js';
+import { resolveUserScope, getOwnFilter, canEdit } from '../../middleware/scopeResolver.js';
 
 // Tipos para params con mergeParams
 interface RouteParams { [key: string]: string | undefined;
@@ -30,6 +30,9 @@ interface RouteParams { [key: string]: string | undefined;
 }
 
 const router = express.Router({ mergeParams: true });
+
+// Apply scope resolution inside sub-router where mergeParams ensures tenantId is available
+router.use(resolveUserScope);
 
 /**
  * GET /api/tenants/:tenantId/propiedades
