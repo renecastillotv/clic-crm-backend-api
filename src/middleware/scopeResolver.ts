@@ -34,6 +34,9 @@ export async function resolveUserScope(
   res: Response,
   next: NextFunction
 ): Promise<void> {
+  // Mark that scope resolution was attempted (for fail-closed behavior)
+  (req as any)._scopeAttempted = true;
+
   try {
     // Try to get clerkId from existing auth or verify token directly
     let clerkId = req.auth?.userId;
@@ -42,6 +45,7 @@ export async function resolveUserScope(
       const authHeader = req.headers.authorization;
       if (!authHeader || !authHeader.startsWith('Bearer ')) {
         console.log('[ScopeResolver] No auth header, skipping');
+        res.setHeader('X-Scope-Status', 'no-auth-header');
         next();
         return;
       }
@@ -59,6 +63,7 @@ export async function resolveUserScope(
         clerkId = payload.sub;
       } catch (tokenError: any) {
         console.error('[ScopeResolver] Token verification failed:', tokenError.message);
+        res.setHeader('X-Scope-Status', 'token-verification-failed: ' + tokenError.message);
         next();
         return;
       }
@@ -66,6 +71,7 @@ export async function resolveUserScope(
 
     if (!clerkId) {
       console.log('[ScopeResolver] No clerkId resolved');
+      res.setHeader('X-Scope-Status', 'no-clerk-id');
       next();
       return;
     }
@@ -73,6 +79,7 @@ export async function resolveUserScope(
     const tenantId = req.params.tenantId;
     if (!tenantId) {
       console.log('[ScopeResolver] No tenantId in params. Available params:', JSON.stringify(req.params));
+      res.setHeader('X-Scope-Status', 'no-tenant-id-in-params');
       next();
       return;
     }
@@ -86,6 +93,7 @@ export async function resolveUserScope(
     );
 
     if (userResult.rows.length === 0) {
+      res.setHeader('X-Scope-Status', 'user-not-found-for-clerk-id');
       next();
       return;
     }
@@ -102,6 +110,7 @@ export async function resolveUserScope(
         alcances: {},
       };
       console.log('[ScopeResolver] Platform admin - bypassing scope filter');
+      res.setHeader('X-Scope-Status', 'platform-admin');
       next();
       return;
     }
@@ -147,9 +156,11 @@ export async function resolveUserScope(
       alcances,
     };
 
+    res.setHeader('X-Scope-Status', `resolved:${Object.keys(alcances).length}-modules`);
     next();
   } catch (error: any) {
     console.error('Error in resolveUserScope:', error.message);
+    res.setHeader('X-Scope-Status', 'error: ' + error.message);
     // Don't block the request on scope resolution failure
     next();
   }
@@ -161,11 +172,15 @@ export async function resolveUserScope(
  */
 export function getOwnFilter(req: any, moduloId: string): string | null {
   if (!req.scope) {
-    console.log(`[getOwnFilter] No scope set for module=${moduloId}, returning null (no filter)`);
+    // FAIL-CLOSED: If scope middleware ran but couldn't resolve, deny access
+    if (req._scopeAttempted) {
+      console.log(`[getOwnFilter] Scope attempted but not set for module=${moduloId}, DENYING (fail-closed)`);
+      return '00000000-0000-0000-0000-000000000000'; // UUID that matches nothing
+    }
+    // Scope middleware didn't run (route without scope) - allow
     return null;
   }
   if (req.scope.isPlatformAdmin) {
-    console.log(`[getOwnFilter] Platform admin for module=${moduloId}, returning null (no filter)`);
     return null;
   }
 
@@ -175,7 +190,6 @@ export function getOwnFilter(req: any, moduloId: string): string | null {
     return req.scope.dbUserId;
   }
 
-  console.log(`[getOwnFilter] module=${moduloId}, alcance_ver=${alcance.ver}, no filter needed`);
   return null; // 'team' or 'all' - no filter needed
 }
 
