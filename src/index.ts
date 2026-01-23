@@ -82,7 +82,9 @@ console.log('🔧 Puerto configurado para el servidor API:', PORT);
 console.log('🔧 DATABASE_URL configurada:', process.env.DATABASE_URL ? 'Sí' : 'No');
 
 // Middlewares
-app.use(cors());
+app.use(cors({
+  exposedHeaders: ['X-Scope-Status'],
+}));
 app.use(express.json());
 
 // Health check
