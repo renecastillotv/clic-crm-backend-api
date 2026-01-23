@@ -41,6 +41,7 @@ export async function resolveUserScope(
     if (!clerkId) {
       const authHeader = req.headers.authorization;
       if (!authHeader || !authHeader.startsWith('Bearer ')) {
+        console.log('[ScopeResolver] No auth header, skipping');
         next();
         return;
       }
@@ -56,23 +57,27 @@ export async function resolveUserScope(
           ],
         });
         clerkId = payload.sub;
-      } catch {
-        // Invalid token - skip scope resolution
+      } catch (tokenError: any) {
+        console.error('[ScopeResolver] Token verification failed:', tokenError.message);
         next();
         return;
       }
     }
 
     if (!clerkId) {
+      console.log('[ScopeResolver] No clerkId resolved');
       next();
       return;
     }
 
     const tenantId = req.params.tenantId;
     if (!tenantId) {
+      console.log('[ScopeResolver] No tenantId in params. Available params:', JSON.stringify(req.params));
       next();
       return;
     }
+
+    console.log(`[ScopeResolver] Resolving scope for clerkId=${clerkId}, tenantId=${tenantId}`);
 
     // Get DB user ID and platform admin status
     const userResult = await query(
@@ -86,6 +91,7 @@ export async function resolveUserScope(
     }
 
     const dbUser = userResult.rows[0];
+    console.log(`[ScopeResolver] Found user: id=${dbUser.id}, isPlatformAdmin=${dbUser.es_platform_admin}`);
 
     // Platform admins see everything
     if (dbUser.es_platform_admin) {
@@ -95,6 +101,7 @@ export async function resolveUserScope(
         isPlatformAdmin: true,
         alcances: {},
       };
+      console.log('[ScopeResolver] Platform admin - bypassing scope filter');
       next();
       return;
     }
@@ -131,6 +138,8 @@ export async function resolveUserScope(
       };
     }
 
+    console.log(`[ScopeResolver] Resolved ${Object.keys(alcances).length} module alcances:`, JSON.stringify(alcances));
+
     req.scope = {
       dbUserId: dbUser.id,
       tenantId,
@@ -151,14 +160,41 @@ export async function resolveUserScope(
  * Returns the user's DB ID if scope is 'own', null otherwise.
  */
 export function getOwnFilter(req: any, moduloId: string): string | null {
-  if (!req.scope) return null;
-  if (req.scope.isPlatformAdmin) return null;
+  if (!req.scope) {
+    console.log(`[getOwnFilter] No scope set for module=${moduloId}, returning null (no filter)`);
+    return null;
+  }
+  if (req.scope.isPlatformAdmin) {
+    console.log(`[getOwnFilter] Platform admin for module=${moduloId}, returning null (no filter)`);
+    return null;
+  }
 
   const alcance = req.scope.alcances[moduloId];
   if (!alcance || alcance.ver === 'own') {
-    // Default to 'own' if module not found in permissions
+    console.log(`[getOwnFilter] module=${moduloId}, alcance_ver=${alcance?.ver || 'not found'}, filtering to userId=${req.scope.dbUserId}`);
     return req.scope.dbUserId;
   }
 
+  console.log(`[getOwnFilter] module=${moduloId}, alcance_ver=${alcance.ver}, no filter needed`);
   return null; // 'team' or 'all' - no filter needed
+}
+
+/**
+ * Helper to check if the user can edit a specific record.
+ * Returns true if the user can edit, false if not.
+ * Uses alcance_editar: 'own' means only records assigned to them.
+ */
+export function canEdit(req: any, moduloId: string, recordOwnerId: string | null): boolean {
+  if (!req.scope) return true; // No scope = no restriction
+  if (req.scope.isPlatformAdmin) return true;
+
+  const alcance = req.scope.alcances[moduloId];
+  if (!alcance) return false; // No permission for this module
+
+  if (alcance.editar === 'all') return true;
+  if (alcance.editar === 'own') {
+    return recordOwnerId === req.scope.dbUserId;
+  }
+  // 'team' - TODO: implement team check
+  return true;
 }

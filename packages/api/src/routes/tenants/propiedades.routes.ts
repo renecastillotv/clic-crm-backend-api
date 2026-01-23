@@ -21,7 +21,7 @@ import {
   getTagsStats,
 } from '../../services/tagsSyncService.js';
 import unidadesRouter from './unidades.routes.js';
-import { getOwnFilter } from '../../middleware/scopeResolver.js';
+import { getOwnFilter, canEdit } from '../../middleware/scopeResolver.js';
 
 // Tipos para params con mergeParams
 interface RouteParams { [key: string]: string | undefined;
@@ -129,12 +129,18 @@ router.post('/', async (req, res, next) => {
 router.put('/:propiedadId', async (req, res, next) => {
   try {
     const { tenantId, propiedadId } = req.params as RouteParams;
-    const propiedad = await updatePropiedad(tenantId, propiedadId, req.body);
 
-    if (!propiedad) {
+    // Check edit scope: get current record to verify ownership
+    const existing = await getPropiedadById(tenantId, propiedadId);
+    if (!existing) {
       return res.status(404).json({ error: 'Propiedad no encontrada' });
     }
 
+    if (!canEdit(req, 'propiedades', existing.agente_id || existing.captador_id)) {
+      return res.status(403).json({ error: 'No tienes permiso para editar esta propiedad' });
+    }
+
+    const propiedad = await updatePropiedad(tenantId, propiedadId, req.body);
     res.json(propiedad);
   } catch (error) {
     next(error);

@@ -201,6 +201,29 @@ router.put('/:tenantId/tasas-cambio', async (req: Request<TenantParams>, res: Re
 });
 
 // ============================================================================
+// DIAGNÓSTICO DE SCOPE (temporal)
+// ============================================================================
+
+/**
+ * GET /api/tenants/:tenantId/debug-scope
+ * Endpoint de diagnóstico para verificar resolución de scope
+ */
+router.get('/:tenantId/debug-scope', resolveUserScope, async (req: Request<TenantParams>, res: Response) => {
+  res.json({
+    hasScope: !!req.scope,
+    scope: req.scope ? {
+      dbUserId: req.scope.dbUserId,
+      tenantId: req.scope.tenantId,
+      isPlatformAdmin: req.scope.isPlatformAdmin,
+      alcancesCount: Object.keys(req.scope.alcances).length,
+      alcances: req.scope.alcances,
+    } : null,
+    params: req.params,
+    hasAuthHeader: !!req.headers.authorization,
+  });
+});
+
+// ============================================================================
 // NO HAY LEGACY FALLBACK - Las rutas no migradas devolverán 404
 // ============================================================================
 
