@@ -15,7 +15,7 @@ import {
   cambiarEtapaSolicitud,
 } from '../../services/solicitudesService.js';
 import { getActividadesBySolicitud } from '../../services/actividadesService.js';
-import { getOwnFilter } from '../../middleware/scopeResolver.js';
+import { resolveUserScope, getOwnFilter } from '../../middleware/scopeResolver.js';
 
 // Tipos para params con mergeParams
 interface RouteParams { [key: string]: string | undefined;
@@ -24,6 +24,9 @@ interface RouteParams { [key: string]: string | undefined;
 }
 
 const router = express.Router({ mergeParams: true });
+
+// Apply scope resolution inside sub-router where mergeParams ensures tenantId is available
+router.use(resolveUserScope);
 
 /**
  * GET /api/tenants/:tenantId/solicitudes

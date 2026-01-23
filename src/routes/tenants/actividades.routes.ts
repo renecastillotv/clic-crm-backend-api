@@ -21,9 +21,12 @@ import {
   getActividadesPendientes,
   getActividadesStats,
 } from '../../services/actividadesService.js';
-import { getOwnFilter } from '../../middleware/scopeResolver.js';
+import { resolveUserScope, getOwnFilter } from '../../middleware/scopeResolver.js';
 
 const router = express.Router({ mergeParams: true });
+
+// Apply scope resolution inside sub-router where mergeParams ensures tenantId is available
+router.use(resolveUserScope);
 
 /**
  * GET /api/tenants/:tenantId/actividades
