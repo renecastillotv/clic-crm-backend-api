@@ -18,6 +18,7 @@ import {
   deleteRelacionContacto,
 } from '../../services/contactosService.js';
 import { getActividadesByContacto } from '../../services/actividadesService.js';
+import { getOwnFilter } from '../../middleware/scopeResolver.js';
 import { query } from '../../utils/db.js';
 
 const router = express.Router({ mergeParams: true });
@@ -39,11 +40,14 @@ router.get('/', async (req: Request<TenantParams>, res: Response, next: NextFunc
     const { tenantId } = req.params as TenantParams;
     const { tipo, favorito, busqueda, usuario_asignado_id, page, limit } = req.query;
 
+    // Apply scope filter: if alcance_ver = 'own', force user's own contacts
+    const ownUserId = getOwnFilter(req, 'contactos');
+
     const filtros = {
       tipo: tipo as string | undefined,
       favorito: favorito === 'true' ? true : favorito === 'false' ? false : undefined,
       busqueda: busqueda as string | undefined,
-      usuario_asignado_id: usuario_asignado_id as string | undefined,
+      usuario_asignado_id: ownUserId || (usuario_asignado_id as string | undefined),
       page: page ? parseInt(page as string) : 1,
       limit: limit ? parseInt(limit as string) : 50,
     };

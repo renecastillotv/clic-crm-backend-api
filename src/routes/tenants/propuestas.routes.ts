@@ -21,6 +21,7 @@ import {
 } from '../../services/propuestasService.js';
 import { requireAuth } from '../../middleware/clerkAuth.js';
 import { getUsuarioByClerkId } from '../../services/usuariosService.js';
+import { getOwnFilter } from '../../middleware/scopeResolver.js';
 
 // Tipos para params con mergeParams
 interface RouteParams { [key: string]: string | undefined;
@@ -40,12 +41,15 @@ router.get('/', async (req, res, next) => {
     const { tenantId } = req.params as RouteParams;
     const { estado, estados, solicitud_id, contacto_id, usuario_creador_id, busqueda, page, limit } = req.query;
 
+    // Apply scope filter: if alcance_ver = 'own', force user's own proposals
+    const ownUserId = getOwnFilter(req, 'propuestas');
+
     const filtros = {
       estado: estado as string | undefined,
       estados: estados ? (estados as string).split(',') : undefined,
       solicitud_id: solicitud_id as string | undefined,
       contacto_id: contacto_id as string | undefined,
-      usuario_creador_id: usuario_creador_id as string | undefined,
+      usuario_creador_id: ownUserId || (usuario_creador_id as string | undefined),
       busqueda: busqueda as string | undefined,
       page: page ? parseInt(page as string) : 1,
       limit: limit ? parseInt(limit as string) : 50,
