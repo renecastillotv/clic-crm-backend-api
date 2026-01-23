@@ -69,8 +69,9 @@ export async function apiFetch(url: string, options: RequestInit = {}, token?: s
 
   if (authToken) {
     headers['Authorization'] = `Bearer ${authToken}`;
+    console.log(`[apiFetch] ✅ Token sent | ${options.method || 'GET'} ${url}`);
   } else {
-    console.warn('[apiFetch] ⚠️ NO TOKEN for:', fullUrl);
+    console.warn(`[apiFetch] ⚠️ NO TOKEN | ${options.method || 'GET'} ${url}`);
   }
 
   try {
