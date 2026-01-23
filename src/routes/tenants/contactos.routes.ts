@@ -18,7 +18,7 @@ import {
   deleteRelacionContacto,
 } from '../../services/contactosService.js';
 import { getActividadesByContacto } from '../../services/actividadesService.js';
-import { getOwnFilter } from '../../middleware/scopeResolver.js';
+import { getOwnFilter, canEdit } from '../../middleware/scopeResolver.js';
 import { query } from '../../utils/db.js';
 
 const router = express.Router({ mergeParams: true });
@@ -99,12 +99,18 @@ router.post('/', async (req, res, next) => {
 router.put('/:contactoId', async (req, res, next) => {
   try {
     const { tenantId, contactoId } = req.params as TenantParams;
-    const contacto = await updateContacto(tenantId, contactoId, req.body);
 
-    if (!contacto) {
+    // Check edit scope: get current record to verify ownership
+    const existing = await getContactoById(tenantId, contactoId);
+    if (!existing) {
       return res.status(404).json({ error: 'Contacto no encontrado' });
     }
 
+    if (!canEdit(req, 'contactos', existing.usuario_asignado_id)) {
+      return res.status(403).json({ error: 'No tienes permiso para editar este contacto' });
+    }
+
+    const contacto = await updateContacto(tenantId, contactoId, req.body);
     res.json(contacto);
   } catch (error) {
     next(error);
