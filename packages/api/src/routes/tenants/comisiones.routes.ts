@@ -7,8 +7,12 @@
 
 import { Router, Request, Response, NextFunction } from 'express';
 import { query } from '../../utils/db.js';
+import { resolveUserScope, getOwnFilter } from '../../middleware/scopeResolver.js';
 
 const router = Router({ mergeParams: true });
+
+// Apply scope resolution
+router.use(resolveUserScope);
 
 interface TenantParams {
   tenantId: string;
@@ -87,16 +91,20 @@ router.get('/', async (req: Request<TenantParams, any, any, ComisionesQuery>, re
       include_empresa = 'true'
     } = req.query;
 
+    // Apply scope filter: if alcance_ver = 'own', only show user's comisiones
+    const ownUserId = getOwnFilter(req, 'finanzas-comisiones');
+
     // Construir query dinámica con filtros
     const params: any[] = [tenantId];
     let paramIndex = 2;
 
     let whereClause = `WHERE c.tenant_id = $1`;
 
-    // Filtro por usuario
-    if (usuario_id) {
+    // Filtro por usuario (scope override or explicit filter)
+    const effectiveUsuarioId = ownUserId || (usuario_id as string | undefined);
+    if (effectiveUsuarioId) {
       whereClause += ` AND c.usuario_id = $${paramIndex}`;
-      params.push(usuario_id);
+      params.push(effectiveUsuarioId);
       paramIndex++;
     }
 
