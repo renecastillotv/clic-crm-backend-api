@@ -70,9 +70,18 @@ export async function resolveUserScope(
       return;
     }
 
-    const tenantId = req.params.tenantId;
+    // Extract tenantId from params or URL path (router.use() may not populate params)
+    let tenantId = req.params.tenantId;
     if (!tenantId) {
-      console.log('[ScopeResolver] No tenantId in params. Available params:', JSON.stringify(req.params));
+      // Fallback: extract UUID from originalUrl path after /tenants/
+      const match = req.originalUrl?.match(/\/tenants\/([0-9a-f-]{36})/i);
+      if (match) {
+        tenantId = match[1];
+        console.log(`[ScopeResolver] tenantId extracted from URL: ${tenantId}`);
+      }
+    }
+    if (!tenantId) {
+      console.log('[ScopeResolver] No tenantId in params or URL. Available params:', JSON.stringify(req.params), 'URL:', req.originalUrl);
       res.setHeader('X-Scope-Status', 'no-tenant-id-in-params');
       next();
       return;
