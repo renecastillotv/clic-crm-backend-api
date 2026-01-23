@@ -288,11 +288,21 @@ router.get('/stats', async (req: Request<TenantParams>, res: Response, next: Nex
     const { tenantId } = req.params;
     const { fecha_inicio, fecha_fin } = req.query;
 
-    let dateFilter = '';
+    // Apply scope filter
+    const ownUserId = getOwnFilter(req, 'finanzas-ventas');
+
+    let extraFilters = '';
     const params: any[] = [tenantId];
+    let paramIndex = 2;
+
+    if (ownUserId) {
+      extraFilters += ` AND usuario_cerrador_id = $${paramIndex}`;
+      params.push(ownUserId);
+      paramIndex++;
+    }
 
     if (fecha_inicio && fecha_fin) {
-      dateFilter = 'AND fecha_cierre BETWEEN $2 AND $3';
+      extraFilters += ` AND fecha_cierre BETWEEN $${paramIndex} AND $${paramIndex + 1}`;
       params.push(fecha_inicio, fecha_fin);
     }
 
@@ -306,7 +316,7 @@ router.get('/stats', async (req: Request<TenantParams>, res: Response, next: Nex
         COALESCE(SUM(monto_comision) FILTER (WHERE completada = true), 0) as comisiones_totales,
         COALESCE(AVG(valor_cierre) FILTER (WHERE completada = true), 0) as valor_promedio
       FROM ventas
-      WHERE tenant_id = $1 AND activo = true ${dateFilter}
+      WHERE tenant_id = $1 AND activo = true ${extraFilters}
     `;
 
     const result = await query(sql, params);

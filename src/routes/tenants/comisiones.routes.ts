@@ -317,15 +317,19 @@ router.get('/resumen', async (req: Request<TenantParams, any, any, ComisionesQue
       include_empresa = 'true'
     } = req.query;
 
+    // Apply scope filter: if alcance_ver = 'own', only show user's comisiones
+    const ownUserId = getOwnFilter(req, 'finanzas-comisiones');
+
     // Construir filtros para comisiones
     const params: any[] = [tenantId];
     let paramIndex = 2;
 
     let whereClause = `WHERE c.tenant_id = $1`;
 
-    if (usuario_id) {
+    const effectiveUsuarioId = ownUserId || (usuario_id as string | undefined);
+    if (effectiveUsuarioId) {
       whereClause += ` AND c.usuario_id = $${paramIndex}`;
-      params.push(usuario_id);
+      params.push(effectiveUsuarioId);
       paramIndex++;
     }
 
