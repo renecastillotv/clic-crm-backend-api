@@ -18,8 +18,12 @@ import { calcularYCrearComisiones, modificarDistribucion, getMisComisiones } fro
 import * as ventasCobrosService from '../../services/ventasCobrosService.js';
 import * as ventasHistorialService from '../../services/ventasHistorialService.js';
 import * as pagosComisionesService from '../../services/pagosComisionesService.js';
+import { resolveUserScope, getOwnFilter } from '../../middleware/scopeResolver.js';
 
 const router = express.Router({ mergeParams: true });
+
+// Apply scope resolution
+router.use(resolveUserScope);
 
 // Tipo para request con tenantId del parent router
 interface TenantParams { tenantId: string }
@@ -161,6 +165,9 @@ router.get('/', async (req: Request<TenantParams>, res: Response, next: NextFunc
       limit = '50'
     } = req.query;
 
+    // Apply scope filter: if alcance_ver = 'own', only show user's ventas
+    const ownUserId = getOwnFilter(req, 'finanzas-ventas');
+
     let sql = `
       SELECT v.*,
         ev.nombre as estado_venta_nombre,
@@ -182,6 +189,12 @@ router.get('/', async (req: Request<TenantParams>, res: Response, next: NextFunc
     `;
     const params: any[] = [tenantId];
     let paramIndex = 2;
+
+    if (ownUserId) {
+      sql += ` AND v.usuario_cerrador_id = $${paramIndex}`;
+      params.push(ownUserId);
+      paramIndex++;
+    }
 
     if (estado_venta_id) {
       sql += ` AND v.estado_venta_id = $${paramIndex}`;
