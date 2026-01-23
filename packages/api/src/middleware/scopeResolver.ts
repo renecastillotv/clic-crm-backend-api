@@ -44,7 +44,6 @@ export async function resolveUserScope(
     if (!clerkId) {
       const authHeader = req.headers.authorization;
       if (!authHeader || !authHeader.startsWith('Bearer ')) {
-        console.log('[ScopeResolver] No auth header, skipping');
         res.setHeader('X-Scope-Status', 'no-auth-header');
         next();
         return;
@@ -64,7 +63,6 @@ export async function resolveUserScope(
     }
 
     if (!clerkId) {
-      console.log('[ScopeResolver] No clerkId resolved');
       res.setHeader('X-Scope-Status', 'no-clerk-id');
       next();
       return;
@@ -77,17 +75,13 @@ export async function resolveUserScope(
       const match = req.originalUrl?.match(/\/tenants\/([0-9a-f-]{36})/i);
       if (match) {
         tenantId = match[1];
-        console.log(`[ScopeResolver] tenantId extracted from URL: ${tenantId}`);
       }
     }
     if (!tenantId) {
-      console.log('[ScopeResolver] No tenantId in params or URL. Available params:', JSON.stringify(req.params), 'URL:', req.originalUrl);
       res.setHeader('X-Scope-Status', 'no-tenant-id-in-params');
       next();
       return;
     }
-
-    console.log(`[ScopeResolver] Resolving scope for clerkId=${clerkId}, tenantId=${tenantId}`);
 
     // Get DB user ID and platform admin status
     const userResult = await query(
@@ -102,7 +96,6 @@ export async function resolveUserScope(
     }
 
     const dbUser = userResult.rows[0];
-    console.log(`[ScopeResolver] Found user: id=${dbUser.id}, isPlatformAdmin=${dbUser.es_platform_admin}`);
 
     // Platform admins see everything
     if (dbUser.es_platform_admin) {
@@ -112,7 +105,6 @@ export async function resolveUserScope(
         isPlatformAdmin: true,
         alcances: {},
       };
-      console.log('[ScopeResolver] Platform admin - bypassing scope filter');
       res.setHeader('X-Scope-Status', 'platform-admin');
       next();
       return;
@@ -150,8 +142,6 @@ export async function resolveUserScope(
       };
     }
 
-    console.log(`[ScopeResolver] Resolved ${Object.keys(alcances).length} module alcances:`, JSON.stringify(alcances));
-
     req.scope = {
       dbUserId: dbUser.id,
       tenantId,
@@ -177,8 +167,7 @@ export function getOwnFilter(req: any, moduloId: string): string | null {
   if (!req.scope) {
     // FAIL-CLOSED: If scope middleware ran but couldn't resolve, deny access
     if (req._scopeAttempted) {
-      console.log(`[getOwnFilter] Scope attempted but not set for module=${moduloId}, DENYING (fail-closed)`);
-      return '00000000-0000-0000-0000-000000000000'; // UUID that matches nothing
+      return '00000000-0000-0000-0000-000000000000'; // UUID that matches nothing (fail-closed)
     }
     // Scope middleware didn't run (route without scope) - allow
     return null;
@@ -189,7 +178,6 @@ export function getOwnFilter(req: any, moduloId: string): string | null {
 
   const alcance = req.scope.alcances[moduloId];
   if (!alcance || alcance.ver === 'own') {
-    console.log(`[getOwnFilter] module=${moduloId}, alcance_ver=${alcance?.ver || 'not found'}, filtering to userId=${req.scope.dbUserId}`);
     return req.scope.dbUserId;
   }
 

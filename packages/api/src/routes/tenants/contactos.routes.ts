@@ -56,16 +56,6 @@ router.get('/', async (req: Request<TenantParams>, res: Response, next: NextFunc
     };
 
     const resultado = await getContactos(tenantId, filtros);
-    // TEMP DEBUG: include scope info in response to diagnose filtering
-    (resultado as any)._debug = {
-      hasScope: !!(req as any).scope,
-      scopeAttempted: !!(req as any)._scopeAttempted,
-      tenantIdFromParams: req.params.tenantId || null,
-      ownUserId,
-      dbUserId: (req as any).scope?.dbUserId || null,
-      alcanceContactos: (req as any).scope?.alcances?.contactos || null,
-      originalUrl: req.originalUrl,
-    };
     res.json(resultado);
   } catch (error) {
     next(error);
