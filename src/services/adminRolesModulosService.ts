@@ -6,6 +6,7 @@
  */
 
 import { query } from '../utils/db.js';
+import { incrementPermisosVersion } from './usuariosService.js';
 
 // Interfaces
 export interface Modulo {
@@ -255,6 +256,20 @@ export async function updateRolModulo(
   }
 
   const row = result.rows[0];
+
+  // Invalidate permission cache for affected tenants
+  try {
+    const affectedTenants = await query(
+      'SELECT DISTINCT tenant_id FROM usuarios_roles WHERE rol_id = $1 AND tenant_id IS NOT NULL',
+      [rolId]
+    );
+    for (const t of affectedTenants.rows) {
+      await incrementPermisosVersion(t.tenant_id);
+    }
+  } catch (err) {
+    console.error('Error incrementing permisos_version:', err);
+  }
+
   return {
     id: row.id,
     rolId: row.rol_id,
@@ -322,6 +337,19 @@ export async function updateAllRolModulos(
         alcanceEditar: row.alcance_editar || 'own',
       });
     }
+  }
+
+  // Invalidate permission cache for all tenants that have users with this role
+  try {
+    const affectedTenants = await query(
+      'SELECT DISTINCT tenant_id FROM usuarios_roles WHERE rol_id = $1 AND tenant_id IS NOT NULL',
+      [rolId]
+    );
+    for (const row of affectedTenants.rows) {
+      await incrementPermisosVersion(row.tenant_id);
+    }
+  } catch (err) {
+    console.error('Error incrementing permisos_version:', err);
   }
 
   return results;
