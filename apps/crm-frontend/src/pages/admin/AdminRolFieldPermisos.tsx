@@ -10,8 +10,7 @@ import { useParams, useNavigate } from 'react-router-dom';
 import { useAuth } from '@clerk/clerk-react';
 import {
   getRolModulosMatrix,
-  updateRolModulos,
-  RolModuloInput,
+  updateRolModulo,
   PermisosCampos,
 } from '../../services/api';
 import {
@@ -237,19 +236,10 @@ export default function AdminRolFieldPermisos() {
         permisosCampos.override = validOverrides;
       }
 
-      // Preparar datos para guardar
-      const dataToSave: RolModuloInput[] = [{
-        moduloId,
-        puedeVer: moduloData.puedeVer,
-        puedeCrear: moduloData.puedeCrear,
-        puedeEditar: moduloData.puedeEditar,
-        puedeEliminar: moduloData.puedeEliminar,
-        alcanceVer: moduloData.alcanceVer as 'all' | 'team' | 'own',
-        alcanceEditar: moduloData.alcanceEditar as 'all' | 'team' | 'own',
+      // Usar updateRolModulo para actualizar solo este módulo (no todos los permisos del rol)
+      await updateRolModulo(rolId, moduloId, {
         permisosCampos: Object.keys(permisosCampos).length > 0 ? permisosCampos : undefined,
-      }];
-
-      await updateRolModulos(rolId, dataToSave, token);
+      }, token);
 
       setSuccess(true);
       setTimeout(() => setSuccess(false), 3000);
