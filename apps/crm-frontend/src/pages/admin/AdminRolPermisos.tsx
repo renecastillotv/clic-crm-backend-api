@@ -6,6 +6,7 @@
  */
 
 import { useState, useEffect } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { useAuth } from '@clerk/clerk-react';
 import {
   getAllRolesForManagement,
@@ -15,11 +16,11 @@ import {
   RoleWithDates,
   RolModulosMatrix,
   RolModuloInput,
-  ModuloConPermisos,
   PermisosCampos,
 } from '../../services/api';
 
 export default function AdminRolPermisos() {
+  const navigate = useNavigate();
   const { getToken } = useAuth();
   const [roles, setRoles] = useState<RoleWithDates[]>([]);
   const [selectedRoleId, setSelectedRoleId] = useState<string>('');
@@ -45,16 +46,6 @@ export default function AdminRolPermisos() {
   // Modal para copiar permisos
   const [showCopyModal, setShowCopyModal] = useState(false);
   const [copySourceRoleId, setCopySourceRoleId] = useState<string>('');
-
-  // Modal para permisos de campos
-  const [showFieldPermsModal, setShowFieldPermsModal] = useState(false);
-  const [selectedModuloForFields, setSelectedModuloForFields] = useState<ModuloConPermisos | null>(null);
-  const [fieldPermsForm, setFieldPermsForm] = useState<{
-    hide: string;
-    readonly: string;
-    autoFilter: string;
-    override: string;
-  }>({ hide: '', readonly: '', autoFilter: '', override: '' });
 
   // Cargar roles al inicio
   useEffect(() => {
@@ -277,77 +268,9 @@ export default function AdminRolPermisos() {
     setSuccess(null);
   };
 
-  // Abrir modal de permisos de campos
-  const openFieldPermsModal = (modulo: ModuloConPermisos) => {
-    setSelectedModuloForFields(modulo);
-    const permisos = editedPermisos.get(modulo.id)?.permisosCampos;
-    setFieldPermsForm({
-      hide: permisos?.hide?.join(', ') || '',
-      readonly: permisos?.readonly?.join(', ') || '',
-      autoFilter: permisos?.autoFilter ? JSON.stringify(permisos.autoFilter, null, 2) : '',
-      override: permisos?.override ? JSON.stringify(permisos.override, null, 2) : '',
-    });
-    setShowFieldPermsModal(true);
-  };
-
-  // Guardar permisos de campos
-  const handleSaveFieldPerms = () => {
-    if (!selectedModuloForFields) return;
-
-    // Parsear los valores del formulario
-    const hideArray = fieldPermsForm.hide
-      .split(',')
-      .map(s => s.trim())
-      .filter(s => s.length > 0);
-    const readonlyArray = fieldPermsForm.readonly
-      .split(',')
-      .map(s => s.trim())
-      .filter(s => s.length > 0);
-
-    let autoFilterObj: Record<string, any> | undefined;
-    let overrideObj: Record<string, any> | undefined;
-
-    try {
-      if (fieldPermsForm.autoFilter.trim()) {
-        autoFilterObj = JSON.parse(fieldPermsForm.autoFilter);
-      }
-    } catch {
-      setError('Error: autoFilter no es JSON válido');
-      return;
-    }
-
-    try {
-      if (fieldPermsForm.override.trim()) {
-        overrideObj = JSON.parse(fieldPermsForm.override);
-      }
-    } catch {
-      setError('Error: override no es JSON válido');
-      return;
-    }
-
-    const newPermisosCampos: PermisosCampos = {};
-    if (hideArray.length > 0) newPermisosCampos.hide = hideArray;
-    if (readonlyArray.length > 0) newPermisosCampos.readonly = readonlyArray;
-    if (autoFilterObj) newPermisosCampos.autoFilter = autoFilterObj;
-    if (overrideObj) newPermisosCampos.override = overrideObj;
-
-    // Actualizar estado
-    setEditedPermisos(prev => {
-      const newMap = new Map(prev);
-      const current = newMap.get(selectedModuloForFields.id);
-      if (current) {
-        newMap.set(selectedModuloForFields.id, {
-          ...current,
-          permisosCampos: Object.keys(newPermisosCampos).length > 0 ? newPermisosCampos : undefined,
-        });
-      }
-      return newMap;
-    });
-
-    setHasChanges(true);
-    setShowFieldPermsModal(false);
-    setSelectedModuloForFields(null);
-    setSuccess(null);
+  // Navegar a la página de permisos de campos
+  const openFieldPermsPage = (moduloId: string) => {
+    navigate(`/admin/roles/${selectedRoleId}/campos/${moduloId}`);
   };
 
   // Verificar si un módulo tiene permisos de campos configurados
@@ -597,7 +520,7 @@ export default function AdminRolPermisos() {
                       <td className="fields-col">
                         <button
                           className={`field-perms-btn ${hasFieldPerms(modulo.id) ? 'has-perms' : ''}`}
-                          onClick={() => openFieldPermsModal(modulo)}
+                          onClick={() => openFieldPermsPage(modulo.id)}
                           disabled={saving || !permisos?.puedeVer}
                           title={hasFieldPerms(modulo.id) ? 'Permisos de campos configurados' : 'Configurar permisos de campos'}
                         >
@@ -677,82 +600,6 @@ export default function AdminRolPermisos() {
                 disabled={saving || !copySourceRoleId}
               >
                 {saving ? 'Copiando...' : 'Copiar permisos'}
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
-
-      {/* Modal para permisos de campos */}
-      {showFieldPermsModal && selectedModuloForFields && (
-        <div className="modal-overlay" onClick={() => setShowFieldPermsModal(false)}>
-          <div className="modal-content modal-wide" onClick={(e) => e.stopPropagation()}>
-            <div className="modal-header">
-              <h2>Permisos de Campos: {selectedModuloForFields.nombre}</h2>
-              <button className="modal-close" onClick={() => setShowFieldPermsModal(false)}>×</button>
-            </div>
-            <div className="modal-body">
-              <p className="modal-hint">
-                Configura restricciones a nivel de campo para este módulo.
-                Los campos ocultos no se mostrarán al usuario con este rol.
-              </p>
-
-              <div className="form-group">
-                <label>Campos ocultos (hide)</label>
-                <input
-                  type="text"
-                  value={fieldPermsForm.hide}
-                  onChange={(e) => setFieldPermsForm(prev => ({ ...prev, hide: e.target.value }))}
-                  placeholder="propietario_*, comision, precio_compra"
-                />
-                <span className="field-hint">Separar con comas. Usa * para wildcards (ej: propietario_*)</span>
-              </div>
-
-              <div className="form-group">
-                <label>Campos de solo lectura (readonly)</label>
-                <input
-                  type="text"
-                  value={fieldPermsForm.readonly}
-                  onChange={(e) => setFieldPermsForm(prev => ({ ...prev, readonly: e.target.value }))}
-                  placeholder="estado, fecha_cierre"
-                />
-                <span className="field-hint">Separar con comas</span>
-              </div>
-
-              <div className="form-group">
-                <label>Filtros automáticos (autoFilter) - JSON</label>
-                <textarea
-                  value={fieldPermsForm.autoFilter}
-                  onChange={(e) => setFieldPermsForm(prev => ({ ...prev, autoFilter: e.target.value }))}
-                  placeholder='{ "connect": true }'
-                  rows={3}
-                />
-                <span className="field-hint">JSON con filtros que se aplican automáticamente al listar (ej: solo mostrar propiedades con connect=true)</span>
-              </div>
-
-              <div className="form-group">
-                <label>Valores de override (override) - JSON</label>
-                <textarea
-                  value={fieldPermsForm.override}
-                  onChange={(e) => setFieldPermsForm(prev => ({ ...prev, override: e.target.value }))}
-                  placeholder='{ "contacto_nombre": "Contacto CLIC", "contacto_telefono": "809-000-0000" }'
-                  rows={3}
-                />
-                <span className="field-hint">JSON con valores fijos que reemplazan los originales</span>
-              </div>
-            </div>
-            <div className="modal-actions">
-              <button
-                className="btn-secondary"
-                onClick={() => setShowFieldPermsModal(false)}
-              >
-                Cancelar
-              </button>
-              <button
-                className="btn-primary"
-                onClick={handleSaveFieldPerms}
-              >
-                Aplicar
               </button>
             </div>
           </div>

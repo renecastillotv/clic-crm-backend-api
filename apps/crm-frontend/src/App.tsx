@@ -38,10 +38,9 @@ import AdminFacturacion from './pages/admin/AdminFacturacion';
 import AdminConfiguracion from './pages/admin/AdminConfiguracion';
 import AdminRoles from './pages/admin/AdminRoles';
 import AdminRolPermisos from './pages/admin/AdminRolPermisos';
+import AdminRolFieldPermisos from './pages/admin/AdminRolFieldPermisos';
 import AdminUbicaciones from './pages/admin/AdminUbicaciones';
 import AdminTagsGlobal from './pages/admin/AdminTagsGlobal';
-import AdminTemplates from './pages/admin/AdminTemplates';
-import AdminTemplatePermisos from './pages/admin/AdminTemplatePermisos';
 
 // Páginas CRM
 import CrmDashboard from './pages/crm/CrmDashboard';
@@ -110,6 +109,10 @@ import CrmMarketingImageConverter from './pages/crm/CrmMarketingImageConverter';
 import CrmMarketingFlyerGenerator from './pages/crm/CrmMarketingFlyerGenerator';
 import CrmMarketingStoriesCreator from './pages/crm/CrmMarketingStoriesCreator';
 import CrmMarketingTemplates from './pages/crm/CrmMarketingTemplates';
+
+// Páginas de Roles del Tenant
+import CrmRoles from './pages/crm/CrmRoles';
+import CrmRolEditar from './pages/crm/CrmRolEditar';
 
 // Páginas de Configuración adicionales
 import CrmUsuarios from './pages/crm/CrmUsuarios';
@@ -283,10 +286,9 @@ function AppRoutes() {
                 <Route path="configuracion" element={<AdminConfiguracion />} />
                 <Route path="roles" element={<AdminRoles />} />
                 <Route path="roles/permisos" element={<AdminRolPermisos />} />
+                <Route path="roles/:rolId/campos/:moduloId" element={<AdminRolFieldPermisos />} />
                 <Route path="ubicaciones" element={<AdminUbicaciones />} />
                 <Route path="tags-global" element={<AdminTagsGlobal />} />
-                <Route path="templates" element={<AdminTemplates />} />
-                <Route path="templates/:templateId/permisos" element={<AdminTemplatePermisos />} />
       </Route>
 
       {/* ========== CRM POR TENANT ========== */}
@@ -370,6 +372,10 @@ function AppRoutes() {
         <Route path="usuarios/nuevo" element={<CrmUsuarioEditar />} />
         <Route path="usuarios/:usuarioId" element={<CrmUsuarioEditar />} />
 
+        {/* Roles del Tenant */}
+        <Route path="roles" element={<CrmRoles />} />
+        <Route path="roles/:rolId" element={<CrmRolEditar />} />
+
         {/* Configuración (Web, Tema, General) */}
         <Route path="web/paginas" element={<CrmWebPaginas />} />
         <Route path="web/paginas/:paginaId" element={<CrmWebPaginaEditar />} />
@@ -412,76 +418,6 @@ function AppRoutes() {
       {/* ========== 404 ========== */}
       <Route path="*" element={<NotFound />} />
     </Routes>
-  );
-}
-
-/**
- * Placeholder para páginas admin no implementadas
- */
-function AdminPlaceholder({ title }: { title: string }) {
-  return (
-    <div className="admin-placeholder">
-      <div className="admin-placeholder-header">
-        <h1>{title}</h1>
-        <p className="admin-placeholder-subtitle">Módulo en desarrollo</p>
-      </div>
-      <div className="admin-placeholder-content">
-        <div className="admin-placeholder-icon">🚧</div>
-        <p>Esta sección estará disponible próximamente</p>
-        <p className="admin-placeholder-note">
-          Estamos trabajando para traerte las mejores funcionalidades
-        </p>
-      </div>
-      
-      <style>{`
-        .admin-placeholder {
-          max-width: 800px;
-        }
-        
-        .admin-placeholder-header {
-          margin-bottom: 32px;
-        }
-        
-        .admin-placeholder-header h1 {
-          margin: 0 0 8px 0;
-          font-size: 2rem;
-          font-weight: 700;
-          color: #f3e8ff;
-          letter-spacing: -0.02em;
-        }
-        
-        .admin-placeholder-subtitle {
-          margin: 0;
-          color: #a78bfa;
-          font-size: 1rem;
-        }
-        
-        .admin-placeholder-content {
-          background: linear-gradient(135deg, rgba(139, 92, 246, 0.05) 0%, rgba(124, 58, 237, 0.02) 100%);
-          border: 1px solid rgba(139, 92, 246, 0.15);
-          border-radius: 16px;
-          padding: 64px 40px;
-          text-align: center;
-        }
-        
-        .admin-placeholder-icon {
-          font-size: 64px;
-          margin-bottom: 24px;
-        }
-        
-        .admin-placeholder-content p {
-          margin: 0 0 12px 0;
-          color: #ddd6fe;
-          font-size: 1.125rem;
-        }
-        
-        .admin-placeholder-note {
-          color: #a78bfa !important;
-          font-size: 0.9375rem !important;
-          margin-top: 8px !important;
-        }
-      `}</style>
-    </div>
   );
 }
 
