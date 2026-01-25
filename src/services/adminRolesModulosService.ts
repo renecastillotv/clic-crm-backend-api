@@ -91,6 +91,7 @@ export async function getModulosByRol(rolId: string): Promise<RolModulo[]> {
       rm.puede_eliminar,
       rm.alcance_ver,
       rm.alcance_editar,
+      rm.permisos_campos,
       m.nombre as modulo_nombre,
       m.descripcion as modulo_descripcion,
       m.categoria as modulo_categoria
@@ -110,6 +111,7 @@ export async function getModulosByRol(rolId: string): Promise<RolModulo[]> {
     puedeEliminar: row.puede_eliminar,
     alcanceVer: row.alcance_ver || 'own',
     alcanceEditar: row.alcance_editar || 'own',
+    permisosCampos: row.permisos_campos || undefined,
     moduloNombre: row.modulo_nombre,
     moduloDescripcion: row.modulo_descripcion,
     moduloCategoria: row.modulo_categoria,
@@ -153,7 +155,8 @@ export async function getRolModulosMatrix(rolId: string): Promise<{
       rm.puede_editar,
       rm.puede_eliminar,
       rm.alcance_ver,
-      rm.alcance_editar
+      rm.alcance_editar,
+      rm.permisos_campos
     FROM modulos m
     LEFT JOIN roles_modulos rm ON rm.modulo_id = m.id AND rm.rol_id = $1
     WHERE m.activo = true
@@ -178,6 +181,7 @@ export async function getRolModulosMatrix(rolId: string): Promise<{
       puedeEliminar: row.puede_eliminar,
       alcanceVer: row.alcance_ver || 'own',
       alcanceEditar: row.alcance_editar || 'own',
+      permisosCampos: row.permisos_campos || undefined,
     } : null,
   }));
 
@@ -322,8 +326,9 @@ export async function updateAllRolModulos(
         INSERT INTO roles_modulos (
           rol_id, modulo_id,
           puede_ver, puede_crear, puede_editar, puede_eliminar,
-          alcance_ver, alcance_editar
-        ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
+          alcance_ver, alcance_editar,
+          permisos_campos
+        ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)
         RETURNING *
       `, [
         rolId,
@@ -334,6 +339,7 @@ export async function updateAllRolModulos(
         modulo.puedeEliminar,
         modulo.alcanceVer ?? 'own',
         modulo.alcanceEditar ?? 'own',
+        modulo.permisosCampos ? JSON.stringify(modulo.permisosCampos) : null,
       ]);
 
       const row = result.rows[0];
@@ -347,6 +353,7 @@ export async function updateAllRolModulos(
         puedeEliminar: row.puede_eliminar,
         alcanceVer: row.alcance_ver || 'own',
         alcanceEditar: row.alcance_editar || 'own',
+        permisosCampos: row.permisos_campos || undefined,
       });
     }
   }
