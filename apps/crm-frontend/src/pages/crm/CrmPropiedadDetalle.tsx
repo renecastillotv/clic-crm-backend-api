@@ -718,8 +718,9 @@ export default function CrmPropiedadDetalle() {
               </div>
             </div>
 
-            {/* Comisión Connect - visible solo para usuarios Connect */}
-            {(propiedad as any).connect_comision && (
+            {/* Comisión Connect - visible SOLO para usuarios Connect (detectados por tener captador oculto) */}
+            {(propiedad as any).connect_comision &&
+             getPermisosCampos('propiedades')?.hide?.includes('captador_nombre') && (
               <div className="sidebar-card connect-card">
                 <h4><Percent size={16} /> Comisión Connect</h4>
                 <div className="connect-info">
@@ -736,7 +737,7 @@ export default function CrmPropiedadDetalle() {
               </div>
             )}
 
-            {/* Captador - oculto si los campos están restringidos */}
+            {/* Captador - visible SOLO para usuarios normales (NO Connect) */}
             {(propiedad.agente_nombre || (propiedad as any).captador_nombre) &&
              !getPermisosCampos('propiedades')?.hide?.includes('captador_nombre') && (
               <div className="sidebar-card captador-card">
