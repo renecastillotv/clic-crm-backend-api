@@ -65,6 +65,14 @@ router.get('/', async (req, res, next) => {
     const autoFilter = getAutoFilter(req, 'propiedades');
     const permisosCampos = getFieldPermissions(req, 'propiedades');
 
+    // DEBUG: Log para verificar autoFilter
+    console.log(`🏠 [GET /propiedades] scope:`, JSON.stringify({
+      isPlatformAdmin: (req as any).scope?.isPlatformAdmin,
+      alcance: (req as any).scope?.alcances?.propiedades,
+    }));
+    console.log(`🏠 [GET /propiedades] autoFilter:`, JSON.stringify(autoFilter));
+    console.log(`🏠 [GET /propiedades] permisosCampos:`, JSON.stringify(permisosCampos));
+
     const filtros: Record<string, any> = {
       tipo: tipo as string | undefined,
       operacion: operacion as string | undefined,
@@ -87,6 +95,7 @@ router.get('/', async (req, res, next) => {
     // Apply auto-filters from field permissions (e.g., connect: true for CONNECT role)
     if (autoFilter) {
       Object.assign(filtros, autoFilter);
+      console.log(`🏠 [GET /propiedades] filtros después de autoFilter:`, JSON.stringify({ connect: filtros.connect, estado_propiedad: filtros.estado_propiedad }));
     }
 
     const resultado = await getPropiedades(tenantId, filtros);

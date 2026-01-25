@@ -411,7 +411,13 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
   const puedeCrear = (moduloId: string): boolean => {
     if (isPlatformAdmin) return true;
-    return modulos.some((m) => m.id === moduloId && m.puedeCrear);
+    const modulo = modulos.find((m) => m.id === moduloId);
+    const resultado = modulo?.puedeCrear ?? false;
+    // DEBUG: Log para propiedades
+    if (moduloId === 'propiedades') {
+      console.log(`🏠 [puedeCrear] propiedades: ${resultado}, modulo:`, modulo);
+    }
+    return resultado;
   };
 
   const puedeEditar = (moduloId: string): boolean => {
