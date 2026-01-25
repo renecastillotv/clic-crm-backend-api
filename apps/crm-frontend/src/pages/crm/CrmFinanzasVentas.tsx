@@ -81,9 +81,12 @@ export default function CrmFinanzasVentas() {
   const { tenantSlug } = useParams<{ tenantSlug: string }>();
   const navigate = useNavigate();
   const [searchParams, setSearchParams] = useSearchParams();
-  const { tenantActual, user } = useAuth();
+  const { tenantActual, user, tieneAcceso, isPlatformAdmin } = useAuth();
   const { getToken } = useClerkAuth();
   const { setPageHeader } = usePageHeader();
+
+  // Solo admin (finanzas-config) o platform admin pueden ver filtros de agentes
+  const esAdmin = isPlatformAdmin || tieneAcceso('finanzas-config');
 
   // Estado
   const [ventas, setVentas] = useState<Venta[]>([]);
@@ -1201,60 +1204,63 @@ export default function CrmFinanzasVentas() {
           />
         </div>
 
-        <button
-          onClick={() => setShowAgentsModal(true)}
-          style={{
-            display: 'flex',
-            alignItems: 'center',
-            gap: '10px',
-            padding: '14px 24px',
-            borderRadius: '12px',
-            border: '1px solid #e2e8f0',
-            background: (usuariosSeleccionados.length > 0 || showMyVentas || showParticipatedVentas)
-              ? 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)'
-              : 'white',
-            color: (usuariosSeleccionados.length > 0 || showMyVentas || showParticipatedVentas)
-              ? 'white'
-              : '#475569',
-            fontWeight: 600,
-            fontSize: '0.9375rem',
-            cursor: 'pointer',
-            transition: 'all 0.2s',
-            boxShadow: (usuariosSeleccionados.length > 0 || showMyVentas || showParticipatedVentas)
-              ? '0 4px 6px rgba(102, 126, 234, 0.25)'
-              : '0 1px 3px rgba(0, 0, 0, 0.05)',
-            flex: '0 0 auto',
-            whiteSpace: 'nowrap'
-          }}
-          onMouseEnter={(e) => {
-            if (!(usuariosSeleccionados.length > 0 || showMyVentas || showParticipatedVentas)) {
-              e.currentTarget.style.background = '#f8fafc';
-              e.currentTarget.style.borderColor = '#cbd5e1';
-              e.currentTarget.style.transform = 'translateY(-1px)';
-              e.currentTarget.style.boxShadow = '0 4px 6px rgba(0, 0, 0, 0.1)';
-            }
-          }}
-          onMouseLeave={(e) => {
-            if (!(usuariosSeleccionados.length > 0 || showMyVentas || showParticipatedVentas)) {
-              e.currentTarget.style.background = 'white';
-              e.currentTarget.style.borderColor = '#e2e8f0';
-              e.currentTarget.style.transform = 'translateY(0)';
-              e.currentTarget.style.boxShadow = '0 1px 3px rgba(0, 0, 0, 0.05)';
-            }
-          }}
-        >
-          <User style={{ width: '18px', height: '18px' }} />
-          <span>Agentes</span>
-          {(usuariosSeleccionados.length > 0 || showMyVentas || showParticipatedVentas) && (
-            <span style={{
-              width: '8px',
-              height: '8px',
-              borderRadius: '50%',
-              background: 'white',
-              marginLeft: '4px'
-            }}></span>
-          )}
-        </button>
+        {/* Botón de Agentes - solo visible para admin */}
+        {esAdmin && (
+          <button
+            onClick={() => setShowAgentsModal(true)}
+            style={{
+              display: 'flex',
+              alignItems: 'center',
+              gap: '10px',
+              padding: '14px 24px',
+              borderRadius: '12px',
+              border: '1px solid #e2e8f0',
+              background: (usuariosSeleccionados.length > 0 || showMyVentas || showParticipatedVentas)
+                ? 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)'
+                : 'white',
+              color: (usuariosSeleccionados.length > 0 || showMyVentas || showParticipatedVentas)
+                ? 'white'
+                : '#475569',
+              fontWeight: 600,
+              fontSize: '0.9375rem',
+              cursor: 'pointer',
+              transition: 'all 0.2s',
+              boxShadow: (usuariosSeleccionados.length > 0 || showMyVentas || showParticipatedVentas)
+                ? '0 4px 6px rgba(102, 126, 234, 0.25)'
+                : '0 1px 3px rgba(0, 0, 0, 0.05)',
+              flex: '0 0 auto',
+              whiteSpace: 'nowrap'
+            }}
+            onMouseEnter={(e) => {
+              if (!(usuariosSeleccionados.length > 0 || showMyVentas || showParticipatedVentas)) {
+                e.currentTarget.style.background = '#f8fafc';
+                e.currentTarget.style.borderColor = '#cbd5e1';
+                e.currentTarget.style.transform = 'translateY(-1px)';
+                e.currentTarget.style.boxShadow = '0 4px 6px rgba(0, 0, 0, 0.1)';
+              }
+            }}
+            onMouseLeave={(e) => {
+              if (!(usuariosSeleccionados.length > 0 || showMyVentas || showParticipatedVentas)) {
+                e.currentTarget.style.background = 'white';
+                e.currentTarget.style.borderColor = '#e2e8f0';
+                e.currentTarget.style.transform = 'translateY(0)';
+                e.currentTarget.style.boxShadow = '0 1px 3px rgba(0, 0, 0, 0.05)';
+              }
+            }}
+          >
+            <User style={{ width: '18px', height: '18px' }} />
+            <span>Agentes</span>
+            {(usuariosSeleccionados.length > 0 || showMyVentas || showParticipatedVentas) && (
+              <span style={{
+                width: '8px',
+                height: '8px',
+                borderRadius: '50%',
+                background: 'white',
+                marginLeft: '4px'
+              }}></span>
+            )}
+          </button>
+        )}
 
         <button
           onClick={() => setShowDateModal(true)}
@@ -2584,8 +2590,8 @@ export default function CrmFinanzasVentas() {
         </div>
       )}
 
-      {/* Modal de Filtros de Agentes */}
-      {showAgentsModal && (
+      {/* Modal de Filtros de Agentes - solo visible para admin */}
+      {esAdmin && showAgentsModal && (
         <div className="modal-overlay" onClick={() => setShowAgentsModal(false)}>
           <div className="modal-content modal-medium" onClick={(e) => e.stopPropagation()} style={{ maxWidth: '500px', width: '100%' }}>
             <div className="modal-header">

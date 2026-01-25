@@ -64,9 +64,12 @@ const ROLES_DISPONIBLES = [
 export default function CrmFinanzasComisiones() {
   const { tenantSlug } = useParams<{ tenantSlug: string }>();
   const navigate = useNavigate();
-  const { tenantActual, user } = useAuth();
+  const { tenantActual, user, tieneAcceso, isPlatformAdmin } = useAuth();
   const { getToken } = useClerkAuth();
   const { setPageHeader } = usePageHeader();
+
+  // Solo admin (finanzas-config) o platform admin pueden ver filtros de equipo y aplicar pagos
+  const esAdmin = isPlatformAdmin || tieneAcceso('finanzas-config');
 
   // Estado principal
   const [comisiones, setComisiones] = useState<ComisionCompleta[]>([]);
@@ -75,9 +78,9 @@ export default function CrmFinanzasComisiones() {
   const [error, setError] = useState<string | null>(null);
   const [usuarios, setUsuarios] = useState<UsuarioTenant[]>([]);
 
-  // Filtros
+  // Filtros - usuarios normales solo ven sus comisiones, admin ve todo el equipo por defecto
   const [busqueda, setBusqueda] = useState('');
-  const [filtroUsuarioTipo, setFiltroUsuarioTipo] = useState<FiltroUsuarioTipo>('todo_equipo');
+  const [filtroUsuarioTipo, setFiltroUsuarioTipo] = useState<FiltroUsuarioTipo>('mis_comisiones');
   const [usuarioSeleccionado, setUsuarioSeleccionado] = useState<string>('');
   const [filtroRol, setFiltroRol] = useState<string>('');
   const [filtroEstado, setFiltroEstado] = useState<string>('');
@@ -563,33 +566,35 @@ export default function CrmFinanzasComisiones() {
             />
           </div>
 
-          {/* Filtro de usuario */}
-          <select
-            value={filtroUsuarioTipo}
-            onChange={(e) => {
-              setFiltroUsuarioTipo(e.target.value as FiltroUsuarioTipo);
-              if (e.target.value !== 'usuario_especifico') {
-                setUsuarioSeleccionado('');
-              }
-            }}
-            style={{
-              padding: '10px 12px',
-              border: '1px solid #e2e8f0',
-              borderRadius: '8px',
-              fontSize: '14px',
-              background: 'white',
-              cursor: 'pointer',
-              minWidth: '160px',
-            }}
-          >
-            <option value="todo_equipo">Todo el equipo</option>
-            <option value="mis_comisiones">Mis comisiones</option>
-            <option value="empresa">Comisiones empresa</option>
-            <option value="usuario_especifico">Usuario específico</option>
-          </select>
+          {/* Filtro de usuario - solo visible para admin */}
+          {esAdmin && (
+            <select
+              value={filtroUsuarioTipo}
+              onChange={(e) => {
+                setFiltroUsuarioTipo(e.target.value as FiltroUsuarioTipo);
+                if (e.target.value !== 'usuario_especifico') {
+                  setUsuarioSeleccionado('');
+                }
+              }}
+              style={{
+                padding: '10px 12px',
+                border: '1px solid #e2e8f0',
+                borderRadius: '8px',
+                fontSize: '14px',
+                background: 'white',
+                cursor: 'pointer',
+                minWidth: '160px',
+              }}
+            >
+              <option value="todo_equipo">Todo el equipo</option>
+              <option value="mis_comisiones">Mis comisiones</option>
+              <option value="empresa">Comisiones empresa</option>
+              <option value="usuario_especifico">Usuario específico</option>
+            </select>
+          )}
 
-          {/* Selector de usuario específico */}
-          {filtroUsuarioTipo === 'usuario_especifico' && (
+          {/* Selector de usuario específico - solo visible para admin */}
+          {esAdmin && filtroUsuarioTipo === 'usuario_especifico' && (
             <select
               value={usuarioSeleccionado}
               onChange={(e) => setUsuarioSeleccionado(e.target.value)}
@@ -862,8 +867,8 @@ export default function CrmFinanzasComisiones() {
                             Ver Venta
                           </button>
 
-                          {/* Botón de pago - solo si hay cobros y la comisión no está pagada */}
-                          {puedePagar(comision) && tieneCobroRegistrado(comision) && (
+                          {/* Botón de pago - solo para admin y si hay cobros y la comisión no está pagada */}
+                          {esAdmin && puedePagar(comision) && tieneCobroRegistrado(comision) && (
                             <button
                               onClick={() => abrirModalPago(comision)}
                               style={{
@@ -892,8 +897,8 @@ export default function CrmFinanzasComisiones() {
                             </button>
                           )}
 
-                          {/* Indicador si no hay cobros pero tiene pendiente */}
-                          {puedePagar(comision) && !tieneCobroRegistrado(comision) && (
+                          {/* Indicador si no hay cobros pero tiene pendiente - solo para admin */}
+                          {esAdmin && puedePagar(comision) && !tieneCobroRegistrado(comision) && (
                             <span
                               title="La inmobiliaria debe registrar cobros de la venta para habilitar el pago"
                               style={{

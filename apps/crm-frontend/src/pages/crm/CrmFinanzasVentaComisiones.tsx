@@ -52,8 +52,11 @@ const CrmFinanzasVentaComisiones: React.FC<CrmFinanzasVentaComisionesProps> = ({
   ventaId,
   venta,
 }) => {
-  const { tenantActual, user } = useAuth();
+  const { tenantActual, user, tieneAcceso, isPlatformAdmin } = useAuth();
   const { getToken } = useClerkAuth();
+
+  // Solo admin (finanzas-config) o platform admin pueden aplicar pagos/cobros
+  const esAdmin = isPlatformAdmin || tieneAcceso('finanzas-config');
   const [comisiones, setComisiones] = useState<Comision[]>([]);
   const [pagos, setPagos] = useState<PagoComision[]>([]);
   const [loading, setLoading] = useState(false);
@@ -495,7 +498,7 @@ const CrmFinanzasVentaComisiones: React.FC<CrmFinanzasVentaComisionesProps> = ({
             </div>
           </div>
         </div>
-        {/* Cobrado (entrada de dinero del cliente) */}
+        {/* Cobrado (entrada de dinero del cliente) - clickeable solo para admin */}
         <div style={{
           background: totalPendienteCobrar > 0
             ? 'linear-gradient(135deg, #fefce8 0%, #fef08a 100%)'
@@ -503,12 +506,12 @@ const CrmFinanzasVentaComisiones: React.FC<CrmFinanzasVentaComisionesProps> = ({
           border: `1px solid ${totalPendienteCobrar > 0 ? '#fde047' : '#86efac'}`,
           borderRadius: '12px',
           padding: '14px',
-          cursor: totalPendienteCobrar > 0 ? 'pointer' : 'default',
+          cursor: (esAdmin && totalPendienteCobrar > 0) ? 'pointer' : 'default',
           transition: 'transform 0.15s, box-shadow 0.15s'
         }}
-          onClick={totalPendienteCobrar > 0 ? handleAbrirCobroGeneral : undefined}
+          onClick={(esAdmin && totalPendienteCobrar > 0) ? handleAbrirCobroGeneral : undefined}
           onMouseOver={(e) => {
-            if (totalPendienteCobrar > 0) {
+            if (esAdmin && totalPendienteCobrar > 0) {
               e.currentTarget.style.transform = 'translateY(-2px)';
               e.currentTarget.style.boxShadow = '0 4px 12px rgba(0,0,0,0.15)';
             }
@@ -544,7 +547,7 @@ const CrmFinanzasVentaComisiones: React.FC<CrmFinanzasVentaComisionesProps> = ({
                 gap: '4px'
               }}>
                 {totalPendienteCobrar > 0 ? 'Por Cobrar' : 'Cobrado'}
-                {totalPendienteCobrar > 0 && (
+                {esAdmin && totalPendienteCobrar > 0 && (
                   <span style={{ fontSize: '0.625rem', opacity: 0.8 }}>• Click para registrar</span>
                 )}
               </p>
@@ -992,9 +995,9 @@ const CrmFinanzasVentaComisiones: React.FC<CrmFinanzasVentaComisionesProps> = ({
                               </span>
                             )}
                           </div>
-                          {/* Columna 7: Acción */}
+                          {/* Columna 7: Acción - solo visible para admin */}
                           <div style={{ textAlign: 'center' }}>
-                            {comisionOriginal && montoPendiente > 0 ? (
+                            {esAdmin && comisionOriginal && montoPendiente > 0 ? (
                               <button
                                 onClick={() => handleAbrirPago(comisionOriginal)}
                                 style={{
@@ -1156,7 +1159,7 @@ const CrmFinanzasVentaComisiones: React.FC<CrmFinanzasVentaComisionesProps> = ({
                   {historial.cobros.length}
                 </span>
               </div>
-              {totalPendienteCobrar > 0 && (
+              {esAdmin && totalPendienteCobrar > 0 && (
                 <button
                   onClick={handleAbrirCobroGeneral}
                   style={{
