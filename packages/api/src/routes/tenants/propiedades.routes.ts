@@ -65,6 +65,16 @@ router.get('/', async (req, res, next) => {
     const autoFilter = getAutoFilter(req, 'propiedades');
     const permisosCampos = getFieldPermissions(req, 'propiedades');
 
+    // DEBUG: Log scope and autoFilter info
+    console.log('[DEBUG propiedades] scope:', JSON.stringify({
+      dbUserId: req.scope?.dbUserId,
+      tenantId: req.scope?.tenantId,
+      isPlatformAdmin: req.scope?.isPlatformAdmin,
+      propiedadesAlcance: req.scope?.alcances?.propiedades,
+    }, null, 2));
+    console.log('[DEBUG propiedades] autoFilter:', autoFilter);
+    console.log('[DEBUG propiedades] permisosCampos:', permisosCampos);
+
     const filtros: Record<string, any> = {
       tipo: tipo as string | undefined,
       operacion: operacion as string | undefined,
