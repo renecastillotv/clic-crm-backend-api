@@ -2320,10 +2320,12 @@ const styles = `
 
   .modal-content.evidence-modal {
     max-width: 800px;
-    width: 100%;
+    width: calc(100% - 20px);
     max-height: 90vh;
     display: flex;
     flex-direction: column;
+    margin: 10px;
+    box-sizing: border-box;
   }
 
   .modal-header-gradient {
@@ -2535,10 +2537,16 @@ const styles = `
     color: #374151;
   }
 
+  .evidences-section {
+    width: 100%;
+    overflow: hidden;
+  }
+
   .evidences-grid {
     display: grid;
-    grid-template-columns: repeat(2, 1fr);
+    grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
     gap: 16px;
+    width: 100%;
   }
 
   .evidence-card {
@@ -2574,6 +2582,7 @@ const styles = `
 
   .evidence-info {
     padding: 12px;
+    overflow: hidden;
   }
 
   .evidence-name {
@@ -2584,6 +2593,7 @@ const styles = `
     white-space: nowrap;
     overflow: hidden;
     text-overflow: ellipsis;
+    max-width: 100%;
   }
 
   .evidence-size {
@@ -3002,13 +3012,11 @@ const styles = `
       grid-template-columns: 1fr;
     }
 
-    .modal-overlay {
-      padding: 10px;
-    }
-
     .modal-content.evidence-modal {
+      width: calc(100% - 20px);
       max-height: calc(100vh - 20px);
       border-radius: 16px;
+      margin: 10px;
     }
 
     .evidence-modal-header {
