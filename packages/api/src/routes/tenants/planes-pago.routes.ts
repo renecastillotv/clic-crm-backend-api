@@ -221,7 +221,11 @@ router.get('/:planId/pdf', async (req: Request<RouteParams>, res: Response, next
     res.setHeader('Content-Length', pdfBuffer.length);
     res.send(pdfBuffer);
   } catch (error) {
-    next(error);
+    console.error('Error generating PDF:', error);
+    res.status(500).json({
+      error: 'Error generando PDF',
+      details: error instanceof Error ? error.message : 'Unknown error'
+    });
   }
 });
 
