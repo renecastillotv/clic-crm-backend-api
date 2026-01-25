@@ -180,6 +180,11 @@ router.get('/modulos/:tenantId', requireAuth, async (req, res) => {
 
     const modulos = await getModulosAccesibles(usuario.id, tenantId);
 
+    // DEBUG: Log detallado de módulos devueltos
+    console.log(`📋 [/auth/modulos] Usuario: ${usuario.email}, Tenant: ${tenantId}`);
+    console.log(`📋 [/auth/modulos] Módulos devueltos: ${modulos.length}`);
+    console.log(`📋 [/auth/modulos] IDs: ${modulos.map((m: any) => m.id).join(', ')}`);
+
     res.json(modulos);
   } catch (error: any) {
     console.error('❌ Error en /auth/modulos:', error);
