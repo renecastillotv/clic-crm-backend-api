@@ -44,7 +44,7 @@ const OPERACIONES_CONFIG: Record<string, { label: string; color: string; bg: str
 export default function CrmPropiedadDetalle() {
   const { tenantSlug, propiedadId } = useParams<{ tenantSlug: string; propiedadId: string }>();
   const navigate = useNavigate();
-  const { user, puedeEditar, loadingModulos } = useAuth();
+  const { user, puedeEditar, loadingModulos, getPermisosCampos } = useAuth();
   const { getToken } = useClerkAuth();
   const { setPageHeader } = usePageHeader();
   const { etiquetasPropiedad } = useCatalogos();
@@ -718,8 +718,27 @@ export default function CrmPropiedadDetalle() {
               </div>
             </div>
 
-            {/* Captador */}
-            {(propiedad.agente_nombre || (propiedad as any).captador_nombre) && (
+            {/* Comisión Connect - visible solo para usuarios Connect */}
+            {(propiedad as any).connect_comision && (
+              <div className="sidebar-card connect-card">
+                <h4><Percent size={16} /> Comisión Connect</h4>
+                <div className="connect-info">
+                  <div className="connect-comision">
+                    <span className="comision-valor">{(propiedad as any).connect_comision}%</span>
+                  </div>
+                  {(propiedad as any).connect_terminos && (
+                    <div className="connect-terminos">
+                      <span className="terminos-label">Términos:</span>
+                      <p className="terminos-texto">{(propiedad as any).connect_terminos}</p>
+                    </div>
+                  )}
+                </div>
+              </div>
+            )}
+
+            {/* Captador - oculto si los campos están restringidos */}
+            {(propiedad.agente_nombre || (propiedad as any).captador_nombre) &&
+             !getPermisosCampos('propiedades')?.hide?.includes('captador_nombre') && (
               <div className="sidebar-card captador-card">
                 <h4><User size={16} /> Captador</h4>
                 <div className="agente-info">
@@ -842,17 +861,14 @@ export default function CrmPropiedadDetalle() {
               </div>
             </div>
 
-            {/* Acciones rápidas */}
-            <div className="sidebar-card acciones-card">
-              {canEdit && (
+            {/* Acciones rápidas - solo mostrar si hay acciones disponibles */}
+            {canEdit && (
+              <div className="sidebar-card acciones-card">
                 <button className="btn-accion" onClick={() => navigate(`/crm/${tenantSlug}/propiedades/${propiedadId}/editar`)}>
                   <Edit size={16} /> Editar propiedad
                 </button>
-              )}
-              <button className="btn-accion secondary">
-                <Share2 size={16} /> Compartir
-              </button>
-            </div>
+              </div>
+            )}
           </div>
         </div>
       </div>
@@ -1905,6 +1921,58 @@ const styles = `
     color: #0057FF;
     width: 18px;
     height: 18px;
+  }
+
+  /* Connect commission card */
+  .connect-card {
+    background: linear-gradient(135deg, #f0f9ff 0%, #e0f2fe 100%);
+    border: 1px solid #0ea5e9;
+  }
+
+  .connect-card h4 {
+    color: #0369a1;
+  }
+
+  .connect-card h4 svg {
+    color: #0ea5e9;
+  }
+
+  .connect-info {
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+  }
+
+  .connect-comision {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+  }
+
+  .comision-valor {
+    font-size: 1.5rem;
+    font-weight: 700;
+    color: #0369a1;
+  }
+
+  .connect-terminos {
+    padding-top: 12px;
+    border-top: 1px solid rgba(14, 165, 233, 0.3);
+  }
+
+  .terminos-label {
+    font-size: 0.8rem;
+    font-weight: 600;
+    color: #64748b;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+  }
+
+  .terminos-texto {
+    margin-top: 6px;
+    font-size: 0.9rem;
+    color: #334155;
+    line-height: 1.5;
   }
 
   /* Desarrollador card */
