@@ -7,6 +7,7 @@
 
 import { query } from '../utils/db.js';
 import { incrementPermisosVersion } from './usuariosService.js';
+import type { PermisosCampos } from '../middleware/scopeResolver.js';
 
 // Interfaces
 export interface Modulo {
@@ -29,6 +30,7 @@ export interface RolModulo {
   puedeEliminar: boolean;
   alcanceVer: 'all' | 'team' | 'own';
   alcanceEditar: 'all' | 'team' | 'own';
+  permisosCampos?: PermisosCampos;
   // Datos del módulo (para mostrar en UI)
   moduloNombre?: string;
   moduloDescripcion?: string;
@@ -43,6 +45,7 @@ export interface RolModuloInput {
   puedeEliminar: boolean;
   alcanceVer?: 'all' | 'team' | 'own';
   alcanceEditar?: 'all' | 'team' | 'own';
+  permisosCampos?: PermisosCampos;
 }
 
 /**
@@ -211,7 +214,10 @@ export async function updateRolModulo(
   let result;
 
   if (existing.rows.length > 0) {
-    // Actualizar existente
+    // Actualizar existente - solo campos que fueron enviados
+    // Para permisos_campos: si se envía explícitamente (incluso null/undefined), actualizarlo
+    const hasPermisosCampos = 'permisosCampos' in permisos;
+
     result = await query(`
       UPDATE roles_modulos
       SET
@@ -221,6 +227,7 @@ export async function updateRolModulo(
         puede_eliminar = COALESCE($6, puede_eliminar),
         alcance_ver = COALESCE($7, alcance_ver),
         alcance_editar = COALESCE($8, alcance_editar),
+        permisos_campos = CASE WHEN $9::boolean THEN $10::jsonb ELSE permisos_campos END,
         updated_at = CURRENT_TIMESTAMP
       WHERE rol_id = $1 AND modulo_id = $2
       RETURNING *
@@ -233,6 +240,8 @@ export async function updateRolModulo(
       permisos.puedeEliminar,
       permisos.alcanceVer,
       permisos.alcanceEditar,
+      hasPermisosCampos,
+      permisos.permisosCampos ? JSON.stringify(permisos.permisosCampos) : null,
     ]);
   } else {
     // Crear nuevo
@@ -240,8 +249,9 @@ export async function updateRolModulo(
       INSERT INTO roles_modulos (
         rol_id, modulo_id,
         puede_ver, puede_crear, puede_editar, puede_eliminar,
-        alcance_ver, alcance_editar
-      ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
+        alcance_ver, alcance_editar,
+        permisos_campos
+      ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)
       RETURNING *
     `, [
       rolId,
@@ -252,6 +262,7 @@ export async function updateRolModulo(
       permisos.puedeEliminar ?? false,
       permisos.alcanceVer ?? 'own',
       permisos.alcanceEditar ?? 'own',
+      permisos.permisosCampos ? JSON.stringify(permisos.permisosCampos) : null,
     ]);
   }
 
@@ -280,6 +291,7 @@ export async function updateRolModulo(
     puedeEliminar: row.puede_eliminar,
     alcanceVer: row.alcance_ver || 'own',
     alcanceEditar: row.alcance_editar || 'own',
+    permisosCampos: row.permisos_campos || undefined,
   };
 }
 
