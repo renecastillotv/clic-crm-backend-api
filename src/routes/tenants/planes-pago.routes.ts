@@ -16,6 +16,7 @@ import {
   PlanPagoFiltros,
   EstadoPlanPago,
 } from '../../services/planesPagoService.js';
+import { generarPdfPlanPago } from '../../services/planesPagoPdfService.js';
 import { resolveUserScope, getOwnFilter } from '../../middleware/scopeResolver.js';
 
 interface RouteParams {
@@ -194,6 +195,31 @@ router.post('/:planId/regenerar-url', async (req: Request<RouteParams>, res: Res
     }
 
     res.json(plan);
+  } catch (error) {
+    next(error);
+  }
+});
+
+/**
+ * GET /api/tenants/:tenantId/planes-pago/:planId/pdf
+ * Genera y descarga el PDF del plan de pago
+ */
+router.get('/:planId/pdf', async (req: Request<RouteParams>, res: Response, next: NextFunction) => {
+  try {
+    const { tenantId, planId } = req.params;
+
+    const plan = await getPlanPagoById(tenantId, planId!);
+
+    if (!plan) {
+      return res.status(404).json({ error: 'Plan de pago no encontrado' });
+    }
+
+    const pdfBuffer = await generarPdfPlanPago(plan);
+
+    res.setHeader('Content-Type', 'application/pdf');
+    res.setHeader('Content-Disposition', `attachment; filename="plan-pago-${planId!.slice(0, 8)}.pdf"`);
+    res.setHeader('Content-Length', pdfBuffer.length);
+    res.send(pdfBuffer);
   } catch (error) {
     next(error);
   }
