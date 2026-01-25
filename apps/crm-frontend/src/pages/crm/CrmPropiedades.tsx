@@ -50,6 +50,7 @@ import {
   Hotel,
   ParkingCircle,
   Download,
+  DollarSign,
   type LucideIcon,
 } from 'lucide-react';
 
@@ -82,7 +83,7 @@ const ESTADOS: Record<string, { label: string; color: string; bgColor: string }>
 export default function CrmPropiedades() {
   const { tenantSlug } = useParams<{ tenantSlug: string }>();
   const navigate = useNavigate();
-  const { tenantActual, puedeCrear, puedeEditar, puedeEliminar, loadingModulos, modulos } = useAuth();
+  const { tenantActual, puedeCrear, puedeEditar, puedeEliminar, loadingModulos, modulos, getPermisosCampos } = useAuth();
   const { setPageHeader } = usePageHeader();
 
   // Estado
@@ -524,7 +525,10 @@ export default function CrmPropiedades() {
         </div>
       ) : vista === 'grid' ? (
         <div className="propiedades-grid">
-          {propiedades.map((propiedad) => {
+          {/* Detectar si es usuario Connect (tiene captador en hide) */}
+          {(() => {
+            const isConnectUser = getPermisosCampos('propiedades')?.hide?.includes('captador_nombre');
+            return propiedades.map((propiedad) => {
             const estado = ESTADOS[propiedad.estado_propiedad] || ESTADOS.disponible;
             const tipo = getTipoPropiedad(propiedad.tipo);
             // Mostrar estado solo si no es 'disponible' y no coincide con el filtro actual
@@ -543,6 +547,12 @@ export default function CrmPropiedades() {
                     <div className="image-placeholder">
                       <Home size={48} />
                     </div>
+                  )}
+                  {/* Badge comisión Connect - prominente para usuarios Connect */}
+                  {isConnectUser && (propiedad as any).connect_comision && (
+                    <span className="badge-comision-connect">
+                      <DollarSign size={12} /> {(propiedad as any).connect_comision}%
+                    </span>
                   )}
                   {/* Badge destacada - pequeño y elegante */}
                   {propiedad.destacada && (
@@ -615,7 +625,8 @@ export default function CrmPropiedades() {
 
                 {/* Footer compacto con captador y acciones */}
                 <div className="card-footer">
-                  {(propiedad.captador_nombre || propiedad.captador_apellido) ? (
+                  {/* Captador avatar - oculto para usuarios Connect */}
+                  {!isConnectUser && (propiedad.captador_nombre || propiedad.captador_apellido) ? (
                     <div
                       className="captador-avatar"
                       title={`${propiedad.captador_nombre || ''} ${propiedad.captador_apellido || ''}`.trim()}
@@ -653,7 +664,8 @@ export default function CrmPropiedades() {
                 </div>
               </div>
             );
-          })}
+          });
+          })()}
         </div>
       ) : (
         <div className="propiedades-list">
@@ -1282,6 +1294,28 @@ const styles = `
     align-items: center;
     justify-content: center;
     box-shadow: 0 1px 3px rgba(0, 0, 0, 0.2);
+  }
+
+  .badge-comision-connect {
+    position: absolute;
+    bottom: 8px;
+    left: 8px;
+    background: linear-gradient(135deg, #10b981, #059669);
+    color: white;
+    padding: 6px 10px;
+    border-radius: 6px;
+    font-size: 0.85rem;
+    font-weight: 700;
+    display: flex;
+    align-items: center;
+    gap: 4px;
+    box-shadow: 0 2px 8px rgba(16, 185, 129, 0.4);
+    text-shadow: 0 1px 2px rgba(0, 0, 0, 0.2);
+  }
+
+  .badge-comision-connect svg {
+    width: 14px;
+    height: 14px;
   }
 
   .badge-estado {
