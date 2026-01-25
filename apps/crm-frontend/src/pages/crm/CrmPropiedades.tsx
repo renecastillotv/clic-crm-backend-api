@@ -82,7 +82,7 @@ const ESTADOS: Record<string, { label: string; color: string; bgColor: string }>
 export default function CrmPropiedades() {
   const { tenantSlug } = useParams<{ tenantSlug: string }>();
   const navigate = useNavigate();
-  const { tenantActual } = useAuth();
+  const { tenantActual, puedeCrear, puedeEditar, puedeEliminar, loadingModulos, modulos } = useAuth();
   const { setPageHeader } = usePageHeader();
 
   // Estado
@@ -130,12 +130,17 @@ export default function CrmPropiedades() {
     notas: '',
   });
 
-  // Configurar header de la página
+  // Configurar header de la página - depende de modulos para re-evaluar permisos
+  const canCreate = !loadingModulos && puedeCrear('propiedades');
+
   useEffect(() => {
+    // Solo configurar el header cuando los módulos estén cargados
+    if (loadingModulos) return;
+
     setPageHeader({
       title: 'Propiedades',
       subtitle: 'Gestiona tu inventario de propiedades',
-      actions: (
+      actions: canCreate ? (
         <div style={{ display: 'flex', gap: '8px' }}>
           <button
             className="btn-secondary"
@@ -150,9 +155,9 @@ export default function CrmPropiedades() {
             Nueva Propiedad
           </button>
         </div>
-      ),
+      ) : undefined,
     });
-  }, [setPageHeader]);
+  }, [setPageHeader, canCreate, loadingModulos, navigate, tenantSlug]);
 
   // Ref para trackear el tenant actual y evitar race conditions
   const currentTenantRef = useRef<string | null>(null);
@@ -626,20 +631,24 @@ export default function CrmPropiedades() {
                     </div>
                   ) : <div />}
                   <div className="card-actions">
-                    <button
-                      className="action-btn"
-                      onClick={(e) => { e.stopPropagation(); navigate(`/crm/${tenantSlug}/propiedades/${propiedad.id}/editar`); }}
-                      title="Editar"
-                    >
-                      <Pencil size={15} />
-                    </button>
-                    <button
-                      className="action-btn danger"
-                      onClick={(e) => { e.stopPropagation(); setDeleteConfirm(propiedad.id); }}
-                      title="Eliminar"
-                    >
-                      <Trash2 size={15} />
-                    </button>
+                    {puedeEditar('propiedades') && (
+                      <button
+                        className="action-btn"
+                        onClick={(e) => { e.stopPropagation(); navigate(`/crm/${tenantSlug}/propiedades/${propiedad.id}/editar`); }}
+                        title="Editar"
+                      >
+                        <Pencil size={15} />
+                      </button>
+                    )}
+                    {puedeEliminar('propiedades') && (
+                      <button
+                        className="action-btn danger"
+                        onClick={(e) => { e.stopPropagation(); setDeleteConfirm(propiedad.id); }}
+                        title="Eliminar"
+                      >
+                        <Trash2 size={15} />
+                      </button>
+                    )}
                   </div>
                 </div>
               </div>
@@ -734,18 +743,22 @@ export default function CrmPropiedades() {
                     </td>
                     <td>
                       <div className="list-actions">
-                        <button
-                          className="action-btn"
-                          onClick={(e) => { e.stopPropagation(); navigate(`/crm/${tenantSlug}/propiedades/${propiedad.id}`); }}
-                        >
-                          <Pencil size={16} />
-                        </button>
-                        <button
-                          className="action-btn danger"
-                          onClick={(e) => { e.stopPropagation(); setDeleteConfirm(propiedad.id); }}
-                        >
-                          <Trash2 size={16} />
-                        </button>
+                        {puedeEditar('propiedades') && (
+                          <button
+                            className="action-btn"
+                            onClick={(e) => { e.stopPropagation(); navigate(`/crm/${tenantSlug}/propiedades/${propiedad.id}`); }}
+                          >
+                            <Pencil size={16} />
+                          </button>
+                        )}
+                        {puedeEliminar('propiedades') && (
+                          <button
+                            className="action-btn danger"
+                            onClick={(e) => { e.stopPropagation(); setDeleteConfirm(propiedad.id); }}
+                          >
+                            <Trash2 size={16} />
+                          </button>
+                        )}
                       </div>
                     </td>
                   </tr>
