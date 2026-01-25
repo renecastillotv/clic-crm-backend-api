@@ -74,6 +74,15 @@ const Icons = {
       <polyline points="10 9 9 9 8 9"/>
     </svg>
   ),
+  planesPago: (
+    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+      <rect x="4" y="2" width="16" height="20" rx="2"/>
+      <line x1="8" y1="6" x2="16" y2="6"/>
+      <line x1="8" y1="10" x2="16" y2="10"/>
+      <line x1="8" y1="14" x2="12" y2="14"/>
+      <line x1="8" y1="18" x2="10" y2="18"/>
+    </svg>
+  ),
   clientes: (
     <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
       <path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/>
@@ -512,6 +521,7 @@ export default function CrmLayout() {
     { id: 'contactos', path: 'contactos', label: 'Contactos', icon: Icons.clientes },
     { id: 'pipeline', path: 'pipeline', label: 'Pipeline', icon: Icons.pipeline },
     { id: 'propuestas', path: 'propuestas', label: 'Propuestas', icon: Icons.propuestas },
+    { id: 'planes-pago', path: 'planes-pago', label: 'Planes de Pago', icon: Icons.planesPago },
     { id: 'actividades', path: 'actividades', label: 'Seguimiento', icon: Icons.actividades },
     { id: 'metas', path: 'metas', label: 'Metas', icon: Icons.metas },
   ];

@@ -23,6 +23,7 @@ import propiedadesRouter from './propiedades.routes.js';
 import solicitudesRouter from './solicitudes.routes.js';
 import actividadesRouter from './actividades.routes.js';
 import propuestasRouter from './propuestas.routes.js';
+import planesPagoRouter from './planes-pago.routes.js';
 import metasRouter from './metas.routes.js';
 
 // Importar sub-routers modulares - Ventas y Sistema de Fases
@@ -76,6 +77,7 @@ router.use('/:tenantId/propiedades', propiedadesRouter);
 router.use('/:tenantId/solicitudes', solicitudesRouter);
 router.use('/:tenantId/actividades', actividadesRouter);
 router.use('/:tenantId/propuestas', propuestasRouter);
+router.use('/:tenantId/planes-pago', planesPagoRouter);
 router.use('/:tenantId/metas', metasRouter);
 
 // Ventas Module (incluye ventas-stats)

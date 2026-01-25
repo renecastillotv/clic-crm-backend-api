@@ -55,6 +55,8 @@ import CrmSolicitudes from './pages/crm/CrmSolicitudes';
 import SolicitudDetalle from './pages/crm/SolicitudDetalle';
 import CrmPropuestas from './pages/crm/CrmPropuestas';
 import CrmPropuestaEditar from './pages/crm/CrmPropuestaEditar';
+import CrmPlanesPago from './pages/crm/CrmPlanesPago';
+import CrmPlanPagoEditar from './pages/crm/CrmPlanPagoEditar';
 import CrmActividades from './pages/crm/CrmActividades';
 import CrmMetas from './pages/crm/CrmMetas';
 import CrmEquipo from './pages/crm/CrmEquipo';
@@ -319,6 +321,9 @@ function AppRoutes() {
         <Route path="propuestas" element={<CrmPropuestas />} />
         <Route path="propuestas/nueva" element={<CrmPropuestaEditar />} />
         <Route path="propuestas/:propuestaId" element={<CrmPropuestaEditar />} />
+        <Route path="planes-pago" element={<CrmPlanesPago />} />
+        <Route path="planes-pago/nuevo" element={<CrmPlanPagoEditar />} />
+        <Route path="planes-pago/:planId" element={<CrmPlanPagoEditar />} />
         <Route path="actividades" element={<CrmActividades />} />
         <Route path="metas" element={<CrmMetas />} />
         <Route path="clientes" element={<CrmClientes />} />

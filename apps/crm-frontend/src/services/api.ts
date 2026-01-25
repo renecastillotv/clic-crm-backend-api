@@ -7663,3 +7663,224 @@ export async function getTagGlobalTipos(token?: string | null): Promise<string[]
   return data.tipos || [];
 }
 
+// ============================================================================
+// PLANES DE PAGO
+// ============================================================================
+
+export type EstadoPlanPago = 'borrador' | 'enviado' | 'visto' | 'aceptado' | 'rechazado';
+
+export interface PlanDetalleItem {
+  tipo: 'porcentaje' | 'valor';
+  valor: number;
+  descripcion?: string;
+  cuotas?: number; // Solo para inicial
+}
+
+export interface PlanDetalle {
+  reserva?: PlanDetalleItem;
+  separacion?: PlanDetalleItem;
+  inicial?: PlanDetalleItem;
+  contra_entrega?: PlanDetalleItem;
+  financiamiento?: {
+    tipo: 'bancario' | 'desarrollador' | 'otro';
+    porcentaje: number;
+    plazo_meses?: number;
+    descripcion?: string;
+  };
+  notas_adicionales?: string;
+  valores_calculados?: {
+    reserva_monto?: number;
+    separacion_monto?: number;
+    inicial_monto?: number;
+    contra_entrega_monto?: number;
+    financiamiento_monto?: number;
+  };
+}
+
+export interface PlanPago {
+  id: string;
+  tenant_id: string;
+  titulo: string;
+  descripcion?: string | null;
+  estado: EstadoPlanPago;
+  contacto_id?: string | null;
+  contacto?: {
+    id: string;
+    nombre: string;
+    apellido?: string;
+    email?: string;
+    telefono?: string;
+  };
+  solicitud_id?: string | null;
+  solicitud?: {
+    id: string;
+    titulo?: string;
+  };
+  propiedad_id?: string | null;
+  propiedad?: {
+    id: string;
+    titulo: string;
+    codigo?: string;
+    precio?: number;
+    moneda?: string;
+    imagen_principal?: string;
+    tipo?: string;
+    operacion?: string;
+    ciudad?: string;
+  };
+  unidad_id?: string | null;
+  unidad?: {
+    id: string;
+    nombre: string;
+    codigo?: string;
+    precio?: number;
+    moneda?: string;
+  };
+  usuario_creador_id?: string | null;
+  usuario_creador?: {
+    id: string;
+    nombre: string;
+    apellido?: string;
+  };
+  precio_total?: number | null;
+  moneda: string;
+  plan_detalle: PlanDetalle;
+  condiciones?: string | null;
+  notas_internas?: string | null;
+  url_publica?: string | null;
+  fecha_expiracion?: string | null;
+  fecha_enviada?: string | null;
+  fecha_vista?: string | null;
+  fecha_respuesta?: string | null;
+  veces_vista: number;
+  datos_extra?: Record<string, any>;
+  activo: boolean;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface PlanesPagoResponse {
+  data: PlanPago[];
+  total: number;
+}
+
+export interface PlanPagoFiltros {
+  busqueda?: string;
+  estado?: string;
+  estados?: string[];
+  solicitud_id?: string;
+  contacto_id?: string;
+  propiedad_id?: string;
+  page?: number;
+  limit?: number;
+}
+
+/**
+ * Obtiene los planes de pago de un tenant
+ */
+export async function getPlanesPago(tenantId: string, filtros?: PlanPagoFiltros): Promise<PlanesPagoResponse> {
+  const params = new URLSearchParams();
+
+  if (filtros?.busqueda) params.append('busqueda', filtros.busqueda);
+  if (filtros?.estado) params.append('estado', filtros.estado);
+  if (filtros?.estados) {
+    filtros.estados.forEach(e => params.append('estados', e));
+  }
+  if (filtros?.solicitud_id) params.append('solicitud_id', filtros.solicitud_id);
+  if (filtros?.contacto_id) params.append('contacto_id', filtros.contacto_id);
+  if (filtros?.propiedad_id) params.append('propiedad_id', filtros.propiedad_id);
+  if (filtros?.page) params.append('page', filtros.page.toString());
+  if (filtros?.limit) params.append('limit', filtros.limit.toString());
+
+  const queryString = params.toString();
+  const url = `/tenants/${tenantId}/planes-pago${queryString ? `?${queryString}` : ''}`;
+
+  const response = await apiFetch(url);
+  if (!response.ok) {
+    throw new Error('Error al obtener planes de pago');
+  }
+  return response.json();
+}
+
+/**
+ * Obtiene un plan de pago por ID
+ */
+export async function getPlanPago(tenantId: string, planId: string): Promise<PlanPago> {
+  const response = await apiFetch(`/tenants/${tenantId}/planes-pago/${planId}`);
+  if (!response.ok) {
+    throw new Error('Error al obtener plan de pago');
+  }
+  return response.json();
+}
+
+/**
+ * Crea un nuevo plan de pago
+ */
+export async function createPlanPago(tenantId: string, data: Partial<PlanPago>): Promise<PlanPago> {
+  const response = await apiFetch(`/tenants/${tenantId}/planes-pago`, {
+    method: 'POST',
+    body: JSON.stringify(data),
+  });
+  if (!response.ok) {
+    const error = await response.json();
+    throw new Error(error.message || 'Error al crear plan de pago');
+  }
+  return response.json();
+}
+
+/**
+ * Actualiza un plan de pago
+ */
+export async function updatePlanPago(tenantId: string, planId: string, data: Partial<PlanPago>): Promise<PlanPago> {
+  const response = await apiFetch(`/tenants/${tenantId}/planes-pago/${planId}`, {
+    method: 'PUT',
+    body: JSON.stringify(data),
+  });
+  if (!response.ok) {
+    const error = await response.json();
+    throw new Error(error.message || 'Error al actualizar plan de pago');
+  }
+  return response.json();
+}
+
+/**
+ * Elimina un plan de pago
+ */
+export async function deletePlanPago(tenantId: string, planId: string): Promise<void> {
+  const response = await apiFetch(`/tenants/${tenantId}/planes-pago/${planId}`, {
+    method: 'DELETE',
+  });
+  if (!response.ok) {
+    throw new Error('Error al eliminar plan de pago');
+  }
+}
+
+/**
+ * Cambia el estado de un plan de pago
+ */
+export async function cambiarEstadoPlanPago(tenantId: string, planId: string, estado: EstadoPlanPago): Promise<PlanPago> {
+  const response = await apiFetch(`/tenants/${tenantId}/planes-pago/${planId}/estado`, {
+    method: 'POST',
+    body: JSON.stringify({ estado }),
+  });
+  if (!response.ok) {
+    const error = await response.json();
+    throw new Error(error.message || 'Error al cambiar estado del plan');
+  }
+  return response.json();
+}
+
+/**
+ * Regenera la URL pública de un plan de pago
+ */
+export async function regenerarUrlPlanPago(tenantId: string, planId: string): Promise<PlanPago> {
+  const response = await apiFetch(`/tenants/${tenantId}/planes-pago/${planId}/regenerar-url`, {
+    method: 'POST',
+  });
+  if (!response.ok) {
+    const error = await response.json();
+    throw new Error(error.message || 'Error al regenerar URL');
+  }
+  return response.json();
+}
+
