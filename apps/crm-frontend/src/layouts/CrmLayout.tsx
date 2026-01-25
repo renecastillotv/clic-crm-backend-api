@@ -374,7 +374,7 @@ const Icons = {
 
 export default function CrmLayout() {
   const { tenantSlug } = useParams<{ tenantSlug: string }>();
-  const { user, tenantActual, switchTenant, isPlatformAdmin, tieneAcceso } = useAuth();
+  const { user, tenantActual, switchTenant, isPlatformAdmin, tieneAcceso, loadingModulos } = useAuth();
   const { signOut } = useClerk();
   const { getToken } = useClerkAuth();
   const navigate = useNavigate();
@@ -1016,7 +1016,21 @@ export default function CrmLayout() {
 
           {/* Content */}
           <main className="crm-content">
-            {routeAccessDenied ? (
+            {loadingModulos ? (
+              <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', minHeight: '50vh', padding: '2rem' }}>
+                <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '16px' }}>
+                  <div className="loading-spinner" style={{
+                    width: '40px',
+                    height: '40px',
+                    border: '3px solid #e2e8f0',
+                    borderTop: '3px solid #2563eb',
+                    borderRadius: '50%',
+                    animation: 'spin 1s linear infinite'
+                  }} />
+                  <p style={{ color: '#64748b', margin: 0, fontSize: '0.875rem' }}>Cargando...</p>
+                </div>
+              </div>
+            ) : routeAccessDenied ? (
               <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', minHeight: '50vh', padding: '2rem' }}>
                 <div style={{ background: 'rgba(239, 68, 68, 0.05)', border: '1px solid rgba(239, 68, 68, 0.2)', borderRadius: '12px', padding: '3rem 2rem', maxWidth: '400px', textAlign: 'center' }}>
                   <div style={{ fontSize: '3rem', marginBottom: '1rem' }}>🔒</div>
@@ -1582,6 +1596,12 @@ export default function CrmLayout() {
             position: relative;
             z-index: 1;
             background: white;
+          }
+
+          /* ========== LOADING SPINNER ========== */
+          @keyframes spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
           }
 
           /* ========== RESPONSIVE ========== */
