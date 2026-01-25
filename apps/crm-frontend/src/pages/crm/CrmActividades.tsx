@@ -60,6 +60,8 @@ import {
   Paperclip,
   ExternalLink,
   Loader2,
+  Download,
+  ZoomIn,
 } from 'lucide-react';
 
 // Configuración de tipos de actividad con iconos Lucide
@@ -197,6 +199,7 @@ export default function CrmActividades() {
   const [evidences, setEvidences] = useState<Evidencia[]>([]);
   const [uploading, setUploading] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const [previewImage, setPreviewImage] = useState<{ url: string; name: string } | null>(null);
 
   // Stats calculados
   const now = new Date();
@@ -1182,46 +1185,65 @@ export default function CrmActividades() {
                     <h4>Archivos adjuntos ({evidences.length})</h4>
                   </div>
                   <div className="evidences-grid">
-                    {evidences.map((evidence, idx) => (
-                      <div key={idx} className="evidence-card">
-                        {/* Image or File Icon */}
-                        {evidence.type?.startsWith('image/') ? (
-                          <div className="evidence-preview">
-                            <img src={evidence.url} alt={evidence.name} />
-                          </div>
-                        ) : (
-                          <div className="evidence-preview file-preview">
-                            <FileText className="w-12 h-12" />
-                          </div>
-                        )}
+                    {evidences.map((evidence, idx) => {
+                      const isImage = evidence.type?.startsWith('image/') ||
+                        evidence.url?.match(/\.(jpg|jpeg|png|gif|webp)$/i);
+                      return (
+                        <div key={idx} className="evidence-card">
+                          {/* Image Preview (clickable) or File Icon */}
+                          {isImage ? (
+                            <div
+                              className="evidence-preview clickable"
+                              onClick={() => setPreviewImage({ url: evidence.url, name: evidence.name })}
+                              title="Clic para ampliar"
+                            >
+                              <img src={evidence.url} alt={evidence.name} />
+                              <div className="preview-overlay">
+                                <ZoomIn className="w-6 h-6" />
+                              </div>
+                            </div>
+                          ) : (
+                            <div className="evidence-preview file-preview">
+                              <FileText className="w-12 h-12" />
+                            </div>
+                          )}
 
-                        {/* File Info */}
-                        <div className="evidence-info">
-                          <p className="evidence-name">{evidence.name}</p>
-                          <p className="evidence-size">{(evidence.size / 1024).toFixed(1)} KB</p>
-                        </div>
+                          {/* File Info */}
+                          <div className="evidence-info">
+                            <p className="evidence-name">{evidence.name}</p>
+                            <p className="evidence-size">{(evidence.size / 1024).toFixed(1)} KB</p>
+                          </div>
 
-                        {/* Actions */}
-                        <div className="evidence-actions">
-                          <button
-                            onClick={() => handleDeleteEvidence(idx)}
-                            className="evidence-delete-btn"
-                            title="Eliminar"
-                          >
-                            <Trash2 className="w-4 h-4" />
-                          </button>
-                          <a
-                            href={evidence.url}
-                            target="_blank"
-                            rel="noopener noreferrer"
-                            className="evidence-view-btn"
-                            title="Ver/Descargar"
-                          >
-                            <ExternalLink className="w-4 h-4" />
-                          </a>
+                          {/* Actions */}
+                          <div className="evidence-actions">
+                            <button
+                              onClick={() => handleDeleteEvidence(idx)}
+                              className="evidence-action-btn delete"
+                              title="Eliminar"
+                            >
+                              <Trash2 className="w-4 h-4" />
+                            </button>
+                            {isImage && (
+                              <button
+                                onClick={() => setPreviewImage({ url: evidence.url, name: evidence.name })}
+                                className="evidence-action-btn view"
+                                title="Ver imagen"
+                              >
+                                <ZoomIn className="w-4 h-4" />
+                              </button>
+                            )}
+                            <a
+                              href={evidence.url}
+                              download={evidence.name}
+                              className="evidence-action-btn download"
+                              title="Descargar"
+                            >
+                              <Download className="w-4 h-4" />
+                            </a>
+                          </div>
                         </div>
-                      </div>
-                    ))}
+                      );
+                    })}
                   </div>
                 </div>
               ) : (
@@ -1240,6 +1262,30 @@ export default function CrmActividades() {
               <button onClick={() => setShowEvidenceModal(false)} className="btn-primary full-width">
                 Cerrar
               </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Image Preview Lightbox */}
+      {previewImage && (
+        <div className="lightbox-overlay" onClick={() => setPreviewImage(null)}>
+          <div className="lightbox-content" onClick={(e) => e.stopPropagation()}>
+            <button className="lightbox-close" onClick={() => setPreviewImage(null)}>
+              <X className="w-6 h-6" />
+            </button>
+            <img src={previewImage.url} alt={previewImage.name} />
+            <div className="lightbox-footer">
+              <span className="lightbox-name">{previewImage.name}</span>
+              <a
+                href={previewImage.url}
+                download={previewImage.name}
+                className="lightbox-download"
+                onClick={(e) => e.stopPropagation()}
+              >
+                <Download className="w-5 h-5" />
+                Descargar
+              </a>
             </div>
           </div>
         </div>
@@ -2555,8 +2601,7 @@ const styles = `
     opacity: 1;
   }
 
-  .evidence-delete-btn,
-  .evidence-view-btn {
+  .evidence-action-btn {
     width: 32px;
     height: 32px;
     border-radius: 8px;
@@ -2569,22 +2614,136 @@ const styles = `
     text-decoration: none;
   }
 
-  .evidence-delete-btn {
+  .evidence-action-btn.delete {
     background: #ef4444;
     color: white;
   }
 
-  .evidence-delete-btn:hover {
+  .evidence-action-btn.delete:hover {
     background: #dc2626;
   }
 
-  .evidence-view-btn {
+  .evidence-action-btn.view {
     background: #6366f1;
     color: white;
   }
 
-  .evidence-view-btn:hover {
+  .evidence-action-btn.view:hover {
     background: #4f46e5;
+  }
+
+  .evidence-action-btn.download {
+    background: #22c55e;
+    color: white;
+  }
+
+  .evidence-action-btn.download:hover {
+    background: #16a34a;
+  }
+
+  .evidence-preview.clickable {
+    cursor: pointer;
+    position: relative;
+  }
+
+  .evidence-preview.clickable:hover img {
+    filter: brightness(0.8);
+  }
+
+  .preview-overlay {
+    position: absolute;
+    inset: 0;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    background: rgba(0,0,0,0.3);
+    opacity: 0;
+    transition: opacity 0.2s;
+    color: white;
+    border-radius: 12px 12px 0 0;
+  }
+
+  .evidence-preview.clickable:hover .preview-overlay {
+    opacity: 1;
+  }
+
+  /* Lightbox */
+  .lightbox-overlay {
+    position: fixed;
+    inset: 0;
+    background: rgba(0,0,0,0.9);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    z-index: 2000;
+    padding: 40px;
+  }
+
+  .lightbox-content {
+    position: relative;
+    max-width: 90vw;
+    max-height: 90vh;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+  }
+
+  .lightbox-content img {
+    max-width: 100%;
+    max-height: calc(90vh - 80px);
+    object-fit: contain;
+    border-radius: 8px;
+  }
+
+  .lightbox-close {
+    position: absolute;
+    top: -40px;
+    right: 0;
+    background: rgba(255,255,255,0.1);
+    border: none;
+    color: white;
+    width: 40px;
+    height: 40px;
+    border-radius: 50%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    cursor: pointer;
+    transition: background 0.2s;
+  }
+
+  .lightbox-close:hover {
+    background: rgba(255,255,255,0.2);
+  }
+
+  .lightbox-footer {
+    margin-top: 16px;
+    display: flex;
+    align-items: center;
+    gap: 24px;
+    color: white;
+  }
+
+  .lightbox-name {
+    font-size: 0.9375rem;
+    opacity: 0.8;
+  }
+
+  .lightbox-download {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 10px 20px;
+    background: #22c55e;
+    color: white;
+    border-radius: 8px;
+    text-decoration: none;
+    font-weight: 500;
+    transition: background 0.2s;
+  }
+
+  .lightbox-download:hover {
+    background: #16a34a;
   }
 
   .no-evidences {
