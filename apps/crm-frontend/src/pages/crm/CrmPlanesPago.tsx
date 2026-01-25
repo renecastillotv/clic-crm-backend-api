@@ -1,11 +1,7 @@
 /**
- * CrmPlanesPago - Gestión de planes de pago
+ * CrmPlanesPago - Lista de planes de pago
  *
- * Módulo para crear y gestionar planes de pago a clientes con:
- * - Vista de grid de tarjetas y lista (toggle)
- * - Stats por estado en header
- * - Cards de conteo por estado
- * - Iconos Lucide React
+ * Lista simple para gestionar planes de pago rápidos para clientes
  */
 
 import { useState, useEffect, useCallback } from 'react';
@@ -23,32 +19,19 @@ import {
   Calculator,
   Plus,
   Search,
-  Clock,
-  Send,
-  Eye,
-  CheckCircle,
-  XCircle,
   Copy,
   ExternalLink,
   Trash2,
   X,
   Building2,
   Loader2,
-  TrendingUp,
   Pencil,
   Calendar,
   LayoutGrid,
   List,
+  CheckCircle,
+  User,
 } from 'lucide-react';
-
-// Estados de plan de pago con iconos
-const ESTADOS: Record<string, { label: string; color: string; bgColor: string; icon: any }> = {
-  borrador: { label: 'Borrador', color: '#64748b', bgColor: '#f1f5f9', icon: Clock },
-  enviado: { label: 'Enviado', color: '#2563eb', bgColor: '#dbeafe', icon: Send },
-  visto: { label: 'Visto', color: '#7c3aed', bgColor: '#f3e8ff', icon: Eye },
-  aceptado: { label: 'Aceptado', color: '#16a34a', bgColor: '#dcfce7', icon: CheckCircle },
-  rechazado: { label: 'Rechazado', color: '#dc2626', bgColor: '#fef2f2', icon: XCircle },
-};
 
 export default function CrmPlanesPago() {
   const { tenantSlug } = useParams<{ tenantSlug: string }>();
@@ -62,31 +45,18 @@ export default function CrmPlanesPago() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [busqueda, setBusqueda] = useState('');
-  const [estadoFiltro, setEstadoFiltro] = useState<string>('');
   const [deleteConfirm, setDeleteConfirm] = useState<string | null>(null);
   const [copiedUrl, setCopiedUrl] = useState<string | null>(null);
   const [dominioPersonalizado, setDominioPersonalizado] = useState<string | null>(null);
   const [vista, setVista] = useState<'grid' | 'list'>('grid');
 
-  // Stats calculados
-  const countByStatus = Object.keys(ESTADOS).reduce((acc, status) => {
-    acc[status] = planes.filter(p => p.estado === status).length;
-    return acc;
-  }, {} as Record<string, number>);
-
-  const activeCount = (countByStatus.borrador || 0) + (countByStatus.enviado || 0);
-  const wonCount = countByStatus.aceptado || 0;
-  const totalCount = planes.length;
-
-  // Configurar header de la página con stats
+  // Configurar header de la página
   useEffect(() => {
     setPageHeader({
       title: 'Planes de Pago',
-      subtitle: 'Gestiona y envía planes de pago a clientes',
+      subtitle: 'Genera planes de pago rápidos para clientes',
       stats: [
-        { label: 'Activos', value: activeCount, icon: <Clock className="w-4 h-4" /> },
-        { label: 'Aceptados', value: wonCount, icon: <CheckCircle className="w-4 h-4" /> },
-        { label: 'Total', value: totalCount, icon: <TrendingUp className="w-4 h-4" /> },
+        { label: 'Total', value: planes.length, icon: <Calculator className="w-4 h-4" /> },
       ],
       actions: (
         <button className="btn-primary" onClick={() => navigate(`/crm/${tenantSlug}/planes-pago/nuevo`)}>
@@ -95,7 +65,7 @@ export default function CrmPlanesPago() {
         </button>
       ),
     });
-  }, [setPageHeader, activeCount, wonCount, totalCount, navigate, tenantSlug]);
+  }, [setPageHeader, planes.length, navigate, tenantSlug]);
 
   // Cargar planes de pago
   const cargarPlanes = useCallback(async () => {
@@ -107,7 +77,6 @@ export default function CrmPlanesPago() {
 
       const filtros: PlanPagoFiltros = {
         busqueda: busqueda || undefined,
-        estado: estadoFiltro || undefined,
       };
 
       const response = await getPlanesPago(tenantActual.id, filtros);
@@ -118,7 +87,7 @@ export default function CrmPlanesPago() {
     } finally {
       setLoading(false);
     }
-  }, [tenantActual?.id, busqueda, estadoFiltro]);
+  }, [tenantActual?.id, busqueda]);
 
   useEffect(() => {
     cargarPlanes();
@@ -199,17 +168,8 @@ export default function CrmPlanesPago() {
     }).format(value);
   };
 
-  // Formatear fecha corta
+  // Formatear fecha
   const formatDate = (dateString: string | null) => {
-    if (!dateString) return '-';
-    return new Date(dateString).toLocaleDateString('es-MX', {
-      day: '2-digit',
-      month: 'short',
-    });
-  };
-
-  // Formatear fecha completa
-  const formatDateFull = (dateString: string | null) => {
     if (!dateString) return '-';
     return new Date(dateString).toLocaleDateString('es-MX', {
       day: '2-digit',
@@ -274,22 +234,11 @@ export default function CrmPlanesPago() {
           <Search className="search-icon" size={16} />
           <input
             type="text"
-            placeholder="Buscar planes..."
+            placeholder="Buscar por título, propiedad o cliente..."
             value={busqueda}
             onChange={(e) => setBusqueda(e.target.value)}
           />
         </div>
-
-        <select
-          value={estadoFiltro}
-          onChange={(e) => setEstadoFiltro(e.target.value)}
-          className="filter-select"
-        >
-          <option value="">Todos los estados</option>
-          {Object.entries(ESTADOS).map(([key, val]) => (
-            <option key={key} value={key}>{val.label}</option>
-          ))}
-        </select>
 
         {/* Toggle vista */}
         <div className="view-toggle">
@@ -320,40 +269,17 @@ export default function CrmPlanesPago() {
         </div>
       )}
 
-      {/* Stats por estado */}
-      <div className="status-stats">
-        {Object.entries(ESTADOS).map(([status, config]) => {
-          const count = countByStatus[status] || 0;
-          const Icon = config.icon;
-          return (
-            <div
-              key={status}
-              className={`status-card ${estadoFiltro === status ? 'active' : ''}`}
-              onClick={() => setEstadoFiltro(estadoFiltro === status ? '' : status)}
-            >
-              <div className="status-card-icon" style={{ backgroundColor: config.bgColor, color: config.color }}>
-                <Icon size={16} />
-              </div>
-              <div className="status-card-info">
-                <span className="status-card-count">{count}</span>
-                <span className="status-card-label">{config.label}</span>
-              </div>
-            </div>
-          );
-        })}
-      </div>
-
       {/* Contenido según vista */}
       {planesFiltrados.length === 0 ? (
         <div className="empty-state">
           <Calculator size={48} />
           <h3>No hay planes de pago</h3>
           <p>
-            {busqueda || estadoFiltro
+            {busqueda
               ? 'No se encontraron planes con los filtros aplicados'
               : 'Crea tu primer plan de pago para comenzar'}
           </p>
-          {!busqueda && !estadoFiltro && (
+          {!busqueda && (
             <button className="btn-primary" onClick={() => navigate(`/crm/${tenantSlug}/planes-pago/nuevo`)}>
               <Plus size={16} />
               Nuevo Plan
@@ -364,8 +290,6 @@ export default function CrmPlanesPago() {
         /* Vista Grid */
         <div className="planes-grid">
           {planesFiltrados.map((plan) => {
-            const estado = ESTADOS[plan.estado] || ESTADOS.borrador;
-            const StatusIcon = estado.icon;
             const precio = formatMoney(plan.precio_total, plan.moneda);
             const contactoNombre = getContactoNombre(plan);
             const propiedadNombre = getPropiedadNombre(plan);
@@ -376,23 +300,6 @@ export default function CrmPlanesPago() {
                 className="plan-card"
                 onClick={() => navigate(`/crm/${tenantSlug}/planes-pago/${plan.id}`)}
               >
-                {/* Header con estado */}
-                <div className="card-header">
-                  <span
-                    className="estado-badge"
-                    style={{ backgroundColor: estado.bgColor, color: estado.color }}
-                  >
-                    <StatusIcon size={10} />
-                    {estado.label}
-                  </span>
-                  {plan.veces_vista > 0 && (
-                    <span className="vistas-badge">
-                      <Eye size={10} />
-                      {plan.veces_vista}
-                    </span>
-                  )}
-                </div>
-
                 {/* Título y precio */}
                 <div className="card-title-row">
                   <h3 className="card-title">{plan.titulo}</h3>
@@ -410,10 +317,10 @@ export default function CrmPlanesPago() {
                 {/* Cliente */}
                 <div className="card-cliente">
                   <div className={`cliente-avatar ${!contactoNombre ? 'no-contact' : ''}`}>
-                    {getContactoIniciales(plan)}
+                    {contactoNombre ? getContactoIniciales(plan) : <User size={12} />}
                   </div>
                   <span className={`cliente-nombre ${!contactoNombre ? 'no-contact' : ''}`}>
-                    {contactoNombre || 'Sin contacto'}
+                    {contactoNombre || 'Sin cliente'}
                   </span>
                 </div>
 
@@ -423,12 +330,6 @@ export default function CrmPlanesPago() {
                     <Calendar size={11} />
                     <span>{formatDate(plan.created_at)}</span>
                   </div>
-                  {plan.fecha_expiracion && (
-                    <div className="info-item">
-                      <Clock size={11} />
-                      <span>Exp: {formatDate(plan.fecha_expiracion)}</span>
-                    </div>
-                  )}
                 </div>
 
                 {/* Footer con acciones */}
@@ -487,25 +388,19 @@ export default function CrmPlanesPago() {
                 <th>Propiedad</th>
                 <th>Cliente</th>
                 <th>Precio</th>
-                <th>Vistas</th>
-                <th>Estado</th>
                 <th>Creado</th>
                 <th>Acciones</th>
               </tr>
             </thead>
             <tbody>
               {planesFiltrados.map((plan) => {
-                const estado = ESTADOS[plan.estado] || ESTADOS.borrador;
-                const StatusIcon = estado.icon;
                 const contactoNombre = getContactoNombre(plan);
                 const propiedadNombre = getPropiedadNombre(plan);
 
                 return (
                   <tr key={plan.id} onClick={() => navigate(`/crm/${tenantSlug}/planes-pago/${plan.id}`)}>
                     <td>
-                      <div className="plan-info">
-                        <span className="plan-titulo">{plan.titulo}</span>
-                      </div>
+                      <span className="plan-titulo">{plan.titulo}</span>
                     </td>
                     <td>
                       {propiedadNombre ? (
@@ -520,10 +415,10 @@ export default function CrmPlanesPago() {
                     <td>
                       <div className="cliente-info">
                         <div className={`cliente-avatar ${!contactoNombre ? 'no-contact' : ''}`}>
-                          {getContactoIniciales(plan)}
+                          {contactoNombre ? getContactoIniciales(plan) : <User size={10} />}
                         </div>
                         <span className={`cliente-nombre ${!contactoNombre ? 'no-contact' : ''}`}>
-                          {contactoNombre || 'Sin contacto'}
+                          {contactoNombre || 'Sin cliente'}
                         </span>
                       </div>
                     </td>
@@ -537,22 +432,7 @@ export default function CrmPlanesPago() {
                       )}
                     </td>
                     <td>
-                      <span className="badge badge-purple">
-                        <Eye size={11} />
-                        {plan.veces_vista || 0}
-                      </span>
-                    </td>
-                    <td>
-                      <span
-                        className="estado-badge"
-                        style={{ backgroundColor: estado.bgColor, color: estado.color }}
-                      >
-                        <StatusIcon size={10} />
-                        {estado.label}
-                      </span>
-                    </td>
-                    <td>
-                      <span className="fecha-text">{formatDateFull(plan.created_at)}</span>
+                      <span className="fecha-text">{formatDate(plan.created_at)}</span>
                     </td>
                     <td>
                       <div className="actions-cell" onClick={(e) => e.stopPropagation()}>
@@ -655,14 +535,14 @@ const styles = `
   .toolbar {
     display: flex;
     gap: 12px;
-    margin-bottom: 16px;
+    margin-bottom: 20px;
     flex-wrap: wrap;
     align-items: center;
   }
 
   .search-box {
     flex: 1;
-    min-width: 240px;
+    min-width: 280px;
     position: relative;
   }
 
@@ -688,16 +568,6 @@ const styles = `
     outline: none;
     border-color: #2563eb;
     box-shadow: 0 0 0 2px rgba(37, 99, 235, 0.1);
-  }
-
-  .filter-select {
-    padding: 10px 14px;
-    border: 1px solid #e2e8f0;
-    border-radius: 8px;
-    font-size: 0.85rem;
-    background: white;
-    cursor: pointer;
-    min-width: 160px;
   }
 
   /* View Toggle */
@@ -758,71 +628,10 @@ const styles = `
     display: flex;
   }
 
-  /* Status Stats */
-  .status-stats {
-    display: grid;
-    grid-template-columns: repeat(5, 1fr);
-    gap: 10px;
-    margin-bottom: 20px;
-  }
-
-  .status-card {
-    display: flex;
-    align-items: center;
-    gap: 10px;
-    padding: 10px 12px;
-    background: white;
-    border: 1px solid #e2e8f0;
-    border-radius: 8px;
-    cursor: pointer;
-    transition: all 0.2s;
-  }
-
-  .status-card:hover {
-    border-color: #94a3b8;
-  }
-
-  .status-card.active {
-    border-color: #2563eb;
-    box-shadow: 0 0 0 2px rgba(37, 99, 235, 0.15);
-  }
-
-  .status-card-icon {
-    width: 32px;
-    height: 32px;
-    border-radius: 6px;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    flex-shrink: 0;
-  }
-
-  .status-card-info {
-    display: flex;
-    flex-direction: column;
-    min-width: 0;
-  }
-
-  .status-card-count {
-    font-size: 1.1rem;
-    font-weight: 700;
-    color: #0f172a;
-    line-height: 1;
-  }
-
-  .status-card-label {
-    font-size: 0.65rem;
-    color: #64748b;
-    margin-top: 2px;
-    white-space: nowrap;
-    text-transform: uppercase;
-    letter-spacing: 0.02em;
-  }
-
   /* Grid de planes */
   .planes-grid {
     display: grid;
-    grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+    grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
     gap: 16px;
   }
 
@@ -831,12 +640,12 @@ const styles = `
     background: white;
     border: 1px solid #e2e8f0;
     border-radius: 10px;
-    padding: 12px;
+    padding: 16px;
     cursor: pointer;
     transition: all 0.2s;
     display: flex;
     flex-direction: column;
-    gap: 10px;
+    gap: 12px;
   }
 
   .plan-card:hover {
@@ -844,46 +653,16 @@ const styles = `
     box-shadow: 0 2px 8px rgba(0, 0, 0, 0.06);
   }
 
-  .card-header {
-    display: flex;
-    justify-content: space-between;
-    align-items: center;
-  }
-
-  .estado-badge {
-    display: inline-flex;
-    align-items: center;
-    gap: 4px;
-    padding: 3px 8px;
-    border-radius: 4px;
-    font-size: 0.65rem;
-    font-weight: 600;
-    text-transform: uppercase;
-    letter-spacing: 0.02em;
-  }
-
-  .vistas-badge {
-    display: inline-flex;
-    align-items: center;
-    gap: 3px;
-    padding: 3px 6px;
-    border-radius: 4px;
-    font-size: 0.65rem;
-    font-weight: 600;
-    background: #f3e8ff;
-    color: #7c3aed;
-  }
-
   .card-title-row {
     display: flex;
     justify-content: space-between;
     align-items: flex-start;
-    gap: 8px;
+    gap: 12px;
   }
 
   .card-title {
     margin: 0;
-    font-size: 0.9rem;
+    font-size: 0.95rem;
     font-weight: 600;
     color: #0f172a;
     line-height: 1.3;
@@ -895,7 +674,7 @@ const styles = `
   }
 
   .card-price {
-    font-size: 0.8rem;
+    font-size: 0.9rem;
     font-weight: 600;
     color: #059669;
     white-space: nowrap;
@@ -905,7 +684,7 @@ const styles = `
     display: flex;
     align-items: center;
     gap: 6px;
-    font-size: 0.75rem;
+    font-size: 0.8rem;
     color: #64748b;
   }
 
@@ -922,15 +701,15 @@ const styles = `
   }
 
   .cliente-avatar {
-    width: 24px;
-    height: 24px;
+    width: 26px;
+    height: 26px;
     border-radius: 50%;
     background: linear-gradient(135deg, #f59e0b, #f97316);
     color: white;
     display: flex;
     align-items: center;
     justify-content: center;
-    font-size: 0.65rem;
+    font-size: 0.7rem;
     font-weight: 600;
     flex-shrink: 0;
   }
@@ -941,7 +720,7 @@ const styles = `
   }
 
   .cliente-nombre {
-    font-size: 0.8rem;
+    font-size: 0.85rem;
     color: #374151;
     overflow: hidden;
     text-overflow: ellipsis;
@@ -961,15 +740,15 @@ const styles = `
   .info-item {
     display: flex;
     align-items: center;
-    gap: 3px;
-    font-size: 0.7rem;
+    gap: 4px;
+    font-size: 0.75rem;
     color: #64748b;
   }
 
   .card-footer {
     display: flex;
     gap: 6px;
-    padding-top: 8px;
+    padding-top: 10px;
     border-top: 1px solid #f1f5f9;
   }
 
@@ -977,11 +756,11 @@ const styles = `
     display: flex;
     align-items: center;
     justify-content: center;
-    width: 26px;
-    height: 26px;
+    width: 28px;
+    height: 28px;
     border: none;
     background: #f1f5f9;
-    border-radius: 5px;
+    border-radius: 6px;
     color: #64748b;
     cursor: pointer;
     transition: all 0.15s;
@@ -1017,8 +796,8 @@ const styles = `
 
   .planes-table th {
     text-align: left;
-    padding: 10px 14px;
-    font-size: 0.7rem;
+    padding: 12px 16px;
+    font-size: 0.75rem;
     font-weight: 600;
     text-transform: uppercase;
     letter-spacing: 0.05em;
@@ -1028,7 +807,7 @@ const styles = `
   }
 
   .planes-table td {
-    padding: 10px 14px;
+    padding: 12px 16px;
     border-bottom: 1px solid #f1f5f9;
     vertical-align: middle;
   }
@@ -1040,12 +819,6 @@ const styles = `
 
   .planes-table tbody tr:hover {
     background: #f8fafc;
-  }
-
-  .plan-info {
-    display: flex;
-    flex-direction: column;
-    gap: 2px;
   }
 
   .plan-titulo {
@@ -1069,24 +842,9 @@ const styles = `
   }
 
   .precio-text {
-    font-size: 0.8rem;
+    font-size: 0.85rem;
     font-weight: 600;
     color: #059669;
-  }
-
-  .badge {
-    display: inline-flex;
-    align-items: center;
-    gap: 3px;
-    padding: 3px 8px;
-    border-radius: 5px;
-    font-size: 0.7rem;
-    font-weight: 600;
-  }
-
-  .badge-purple {
-    background: #f3e8ff;
-    color: #7c3aed;
   }
 
   .text-muted {
@@ -1111,7 +869,7 @@ const styles = `
     flex-direction: column;
     align-items: center;
     justify-content: center;
-    padding: 48px 24px;
+    padding: 60px 24px;
     background: white;
     border: 1px dashed #e2e8f0;
     border-radius: 10px;
@@ -1120,17 +878,17 @@ const styles = `
   }
 
   .empty-state h3 {
-    margin: 12px 0 6px 0;
-    font-size: 1rem;
+    margin: 16px 0 8px 0;
+    font-size: 1.1rem;
     font-weight: 600;
     color: #0f172a;
   }
 
   .empty-state p {
-    margin: 0 0 16px 0;
+    margin: 0 0 20px 0;
     color: #64748b;
-    font-size: 0.85rem;
-    max-width: 280px;
+    font-size: 0.9rem;
+    max-width: 300px;
   }
 
   /* Modal */
@@ -1150,8 +908,8 @@ const styles = `
   .modal-content {
     background: white;
     border-radius: 12px;
-    padding: 20px;
-    max-width: 380px;
+    padding: 24px;
+    max-width: 400px;
     width: 90%;
   }
 
@@ -1159,12 +917,12 @@ const styles = `
     display: flex;
     justify-content: space-between;
     align-items: center;
-    margin-bottom: 12px;
+    margin-bottom: 16px;
   }
 
   .modal-header h3 {
     margin: 0;
-    font-size: 1rem;
+    font-size: 1.1rem;
     color: #0f172a;
   }
 
@@ -1172,8 +930,8 @@ const styles = `
     display: flex;
     align-items: center;
     justify-content: center;
-    width: 28px;
-    height: 28px;
+    width: 32px;
+    height: 32px;
     border: none;
     background: #f1f5f9;
     border-radius: 6px;
@@ -1187,20 +945,20 @@ const styles = `
   }
 
   .modal-text {
-    margin: 0 0 20px 0;
+    margin: 0 0 24px 0;
     color: #64748b;
-    font-size: 0.85rem;
+    font-size: 0.9rem;
     line-height: 1.5;
   }
 
   .modal-actions {
     display: flex;
-    gap: 10px;
+    gap: 12px;
     justify-content: flex-end;
   }
 
   .btn-cancel {
-    padding: 8px 16px;
+    padding: 10px 20px;
     background: #f1f5f9;
     border: none;
     border-radius: 6px;
@@ -1215,7 +973,7 @@ const styles = `
   }
 
   .btn-danger {
-    padding: 8px 16px;
+    padding: 10px 20px;
     background: #dc2626;
     border: none;
     border-radius: 6px;
@@ -1234,7 +992,7 @@ const styles = `
     display: flex;
     align-items: center;
     gap: 6px;
-    padding: 8px 16px;
+    padding: 10px 20px;
     background: #2563eb;
     color: white;
     border: none;
@@ -1249,17 +1007,7 @@ const styles = `
     background: #1d4ed8;
   }
 
-  @media (max-width: 1200px) {
-    .status-stats {
-      grid-template-columns: repeat(3, 1fr);
-    }
-  }
-
   @media (max-width: 768px) {
-    .status-stats {
-      grid-template-columns: repeat(2, 1fr);
-    }
-
     .planes-grid {
       grid-template-columns: 1fr;
     }
@@ -1269,7 +1017,7 @@ const styles = `
     }
 
     .planes-table {
-      min-width: 800px;
+      min-width: 700px;
     }
   }
 `;
