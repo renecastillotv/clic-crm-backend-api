@@ -159,19 +159,43 @@ export default function CrmPlanPagoEditar() {
       const data = await getPlanPago(tenantActual.id, planId);
       setPlan(data);
 
-      // Extraer datos del plan_detalle (support both old nested and new flat structure)
+      // Extraer datos del plan_detalle
       const detalle = data.plan_detalle || {};
       console.log('📥 Datos cargados del servidor:', { data, detalle });
+
+      // Read values - support both old nested {tipo, valor} and new flat structure
+      const getSeparacion = () => {
+        if (typeof detalle.separacion === 'object' && detalle.separacion?.valor !== undefined) {
+          return detalle.separacion.valor;
+        }
+        return detalle.separacion ?? '';
+      };
+
+      const getInicial = () => {
+        if (typeof detalle.inicial === 'object' && detalle.inicial?.valor !== undefined) {
+          return detalle.inicial.valor;
+        }
+        return detalle.inicial ?? '';
+      };
+
+      const getNumCuotas = () => {
+        // Old format: cuotas inside inicial object
+        if (typeof detalle.inicial === 'object' && detalle.inicial?.cuotas !== undefined) {
+          return detalle.inicial.cuotas;
+        }
+        // New format: num_cuotas at root level
+        return detalle.num_cuotas ?? 12;
+      };
+
       setForm({
         titulo: data.titulo || '',
         propiedad_id: data.propiedad_id || '',
         contacto_id: data.contacto_id || '',
         precio_total: data.precio_total?.toString() || '',
         moneda: data.moneda || 'USD',
-        // Support both old {tipo, valor} structure and new flat values
-        separacion: (detalle.separacion?.valor ?? detalle.separacion ?? '').toString(),
-        inicial: (detalle.inicial?.valor ?? detalle.inicial ?? '').toString(),
-        num_cuotas: (detalle.inicial?.cuotas ?? detalle.num_cuotas ?? 12).toString(),
+        separacion: String(getSeparacion()),
+        inicial: String(getInicial()),
+        num_cuotas: String(getNumCuotas()),
         fecha_inicio_cuotas: detalle.fecha_inicio_cuotas || '',
         notas: data.condiciones || '',
       });
