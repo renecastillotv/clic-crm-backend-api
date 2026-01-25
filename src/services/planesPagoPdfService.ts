@@ -92,6 +92,7 @@ export async function generarPdfPlanPago(plan: PlanPago): Promise<Buffer> {
       const doc = new PDFDocument({
         size: 'LETTER',
         margin: 50,
+        bufferPages: true, // Required for switchToPage
         info: {
           Title: plan.titulo || 'Plan de Pago',
           Author: tenantInfo?.nombre || 'CRM',
