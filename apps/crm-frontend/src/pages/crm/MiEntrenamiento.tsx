@@ -57,36 +57,37 @@ const MiEntrenamiento: React.FC = () => {
     });
   }, [setPageHeader]);
 
+  // Cargar ambos datos al inicio para mostrar los counters correctamente
   useEffect(() => {
-    // Esperar a que termine la autenticación antes de cargar datos
-    if (!authLoading && isAuthenticated) {
-      loadData();
+    if (!authLoading && isAuthenticated && tenantId) {
+      loadAllData();
     }
-  }, [tenantId, activeTab, authLoading, isAuthenticated]);
+  }, [tenantId, authLoading, isAuthenticated]);
 
-  const loadData = async () => {
+  const loadAllData = async () => {
     if (!tenantId) {
       console.log('[MiEntrenamiento] No tenantId, skipping load');
       return;
     }
 
-    console.log('[MiEntrenamiento] Loading data...', { tenantId, activeTab });
+    console.log('[MiEntrenamiento] Loading all data...', { tenantId });
     setLoading(true);
     setError(null);
 
     try {
-      if (activeTab === 'cursos') {
-        console.log('[MiEntrenamiento] Fetching cursos...');
-        // Token se obtiene automáticamente en api.ts desde window.Clerk
-        const data = await getMiEntrenamientoCursos(tenantId);
-        console.log('[MiEntrenamiento] Cursos received:', data);
-        setCursos(data || []);
-      } else {
-        console.log('[MiEntrenamiento] Fetching certificados...');
-        const data = await getMisCertificados(tenantId);
-        console.log('[MiEntrenamiento] Certificados received:', data);
-        setCertificados(data || []);
-      }
+      // Cargar ambos en paralelo para mostrar los counters
+      const [cursosData, certificadosData] = await Promise.all([
+        getMiEntrenamientoCursos(tenantId),
+        getMisCertificados(tenantId)
+      ]);
+
+      console.log('[MiEntrenamiento] Data received:', {
+        cursos: cursosData?.length || 0,
+        certificados: certificadosData?.length || 0
+      });
+
+      setCursos(cursosData || []);
+      setCertificados(certificadosData || []);
     } catch (err: any) {
       console.error('[MiEntrenamiento] Error cargando datos:', err);
       setError(err.message || 'Error cargando datos');
