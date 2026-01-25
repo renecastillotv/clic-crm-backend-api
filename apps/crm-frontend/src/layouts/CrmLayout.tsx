@@ -415,6 +415,56 @@ export default function CrmLayout() {
     cargarIsotipo();
   }, [tenantActual?.id, getToken]);
 
+  // Mapeo de rutas a módulo requerido para acceso
+  const routeModuleMap: Record<string, string> = {
+    'contactos': 'contactos',
+    'pipeline': 'pipeline',
+    'propuestas': 'propuestas',
+    'actividades': 'actividades',
+    'metas': 'metas',
+    'propiedades': 'propiedades',
+    'finanzas/ventas': 'finanzas-ventas',
+    'finanzas/comisiones': 'finanzas-comisiones',
+    'finanzas/facturas': 'finanzas-facturas',
+    'finanzas/configuracion': 'finanzas-config',
+    'sistema-fases/configuracion': 'sistema-fases-config',
+    'sistema-fases': 'sistema-fases-dashboard',
+    'productividad/configuracion': 'productividad-config',
+    'productividad': 'productividad',
+    'contenido': 'contenido',
+    'mensajeria': 'mensajeria',
+    'marketing': 'marketing',
+    'clic-connect': 'clic-connect',
+    'university': 'university',
+    'mi-entrenamiento': 'mi-entrenamiento',
+    'usuarios': 'usuarios',
+    'roles': 'usuarios',
+    'configuracion': 'configuracion',
+    'web/paginas': 'web-paginas',
+    'web/secciones': 'web-paginas',
+    'web/tema': 'web-tema',
+  };
+
+  // Determinar si el usuario tiene acceso a la ruta actual
+  const getRequiredModule = (): string | null => {
+    if (!tenantSlug) return null;
+    const basePrefixLen = `/crm/${tenantSlug}/`.length;
+    const relativePath = location.pathname.slice(basePrefixLen);
+    if (!relativePath) return null;
+
+    // Check from most specific to least specific
+    const sortedRoutes = Object.keys(routeModuleMap).sort((a, b) => b.length - a.length);
+    for (const route of sortedRoutes) {
+      if (relativePath === route || relativePath.startsWith(route + '/')) {
+        return routeModuleMap[route];
+      }
+    }
+    return null;
+  };
+
+  const requiredModule = getRequiredModule();
+  const routeAccessDenied = requiredModule ? !tieneAcceso(requiredModule) : false;
+
   // Abrir automáticamente los submenús según la ruta (y cerrar los demás)
   useEffect(() => {
     const isConfigRoute = location.pathname.includes('/web/') || location.pathname.includes('/configuracion');
@@ -495,15 +545,18 @@ export default function CrmLayout() {
   );
 
   const visibleFinanzasItems = finanzasSubItems.filter(
-    (item) => tieneAcceso(item.id) || tieneAcceso('finanzas')
+    (item) => tieneAcceso(item.id)
   );
 
+  // DEBUG: Ver qué items de finanzas pasan el filtro
+  console.log(`💰 [CrmLayout] visibleFinanzasItems: ${visibleFinanzasItems.map(i => i.id).join(', ')}`);
+
   const visibleSistemaFasesItems = sistemaFasesSubItems.filter(
-    (item) => tieneAcceso(item.id) || tieneAcceso('sistema-fases')
+    (item) => tieneAcceso(item.id)
   );
 
   const visibleConfigItems = configSubItems.filter(
-    (item) => tieneAcceso(item.id) || tieneAcceso('configuracion')
+    (item) => tieneAcceso(item.id)
   );
 
   const hasVisibleFeatures = tieneAcceso('contenido') || tieneAcceso('clic-connect') ||
@@ -561,7 +614,15 @@ export default function CrmLayout() {
               </NavLink>
 
               {/* CRM con submenú */}
-              {visibleCrmItems.length > 0 && (
+              {visibleCrmItems.length === 1 ? (
+                <NavLink
+                  to={`${basePath}/${visibleCrmItems[0].path}`}
+                  className={({ isActive }) => `nav-item ${isActive ? 'active' : ''}`}
+                >
+                  <span className="nav-icon">{Icons.pipeline}</span>
+                  <span className="nav-label">{visibleCrmItems[0].label}</span>
+                </NavLink>
+              ) : visibleCrmItems.length > 1 && (
               <>
               <button
                 className={`nav-item nav-expandable ${isCrmActive ? 'active' : ''}`}
@@ -601,7 +662,15 @@ export default function CrmLayout() {
               )}
 
               {/* Finanzas con submenú */}
-              {visibleFinanzasItems.length > 0 && (
+              {visibleFinanzasItems.length === 1 ? (
+                <NavLink
+                  to={`${basePath}/${visibleFinanzasItems[0].path}`}
+                  className={({ isActive }) => `nav-item ${isActive ? 'active' : ''}`}
+                >
+                  <span className="nav-icon">{Icons.finanzas}</span>
+                  <span className="nav-label">{visibleFinanzasItems[0].label}</span>
+                </NavLink>
+              ) : visibleFinanzasItems.length > 1 && (
               <>
               <button
                 className={`nav-item nav-expandable ${isFinanzasActive ? 'active' : ''}`}
@@ -702,7 +771,15 @@ export default function CrmLayout() {
               )}
 
               {/* Rendimiento (Fases + Productividad) */}
-              {visibleSistemaFasesItems.length > 0 && (
+              {visibleSistemaFasesItems.length === 1 ? (
+                <NavLink
+                  to={`${basePath}/${visibleSistemaFasesItems[0].path}`}
+                  className={({ isActive }) => `nav-item ${isActive ? 'active' : ''}`}
+                >
+                  <span className="nav-icon">{Icons.fases}</span>
+                  <span className="nav-label">{visibleSistemaFasesItems[0].label}</span>
+                </NavLink>
+              ) : visibleSistemaFasesItems.length > 1 && (
               <>
               <button
                 className={`nav-item nav-expandable ${isSistemaFasesActive ? 'active' : ''}`}
@@ -749,7 +826,15 @@ export default function CrmLayout() {
               )}
 
               {/* Configuración con submenú */}
-              {visibleConfigItems.length > 0 && (
+              {visibleConfigItems.length === 1 ? (
+                <NavLink
+                  to={`${basePath}/${visibleConfigItems[0].path}`}
+                  className={({ isActive }) => `nav-item ${isActive ? 'active' : ''}`}
+                >
+                  <span className="nav-icon">{Icons.configuracion}</span>
+                  <span className="nav-label">{visibleConfigItems[0].label}</span>
+                </NavLink>
+              ) : visibleConfigItems.length > 1 && (
               <>
               <button
                 className={`nav-item nav-expandable ${isConfigActive ? 'active' : ''}`}
@@ -931,7 +1016,20 @@ export default function CrmLayout() {
 
           {/* Content */}
           <main className="crm-content">
-            <Outlet />
+            {routeAccessDenied ? (
+              <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', minHeight: '50vh', padding: '2rem' }}>
+                <div style={{ background: 'rgba(239, 68, 68, 0.05)', border: '1px solid rgba(239, 68, 68, 0.2)', borderRadius: '12px', padding: '3rem 2rem', maxWidth: '400px', textAlign: 'center' }}>
+                  <div style={{ fontSize: '3rem', marginBottom: '1rem' }}>🔒</div>
+                  <h2 style={{ fontSize: '1.25rem', fontWeight: 600, color: '#dc2626', marginBottom: '0.5rem' }}>Acceso Denegado</h2>
+                  <p style={{ color: '#6b7280', margin: 0 }}>No tienes permiso para acceder a esta sección.</p>
+                  <button onClick={() => navigate(`/crm/${tenantSlug}`)} style={{ marginTop: '1.5rem', padding: '0.5rem 1.5rem', background: '#ef4444', color: 'white', border: 'none', borderRadius: '8px', cursor: 'pointer', fontSize: '0.875rem' }}>
+                    Volver al inicio
+                  </button>
+                </div>
+              </div>
+            ) : (
+              <Outlet />
+            )}
           </main>
         </div>
 
