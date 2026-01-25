@@ -2320,6 +2320,10 @@ const styles = `
 
   .modal-content.evidence-modal {
     max-width: 800px;
+    width: 100%;
+    max-height: 90vh;
+    display: flex;
+    flex-direction: column;
   }
 
   .modal-header-gradient {
@@ -2445,8 +2449,9 @@ const styles = `
 
   .evidence-modal-body {
     padding: 24px;
-    max-height: calc(90vh - 200px);
+    flex: 1;
     overflow-y: auto;
+    overflow-x: hidden;
   }
 
   .evidence-modal-footer {
@@ -2995,6 +3000,63 @@ const styles = `
 
     .evidences-grid {
       grid-template-columns: 1fr;
+    }
+
+    .modal-overlay {
+      padding: 10px;
+    }
+
+    .modal-content.evidence-modal {
+      max-height: calc(100vh - 20px);
+      border-radius: 16px;
+    }
+
+    .evidence-modal-header {
+      padding: 16px;
+    }
+
+    .evidence-modal-header h3 {
+      font-size: 1.1rem;
+    }
+
+    .evidence-modal-body {
+      padding: 16px;
+    }
+
+    .upload-btn {
+      padding: 20px;
+    }
+
+    .upload-icon-wrapper {
+      width: 48px;
+      height: 48px;
+    }
+
+    .upload-title {
+      font-size: 0.9rem;
+    }
+
+    .upload-subtitle {
+      font-size: 0.75rem;
+    }
+
+    .evidence-action-btn {
+      width: 28px;
+      height: 28px;
+    }
+
+    .lightbox-overlay {
+      padding: 20px;
+    }
+
+    .lightbox-footer {
+      flex-direction: column;
+      gap: 12px;
+    }
+
+    .lightbox-name {
+      font-size: 0.8rem;
+      text-align: center;
     }
   }
 
