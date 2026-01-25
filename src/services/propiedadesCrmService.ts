@@ -131,6 +131,7 @@ export interface PropiedadFiltros {
   busqueda?: string;
   agente_id?: string;
   include_red_global?: boolean;
+  connect?: boolean;  // Filter for CLIC Connect properties
   page?: number;
   limit?: number;
 }
@@ -154,7 +155,7 @@ export async function getPropiedades(
     tipo, operacion, estado_propiedad, ciudad,
     precio_min, precio_max, habitaciones_min, banos_min,
     m2_min, m2_max, destacada, busqueda, agente_id,
-    include_red_global,
+    include_red_global, connect,
     page = 1, limit = 24
   } = filtros;
 
@@ -236,6 +237,13 @@ export async function getPropiedades(
   if (agente_id) {
     whereClause += ` AND p.agente_id = $${paramIndex}`;
     params.push(agente_id);
+    paramIndex++;
+  }
+
+  // Filter for CLIC Connect properties (autoFilter from permisosCampos)
+  if (connect !== undefined) {
+    whereClause += ` AND p.connect = $${paramIndex}`;
+    params.push(connect);
     paramIndex++;
   }
 
@@ -829,7 +837,7 @@ export async function deletePropiedad(
 /**
  * Obtiene estadísticas de propiedades
  */
-export async function getPropiedadesStats(tenantId: string): Promise<{
+export async function getPropiedadesStats(tenantId: string, agenteId?: string | null): Promise<{
   total: number;
   disponibles: number;
   reservadas: number;
@@ -837,6 +845,9 @@ export async function getPropiedadesStats(tenantId: string): Promise<{
   porTipo: Record<string, number>;
   porOperacion: Record<string, number>;
 }> {
+  const ownerFilter = agenteId ? ' AND (captador_id = $2 OR agente_id = $2)' : '';
+  const params = agenteId ? [tenantId, agenteId] : [tenantId];
+
   const statsSql = `
     SELECT
       COUNT(*) as total,
@@ -844,27 +855,27 @@ export async function getPropiedadesStats(tenantId: string): Promise<{
       COUNT(*) FILTER (WHERE estado_propiedad = 'reservada') as reservadas,
       COUNT(*) FILTER (WHERE estado_propiedad IN ('vendida', 'rentada')) as vendidas
     FROM propiedades
-    WHERE tenant_id = $1 AND activo = true
+    WHERE tenant_id = $1 AND activo = true${ownerFilter}
   `;
 
   const tipoSql = `
     SELECT tipo, COUNT(*) as count
     FROM propiedades
-    WHERE tenant_id = $1 AND activo = true
+    WHERE tenant_id = $1 AND activo = true${ownerFilter}
     GROUP BY tipo
   `;
 
   const operacionSql = `
     SELECT operacion, COUNT(*) as count
     FROM propiedades
-    WHERE tenant_id = $1 AND activo = true
+    WHERE tenant_id = $1 AND activo = true${ownerFilter}
     GROUP BY operacion
   `;
 
   const [statsResult, tipoResult, operacionResult] = await Promise.all([
-    query(statsSql, [tenantId]),
-    query(tipoSql, [tenantId]),
-    query(operacionSql, [tenantId]),
+    query(statsSql, params),
+    query(tipoSql, params),
+    query(operacionSql, params),
   ]);
 
   const stats = statsResult.rows[0];
