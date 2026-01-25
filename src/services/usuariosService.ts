@@ -440,6 +440,11 @@ export async function getModulosAccesibles(
       AND ur.activo = true
       AND rm.puede_ver = true
       AND m.activo = true
+      AND (m.requiere_feature IS NULL OR EXISTS (
+        SELECT 1 FROM tenants_features tf
+        JOIN features f ON tf.feature_id = f.id
+        WHERE tf.tenant_id = $2 AND f.name = m.requiere_feature
+      ))
     GROUP BY m.id, m.nombre, m.descripcion, m.icono, m.categoria, m.orden,
              m.es_submenu, m.modulo_padre_id, m.ruta
     ORDER BY m.categoria, m.orden
@@ -1687,33 +1692,155 @@ export async function deleteRolTenant(tenantId: string, rolId: string): Promise<
 }
 
 /**
- * Obtener un rol específico del tenant
+ * Obtener un rol específico del tenant (con info de parent)
  */
 export async function getRolTenantById(tenantId: string, rolId: string): Promise<any | null> {
+  const sql = `
+    SELECT
+      r.id,
+      r.codigo,
+      r.nombre,
+      r.descripcion,
+      r.color,
+      r.activo,
+      r.tenant_id as "tenantId",
+      r.es_protegido as "esProtegido",
+      r.parent_id as "parentId",
+      p.nombre as "parentNombre",
+      p.codigo as "parentCodigo"
+    FROM roles r
+    LEFT JOIN roles p ON r.parent_id = p.id
+    WHERE r.id = $1
+      AND r.tipo = 'tenant'
+      AND (
+        -- Rol del sistema (disponible para todos los tenants)
+        (r.tenant_id IS NULL)
+        OR
+        -- Rol personalizado del tenant específico
+        r.tenant_id = $2
+      )
+  `;
+
+  const result = await query(sql, [rolId, tenantId]);
+  return result.rows[0] || null;
+}
+
+/**
+ * Obtener roles globales disponibles como padres para roles de tenant
+ */
+export async function getGlobalRoles(): Promise<any[]> {
   const sql = `
     SELECT
       id,
       codigo,
       nombre,
       descripcion,
-      color,
-      activo,
-      tenant_id as "tenantId",
-      es_protegido as "esProtegido"
+      color
     FROM roles
-    WHERE id = $1 
-      AND tipo = 'tenant'
-      AND (
-        -- Rol del sistema (disponible para todos los tenants)
-        (tenant_id IS NULL)
-        OR
-        -- Rol personalizado del tenant específico
-        tenant_id = $2
-      )
+    WHERE tipo = 'global'
+      AND activo = true
+    ORDER BY nombre ASC
   `;
+  const result = await query(sql);
+  return result.rows;
+}
 
-  const result = await query(sql, [rolId, tenantId]);
-  return result.rows[0] || null;
+/**
+ * Obtener los módulos/permisos de un rol (de roles_modulos)
+ */
+export async function getRolModulos(rolId: string): Promise<any[]> {
+  const sql = `
+    SELECT
+      rm.modulo_id as "moduloId",
+      m.nombre as "moduloNombre",
+      m.categoria as "moduloCategoria",
+      m.icono as "moduloIcono",
+      rm.puede_ver as "puedeVer",
+      rm.puede_crear as "puedeCrear",
+      rm.puede_editar as "puedeEditar",
+      rm.puede_eliminar as "puedeEliminar",
+      rm.alcance_ver as "alcanceVer",
+      rm.alcance_editar as "alcanceEditar",
+      COALESCE(rm.permisos_campos, '{}') as "permisosCampos"
+    FROM roles_modulos rm
+    JOIN modulos m ON rm.modulo_id = m.id
+    WHERE rm.rol_id = $1
+    ORDER BY m.categoria, m.orden, m.nombre
+  `;
+  const result = await query(sql, [rolId]);
+  return result.rows;
+}
+
+/**
+ * Guardar los permisos de un rol (reemplaza todos los roles_modulos del rol)
+ * Valida que no excedan los permisos del rol padre.
+ */
+export async function saveRolPermisos(
+  tenantId: string,
+  rolId: string,
+  parentId: string,
+  permisos: Array<{
+    moduloId: string;
+    puedeVer: boolean;
+    puedeCrear: boolean;
+    puedeEditar: boolean;
+    puedeEliminar: boolean;
+    alcanceVer: string;
+    alcanceEditar: string;
+    permisosCampos?: Record<string, any>;
+  }>
+): Promise<void> {
+  // Verificar que el rol pertenece al tenant
+  const checkRol = await query(
+    'SELECT id FROM roles WHERE id = $1 AND tenant_id = $2 AND tipo = $3',
+    [rolId, tenantId, 'tenant']
+  );
+  if (checkRol.rows.length === 0) {
+    throw new Error('Rol no encontrado o no pertenece a este tenant');
+  }
+
+  // Obtener permisos del padre para validar
+  const parentModulos = await getRolModulos(parentId);
+  const parentMap = new Map(parentModulos.map(m => [m.moduloId, m]));
+
+  // Validar que cada permiso no exceda al padre
+  for (const perm of permisos) {
+    const parentPerm = parentMap.get(perm.moduloId);
+    if (!parentPerm) {
+      throw new Error(`Módulo ${perm.moduloId} no está disponible en el rol padre`);
+    }
+    if (perm.puedeVer && !parentPerm.puedeVer) throw new Error(`Permiso 'ver' excede al padre para ${perm.moduloId}`);
+    if (perm.puedeCrear && !parentPerm.puedeCrear) throw new Error(`Permiso 'crear' excede al padre para ${perm.moduloId}`);
+    if (perm.puedeEditar && !parentPerm.puedeEditar) throw new Error(`Permiso 'editar' excede al padre para ${perm.moduloId}`);
+    if (perm.puedeEliminar && !parentPerm.puedeEliminar) throw new Error(`Permiso 'eliminar' excede al padre para ${perm.moduloId}`);
+  }
+
+  // Eliminar permisos anteriores del rol
+  await query('DELETE FROM roles_modulos WHERE rol_id = $1', [rolId]);
+
+  // Insertar los nuevos
+  for (const perm of permisos) {
+    await query(`
+      INSERT INTO roles_modulos (rol_id, modulo_id, puede_ver, puede_crear, puede_editar, puede_eliminar, alcance_ver, alcance_editar, permisos_campos)
+      VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)
+    `, [
+      rolId,
+      perm.moduloId,
+      perm.puedeVer,
+      perm.puedeCrear,
+      perm.puedeEditar,
+      perm.puedeEliminar,
+      perm.alcanceVer || 'own',
+      perm.alcanceEditar || 'own',
+      JSON.stringify(perm.permisosCampos || {})
+    ]);
+  }
+
+  // Actualizar parent_id del rol
+  await query('UPDATE roles SET parent_id = $1 WHERE id = $2', [parentId, rolId]);
+
+  // Invalidar caché de permisos del tenant
+  await incrementPermisosVersion(tenantId);
 }
 
 // ==================== FUNCIONES DE DOCUMENTOS ====================

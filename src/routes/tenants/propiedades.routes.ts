@@ -21,7 +21,16 @@ import {
   getTagsStats,
 } from '../../services/tagsSyncService.js';
 import unidadesRouter from './unidades.routes.js';
-import { resolveUserScope, getOwnFilter, canEdit } from '../../middleware/scopeResolver.js';
+import {
+  resolveUserScope,
+  getOwnFilter,
+  canEdit,
+  hasPermission,
+  getFieldPermissions,
+  getAutoFilter,
+  applyFieldPermissions,
+  applyFieldPermissionsToArray,
+} from '../../middleware/scopeResolver.js';
 
 // Tipos para params con mergeParams
 interface RouteParams { [key: string]: string | undefined;
@@ -52,7 +61,11 @@ router.get('/', async (req, res, next) => {
     // Apply scope filter: if alcance_ver = 'own', force user's own properties
     const ownUserId = getOwnFilter(req, 'propiedades');
 
-    const filtros = {
+    // Get field permissions for auto-filtering (e.g., { connect: true })
+    const autoFilter = getAutoFilter(req, 'propiedades');
+    const permisosCampos = getFieldPermissions(req, 'propiedades');
+
+    const filtros: Record<string, any> = {
       tipo: tipo as string | undefined,
       operacion: operacion as string | undefined,
       estado_propiedad: estado_propiedad as string | undefined,
@@ -71,7 +84,16 @@ router.get('/', async (req, res, next) => {
       limit: limit ? parseInt(limit as string) : 24,
     };
 
+    // Apply auto-filters from field permissions (e.g., connect: true for CONNECT role)
+    if (autoFilter) {
+      Object.assign(filtros, autoFilter);
+    }
+
     const resultado = await getPropiedades(tenantId, filtros);
+
+    // Apply field permissions to hide/transform fields in the response
+    resultado.data = applyFieldPermissionsToArray(resultado.data, permisosCampos);
+
     res.json(resultado);
   } catch (error) {
     next(error);
@@ -85,7 +107,8 @@ router.get('/', async (req, res, next) => {
 router.get('/stats', async (req, res, next) => {
   try {
     const { tenantId } = req.params as RouteParams;
-    const stats = await getPropiedadesStats(tenantId);
+    const ownUserId = getOwnFilter(req, 'propiedades');
+    const stats = await getPropiedadesStats(tenantId, ownUserId || undefined);
     res.json(stats);
   } catch (error) {
     next(error);
@@ -105,7 +128,17 @@ router.get('/:propiedadId', async (req, res, next) => {
       return res.status(404).json({ error: 'Propiedad no encontrada' });
     }
 
-    res.json(propiedad);
+    // Check scope: if user can only see 'own', verify ownership
+    const ownUserId = getOwnFilter(req, 'propiedades');
+    if (ownUserId && propiedad.agente_id !== ownUserId && propiedad.captador_id !== ownUserId) {
+      return res.status(403).json({ error: 'No tienes permiso para ver esta propiedad' });
+    }
+
+    // Apply field permissions to hide/transform fields
+    const permisosCampos = getFieldPermissions(req, 'propiedades');
+    const propiedadTransformada = applyFieldPermissions(propiedad, permisosCampos);
+
+    res.json(propiedadTransformada);
   } catch (error) {
     next(error);
   }
@@ -118,6 +151,11 @@ router.get('/:propiedadId', async (req, res, next) => {
 router.post('/', async (req, res, next) => {
   try {
     const { tenantId } = req.params as RouteParams;
+
+    if (!hasPermission(req, 'propiedades', 'crear')) {
+      return res.status(403).json({ error: 'No tienes permiso para crear propiedades' });
+    }
+
     const propiedad = await createPropiedad(tenantId, req.body);
     res.status(201).json(propiedad);
   } catch (error) {
@@ -157,12 +195,23 @@ router.put('/:propiedadId', async (req, res, next) => {
 router.delete('/:propiedadId', async (req, res, next) => {
   try {
     const { tenantId, propiedadId } = req.params as RouteParams;
-    const eliminado = await deletePropiedad(tenantId, propiedadId);
 
-    if (!eliminado) {
+    if (!hasPermission(req, 'propiedades', 'eliminar')) {
+      return res.status(403).json({ error: 'No tienes permiso para eliminar propiedades' });
+    }
+
+    // Check ownership: if scope is 'own', only allow deleting own records
+    const existing = await getPropiedadById(tenantId, propiedadId);
+    if (!existing) {
       return res.status(404).json({ error: 'Propiedad no encontrada' });
     }
 
+    const ownUserId = getOwnFilter(req, 'propiedades');
+    if (ownUserId && existing.agente_id !== ownUserId && existing.captador_id !== ownUserId) {
+      return res.status(403).json({ error: 'No tienes permiso para eliminar esta propiedad' });
+    }
+
+    const eliminado = await deletePropiedad(tenantId, propiedadId);
     res.json({ success: true, message: 'Propiedad eliminada correctamente' });
   } catch (error) {
     next(error);
@@ -178,6 +227,20 @@ router.delete('/:propiedadId', async (req, res, next) => {
 router.post('/:propiedadId/sync-tags', async (req, res, next) => {
   try {
     const { tenantId, propiedadId } = req.params as RouteParams;
+
+    if (!hasPermission(req, 'propiedades', 'editar')) {
+      return res.status(403).json({ error: 'No tienes permiso para editar propiedades' });
+    }
+
+    // Check ownership for scope 'own'
+    const existing = await getPropiedadById(tenantId, propiedadId);
+    if (!existing) {
+      return res.status(404).json({ error: 'Propiedad no encontrada' });
+    }
+    if (!canEdit(req, 'propiedades', existing.agente_id || existing.captador_id)) {
+      return res.status(403).json({ error: 'No tienes permiso para editar esta propiedad' });
+    }
+
     const resultado = await syncTagsForProperty(propiedadId, tenantId);
     res.json(resultado);
   } catch (error) {
@@ -206,6 +269,12 @@ router.get('/:propiedadId/tags', async (req, res, next) => {
 router.post('/sync-tags/all', async (req, res, next) => {
   try {
     const { tenantId } = req.params as RouteParams;
+
+    // Bulk sync is an admin-level operation - require edit permission with 'all' scope
+    if (!hasPermission(req, 'propiedades', 'editar')) {
+      return res.status(403).json({ error: 'No tienes permiso para sincronizar tags masivamente' });
+    }
+
     const { batchSize, soloActivas } = req.body;
 
     const resultado = await syncAllPropertiesTags(tenantId, {
