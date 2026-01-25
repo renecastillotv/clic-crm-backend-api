@@ -419,22 +419,27 @@ export default function CrmActividades() {
     const newEvidences: Evidencia[] = [...evidences];
 
     try {
-      // Usar la ruta específica para evidencias de actividades
+      // Subir archivos a R2 mediante la ruta de upload
       const token = await getToken();
-      
+
       const formData = new FormData();
       Array.from(files).forEach((file) => {
         formData.append('images', file);
       });
+      formData.append('folder', 'actividades/evidencias');
 
-      const { apiFetch } = await import('../../services/api');
-      const response = await apiFetch(
-        `/upload/actividades/${tenantActual.id}/evidencias`,
+      // Usar fetch directo porque apiFetch establece Content-Type: application/json
+      // y FormData necesita que el browser establezca el Content-Type automáticamente
+      const API_BASE_URL = import.meta.env.VITE_API_URL || 'http://localhost:3001/api';
+      const response = await fetch(
+        `${API_BASE_URL}/tenants/${tenantActual.id}/upload/images`,
         {
           method: 'POST',
+          headers: {
+            'Authorization': `Bearer ${token}`,
+          },
           body: formData,
-        },
-        token
+        }
       );
 
       if (!response.ok) {
