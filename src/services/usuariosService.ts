@@ -403,6 +403,7 @@ export async function getModulosAccesibles(
   tenantId: string
 ): Promise<any[]> {
   // Aggregate permissions across multiple roles (most permissive wins)
+  // For permisosCampos, we take the first non-empty one (LIMIT 1 subquery)
   const sql = `
     SELECT
       m.id,
@@ -428,9 +429,16 @@ export async function getModulosAccesibles(
         WHEN 1 THEN 'team'
         ELSE 'own'
       END as "alcanceEditar",
-      COALESCE(
-        jsonb_object_agg(ur.rol_id, rm.permisos_campos) FILTER (WHERE rm.permisos_campos IS NOT NULL AND rm.permisos_campos != '{}'::jsonb),
-        '{}'::jsonb
+      (SELECT rm2.permisos_campos
+       FROM roles_modulos rm2
+       JOIN usuarios_roles ur2 ON rm2.rol_id = ur2.rol_id
+       WHERE ur2.usuario_id = $1
+         AND (ur2.tenant_id = $2 OR ur2.tenant_id IS NULL)
+         AND ur2.activo = true
+         AND rm2.modulo_id = m.id
+         AND rm2.permisos_campos IS NOT NULL
+         AND rm2.permisos_campos::text != '{}'
+       LIMIT 1
       ) as "permisosCampos"
     FROM usuarios_roles ur
     JOIN roles_modulos rm ON ur.rol_id = rm.rol_id
@@ -451,6 +459,16 @@ export async function getModulosAccesibles(
   `;
 
   const result = await query(sql, [usuarioId, tenantId]);
+
+  // DEBUG: Log modules returned
+  console.log('[DEBUG getModulosAccesibles] userId:', usuarioId, 'tenantId:', tenantId);
+  console.log('[DEBUG getModulosAccesibles] modules found:', result.rows.map(r => ({
+    id: r.id,
+    puedeVer: r.puedeVer,
+    puedeCrear: r.puedeCrear,
+    permisosCampos: r.permisosCampos,
+  })));
+
   return result.rows;
 }
 
