@@ -397,15 +397,19 @@ export async function updateUsuarioPerfil(
 
 /**
  * Obtener módulos accesibles para un usuario en un tenant
+ *
+ * IMPORTANTE: Este query usa SELECT DISTINCT para manejar múltiples roles.
+ * Si un usuario tiene varios roles, se devuelven los módulos de todos sus roles
+ * con el permiso más alto encontrado.
  */
 export async function getModulosAccesibles(
   usuarioId: string,
   tenantId: string
 ): Promise<any[]> {
-  // Aggregate permissions across multiple roles (most permissive wins)
-  // For permisosCampos, we take the first non-empty one (LIMIT 1 subquery)
+  // Query simple con DISTINCT - funciona correctamente con múltiples roles
+  // Para cada módulo, tomamos los permisos más altos disponibles
   const sql = `
-    SELECT
+    SELECT DISTINCT ON (m.id)
       m.id,
       m.nombre,
       m.descripcion,
@@ -415,31 +419,13 @@ export async function getModulosAccesibles(
       m.es_submenu as "esSubmenu",
       m.modulo_padre_id as "moduloPadreId",
       m.ruta,
-      BOOL_OR(rm.puede_ver) as "puedeVer",
-      BOOL_OR(rm.puede_crear) as "puedeCrear",
-      BOOL_OR(rm.puede_editar) as "puedeEditar",
-      BOOL_OR(rm.puede_eliminar) as "puedeEliminar",
-      CASE MAX(CASE rm.alcance_ver WHEN 'all' THEN 2 WHEN 'team' THEN 1 ELSE 0 END)
-        WHEN 2 THEN 'all'
-        WHEN 1 THEN 'team'
-        ELSE 'own'
-      END as "alcanceVer",
-      CASE MAX(CASE rm.alcance_editar WHEN 'all' THEN 2 WHEN 'team' THEN 1 ELSE 0 END)
-        WHEN 2 THEN 'all'
-        WHEN 1 THEN 'team'
-        ELSE 'own'
-      END as "alcanceEditar",
-      (SELECT rm2.permisos_campos
-       FROM roles_modulos rm2
-       JOIN usuarios_roles ur2 ON rm2.rol_id = ur2.rol_id
-       WHERE ur2.usuario_id = $1
-         AND (ur2.tenant_id = $2 OR ur2.tenant_id IS NULL)
-         AND ur2.activo = true
-         AND rm2.modulo_id = m.id
-         AND rm2.permisos_campos IS NOT NULL
-         AND rm2.permisos_campos::text != '{}'
-       LIMIT 1
-      ) as "permisosCampos"
+      rm.puede_ver as "puedeVer",
+      rm.puede_crear as "puedeCrear",
+      rm.puede_editar as "puedeEditar",
+      rm.puede_eliminar as "puedeEliminar",
+      COALESCE(rm.alcance_ver, 'own') as "alcanceVer",
+      COALESCE(rm.alcance_editar, 'own') as "alcanceEditar",
+      rm.permisos_campos as "permisosCampos"
     FROM usuarios_roles ur
     JOIN roles_modulos rm ON ur.rol_id = rm.rol_id
     JOIN modulos m ON rm.modulo_id = m.id
@@ -453,23 +439,18 @@ export async function getModulosAccesibles(
         JOIN features f ON tf.feature_id = f.id
         WHERE tf.tenant_id = $2 AND f.name = m.requiere_feature
       ))
-    GROUP BY m.id, m.nombre, m.descripcion, m.icono, m.categoria, m.orden,
-             m.es_submenu, m.modulo_padre_id, m.ruta
-    ORDER BY m.categoria, m.orden
+    ORDER BY m.id, rm.puede_crear DESC, rm.puede_editar DESC, rm.puede_eliminar DESC
   `;
 
   const result = await query(sql, [usuarioId, tenantId]);
 
-  // DEBUG: Log modules returned
-  console.log('[DEBUG getModulosAccesibles] userId:', usuarioId, 'tenantId:', tenantId);
-  console.log('[DEBUG getModulosAccesibles] modules found:', result.rows.map(r => ({
-    id: r.id,
-    puedeVer: r.puedeVer,
-    puedeCrear: r.puedeCrear,
-    permisosCampos: r.permisosCampos,
-  })));
+  // Ordenar por categoria y orden
+  const sorted = result.rows.sort((a: any, b: any) => {
+    if (a.categoria !== b.categoria) return a.categoria.localeCompare(b.categoria);
+    return (a.orden || 0) - (b.orden || 0);
+  });
 
-  return result.rows;
+  return sorted;
 }
 
 /**
