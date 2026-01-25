@@ -10,6 +10,16 @@ import { Request, Response, NextFunction } from 'express';
 import { verifyToken } from '@clerk/backend';
 import { query } from '../utils/db.js';
 
+// Tipo para permisos de campo
+export interface PermisosCampos {
+  hide?: string[];           // Campos completamente ocultos
+  readonly?: string[];       // Campos visibles pero no editables
+  replace?: Record<string, string>; // Reemplazos: mostrar otro campo
+  autoFilter?: Record<string, any>; // Filtros automáticos que se aplican al GET
+  override?: Record<string, any>;   // Valores override (ej: contacto genérico)
+  cardFields?: string[];     // Campos a mostrar en tarjeta (UI hints)
+}
+
 // Extender Request para incluir scope info
 declare global {
   namespace Express {
@@ -18,7 +28,15 @@ declare global {
         dbUserId: string;
         tenantId: string;
         isPlatformAdmin: boolean;
-        alcances: Record<string, { ver: string; editar: string }>;
+        alcances: Record<string, {
+          ver: string;
+          editar: string;
+          puedeVer: boolean;
+          puedeCrear: boolean;
+          puedeEditar: boolean;
+          puedeEliminar: boolean;
+          permisosCampos?: PermisosCampos;
+        }>;
       };
     }
   }
@@ -123,7 +141,22 @@ export async function resolveUserScope(
           WHEN 2 THEN 'all'
           WHEN 1 THEN 'team'
           ELSE 'own'
-        END as alcance_editar
+        END as alcance_editar,
+        BOOL_OR(rm.puede_ver) as puede_ver,
+        BOOL_OR(rm.puede_crear) as puede_crear,
+        BOOL_OR(rm.puede_editar) as puede_editar,
+        BOOL_OR(rm.puede_eliminar) as puede_eliminar,
+        (SELECT rm2.permisos_campos
+         FROM roles_modulos rm2
+         JOIN usuarios_roles ur2 ON rm2.rol_id = ur2.rol_id
+         WHERE ur2.usuario_id = $1
+           AND (ur2.tenant_id = $2 OR ur2.tenant_id IS NULL)
+           AND ur2.activo = true
+           AND rm2.modulo_id = m.id
+           AND rm2.permisos_campos IS NOT NULL
+           AND rm2.permisos_campos::text != '{}'
+         LIMIT 1
+        ) as permisos_campos
       FROM usuarios_roles ur
       JOIN roles_modulos rm ON ur.rol_id = rm.rol_id
       JOIN modulos m ON rm.modulo_id = m.id
@@ -131,14 +164,24 @@ export async function resolveUserScope(
         AND (ur.tenant_id = $2 OR ur.tenant_id IS NULL)
         AND ur.activo = true
         AND rm.puede_ver = true
+        AND (m.requiere_feature IS NULL OR EXISTS (
+          SELECT 1 FROM tenants_features tf
+          JOIN features f ON tf.feature_id = f.id
+          WHERE tf.tenant_id = $2 AND f.name = m.requiere_feature
+        ))
       GROUP BY m.id
     `, [dbUser.id, tenantId]);
 
-    const alcances: Record<string, { ver: string; editar: string }> = {};
+    const alcances: Record<string, { ver: string; editar: string; puedeVer: boolean; puedeCrear: boolean; puedeEditar: boolean; puedeEliminar: boolean; permisosCampos?: PermisosCampos }> = {};
     for (const row of scopeResult.rows) {
       alcances[row.modulo_id] = {
         ver: row.alcance_ver,
         editar: row.alcance_editar,
+        puedeVer: row.puede_ver,
+        puedeCrear: row.puede_crear,
+        puedeEditar: row.puede_editar,
+        puedeEliminar: row.puede_eliminar,
+        permisosCampos: row.permisos_campos || undefined,
       };
     }
 
@@ -196,10 +239,129 @@ export function canEdit(req: any, moduloId: string, recordOwnerId: string | null
   const alcance = req.scope.alcances[moduloId];
   if (!alcance) return false; // No permission for this module
 
+  if (!alcance.puedeEditar) return false;
+
   if (alcance.editar === 'all') return true;
   if (alcance.editar === 'own') {
     return recordOwnerId === req.scope.dbUserId;
   }
   // 'team' - TODO: implement team check
   return true;
+}
+
+/**
+ * Checks if user has a specific permission (crear, editar, eliminar) for a module.
+ * Returns true if allowed, false if not.
+ * Use this in route handlers to block unauthorized POST/PUT/DELETE operations.
+ */
+export function hasPermission(req: any, moduloId: string, action: 'ver' | 'crear' | 'editar' | 'eliminar'): boolean {
+  if (!req.scope) {
+    // If scope middleware ran but couldn't resolve, deny (fail-closed)
+    return !req._scopeAttempted;
+  }
+  if (req.scope.isPlatformAdmin) return true;
+
+  const alcance = req.scope.alcances[moduloId];
+  if (!alcance) return false;
+
+  switch (action) {
+    case 'ver': return alcance.puedeVer;
+    case 'crear': return alcance.puedeCrear;
+    case 'editar': return alcance.puedeEditar;
+    case 'eliminar': return alcance.puedeEliminar;
+    default: return false;
+  }
+}
+
+/**
+ * Express middleware factory that blocks requests if user doesn't have permission.
+ * Usage: router.post('/', requirePermission('contenido', 'crear'), handler)
+ */
+export function requirePermission(moduloId: string, action: 'ver' | 'crear' | 'editar' | 'eliminar') {
+  return (req: any, res: any, next: any) => {
+    if (hasPermission(req, moduloId, action)) {
+      next();
+    } else {
+      res.status(403).json({
+        error: 'Sin permisos',
+        message: `No tienes permiso para ${action} en ${moduloId}`,
+      });
+    }
+  };
+}
+
+/**
+ * Get field permissions for a module
+ */
+export function getFieldPermissions(req: any, moduloId: string): PermisosCampos | undefined {
+  if (!req.scope) return undefined;
+  if (req.scope.isPlatformAdmin) return undefined; // Platform admin sees everything
+  return req.scope.alcances[moduloId]?.permisosCampos;
+}
+
+/**
+ * Get auto filters to apply for a module (e.g., { connect: true })
+ */
+export function getAutoFilter(req: any, moduloId: string): Record<string, any> | undefined {
+  const permisosCampos = getFieldPermissions(req, moduloId);
+  return permisosCampos?.autoFilter;
+}
+
+/**
+ * Apply field permissions to transform a data object.
+ * - Hides specified fields
+ * - Applies field replacements
+ * - Applies override values
+ */
+export function applyFieldPermissions<T extends Record<string, any>>(
+  data: T,
+  permisosCampos: PermisosCampos | undefined
+): T {
+  if (!permisosCampos) return data;
+
+  const result = { ...data };
+
+  // 1. Hide specified fields
+  if (permisosCampos.hide) {
+    for (const field of permisosCampos.hide) {
+      // Support wildcards like "propietario_*"
+      if (field.endsWith('*')) {
+        const prefix = field.slice(0, -1);
+        for (const key of Object.keys(result)) {
+          if (key.startsWith(prefix)) {
+            delete result[key];
+          }
+        }
+      } else {
+        delete result[field];
+      }
+    }
+  }
+
+  // 2. Apply replacements (show a different field's value)
+  if (permisosCampos.replace) {
+    for (const [displayField, sourceField] of Object.entries(permisosCampos.replace)) {
+      if (data[sourceField] !== undefined) {
+        (result as any)[displayField] = data[sourceField];
+      }
+    }
+  }
+
+  // 3. Apply overrides (fixed values)
+  if (permisosCampos.override) {
+    Object.assign(result, permisosCampos.override);
+  }
+
+  return result;
+}
+
+/**
+ * Apply field permissions to an array of objects
+ */
+export function applyFieldPermissionsToArray<T extends Record<string, any>>(
+  dataArray: T[],
+  permisosCampos: PermisosCampos | undefined
+): T[] {
+  if (!permisosCampos) return dataArray;
+  return dataArray.map(item => applyFieldPermissions(item, permisosCampos));
 }

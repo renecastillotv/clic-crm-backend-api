@@ -37,10 +37,12 @@ export interface Role {
 }
 
 export interface PermisosCampos {
-  hide?: string[];
-  readonly?: string[];
-  hideTabs?: string[];
-  hideActions?: string[];
+  hide?: string[];           // Campos completamente ocultos
+  readonly?: string[];       // Campos visibles pero no editables
+  replace?: Record<string, string>; // Reemplazos: mostrar otro campo
+  autoFilter?: Record<string, any>; // Filtros automáticos que se aplican al GET
+  override?: Record<string, any>;   // Valores override (ej: contacto genérico)
+  cardFields?: string[];     // Campos a mostrar en tarjeta (UI hints)
 }
 
 export interface Modulo {
@@ -59,7 +61,7 @@ export interface Modulo {
   puedeEliminar: boolean;
   alcanceVer: 'all' | 'own' | 'team';
   alcanceEditar: 'all' | 'own' | 'team';
-  permisosCampos?: Record<string, PermisosCampos>;
+  permisosCampos?: PermisosCampos;
 }
 
 export interface User {
@@ -114,6 +116,7 @@ interface AuthContextType {
   puedeCrear: (moduloId: string) => boolean;
   puedeEditar: (moduloId: string) => boolean;
   puedeEliminar: (moduloId: string) => boolean;
+  getPermisosCampos: (moduloId: string) => PermisosCampos | undefined;
 }
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
@@ -394,6 +397,12 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     return modulos.some((m) => m.id === moduloId && m.puedeEliminar);
   };
 
+  const getPermisosCampos = (moduloId: string): PermisosCampos | undefined => {
+    if (isPlatformAdmin) return undefined; // Platform admin sees everything
+    const modulo = modulos.find((m) => m.id === moduloId);
+    return modulo?.permisosCampos;
+  };
+
   return (
     <AuthContext.Provider
       value={{
@@ -415,6 +424,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         puedeCrear,
         puedeEditar,
         puedeEliminar,
+        getPermisosCampos,
       }}
     >
       {children}

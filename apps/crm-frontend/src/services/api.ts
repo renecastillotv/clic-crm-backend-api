@@ -917,6 +917,16 @@ export interface Modulo {
   activo: boolean;
 }
 
+// Permisos a nivel de campo para un módulo
+export interface PermisosCampos {
+  hide?: string[];           // Campos completamente ocultos
+  readonly?: string[];       // Campos visibles pero no editables
+  replace?: Record<string, string>; // Reemplazos: mostrar otro campo
+  autoFilter?: Record<string, any>; // Filtros automáticos que se aplican al GET
+  override?: Record<string, any>;   // Valores override (ej: contacto genérico)
+  cardFields?: string[];     // Campos a mostrar en tarjeta (UI hints)
+}
+
 export interface RolModulo {
   id: string;
   rolId: string;
@@ -930,6 +940,7 @@ export interface RolModulo {
   moduloNombre?: string;
   moduloDescripcion?: string;
   moduloCategoria?: string;
+  permisosCampos?: PermisosCampos;
 }
 
 export interface RolModuloInput {
@@ -940,6 +951,7 @@ export interface RolModuloInput {
   puedeEliminar: boolean;
   alcanceVer?: 'all' | 'team' | 'own';
   alcanceEditar?: 'all' | 'team' | 'own';
+  permisosCampos?: PermisosCampos;
 }
 
 export interface ModuloConPermisos extends Modulo {
@@ -5282,6 +5294,9 @@ export interface RolTenant {
   permisos: string[];
   activo: boolean;
   tenant_id: string;
+  parentId?: string | null;
+  parentNombre?: string | null;
+  parentCodigo?: string | null;
   created_at: string;
   updated_at: string;
 }
@@ -5373,6 +5388,80 @@ export async function deleteRolTenant(
 ): Promise<void> {
   await apiFetch(`/tenants/${tenantId}/roles/${rolId}`, {
     method: 'DELETE',
+  }, token);
+}
+
+// ==========================================
+// Permisos de Roles
+// ==========================================
+
+export interface ModuloPermiso {
+  moduloId: string;
+  moduloNombre: string;
+  moduloCategoria: string;
+  moduloIcono: string | null;
+  puedeVer: boolean;
+  puedeCrear: boolean;
+  puedeEditar: boolean;
+  puedeEliminar: boolean;
+  alcanceVer: string;
+  alcanceEditar: string;
+}
+
+export interface GlobalRol {
+  id: string;
+  codigo: string;
+  nombre: string;
+  descripcion: string | null;
+  color: string | null;
+}
+
+/**
+ * Obtiene roles globales disponibles como padres
+ */
+export async function getGlobalRoles(
+  tenantId: string,
+  token?: string | null
+): Promise<GlobalRol[]> {
+  const response = await apiFetch(`/tenants/${tenantId}/roles/global-roles`, {}, token);
+  const data = await response.json();
+  return data.roles || [];
+}
+
+/**
+ * Obtiene los permisos (módulos) de un rol
+ */
+export async function getRolPermisos(
+  tenantId: string,
+  rolId: string,
+  token?: string | null
+): Promise<ModuloPermiso[]> {
+  const response = await apiFetch(`/tenants/${tenantId}/roles/${rolId}/permisos`, {}, token);
+  const data = await response.json();
+  return data.modulos || [];
+}
+
+/**
+ * Guarda los permisos de un rol
+ */
+export async function saveRolPermisos(
+  tenantId: string,
+  rolId: string,
+  parentId: string,
+  permisos: Array<{
+    moduloId: string;
+    puedeVer: boolean;
+    puedeCrear: boolean;
+    puedeEditar: boolean;
+    puedeEliminar: boolean;
+    alcanceVer: string;
+    alcanceEditar: string;
+  }>,
+  token?: string | null
+): Promise<void> {
+  await apiFetch(`/tenants/${tenantId}/roles/${rolId}/permisos`, {
+    method: 'PUT',
+    body: JSON.stringify({ parentId, permisos }),
   }, token);
 }
 
