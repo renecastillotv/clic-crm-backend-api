@@ -159,7 +159,7 @@ export default function CrmPlanPagoEditar() {
       const data = await getPlanPago(tenantActual.id, planId);
       setPlan(data);
 
-      // Extraer datos del plan_detalle
+      // Extraer datos del plan_detalle (support both old nested and new flat structure)
       const detalle = data.plan_detalle || {};
       setForm({
         titulo: data.titulo || '',
@@ -167,9 +167,10 @@ export default function CrmPlanPagoEditar() {
         contacto_id: data.contacto_id || '',
         precio_total: data.precio_total?.toString() || '',
         moneda: data.moneda || 'USD',
-        separacion: detalle.separacion?.valor?.toString() || '',
-        inicial: detalle.inicial?.valor?.toString() || '',
-        num_cuotas: detalle.inicial?.cuotas?.toString() || '12',
+        // Support both old {tipo, valor} structure and new flat values
+        separacion: (detalle.separacion?.valor ?? detalle.separacion ?? '').toString(),
+        inicial: (detalle.inicial?.valor ?? detalle.inicial ?? '').toString(),
+        num_cuotas: (detalle.inicial?.cuotas ?? detalle.num_cuotas ?? 12).toString(),
         fecha_inicio_cuotas: detalle.fecha_inicio_cuotas || '',
         notas: data.condiciones || '',
       });
@@ -258,18 +259,20 @@ export default function CrmPlanPagoEditar() {
       setSaving(true);
       setError(null);
 
+      // Use null instead of undefined so backend updates the field
       const data = {
         titulo: form.titulo || `Plan de Pago - ${new Date().toLocaleDateString('es-MX')}`,
         precio_total: parseFloat(form.precio_total),
         moneda: form.moneda,
-        propiedad_id: form.propiedad_id || undefined,
-        contacto_id: form.contacto_id || undefined,
-        condiciones: form.notas || undefined,
+        propiedad_id: form.propiedad_id || null,
+        contacto_id: form.contacto_id || null,
+        condiciones: form.notas || null,
         estado: 'borrador',
         plan_detalle: {
-          separacion: { tipo: 'valor' as const, valor: parseFloat(form.separacion) || 0 },
-          inicial: { tipo: 'valor' as const, valor: parseFloat(form.inicial) || 0, cuotas: parseInt(form.num_cuotas) || 12 },
-          fecha_inicio_cuotas: form.fecha_inicio_cuotas,
+          separacion: parseFloat(form.separacion) || 0,
+          inicial: parseFloat(form.inicial) || 0,
+          num_cuotas: parseInt(form.num_cuotas) || 12,
+          fecha_inicio_cuotas: form.fecha_inicio_cuotas || null,
           cuotas_generadas: cuotas.map(c => ({
             numero: c.numero,
             fecha: c.fecha.toISOString(),
