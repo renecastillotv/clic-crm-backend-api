@@ -161,6 +161,7 @@ export default function CrmPlanPagoEditar() {
 
       // Extraer datos del plan_detalle (support both old nested and new flat structure)
       const detalle = data.plan_detalle || {};
+      console.log('📥 Datos cargados del servidor:', { data, detalle });
       setForm({
         titulo: data.titulo || '',
         propiedad_id: data.propiedad_id || '',
@@ -260,6 +261,18 @@ export default function CrmPlanPagoEditar() {
       setError(null);
 
       // Use null instead of undefined so backend updates the field
+      const planDetalle = {
+        separacion: parseFloat(form.separacion) || 0,
+        inicial: parseFloat(form.inicial) || 0,
+        num_cuotas: parseInt(form.num_cuotas) || 12,
+        fecha_inicio_cuotas: form.fecha_inicio_cuotas || null,
+        cuotas_generadas: cuotas.map(c => ({
+          numero: c.numero,
+          fecha: c.fecha.toISOString(),
+          monto: c.monto,
+        })),
+      };
+
       const data = {
         titulo: form.titulo || `Plan de Pago - ${new Date().toLocaleDateString('es-MX')}`,
         precio_total: parseFloat(form.precio_total),
@@ -268,18 +281,10 @@ export default function CrmPlanPagoEditar() {
         contacto_id: form.contacto_id || null,
         condiciones: form.notas || null,
         estado: 'borrador',
-        plan_detalle: {
-          separacion: parseFloat(form.separacion) || 0,
-          inicial: parseFloat(form.inicial) || 0,
-          num_cuotas: parseInt(form.num_cuotas) || 12,
-          fecha_inicio_cuotas: form.fecha_inicio_cuotas || null,
-          cuotas_generadas: cuotas.map(c => ({
-            numero: c.numero,
-            fecha: c.fecha.toISOString(),
-            monto: c.monto,
-          })),
-        },
+        plan_detalle: planDetalle,
       };
+
+      console.log('💾 Guardando plan de pago:', { form, planDetalle, data });
 
       if (isNew) {
         const created = await createPlanPago(tenantActual.id, data as any);
