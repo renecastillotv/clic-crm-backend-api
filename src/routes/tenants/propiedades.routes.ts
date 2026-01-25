@@ -117,7 +117,8 @@ router.get('/stats', async (req, res, next) => {
   try {
     const { tenantId } = req.params as RouteParams;
     const ownUserId = getOwnFilter(req, 'propiedades');
-    const stats = await getPropiedadesStats(tenantId, ownUserId || undefined);
+    const autoFilter = getAutoFilter(req, 'propiedades');
+    const stats = await getPropiedadesStats(tenantId, ownUserId || undefined, autoFilter);
     res.json(stats);
   } catch (error) {
     next(error);

@@ -837,7 +837,11 @@ export async function deletePropiedad(
 /**
  * Obtiene estadísticas de propiedades
  */
-export async function getPropiedadesStats(tenantId: string, agenteId?: string | null): Promise<{
+export async function getPropiedadesStats(
+  tenantId: string,
+  agenteId?: string | null,
+  autoFilter?: Record<string, any>
+): Promise<{
   total: number;
   disponibles: number;
   reservadas: number;
@@ -845,8 +849,29 @@ export async function getPropiedadesStats(tenantId: string, agenteId?: string | 
   porTipo: Record<string, number>;
   porOperacion: Record<string, number>;
 }> {
-  const ownerFilter = agenteId ? ' AND (captador_id = $2 OR agente_id = $2)' : '';
-  const params = agenteId ? [tenantId, agenteId] : [tenantId];
+  const params: any[] = [tenantId];
+  let paramIndex = 2;
+
+  let ownerFilter = '';
+  if (agenteId) {
+    ownerFilter = ` AND (captador_id = $${paramIndex} OR agente_id = $${paramIndex})`;
+    params.push(agenteId);
+    paramIndex++;
+  }
+
+  // Build autoFilter conditions (e.g., connect = true)
+  let autoFilterClause = '';
+  if (autoFilter) {
+    for (const [key, value] of Object.entries(autoFilter)) {
+      if (value !== undefined) {
+        autoFilterClause += ` AND ${key} = $${paramIndex}`;
+        params.push(value);
+        paramIndex++;
+      }
+    }
+  }
+
+  const whereClause = `tenant_id = $1 AND activo = true${ownerFilter}${autoFilterClause}`;
 
   const statsSql = `
     SELECT
@@ -855,20 +880,20 @@ export async function getPropiedadesStats(tenantId: string, agenteId?: string | 
       COUNT(*) FILTER (WHERE estado_propiedad = 'reservada') as reservadas,
       COUNT(*) FILTER (WHERE estado_propiedad IN ('vendida', 'rentada')) as vendidas
     FROM propiedades
-    WHERE tenant_id = $1 AND activo = true${ownerFilter}
+    WHERE ${whereClause}
   `;
 
   const tipoSql = `
     SELECT tipo, COUNT(*) as count
     FROM propiedades
-    WHERE tenant_id = $1 AND activo = true${ownerFilter}
+    WHERE ${whereClause}
     GROUP BY tipo
   `;
 
   const operacionSql = `
     SELECT operacion, COUNT(*) as count
     FROM propiedades
-    WHERE tenant_id = $1 AND activo = true${ownerFilter}
+    WHERE ${whereClause}
     GROUP BY operacion
   `;
 
