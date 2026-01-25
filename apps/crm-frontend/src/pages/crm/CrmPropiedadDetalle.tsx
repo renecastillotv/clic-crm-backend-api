@@ -44,7 +44,7 @@ const OPERACIONES_CONFIG: Record<string, { label: string; color: string; bg: str
 export default function CrmPropiedadDetalle() {
   const { tenantSlug, propiedadId } = useParams<{ tenantSlug: string; propiedadId: string }>();
   const navigate = useNavigate();
-  const { user } = useAuth();
+  const { user, puedeEditar, loadingModulos } = useAuth();
   const { getToken } = useClerkAuth();
   const { setPageHeader } = usePageHeader();
   const { etiquetasPropiedad } = useCatalogos();
@@ -72,30 +72,36 @@ export default function CrmPropiedadDetalle() {
     }
   }, [tenantActual?.id, propiedadId]);
 
+  // Calcular permiso de edición después de que los módulos carguen
+  const canEdit = !loadingModulos && puedeEditar('propiedades');
+
   useEffect(() => {
-    if (propiedad) {
-      setPageHeader({
-        title: propiedad.titulo || 'Propiedad',
-        subtitle: `#${(propiedad as any).codigo_publico || 'N/A'} ${propiedad.codigo ? `· Ref: ${propiedad.codigo}` : ''}`,
-        backButton: {
-          label: 'Propiedades',
-          onClick: () => navigate(`/crm/${tenantSlug}/propiedades`),
-        },
-        actions: (
-          <div style={{ display: 'flex', gap: '8px' }}>
-            <button
-              className="btn-secondary"
-              onClick={() => {
-                const code = (propiedad as any).codigo_publico?.toString() || propiedad.codigo || '';
-                navigator.clipboard.writeText(code);
-                setCopiedCode(true);
-                setTimeout(() => setCopiedCode(false), 2000);
-              }}
-              title="Copiar código"
-            >
-              {copiedCode ? <Check size={16} /> : <Copy size={16} />}
-              {copiedCode ? 'Copiado' : 'Código'}
-            </button>
+    // Esperar a que los módulos carguen antes de configurar el header
+    if (!propiedad || loadingModulos) return;
+
+    setPageHeader({
+      title: propiedad.titulo || 'Propiedad',
+      subtitle: `#${(propiedad as any).codigo_publico || 'N/A'} ${propiedad.codigo ? `· Ref: ${propiedad.codigo}` : ''}`,
+      backButton: {
+        label: 'Propiedades',
+        onClick: () => navigate(`/crm/${tenantSlug}/propiedades`),
+      },
+      actions: (
+        <div style={{ display: 'flex', gap: '8px' }}>
+          <button
+            className="btn-secondary"
+            onClick={() => {
+              const code = (propiedad as any).codigo_publico?.toString() || propiedad.codigo || '';
+              navigator.clipboard.writeText(code);
+              setCopiedCode(true);
+              setTimeout(() => setCopiedCode(false), 2000);
+            }}
+            title="Copiar código"
+          >
+            {copiedCode ? <Check size={16} /> : <Copy size={16} />}
+            {copiedCode ? 'Copiado' : 'Código'}
+          </button>
+          {canEdit && (
             <button
               className="btn-primary"
               onClick={() => navigate(`/crm/${tenantSlug}/propiedades/${propiedadId}/editar`)}
@@ -103,11 +109,11 @@ export default function CrmPropiedadDetalle() {
               <Edit size={16} />
               Editar
             </button>
-          </div>
-        ),
-      });
-    }
-  }, [propiedad, copiedCode, setPageHeader, tenantSlug, propiedadId, navigate]);
+          )}
+        </div>
+      ),
+    });
+  }, [propiedad, copiedCode, setPageHeader, tenantSlug, propiedadId, navigate, canEdit, loadingModulos]);
 
   const cargarPropiedad = async () => {
     if (!tenantActual?.id || !propiedadId) return;
@@ -838,9 +844,11 @@ export default function CrmPropiedadDetalle() {
 
             {/* Acciones rápidas */}
             <div className="sidebar-card acciones-card">
-              <button className="btn-accion" onClick={() => navigate(`/crm/${tenantSlug}/propiedades/${propiedadId}/editar`)}>
-                <Edit size={16} /> Editar propiedad
-              </button>
+              {canEdit && (
+                <button className="btn-accion" onClick={() => navigate(`/crm/${tenantSlug}/propiedades/${propiedadId}/editar`)}>
+                  <Edit size={16} /> Editar propiedad
+                </button>
+              )}
               <button className="btn-accion secondary">
                 <Share2 size={16} /> Compartir
               </button>
