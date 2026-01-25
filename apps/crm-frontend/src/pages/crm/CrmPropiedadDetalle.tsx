@@ -737,45 +737,66 @@ export default function CrmPropiedadDetalle() {
               </div>
             )}
 
-            {/* Captador - visible SOLO para usuarios normales (NO Connect) */}
-            {(propiedad.agente_nombre || (propiedad as any).captador_nombre) &&
-             !getPermisosCampos('propiedades')?.hide?.includes('captador_nombre') && (
-              <div className="sidebar-card captador-card">
-                <h4><User size={16} /> Captador</h4>
-                <div className="agente-info">
-                  {(propiedad as any).captador_avatar ? (
-                    <img
-                      src={(propiedad as any).captador_avatar}
-                      alt="Avatar"
-                      className="agente-avatar-img"
-                    />
-                  ) : (
-                    <div className="agente-avatar">
-                      {(propiedad.agente_nombre?.[0] || (propiedad as any).captador_nombre?.[0] || 'A').toUpperCase()}
-                    </div>
-                  )}
-                  <div className="agente-datos">
-                    <span className="agente-nombre">
-                      {propiedad.agente_nombre || (propiedad as any).captador_nombre} {propiedad.agente_apellido || (propiedad as any).captador_apellido || ''}
-                    </span>
-                    {((propiedad as any).captador_telefono || (propiedad as any).captador_email) && (
-                      <div className="agente-contacto">
-                        {(propiedad as any).captador_telefono && (
-                          <a href={`tel:${(propiedad as any).captador_telefono}`} className="contacto-link">
-                            <Phone size={14} /> {(propiedad as any).captador_telefono}
-                          </a>
-                        )}
-                        {(propiedad as any).captador_email && (
-                          <a href={`mailto:${(propiedad as any).captador_email}`} className="contacto-link">
-                            <Mail size={14} /> {(propiedad as any).captador_email}
-                          </a>
-                        )}
+            {/* Captador - visible si:
+                - No está en hide, O
+                - Está en hide pero tiene override (valores de reemplazo)
+            */}
+            {(() => {
+              const permisosCampos = getPermisosCampos('propiedades');
+              const override = permisosCampos?.override;
+              const isHidden = permisosCampos?.hide?.includes('captador_nombre');
+              const hasOverride = override?.captador_nombre;
+
+              // No mostrar si está oculto y no hay override
+              if (isHidden && !hasOverride) return null;
+              // No mostrar si no hay datos de captador ni override
+              if (!propiedad.agente_nombre && !(propiedad as any).captador_nombre && !hasOverride) return null;
+
+              // Usar override si existe, sino usar datos de la propiedad
+              const nombre = hasOverride ? override.captador_nombre : (propiedad.agente_nombre || (propiedad as any).captador_nombre);
+              const apellido = hasOverride ? '' : (propiedad.agente_apellido || (propiedad as any).captador_apellido || '');
+              const telefono = hasOverride ? override.captador_telefono : (propiedad as any).captador_telefono;
+              const email = hasOverride ? override.captador_email : (propiedad as any).captador_email;
+              const avatar = hasOverride ? null : (propiedad as any).captador_avatar;
+
+              return (
+                <div className="sidebar-card captador-card">
+                  <h4><User size={16} /> {hasOverride ? 'Contacto' : 'Captador'}</h4>
+                  <div className="agente-info">
+                    {avatar ? (
+                      <img
+                        src={avatar}
+                        alt="Avatar"
+                        className="agente-avatar-img"
+                      />
+                    ) : (
+                      <div className="agente-avatar">
+                        {(nombre?.[0] || 'A').toUpperCase()}
                       </div>
                     )}
+                    <div className="agente-datos">
+                      <span className="agente-nombre">
+                        {nombre} {apellido}
+                      </span>
+                      {(telefono || email) && (
+                        <div className="agente-contacto">
+                          {telefono && (
+                            <a href={`tel:${telefono}`} className="contacto-link">
+                              <Phone size={14} /> {telefono}
+                            </a>
+                          )}
+                          {email && (
+                            <a href={`mailto:${email}`} className="contacto-link">
+                              <Mail size={14} /> {email}
+                            </a>
+                          )}
+                        </div>
+                      )}
+                    </div>
                   </div>
                 </div>
-              </div>
-            )}
+              );
+            })()}
 
             {/* Desarrollador (solo si es proyecto y tiene desarrollador) */}
             {propiedad.is_project && ((propiedad as any).desarrollador_nombre || (propiedad as any).desarrollador_empresa) && (
