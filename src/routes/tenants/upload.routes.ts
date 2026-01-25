@@ -45,6 +45,63 @@ const uploadFileMiddleware = multer({
 });
 
 /**
+ * POST /api/tenants/:tenantId/upload/images
+ *
+ * Sube múltiples archivos (imágenes o PDFs) a R2 para el tenant especificado
+ * Body (multipart/form-data):
+ * - images: Archivos a subir (múltiples, max 10)
+ * - folder: Carpeta destino (opcional, default: 'general')
+ */
+router.post('/images', uploadFileMiddleware.array('images', 10), async (req: Request<TenantParams>, res: Response, next: NextFunction) => {
+  try {
+    const { tenantId } = req.params;
+    const { folder = 'general' } = req.body;
+    const files = req.files as Express.Multer.File[];
+
+    if (!files || files.length === 0) {
+      return res.status(400).json({
+        error: 'No se proporcionaron archivos',
+        message: 'Se requieren archivos en el campo "images"',
+      });
+    }
+
+    const results = [];
+
+    for (const file of files) {
+      let result: any;
+
+      // Si es imagen, usar uploadImage para optimización
+      if (file.mimetype.startsWith('image/')) {
+        result = await uploadImage(file.buffer, file.originalname, {
+          tenantId,
+          folder,
+          maxWidth: 1920,
+          maxHeight: 1920,
+          quality: 85,
+          format: 'webp',
+        });
+      } else {
+        // Si es PDF u otro documento, usar uploadDocument
+        result = await uploadDocument(file.buffer, file.originalname, {
+          tenantId,
+          folder,
+        });
+      }
+
+      results.push({
+        ...result,
+        originalName: file.originalname,
+        size: file.size,
+      });
+    }
+
+    res.json({ images: results });
+  } catch (error) {
+    next(error);
+  }
+});
+
+/**
  * POST /api/tenants/:tenantId/upload/image
  *
  * Sube una imagen a R2 para el tenant especificado
