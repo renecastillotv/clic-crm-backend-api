@@ -6,7 +6,7 @@
  * Output: Tabla de cuotas con fechas y montos
  */
 
-import { useState, useEffect, useCallback, useMemo } from 'react';
+import { useState, useEffect, useCallback, useMemo, useRef } from 'react';
 import { useParams, useNavigate, useSearchParams } from 'react-router-dom';
 import { useAuth } from '../../contexts/AuthContext';
 import { usePageHeader } from '../../layouts/CrmLayout';
@@ -63,6 +63,12 @@ export default function CrmPlanPagoEditar() {
     fecha_inicio_cuotas: '',
     notas: '',
   });
+
+  // Ref para acceder al form actual desde el header
+  const formRef = useRef(form);
+  useEffect(() => {
+    formRef.current = form;
+  }, [form]);
 
   // Estado
   const [plan, setPlan] = useState<PlanPago | null>(null);
@@ -276,39 +282,56 @@ export default function CrmPlanPagoEditar() {
     return resultado;
   }, [form.precio_total, form.separacion, form.inicial, form.num_cuotas, form.fecha_inicio_cuotas]);
 
-  // Guardar plan
+  // Guardar plan - usando formRef para evitar closure stale
   const handleSave = async () => {
-    if (!tenantActual?.id || !form.precio_total) return;
+    const currentForm = formRef.current;
+    if (!tenantActual?.id || !currentForm.precio_total) return;
 
     try {
       setSaving(true);
       setError(null);
 
+      // Calcular cuotas con valores actuales
+      const precio = parseFloat(currentForm.precio_total) || 0;
+      const separacionVal = parseFloat(currentForm.separacion) || 0;
+      const inicialVal = parseFloat(currentForm.inicial) || 0;
+      const numCuotasVal = parseInt(currentForm.num_cuotas) || 12;
+      const montoACuotas = precio - separacionVal - inicialVal;
+      const montoPorCuota = montoACuotas > 0 ? montoACuotas / numCuotasVal : 0;
+      const fechaInicio = currentForm.fecha_inicio_cuotas ? new Date(currentForm.fecha_inicio_cuotas + 'T12:00:00') : new Date();
+
+      const cuotasCalculadas = [];
+      for (let i = 0; i < numCuotasVal; i++) {
+        const fecha = new Date(fechaInicio);
+        fecha.setMonth(fecha.getMonth() + i);
+        cuotasCalculadas.push({
+          numero: i + 1,
+          fecha: fecha.toISOString(),
+          monto: montoPorCuota,
+        });
+      }
+
       // Use null instead of undefined so backend updates the field
       const planDetalle = {
-        separacion: parseFloat(form.separacion) || 0,
-        inicial: parseFloat(form.inicial) || 0,
-        num_cuotas: parseInt(form.num_cuotas) || 12,
-        fecha_inicio_cuotas: form.fecha_inicio_cuotas || null,
-        cuotas_generadas: cuotas.map(c => ({
-          numero: c.numero,
-          fecha: c.fecha.toISOString(),
-          monto: c.monto,
-        })),
+        separacion: separacionVal,
+        inicial: inicialVal,
+        num_cuotas: numCuotasVal,
+        fecha_inicio_cuotas: currentForm.fecha_inicio_cuotas || null,
+        cuotas_generadas: cuotasCalculadas,
       };
 
       const data = {
-        titulo: form.titulo || `Plan de Pago - ${new Date().toLocaleDateString('es-MX')}`,
-        precio_total: parseFloat(form.precio_total),
-        moneda: form.moneda,
-        propiedad_id: form.propiedad_id || null,
-        contacto_id: form.contacto_id || null,
-        condiciones: form.notas || null,
+        titulo: currentForm.titulo || `Plan de Pago - ${new Date().toLocaleDateString('es-MX')}`,
+        precio_total: precio,
+        moneda: currentForm.moneda,
+        propiedad_id: currentForm.propiedad_id || null,
+        contacto_id: currentForm.contacto_id || null,
+        condiciones: currentForm.notas || null,
         estado: 'borrador',
         plan_detalle: planDetalle,
       };
 
-      console.log('💾 Guardando plan de pago:', { form, planDetalle, data });
+      console.log('💾 Guardando plan de pago:', { currentForm, planDetalle, data });
 
       if (isNew) {
         const created = await createPlanPago(tenantActual.id, data as any);
