@@ -252,10 +252,16 @@ export function AuthProvider({ children }: { children: ReactNode }) {
                 const { version } = await versionRes.json();
                 if (version === cacheData.version) {
                   // Cache is valid - use it
+                  console.log(`📦 [AuthContext] Usando CACHÉ. Version: ${version}, Módulos: ${cacheData.modulos.length}`);
+                  console.log(`📦 [AuthContext] IDs cacheados: ${cacheData.modulos.map((m: any) => m.id).join(', ')}`);
                   if (isMounted) setModulos(cacheData.modulos);
                   return;
+                } else {
+                  console.log(`🔄 [AuthContext] Caché INVÁLIDO. Version servidor: ${version}, Version cache: ${cacheData.version}`);
                 }
               }
+            } else {
+              console.log(`⏰ [AuthContext] Caché EXPIRADO`);
             }
           } catch {
             // Cache corrupted, continue with fresh fetch
@@ -263,6 +269,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         }
 
         // 3. Fetch fresh data
+        console.log(`🔄 [AuthContext] Fetching módulos para tenant: ${tenantId}, user: ${userId}`);
         const response = await fetch(
           `${API_URL}/auth/modulos/${tenantId}`,
           { headers: { Authorization: `Bearer ${token}` } }
@@ -270,6 +277,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
         if (response.ok && isMounted) {
           const data = await response.json();
+          console.log(`📋 [AuthContext] Módulos recibidos: ${data.length}`);
+          console.log(`📋 [AuthContext] IDs: ${data.map((m: any) => m.id).join(', ')}`);
           setModulos(data);
 
           // 4. Get current version and cache
@@ -366,6 +375,13 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   // Computed properties
   const isPlatformAdmin = user?.esPlatformAdmin || false;
 
+  // DEBUG: Log cuando isPlatformAdmin cambia
+  useEffect(() => {
+    if (user) {
+      console.log(`👤 [AuthContext] Usuario: ${user.email}, isPlatformAdmin: ${isPlatformAdmin}`);
+    }
+  }, [user?.email, isPlatformAdmin]);
+
   const isTenantOwner =
     tenantActual?.esOwner ||
     tenantActual?.roles.some((r) => r.codigo === 'tenant_owner') ||
@@ -378,8 +394,19 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
   // Helpers de permisos
   const tieneAcceso = (moduloId: string): boolean => {
-    if (isPlatformAdmin) return true;
-    return modulos.some((m) => m.id === moduloId && m.puedeVer);
+    if (isPlatformAdmin) {
+      // DEBUG: Solo loguear para módulos específicos
+      if (['finanzas-config', 'mi-entrenamiento', 'university'].includes(moduloId)) {
+        console.log(`🔓 [tieneAcceso] ${moduloId}: TRUE (isPlatformAdmin bypass)`);
+      }
+      return true;
+    }
+    const tiene = modulos.some((m) => m.id === moduloId && m.puedeVer);
+    // DEBUG: Solo loguear para módulos específicos
+    if (['finanzas-config', 'mi-entrenamiento', 'university'].includes(moduloId)) {
+      console.log(`🔐 [tieneAcceso] ${moduloId}: ${tiene} (found in ${modulos.length} modulos)`);
+    }
+    return tiene;
   };
 
   const puedeCrear = (moduloId: string): boolean => {
