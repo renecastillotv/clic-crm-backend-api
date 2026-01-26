@@ -6,22 +6,24 @@
  * está inactivo o no existe.
  */
 
-import { Kysely, sql } from 'kysely';
+import { Knex } from 'knex';
 
-export async function up(db: Kysely<any>): Promise<void> {
+export async function up(knex: Knex): Promise<void> {
+  // Check if column already exists
+  const hasColumn = await knex.schema.hasColumn('tenants', 'asesor_default_id');
+  if (hasColumn) {
+    console.log('✅ Columna asesor_default_id ya existe en tenants');
+    return;
+  }
+
   // Agregar columna asesor_default_id a tenants
-  await db.schema
-    .alterTable('tenants')
-    .addColumn('asesor_default_id', 'uuid', (col) =>
-      col.references('perfiles_asesor.id').onDelete('set null')
-    )
-    .execute();
-
-  // Crear índice para búsquedas rápidas
-  await sql`CREATE INDEX IF NOT EXISTS idx_tenants_asesor_default ON tenants(asesor_default_id)`.execute(db);
+  await knex.schema.alterTable('tenants', (table) => {
+    table.uuid('asesor_default_id').nullable().references('id').inTable('perfiles_asesor').onDelete('SET NULL');
+    table.index('asesor_default_id', 'idx_tenants_asesor_default');
+  });
 
   // Para cada tenant que tenga asesores activos, asignar el primero como default
-  await sql`
+  await knex.raw(`
     UPDATE tenants t
     SET asesor_default_id = (
       SELECT pa.id
@@ -43,18 +45,16 @@ export async function up(db: Kysely<any>): Promise<void> {
         AND pa.visible_en_web = true
         AND u.activo = true
     )
-  `.execute(db);
+  `);
 
   console.log('✅ Columna asesor_default_id agregada a tenants');
 }
 
-export async function down(db: Kysely<any>): Promise<void> {
-  await sql`DROP INDEX IF EXISTS idx_tenants_asesor_default`.execute(db);
-
-  await db.schema
-    .alterTable('tenants')
-    .dropColumn('asesor_default_id')
-    .execute();
+export async function down(knex: Knex): Promise<void> {
+  await knex.schema.alterTable('tenants', (table) => {
+    table.dropIndex('asesor_default_id', 'idx_tenants_asesor_default');
+    table.dropColumn('asesor_default_id');
+  });
 
   console.log('✅ Columna asesor_default_id eliminada de tenants');
 }

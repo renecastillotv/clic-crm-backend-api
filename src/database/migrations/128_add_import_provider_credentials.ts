@@ -9,6 +9,12 @@ import { Knex } from 'knex';
  */
 
 export async function up(knex: Knex): Promise<void> {
+  const hasColumn = await knex.schema.hasColumn('tenant_api_credentials', 'alterestate_api_key_encrypted');
+  if (hasColumn) {
+    console.log('✅ Columnas de importación ya existen en tenant_api_credentials');
+    return;
+  }
+
   await knex.schema.alterTable('tenant_api_credentials', (table) => {
     // Alterestate
     table.text('alterestate_api_key_encrypted').nullable()

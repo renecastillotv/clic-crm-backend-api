@@ -18,6 +18,7 @@ import {
   approveUpgradeRequest,
   rejectUpgradeRequest,
 } from '../../services/clicConnectSolicitudesService.js';
+import { resolveUserScope } from '../../middleware/scopeResolver.js';
 
 // Tipos para params con mergeParams
 interface RouteParams { [key: string]: string | undefined;
@@ -27,6 +28,7 @@ interface RouteParams { [key: string]: string | undefined;
 }
 
 const router = express.Router({ mergeParams: true });
+router.use(resolveUserScope);
 
 // ==================== JOIN REQUESTS ====================
 

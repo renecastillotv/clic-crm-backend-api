@@ -7,8 +7,10 @@
 
 import express, { Request, Response, NextFunction } from 'express';
 import { query } from '../../utils/db.js';
+import { resolveUserScope } from '../../middleware/scopeResolver.js';
 
 const router = express.Router({ mergeParams: true });
+router.use(resolveUserScope);
 
 // Tipo para request con tenantId del parent router
 interface TenantParams { tenantId: string }

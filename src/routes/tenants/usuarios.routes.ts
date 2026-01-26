@@ -18,6 +18,7 @@ import {
   updateRolTenant,
   deleteRolTenant,
 } from '../../services/usuariosService.js';
+import { resolveUserScope } from '../../middleware/scopeResolver.js';
 
 // Tipos para params con mergeParams
 interface RouteParams { [key: string]: string | undefined;
@@ -27,6 +28,7 @@ interface RouteParams { [key: string]: string | undefined;
 }
 
 const router = express.Router({ mergeParams: true });
+router.use(resolveUserScope);
 
 // ==================== USUARIOS DEL TENANT ====================
 

@@ -8,6 +8,7 @@ import express, { Request, Response, Router } from 'express'
 import * as miEntrenamientoService from '../../services/miEntrenamientoService.js';
 import { requireAuth } from '../../middleware/clerkAuth.js';
 import { getUsuarioByClerkId, getUsuarioConRoles } from '../../services/usuariosService.js';
+import { resolveUserScope } from '../../middleware/scopeResolver.js';
 
 // Tipos para params con mergeParams
 interface RouteParams { [key: string]: string | undefined;
@@ -16,6 +17,7 @@ interface RouteParams { [key: string]: string | undefined;
 }
 
 const router: Router = express.Router({ mergeParams: true });
+router.use(resolveUserScope);
 
 // Test endpoint (público)
 router.get('/test', (req, res) => {

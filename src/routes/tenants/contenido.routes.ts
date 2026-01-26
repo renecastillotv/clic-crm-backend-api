@@ -8,8 +8,10 @@
 
 import express, { Request, Response, NextFunction } from 'express';
 import { query } from '../../utils/db.js';
+import { resolveUserScope, requirePermission } from '../../middleware/scopeResolver.js';
 
 const router = express.Router({ mergeParams: true });
+router.use(resolveUserScope);
 
 // Tipos para request con tenantId del parent router
 interface TenantParams { tenantId: string }
@@ -98,7 +100,7 @@ router.get('/articulos/:articuloId', async (req: Request<ArticuloParams>, res: R
 /**
  * POST /api/tenants/:tenantId/contenido/articulos
  */
-router.post('/articulos', async (req: Request<TenantParams>, res: Response, next: NextFunction) => {
+router.post('/articulos', requirePermission('contenido', 'crear'), async (req: Request<TenantParams>, res: Response, next: NextFunction) => {
   try {
     const { tenantId } = req.params;
     const body = req.body;
@@ -151,7 +153,7 @@ router.post('/articulos', async (req: Request<TenantParams>, res: Response, next
 /**
  * PUT /api/tenants/:tenantId/contenido/articulos/:articuloId
  */
-router.put('/articulos/:articuloId', async (req: Request<ArticuloParams>, res: Response, next: NextFunction) => {
+router.put('/articulos/:articuloId', requirePermission('contenido', 'editar'), async (req: Request<ArticuloParams>, res: Response, next: NextFunction) => {
   try {
     const { tenantId, articuloId } = req.params;
     const body = req.body;
@@ -222,7 +224,7 @@ router.put('/articulos/:articuloId', async (req: Request<ArticuloParams>, res: R
 /**
  * DELETE /api/tenants/:tenantId/contenido/articulos/:articuloId
  */
-router.delete('/articulos/:articuloId', async (req: Request<ArticuloParams>, res: Response, next: NextFunction) => {
+router.delete('/articulos/:articuloId', requirePermission('contenido', 'eliminar'), async (req: Request<ArticuloParams>, res: Response, next: NextFunction) => {
   try {
     const { tenantId, articuloId } = req.params;
     const sql = 'DELETE FROM articulos WHERE tenant_id = $1 AND id = $2';
@@ -283,7 +285,7 @@ router.get('/videos/:videoId', async (req: Request<VideoParams>, res: Response, 
 /**
  * POST /api/tenants/:tenantId/contenido/videos
  */
-router.post('/videos', async (req: Request<TenantParams>, res: Response, next: NextFunction) => {
+router.post('/videos', requirePermission('contenido', 'crear'), async (req: Request<TenantParams>, res: Response, next: NextFunction) => {
   try {
     const { tenantId } = req.params;
     const body = req.body;
@@ -338,7 +340,7 @@ router.post('/videos', async (req: Request<TenantParams>, res: Response, next: N
 /**
  * PUT /api/tenants/:tenantId/contenido/videos/:videoId
  */
-router.put('/videos/:videoId', async (req: Request<VideoParams>, res: Response, next: NextFunction) => {
+router.put('/videos/:videoId', requirePermission('contenido', 'editar'), async (req: Request<VideoParams>, res: Response, next: NextFunction) => {
   try {
     const { tenantId, videoId } = req.params;
     const body = req.body;
@@ -411,7 +413,7 @@ router.put('/videos/:videoId', async (req: Request<VideoParams>, res: Response, 
 /**
  * DELETE /api/tenants/:tenantId/contenido/videos/:videoId
  */
-router.delete('/videos/:videoId', async (req: Request<VideoParams>, res: Response, next: NextFunction) => {
+router.delete('/videos/:videoId', requirePermission('contenido', 'eliminar'), async (req: Request<VideoParams>, res: Response, next: NextFunction) => {
   try {
     const { tenantId, videoId } = req.params;
     const sql = 'DELETE FROM videos WHERE tenant_id = $1 AND id = $2';
@@ -472,7 +474,7 @@ router.get('/faqs/:faqId', async (req: Request<FaqParams>, res: Response, next: 
 /**
  * POST /api/tenants/:tenantId/contenido/faqs
  */
-router.post('/faqs', async (req: Request<TenantParams>, res: Response, next: NextFunction) => {
+router.post('/faqs', requirePermission('contenido', 'crear'), async (req: Request<TenantParams>, res: Response, next: NextFunction) => {
   try {
     const { tenantId } = req.params;
     const body = req.body;
@@ -506,7 +508,7 @@ router.post('/faqs', async (req: Request<TenantParams>, res: Response, next: Nex
 /**
  * PUT /api/tenants/:tenantId/contenido/faqs/:faqId
  */
-router.put('/faqs/:faqId', async (req: Request<FaqParams>, res: Response, next: NextFunction) => {
+router.put('/faqs/:faqId', requirePermission('contenido', 'editar'), async (req: Request<FaqParams>, res: Response, next: NextFunction) => {
   try {
     const { tenantId, faqId } = req.params;
     const body = req.body;
@@ -552,7 +554,7 @@ router.put('/faqs/:faqId', async (req: Request<FaqParams>, res: Response, next: 
 /**
  * DELETE /api/tenants/:tenantId/contenido/faqs/:faqId
  */
-router.delete('/faqs/:faqId', async (req: Request<FaqParams>, res: Response, next: NextFunction) => {
+router.delete('/faqs/:faqId', requirePermission('contenido', 'eliminar'), async (req: Request<FaqParams>, res: Response, next: NextFunction) => {
   try {
     const { tenantId, faqId } = req.params;
     const sql = 'DELETE FROM faqs WHERE tenant_id = $1 AND id = $2';
@@ -609,7 +611,7 @@ router.get('/testimonios/:testimonioId', async (req: Request<TestimonioParams>, 
 /**
  * POST /api/tenants/:tenantId/contenido/testimonios
  */
-router.post('/testimonios', async (req: Request<TenantParams>, res: Response, next: NextFunction) => {
+router.post('/testimonios', requirePermission('contenido', 'crear'), async (req: Request<TenantParams>, res: Response, next: NextFunction) => {
   try {
     const { tenantId } = req.params;
     // Acepta tanto camelCase como snake_case
@@ -671,7 +673,7 @@ router.post('/testimonios', async (req: Request<TenantParams>, res: Response, ne
 /**
  * PUT /api/tenants/:tenantId/contenido/testimonios/:testimonioId
  */
-router.put('/testimonios/:testimonioId', async (req: Request<TestimonioParams>, res: Response, next: NextFunction) => {
+router.put('/testimonios/:testimonioId', requirePermission('contenido', 'editar'), async (req: Request<TestimonioParams>, res: Response, next: NextFunction) => {
   try {
     const { tenantId, testimonioId } = req.params;
     // Acepta tanto camelCase como snake_case
@@ -754,7 +756,7 @@ router.put('/testimonios/:testimonioId', async (req: Request<TestimonioParams>, 
 /**
  * DELETE /api/tenants/:tenantId/contenido/testimonios/:testimonioId
  */
-router.delete('/testimonios/:testimonioId', async (req: Request<TestimonioParams>, res: Response, next: NextFunction) => {
+router.delete('/testimonios/:testimonioId', requirePermission('contenido', 'eliminar'), async (req: Request<TestimonioParams>, res: Response, next: NextFunction) => {
   try {
     const { tenantId, testimonioId } = req.params;
     const sql = 'DELETE FROM testimonios WHERE tenant_id = $1 AND id = $2';
@@ -815,7 +817,7 @@ router.get('/categorias/:categoriaId', async (req: Request<TenantParams & { cate
 /**
  * POST /api/tenants/:tenantId/contenido/categorias
  */
-router.post('/categorias', async (req: Request<TenantParams>, res: Response, next: NextFunction) => {
+router.post('/categorias', requirePermission('contenido', 'crear'), async (req: Request<TenantParams>, res: Response, next: NextFunction) => {
   try {
     const { tenantId } = req.params;
     const { nombre, slug, tipo, descripcion, color, icono, orden, traducciones, slug_traducciones } = req.body;
@@ -839,7 +841,7 @@ router.post('/categorias', async (req: Request<TenantParams>, res: Response, nex
 /**
  * PUT /api/tenants/:tenantId/contenido/categorias/:categoriaId
  */
-router.put('/categorias/:categoriaId', async (req: Request<TenantParams & { categoriaId: string }>, res: Response, next: NextFunction) => {
+router.put('/categorias/:categoriaId', requirePermission('contenido', 'editar'), async (req: Request<TenantParams & { categoriaId: string }>, res: Response, next: NextFunction) => {
   try {
     const { tenantId, categoriaId } = req.params;
     const { nombre, slug, tipo, descripcion, color, icono, orden, traducciones, slug_traducciones } = req.body;
@@ -876,7 +878,7 @@ router.put('/categorias/:categoriaId', async (req: Request<TenantParams & { cate
 /**
  * DELETE /api/tenants/:tenantId/contenido/categorias/:categoriaId
  */
-router.delete('/categorias/:categoriaId', async (req: Request<TenantParams & { categoriaId: string }>, res: Response, next: NextFunction) => {
+router.delete('/categorias/:categoriaId', requirePermission('contenido', 'eliminar'), async (req: Request<TenantParams & { categoriaId: string }>, res: Response, next: NextFunction) => {
   try {
     const { tenantId, categoriaId } = req.params;
     const sql = 'DELETE FROM categorias_contenido WHERE tenant_id = $1 AND id = $2';
@@ -996,7 +998,7 @@ router.get('/seo-stats/:seoStatId', async (req: Request<SeoStatParams>, res: Res
 /**
  * POST /api/tenants/:tenantId/contenido/seo-stats
  */
-router.post('/seo-stats', async (req: Request<TenantParams>, res: Response, next: NextFunction) => {
+router.post('/seo-stats', requirePermission('contenido', 'crear'), async (req: Request<TenantParams>, res: Response, next: NextFunction) => {
   try {
     const { tenantId } = req.params;
     const body = req.body;
@@ -1047,7 +1049,7 @@ router.post('/seo-stats', async (req: Request<TenantParams>, res: Response, next
 /**
  * PUT /api/tenants/:tenantId/contenido/seo-stats/:seoStatId
  */
-router.put('/seo-stats/:seoStatId', async (req: Request<SeoStatParams>, res: Response, next: NextFunction) => {
+router.put('/seo-stats/:seoStatId', requirePermission('contenido', 'editar'), async (req: Request<SeoStatParams>, res: Response, next: NextFunction) => {
   try {
     const { tenantId, seoStatId } = req.params;
     const body = req.body;
@@ -1117,7 +1119,7 @@ router.put('/seo-stats/:seoStatId', async (req: Request<SeoStatParams>, res: Res
 /**
  * DELETE /api/tenants/:tenantId/contenido/seo-stats/:seoStatId
  */
-router.delete('/seo-stats/:seoStatId', async (req: Request<SeoStatParams>, res: Response, next: NextFunction) => {
+router.delete('/seo-stats/:seoStatId', requirePermission('contenido', 'eliminar'), async (req: Request<SeoStatParams>, res: Response, next: NextFunction) => {
   try {
     const { tenantId, seoStatId } = req.params;
     const sql = 'DELETE FROM seo_stats WHERE tenant_id = $1 AND id = $2';
@@ -1300,7 +1302,7 @@ router.get('/relaciones/:relacionId', async (req: Request<RelacionParams>, res: 
  * POST /api/tenants/:tenantId/contenido/relaciones
  * Crea una nueva relación de contenido
  */
-router.post('/relaciones', async (req: Request<TenantParams>, res: Response, next: NextFunction) => {
+router.post('/relaciones', requirePermission('contenido', 'crear'), async (req: Request<TenantParams>, res: Response, next: NextFunction) => {
   try {
     const { tenantId } = req.params;
     // Soportar tanto camelCase como snake_case
@@ -1355,7 +1357,7 @@ router.post('/relaciones', async (req: Request<TenantParams>, res: Response, nex
  * PUT /api/tenants/:tenantId/contenido/relaciones/:relacionId
  * Actualiza una relación existente
  */
-router.put('/relaciones/:relacionId', async (req: Request<RelacionParams>, res: Response, next: NextFunction) => {
+router.put('/relaciones/:relacionId', requirePermission('contenido', 'editar'), async (req: Request<RelacionParams>, res: Response, next: NextFunction) => {
   try {
     const { tenantId, relacionId } = req.params;
     const { descripcion, orden, activa } = req.body;
@@ -1383,7 +1385,7 @@ router.put('/relaciones/:relacionId', async (req: Request<RelacionParams>, res: 
  * DELETE /api/tenants/:tenantId/contenido/relaciones/:relacionId
  * Elimina una relación
  */
-router.delete('/relaciones/:relacionId', async (req: Request<RelacionParams>, res: Response, next: NextFunction) => {
+router.delete('/relaciones/:relacionId', requirePermission('contenido', 'eliminar'), async (req: Request<RelacionParams>, res: Response, next: NextFunction) => {
   try {
     const { tenantId, relacionId } = req.params;
     const result = await query(

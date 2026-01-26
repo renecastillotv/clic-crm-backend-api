@@ -15,6 +15,7 @@ import {
   actualizarProgresoMeta,
   getMetasResumen,
 } from '../../services/metasService.js';
+import { resolveUserScope, getOwnFilter } from '../../middleware/scopeResolver.js';
 
 // Tipos para params con mergeParams
 interface RouteParams { [key: string]: string | undefined;
@@ -23,6 +24,7 @@ interface RouteParams { [key: string]: string | undefined;
 }
 
 const router = express.Router({ mergeParams: true });
+router.use(resolveUserScope);
 
 /**
  * GET /api/tenants/:tenantId/metas
@@ -33,10 +35,12 @@ router.get('/', async (req, res, next) => {
     const { tenantId } = req.params as RouteParams;
     const { tipo, estado, usuario_id, equipo_id, periodo, page, limit } = req.query;
 
+    const ownUserId = getOwnFilter(req, 'metas');
+
     const filtros = {
       tipo: tipo as string | undefined,
       estado: estado as string | undefined,
-      usuario_id: usuario_id as string | undefined,
+      usuario_id: ownUserId || (usuario_id as string | undefined),
       equipo_id: equipo_id as string | undefined,
       periodo: periodo as string | undefined,
       page: page ? parseInt(page as string) : 1,
@@ -57,11 +61,13 @@ router.get('/', async (req, res, next) => {
 router.get('/resumen', async (req, res, next) => {
   try {
     const { tenantId } = req.params as RouteParams;
-    const { usuario_id, equipo_id } = req.query;
+    const { usuario_id } = req.query;
+
+    const ownUserId = getOwnFilter(req, 'metas');
 
     const resumen = await getMetasResumen(
       tenantId,
-      usuario_id as string | undefined
+      ownUserId || (usuario_id as string | undefined)
     );
     res.json(resumen);
   } catch (error) {

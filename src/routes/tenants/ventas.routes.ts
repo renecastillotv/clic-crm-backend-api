@@ -18,7 +18,7 @@ import { calcularYCrearComisiones, modificarDistribucion, getMisComisiones } fro
 import * as ventasCobrosService from '../../services/ventasCobrosService.js';
 import * as ventasHistorialService from '../../services/ventasHistorialService.js';
 import * as pagosComisionesService from '../../services/pagosComisionesService.js';
-import { resolveUserScope, getOwnFilter } from '../../middleware/scopeResolver.js';
+import { resolveUserScope, getOwnFilter, requirePermission } from '../../middleware/scopeResolver.js';
 
 const router = express.Router({ mergeParams: true });
 
@@ -368,7 +368,7 @@ router.get('/:ventaId', async (req: Request<VentaParams>, res: Response, next: N
  * POST /api/tenants/:tenantId/ventas
  * Crea una nueva venta
  */
-router.post('/', async (req: Request<TenantParams>, res: Response, next: NextFunction) => {
+router.post('/', requirePermission('finanzas-ventas', 'crear'), async (req: Request<TenantParams>, res: Response, next: NextFunction) => {
   try {
     const { tenantId } = req.params;
     const {
@@ -490,7 +490,7 @@ router.post('/', async (req: Request<TenantParams>, res: Response, next: NextFun
  * PUT /api/tenants/:tenantId/ventas/:ventaId
  * Actualiza una venta
  */
-router.put('/:ventaId', async (req: Request<VentaParams>, res: Response, next: NextFunction) => {
+router.put('/:ventaId', requirePermission('finanzas-ventas', 'editar'), async (req: Request<VentaParams>, res: Response, next: NextFunction) => {
   try {
     const { tenantId, ventaId } = req.params;
     const {
@@ -659,7 +659,7 @@ router.put('/:ventaId', async (req: Request<VentaParams>, res: Response, next: N
  * DELETE /api/tenants/:tenantId/ventas/:ventaId
  * Elimina (desactiva) una venta
  */
-router.delete('/:ventaId', async (req: Request<VentaParams>, res: Response, next: NextFunction) => {
+router.delete('/:ventaId', requirePermission('finanzas-ventas', 'eliminar'), async (req: Request<VentaParams>, res: Response, next: NextFunction) => {
   try {
     const { tenantId, ventaId } = req.params;
     const sql = 'UPDATE ventas SET activo = false, updated_at = NOW() WHERE tenant_id = $1 AND id = $2 RETURNING *';

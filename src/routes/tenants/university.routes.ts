@@ -6,6 +6,7 @@
 import express, { Request, Response, Router } from 'express';
 import * as universityService from '../../services/universityService.js';
 import * as miEntrenamientoService from '../../services/miEntrenamientoService.js';
+import { resolveUserScope } from '../../middleware/scopeResolver.js';
 
 // Tipos para params con mergeParams
 interface RouteParams { [key: string]: string | undefined;
@@ -20,6 +21,7 @@ interface RouteParams { [key: string]: string | undefined;
 }
 
 const router: Router = express.Router({ mergeParams: true });
+router.use(resolveUserScope);
 
 // ==================== CURSOS ====================
 
