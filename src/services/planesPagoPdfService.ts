@@ -26,7 +26,7 @@ interface UsuarioInfo {
 async function getTenantInfo(tenantId: string): Promise<TenantInfo | null> {
   try {
     const result = await query(
-      `SELECT nombre, tipo, info_negocio FROM tenants WHERE id = $1`,
+      `SELECT nombre, info_negocio FROM tenants WHERE id = $1`,
       [tenantId]
     );
     if (result.rows.length === 0) return null;
@@ -43,7 +43,7 @@ async function getTenantInfo(tenantId: string): Promise<TenantInfo | null> {
       email: contacto.email || null,
       ciudad: ubicacion.ciudad || null,
       pais: ubicacion.pais || null,
-      tipo: row.tipo,
+      tipo: null, // No tenant type column exists
     };
   } catch (e) {
     console.error('Error getting tenant info:', e);
