@@ -76,6 +76,7 @@ export async function listAccessibleCustomers(refreshToken: string): Promise<Acc
   }
 
   const resourceNames: string[] = listData.resourceNames || [];
+  console.log(`[Google Ads] listAccessibleCustomers returned ${resourceNames.length} resource names:`, resourceNames);
   if (resourceNames.length === 0) return [];
 
   // Step 2: For each customer, query basic info
@@ -119,11 +120,16 @@ export async function listAccessibleCustomers(refreshToken: string): Promise<Acc
           timeZone: c.timeZone || 'America/Mexico_City',
           manager: c.manager || false,
         });
+        console.log(`[Google Ads] Customer ${customerId}: OK - ${c.descriptiveName}`);
+      } else {
+        console.warn(`[Google Ads] Customer ${customerId}: query failed -`, JSON.stringify(queryData).substring(0, 300));
       }
-    } catch {
-      // Skip customers we can't access (e.g., manager accounts without login access)
+    } catch (err: any) {
+      console.warn(`[Google Ads] Customer ${customerId}: exception - ${err.message}`);
     }
   }
+
+  console.log(`[Google Ads] Total accessible accounts: ${customers.length}`);
 
   return customers;
 }
