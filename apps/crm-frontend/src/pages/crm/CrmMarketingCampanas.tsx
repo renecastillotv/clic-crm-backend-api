@@ -185,9 +185,7 @@ const CrmMarketingCampanas: React.FC = () => {
   }, [setPageHeader]);
 
   const handleAction = (action: string) => {
-    console.log('Action:', action);
-
-    if (action === 'connect-apis') {
+    if (action === 'connect-apis' || action === 'google-ads' || action === 'meta-ads') {
       navigate(`${basePath}/marketing/configuracion-apis`);
       return;
     }
