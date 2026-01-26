@@ -17,6 +17,9 @@ import * as googleAdsService from '../../services/googleAdsService.js';
 import * as gscService from '../../services/googleSearchConsoleService.js';
 import * as metaAdsService from '../../services/metaAdsService.js';
 import * as metaSocialService from '../../services/metaSocialService.js';
+import * as socialCopyService from '../../services/socialCopyService.js';
+import * as scheduledPostsService from '../../services/scheduledPostsService.js';
+import { getPropiedadById } from '../../services/propiedadesCrmService.js';
 
 const router = express.Router({ mergeParams: true });
 
@@ -774,6 +777,170 @@ router.post('/meta/comments/:commentId/reply', async (req: Request<TenantParams 
     res.json(result);
   } catch (error: any) {
     console.error('[Meta Social] Error replying to comment:', error.message);
+    next(error);
+  }
+});
+
+// ==================== META SOCIAL - AI COPY & SCHEDULING ====================
+
+/**
+ * POST /api/tenants/:tenantId/api-credentials/meta/generate-copy
+ * Generates AI social media copy suggestions for a property.
+ */
+router.post('/meta/generate-copy', async (req: Request<TenantParams>, res: Response, next: NextFunction) => {
+  try {
+    const { tenantId } = req.params;
+    const { propiedadId } = req.body;
+
+    if (!propiedadId) {
+      return res.status(400).json({ error: 'Se requiere propiedadId' });
+    }
+
+    const propiedad = await getPropiedadById(tenantId, propiedadId);
+    if (!propiedad) {
+      return res.status(404).json({ error: 'Propiedad no encontrada' });
+    }
+
+    const suggestions = await socialCopyService.generateSocialCopy({
+      titulo: propiedad.titulo,
+      descripcion: propiedad.descripcion,
+      tipo: propiedad.tipo,
+      operacion: propiedad.operacion,
+      precio: propiedad.precio,
+      moneda: propiedad.moneda,
+      ciudad: propiedad.ciudad,
+      sector: propiedad.sector,
+      habitaciones: propiedad.habitaciones,
+      banos: propiedad.banos,
+      m2_construccion: propiedad.m2_construccion,
+      amenidades: propiedad.amenidades,
+    });
+
+    res.json({ suggestions });
+  } catch (error: any) {
+    console.error('[Meta Social] Error generating copy:', error.message);
+    next(error);
+  }
+});
+
+/**
+ * POST /api/tenants/:tenantId/api-credentials/meta/schedule
+ * Schedules a Facebook Page post for future publishing.
+ */
+router.post('/meta/schedule', async (req: Request<TenantParams>, res: Response, next: NextFunction) => {
+  try {
+    const { tenantId } = req.params;
+    const { message, imageUrl, linkUrl, scheduledFor, propiedadId } = req.body;
+
+    if (!message && !imageUrl) {
+      return res.status(400).json({ error: 'Se requiere message o imageUrl' });
+    }
+    if (!scheduledFor) {
+      return res.status(400).json({ error: 'Se requiere scheduledFor (unix timestamp en segundos)' });
+    }
+
+    const scheduledTimestamp = Number(scheduledFor);
+    const nowSec = Math.floor(Date.now() / 1000);
+    const minTime = nowSec + 10 * 60; // 10 minutes from now
+    const maxTime = nowSec + 75 * 24 * 60 * 60; // 75 days from now
+
+    if (scheduledTimestamp < minTime) {
+      return res.status(400).json({ error: 'La publicación debe programarse al menos 10 minutos en el futuro' });
+    }
+    if (scheduledTimestamp > maxTime) {
+      return res.status(400).json({ error: 'La publicación no puede programarse más de 75 días en el futuro' });
+    }
+
+    const tokenData = await credentialsService.getMetaPageToken(tenantId);
+    if (!tokenData) {
+      return res.status(400).json({ error: 'Meta no está conectado' });
+    }
+
+    let metaResult: { id: string };
+
+    if (imageUrl) {
+      const photoResult = await metaSocialService.publishPhotoToPage(
+        tokenData.pageAccessToken,
+        tokenData.pageId,
+        { imageUrl, caption: message, scheduledPublishTime: scheduledTimestamp }
+      );
+      metaResult = { id: photoResult.postId || photoResult.id };
+    } else {
+      metaResult = await metaSocialService.publishToPage(
+        tokenData.pageAccessToken,
+        tokenData.pageId,
+        { message, link: linkUrl, scheduledPublishTime: scheduledTimestamp }
+      );
+    }
+
+    const scheduledPost = await scheduledPostsService.createScheduledPost(tenantId, {
+      platform: 'facebook',
+      metaPostId: metaResult.id,
+      message: message || undefined,
+      imageUrl: imageUrl || undefined,
+      linkUrl: linkUrl || undefined,
+      propiedadId: propiedadId || undefined,
+      scheduledFor: new Date(scheduledTimestamp * 1000).toISOString(),
+      createdBy: (req as any).userId || undefined,
+      metaResponse: metaResult,
+    });
+
+    res.json({ scheduledPost });
+  } catch (error: any) {
+    console.error('[Meta Social] Error scheduling post:', error.message);
+    next(error);
+  }
+});
+
+/**
+ * GET /api/tenants/:tenantId/api-credentials/meta/scheduled-posts
+ * Lists scheduled posts for the tenant.
+ */
+router.get('/meta/scheduled-posts', async (req: Request<TenantParams>, res: Response, next: NextFunction) => {
+  try {
+    const { tenantId } = req.params;
+    const status = req.query.status as string | undefined;
+
+    const posts = await scheduledPostsService.getScheduledPosts(tenantId, status);
+    res.json(posts);
+  } catch (error: any) {
+    console.error('[Meta Social] Error getting scheduled posts:', error.message);
+    next(error);
+  }
+});
+
+/**
+ * DELETE /api/tenants/:tenantId/api-credentials/meta/scheduled-posts/:postId
+ * Cancels a scheduled post (deletes from Meta + updates local status).
+ */
+router.delete('/meta/scheduled-posts/:postId', async (req: Request<TenantParams & { postId: string }>, res: Response, next: NextFunction) => {
+  try {
+    const { tenantId, postId } = req.params;
+
+    const scheduledPost = await scheduledPostsService.getScheduledPostById(tenantId, postId);
+    if (!scheduledPost) {
+      return res.status(404).json({ error: 'Post programado no encontrado' });
+    }
+
+    if (scheduledPost.status !== 'scheduled') {
+      return res.status(400).json({ error: 'Solo se pueden cancelar posts con status "scheduled"' });
+    }
+
+    // Delete from Meta if we have a Meta post ID
+    if (scheduledPost.metaPostId) {
+      const tokenData = await credentialsService.getMetaPageToken(tenantId);
+      if (tokenData) {
+        await metaSocialService.deleteScheduledPost(
+          tokenData.pageAccessToken,
+          scheduledPost.metaPostId
+        );
+      }
+    }
+
+    await scheduledPostsService.updatePostStatus(tenantId, postId, 'cancelled');
+    res.json({ success: true });
+  } catch (error: any) {
+    console.error('[Meta Social] Error cancelling scheduled post:', error.message);
     next(error);
   }
 });
