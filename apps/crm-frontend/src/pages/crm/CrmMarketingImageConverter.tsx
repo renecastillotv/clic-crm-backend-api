@@ -1491,13 +1491,13 @@ const CrmMarketingImageConverter: React.FC = () => {
   };
 
   // Generar imagen
-  const generateImage = () => {
+  const generateImage = useCallback(() => {
     if (!propertyImage || !canvasRef.current) return;
 
     setProcessing(true);
     const canvas = canvasRef.current;
     const ctx = canvas.getContext('2d');
-    if (!ctx) return;
+    if (!ctx) { setProcessing(false); return; }
 
     // Configurar tamaño según formato
     const sizes: Record<OutputFormat, { w: number; h: number }> = {
@@ -1559,7 +1559,14 @@ const CrmMarketingImageConverter: React.FC = () => {
     // Generar imagen final
     setGeneratedImage(canvas.toDataURL('image/jpeg', 0.95));
     setProcessing(false);
-  };
+  }, [propertyImage, selectedTemplate, outputFormat, templateOptions, dataMode, selectedProperty, manualData, infoNegocio, logoImage, colores]);
+
+  // Auto-generar cuando cambia la imagen, plantilla, formato u opciones
+  useEffect(() => {
+    if (propertyImage) {
+      generateImage();
+    }
+  }, [generateImage]);
 
   // Descargar imagen
   const downloadImage = () => {
@@ -2153,7 +2160,7 @@ const CrmMarketingImageConverter: React.FC = () => {
                 }}
               >
                 {processing ? <Loader2 size={16} style={{ animation: 'spin 1s linear infinite' }} /> : <Sparkles size={16} />}
-                Generar
+                {generatedImage ? 'Regenerar' : 'Generar'}
               </button>
 
               {generatedImage && (
@@ -2207,8 +2214,8 @@ const CrmMarketingImageConverter: React.FC = () => {
               />
             ) : propertyImage ? (
               <div style={{ textAlign: 'center', color: '#64748b' }}>
-                <FileImage size={48} style={{ opacity: 0.3, marginBottom: '12px' }} />
-                <p style={{ margin: 0, fontSize: '14px' }}>Haz clic en "Generar" para crear el arte</p>
+                <Loader2 size={48} style={{ opacity: 0.3, marginBottom: '12px', animation: 'spin 1s linear infinite' }} />
+                <p style={{ margin: 0, fontSize: '14px' }}>Generando arte...</p>
               </div>
             ) : (
               <div style={{ textAlign: 'center', color: '#64748b' }}>
