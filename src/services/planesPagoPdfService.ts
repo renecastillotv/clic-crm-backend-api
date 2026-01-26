@@ -296,30 +296,35 @@ export async function generarPdfPlanPago(plan: PlanPago): Promise<Buffer> {
         doc.fontSize(8).fillColor(gray).text(plan.condiciones, 50, tableY + 14, { width: 512 });
       }
 
-      // ========== PREPARED BY (always at bottom) ==========
+      // ========== PREPARED BY ==========
       if (usuarioInfo || plan.usuario_creador) {
-        const prepY = 620; // Fixed position near bottom
-        doc.fontSize(9).fillColor(gray).text('Preparado por:', 50, prepY);
+        // Position after content, with minimum spacing
+        const prepY = Math.max(tableY + 25, 500);
 
-        const asesorName = usuarioInfo
-          ? `${usuarioInfo.nombre || ''} ${usuarioInfo.apellido || ''}`.trim()
-          : plan.usuario_creador
-            ? `${plan.usuario_creador.nombre || ''} ${plan.usuario_creador.apellido || ''}`.trim()
-            : '';
+        // If it would go past footer, skip (single page only)
+        if (prepY < 680) {
+          doc.fontSize(9).fillColor(gray).text('Preparado por:', 50, prepY);
 
-        if (asesorName) {
-          doc.fontSize(10).fillColor(dark).text(asesorName, 50, prepY + 12);
-        }
-        if (usuarioInfo?.titulo_profesional) {
-          doc.fontSize(8).fillColor(gray).text(usuarioInfo.titulo_profesional, 50, prepY + 24);
-        }
-        if (usuarioInfo?.email || plan.usuario_creador?.email) {
-          doc.fontSize(8).fillColor(gray).text(usuarioInfo?.email || plan.usuario_creador?.email || '', 50, prepY + 34);
-        }
+          const asesorName = usuarioInfo
+            ? `${usuarioInfo.nombre || ''} ${usuarioInfo.apellido || ''}`.trim()
+            : plan.usuario_creador
+              ? `${plan.usuario_creador.nombre || ''} ${plan.usuario_creador.apellido || ''}`.trim()
+              : '';
 
-        // Signature line
-        doc.moveTo(50, prepY + 55).lineTo(180, prepY + 55).strokeColor('#e5e7eb').stroke();
-        doc.fontSize(7).fillColor(gray).text('Firma', 50, prepY + 58);
+          if (asesorName) {
+            doc.fontSize(10).fillColor(dark).text(asesorName, 50, prepY + 12);
+          }
+          if (usuarioInfo?.titulo_profesional) {
+            doc.fontSize(8).fillColor(gray).text(usuarioInfo.titulo_profesional, 50, prepY + 24);
+          }
+          if (usuarioInfo?.email || plan.usuario_creador?.email) {
+            doc.fontSize(8).fillColor(gray).text(usuarioInfo?.email || plan.usuario_creador?.email || '', 50, prepY + 34);
+          }
+
+          // Signature line
+          doc.moveTo(50, prepY + 55).lineTo(180, prepY + 55).strokeColor('#e5e7eb').stroke();
+          doc.fontSize(7).fillColor(gray).text('Firma', 50, prepY + 58);
+        }
       }
 
       // ========== FOOTER (simple, one line) ==========
