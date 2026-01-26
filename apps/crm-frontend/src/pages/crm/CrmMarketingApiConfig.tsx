@@ -318,6 +318,11 @@ const CrmMarketingApiConfig: React.FC = () => {
   const [availableAdAccounts, setAvailableAdAccounts] = useState<{ id: string; accountId: string; name: string; accountStatus: number; currency: string; businessName?: string }[]>([]);
   const [adAccountsLoading, setAdAccountsLoading] = useState(false);
 
+  // Meta Social page selector state
+  const [showPageSelector, setShowPageSelector] = useState(false);
+  const [availablePages, setAvailablePages] = useState<{ id: string; name: string; category?: string; instagramBusinessAccount?: { id: string; username: string } }[]>([]);
+  const [pagesLoading, setPagesLoading] = useState(false);
+
   useEffect(() => {
     setPageHeader({
       title: 'Configuración de APIs',
@@ -345,10 +350,10 @@ const CrmMarketingApiConfig: React.FC = () => {
     fetchCredentials();
   }, [tenantActual?.id]);
 
-  // Listen for OAuth postMessage from popup (Google Ads + GSC + Meta Ads)
+  // Listen for OAuth postMessage from popup (Google Ads + GSC + Meta Ads + Meta Social)
   const handleOAuthMessage = useCallback(async (event: MessageEvent) => {
     const type = event.data?.type;
-    if (type !== 'GOOGLE_ADS_OAUTH_RESULT' && type !== 'GSC_OAUTH_RESULT' && type !== 'META_ADS_OAUTH_RESULT') return;
+    if (type !== 'GOOGLE_ADS_OAUTH_RESULT' && type !== 'GSC_OAUTH_RESULT' && type !== 'META_ADS_OAUTH_RESULT' && type !== 'META_SOCIAL_OAUTH_RESULT') return;
 
     // Clean up popup resources
     if (pollTimerRef.current) {
@@ -441,6 +446,35 @@ const CrmMarketingApiConfig: React.FC = () => {
       } else {
         setActionLoading(null);
         alert(event.data.message || 'Error en la autorización de Meta Ads');
+      }
+    }
+
+    if (type === 'META_SOCIAL_OAUTH_RESULT') {
+      if (event.data.success) {
+        setPagesLoading(true);
+        setActionLoading(null);
+        try {
+          const pagesResponse = await apiFetch(
+            `/tenants/${tenantActual?.id}/api-credentials/meta/pages`
+          );
+          const pages = await pagesResponse.json();
+          if (pages.length === 1) {
+            await handleSelectPage(pages[0].id);
+          } else if (pages.length > 0) {
+            setAvailablePages(pages);
+            setShowPageSelector(true);
+          } else {
+            alert('No se encontraron páginas de Facebook. Asegúrate de que tu cuenta administra al menos una página.');
+          }
+        } catch (error) {
+          console.error('Error fetching pages:', error);
+          alert('OAuth exitoso, pero hubo un error al obtener las páginas. Intenta de nuevo.');
+        } finally {
+          setPagesLoading(false);
+        }
+      } else {
+        setActionLoading(null);
+        alert(event.data.message || 'Error en la autorización de Meta');
       }
     }
   }, [tenantActual?.id]);
@@ -636,10 +670,75 @@ const CrmMarketingApiConfig: React.FC = () => {
     }
   };
 
-  const handleConnectMeta = () => {
+  const handleConnectMeta = async () => {
+    if (!tenantActual?.id) return;
+
     setActionLoading('meta');
-    alert('El flujo de OAuth de Meta se implementará próximamente.\n\nNecesitarás:\n1. Una cuenta de Facebook Business\n2. Una aplicación en Meta for Developers\n3. Permisos de pages_manage_posts e instagram_basic');
-    setActionLoading(null);
+
+    try {
+      const userId = user?.id || 'unknown';
+      const authResponse = await apiFetch(
+        `/tenants/${tenantActual.id}/api-credentials/meta/auth-url?connectedBy=${userId}`
+      );
+      const { authUrl } = await authResponse.json();
+
+      const width = 600;
+      const height = 700;
+      const left = window.screenX + (window.outerWidth - width) / 2;
+      const top = window.screenY + (window.outerHeight - height) / 2;
+
+      const popup = window.open(
+        authUrl,
+        'meta-social-oauth',
+        `width=${width},height=${height},left=${left},top=${top},toolbar=no,menubar=no,scrollbars=yes`
+      );
+
+      if (!popup) {
+        alert('No se pudo abrir la ventana de autorización. Verifica que los popups no estén bloqueados.');
+        setActionLoading(null);
+        return;
+      }
+
+      popupRef.current = popup;
+
+      pollTimerRef.current = window.setInterval(() => {
+        if (popup.closed) {
+          if (pollTimerRef.current) {
+            clearInterval(pollTimerRef.current);
+            pollTimerRef.current = null;
+          }
+          popupRef.current = null;
+          setActionLoading(null);
+        }
+      }, 500);
+    } catch (error) {
+      console.error('Error starting Meta Social OAuth:', error);
+      alert('Error al iniciar el flujo de autorización');
+      setActionLoading(null);
+    }
+  };
+
+  const handleSelectPage = async (pageId: string) => {
+    if (!tenantActual?.id) return;
+
+    setPagesLoading(true);
+    try {
+      await apiFetch(`/tenants/${tenantActual.id}/api-credentials/meta/page`, {
+        method: 'PUT',
+        body: JSON.stringify({ pageId }),
+      });
+
+      const refreshResponse = await apiFetch(`/tenants/${tenantActual.id}/api-credentials`);
+      const refreshedData = await refreshResponse.json();
+      setCredentials(refreshedData);
+      setShowPageSelector(false);
+      setAvailablePages([]);
+    } catch (error) {
+      console.error('Error selecting page:', error);
+      alert('Error al seleccionar la página');
+    } finally {
+      setPagesLoading(false);
+    }
   };
 
   const handleDisconnectMeta = async () => {
@@ -1510,6 +1609,165 @@ const CrmMarketingApiConfig: React.FC = () => {
                 ))}
               </div>
             )}
+          </div>
+        </div>
+      )}
+
+      {/* Meta Social Page Selector Modal */}
+      {showPageSelector && (
+        <div
+          style={{
+            position: 'fixed',
+            inset: 0,
+            background: 'rgba(0,0,0,0.5)',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            zIndex: 1000,
+          }}
+          onClick={() => {
+            setShowPageSelector(false);
+            setAvailablePages([]);
+          }}
+        >
+          <div
+            style={{
+              background: 'white',
+              borderRadius: '20px',
+              padding: '32px',
+              maxWidth: '520px',
+              width: '90%',
+              maxHeight: '80vh',
+              overflow: 'auto',
+              boxShadow: '0 24px 80px rgba(0,0,0,0.2)',
+            }}
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '24px' }}>
+              <div>
+                <h3 style={{ fontSize: '18px', fontWeight: 700, color: '#1e293b', margin: 0 }}>
+                  Selecciona una página
+                </h3>
+                <p style={{ fontSize: '13px', color: '#64748b', margin: '4px 0 0 0' }}>
+                  Elige la página de Facebook para publicar contenido
+                </p>
+              </div>
+              <button
+                onClick={() => {
+                  setShowPageSelector(false);
+                  setAvailablePages([]);
+                }}
+                style={{
+                  background: '#f1f5f9',
+                  border: 'none',
+                  borderRadius: '8px',
+                  padding: '8px',
+                  cursor: 'pointer',
+                  color: '#64748b',
+                }}
+              >
+                <X size={18} />
+              </button>
+            </div>
+
+            {pagesLoading ? (
+              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '40px' }}>
+                <Loader2 size={28} style={{ animation: 'spin 1s linear infinite', color: '#e11d48' }} />
+              </div>
+            ) : (
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
+                {availablePages.map((page) => (
+                  <button
+                    key={page.id}
+                    onClick={() => handleSelectPage(page.id)}
+                    disabled={pagesLoading}
+                    style={{
+                      display: 'flex',
+                      alignItems: 'center',
+                      gap: '14px',
+                      padding: '16px',
+                      background: '#f8fafc',
+                      border: '2px solid #e2e8f0',
+                      borderRadius: '12px',
+                      cursor: 'pointer',
+                      textAlign: 'left',
+                      transition: 'all 0.15s',
+                    }}
+                    onMouseEnter={(e) => {
+                      e.currentTarget.style.borderColor = '#e11d48';
+                      e.currentTarget.style.background = '#fef2f2';
+                    }}
+                    onMouseLeave={(e) => {
+                      e.currentTarget.style.borderColor = '#e2e8f0';
+                      e.currentTarget.style.background = '#f8fafc';
+                    }}
+                  >
+                    <div
+                      style={{
+                        width: '44px',
+                        height: '44px',
+                        borderRadius: '10px',
+                        background: '#1877f220',
+                        display: 'flex',
+                        alignItems: 'center',
+                        justifyContent: 'center',
+                        color: '#1877f2',
+                        flexShrink: 0,
+                      }}
+                    >
+                      <Facebook size={20} />
+                    </div>
+                    <div style={{ flex: 1, minWidth: 0 }}>
+                      <div style={{ fontSize: '14px', fontWeight: 600, color: '#1e293b' }}>
+                        {page.name}
+                      </div>
+                      <div style={{ fontSize: '12px', color: '#64748b', marginTop: '2px' }}>
+                        {page.category || 'Página'}
+                        {page.instagramBusinessAccount && (
+                          <span style={{ marginLeft: '8px' }}>
+                            <Instagram size={12} style={{ display: 'inline', verticalAlign: 'middle', marginRight: '2px' }} />
+                            @{page.instagramBusinessAccount.username}
+                          </span>
+                        )}
+                      </div>
+                    </div>
+                    <ChevronRight size={16} color="#94a3b8" />
+                  </button>
+                ))}
+              </div>
+            )}
+          </div>
+        </div>
+      )}
+
+      {/* Pages loading overlay (while fetching pages after OAuth) */}
+      {pagesLoading && !showPageSelector && (
+        <div
+          style={{
+            position: 'fixed',
+            inset: 0,
+            background: 'rgba(0,0,0,0.3)',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            zIndex: 999,
+          }}
+        >
+          <div
+            style={{
+              background: 'white',
+              borderRadius: '16px',
+              padding: '32px 48px',
+              display: 'flex',
+              alignItems: 'center',
+              gap: '16px',
+              boxShadow: '0 12px 40px rgba(0,0,0,0.15)',
+            }}
+          >
+            <Loader2 size={24} style={{ animation: 'spin 1s linear infinite', color: '#e11d48' }} />
+            <span style={{ fontSize: '14px', fontWeight: 500, color: '#1e293b' }}>
+              Obteniendo páginas de Facebook...
+            </span>
           </div>
         </div>
       )}

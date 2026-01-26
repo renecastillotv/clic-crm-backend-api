@@ -269,6 +269,76 @@ router.get('/meta/callback', async (req: Request, res: Response) => {
   }
 });
 
+// ==================== META SOCIAL CALLBACK ====================
+
+/**
+ * GET /api/oauth/meta-social/callback
+ *
+ * Facebook redirects here after user grants social posting consent.
+ * Exchanges the code for a long-lived token and saves it.
+ * The user then selects a Page from the frontend.
+ */
+router.get('/meta-social/callback', async (req: Request, res: Response) => {
+  const { code, state, error, error_reason } = req.query;
+
+  if (error) {
+    const msg = error_reason === 'user_denied'
+      ? 'El usuario canceló la autorización'
+      : `Error: ${error}`;
+    return res.send(buildPopupHTML(false, msg, 'META_SOCIAL_OAUTH_RESULT'));
+  }
+
+  if (!code || !state || typeof code !== 'string' || typeof state !== 'string') {
+    return res.send(buildPopupHTML(false, 'Parámetros inválidos', 'META_SOCIAL_OAUTH_RESULT'));
+  }
+
+  const stateData = verifyOAuthState(state);
+  if (!stateData) {
+    return res.send(buildPopupHTML(false, 'Estado de seguridad inválido o expirado', 'META_SOCIAL_OAUTH_RESULT'));
+  }
+
+  try {
+    const protocol = req.get('x-forwarded-proto') || req.protocol;
+    const host = req.get('host') || '';
+    const redirectUri = `${protocol}://${host}/api/oauth/meta-social/callback`;
+
+    // 1. Exchange code for short-lived token
+    const tokenParams = new URLSearchParams({
+      client_id: META_APP_ID,
+      client_secret: META_APP_SECRET,
+      redirect_uri: redirectUri,
+      code,
+    });
+
+    const tokenResponse = await fetch(`https://graph.facebook.com/v21.0/oauth/access_token?${tokenParams.toString()}`);
+    const tokenData: any = await tokenResponse.json();
+
+    if (!tokenResponse.ok || tokenData.error) {
+      console.error('[OAuth] Meta Social token exchange error:', tokenData);
+      return res.send(buildPopupHTML(false, `Error: ${tokenData.error?.message || 'Token exchange failed'}`, 'META_SOCIAL_OAUTH_RESULT'));
+    }
+
+    // 2. Exchange short-lived token for long-lived token (~60 days)
+    const longLived = await metaAdsService.exchangeForLongLivedToken(tokenData.access_token);
+
+    // 3. Save long-lived USER token with PENDING page (user will select a page in the frontend)
+    await credentialsService.saveMetaCredentials(
+      stateData.tenantId,
+      longLived.accessToken,
+      'PENDING',
+      'Seleccionar página',
+      null,
+      null,
+      stateData.userId
+    );
+
+    return res.send(buildPopupHTML(true, 'Meta conectado exitosamente', 'META_SOCIAL_OAUTH_RESULT'));
+  } catch (err: any) {
+    console.error('[OAuth] Meta Social callback error:', err);
+    return res.send(buildPopupHTML(false, 'Error interno al procesar la autorización', 'META_SOCIAL_OAUTH_RESULT'));
+  }
+});
+
 // ==================== HELPERS ====================
 
 function buildPopupHTML(success: boolean, message: string, messageType: string = 'GOOGLE_ADS_OAUTH_RESULT'): string {

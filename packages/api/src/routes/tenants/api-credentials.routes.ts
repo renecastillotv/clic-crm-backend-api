@@ -16,6 +16,7 @@ import { createOAuthState } from '../oauth.routes.js';
 import * as googleAdsService from '../../services/googleAdsService.js';
 import * as gscService from '../../services/googleSearchConsoleService.js';
 import * as metaAdsService from '../../services/metaAdsService.js';
+import * as metaSocialService from '../../services/metaSocialService.js';
 
 const router = express.Router({ mergeParams: true });
 
@@ -484,6 +485,296 @@ router.delete('/meta', async (req: Request<TenantParams>, res: Response, next: N
     await credentialsService.disconnectMeta(tenantId);
     res.json({ success: true, message: 'Meta desconectado' });
   } catch (error) {
+    next(error);
+  }
+});
+
+/**
+ * GET /api/tenants/:tenantId/api-credentials/meta/auth-url
+ * Generates the Facebook OAuth consent URL for Meta Social (posting/comments).
+ */
+router.get('/meta/auth-url', async (req: Request<TenantParams>, res: Response, next: NextFunction) => {
+  try {
+    const { tenantId } = req.params;
+    const connectedBy = (req.query.connectedBy as string) || 'unknown';
+
+    const appId = process.env.META_APP_ID;
+    if (!appId) {
+      return res.status(500).json({ error: 'META_APP_ID no configurado en el servidor' });
+    }
+
+    const protocol = req.get('x-forwarded-proto') || req.protocol;
+    const host = req.get('host') || '';
+    const redirectUri = `${protocol}://${host}/api/oauth/meta-social/callback`;
+
+    const state = createOAuthState(tenantId, connectedBy);
+
+    const params = new URLSearchParams({
+      client_id: appId,
+      redirect_uri: redirectUri,
+      response_type: 'code',
+      scope: 'pages_show_list,pages_manage_posts,pages_read_engagement,pages_read_user_content,instagram_basic,instagram_content_publish,instagram_manage_comments',
+      state,
+    });
+
+    const authUrl = `https://www.facebook.com/v21.0/dialog/oauth?${params.toString()}`;
+    res.json({ authUrl });
+  } catch (error) {
+    next(error);
+  }
+});
+
+/**
+ * GET /api/tenants/:tenantId/api-credentials/meta/pages
+ * Lists accessible Facebook Pages after OAuth.
+ */
+router.get('/meta/pages', async (req: Request<TenantParams>, res: Response, next: NextFunction) => {
+  try {
+    const { tenantId } = req.params;
+
+    const tokenData = await credentialsService.getMetaPageToken(tenantId);
+    if (!tokenData) {
+      return res.status(400).json({ error: 'Meta no está conectado' });
+    }
+
+    const pages = await metaSocialService.listUserPages(tokenData.pageAccessToken);
+
+    // Return pages without access tokens (security)
+    res.json(pages.map(p => ({
+      id: p.id,
+      name: p.name,
+      category: p.category,
+      instagramBusinessAccount: p.instagramBusinessAccount,
+    })));
+  } catch (error: any) {
+    console.error('[Meta Social] Error listing pages:', error.message);
+    next(error);
+  }
+});
+
+/**
+ * PUT /api/tenants/:tenantId/api-credentials/meta/page
+ * Selects a Facebook Page after OAuth. Saves the page access token.
+ */
+router.put('/meta/page', async (req: Request<TenantParams>, res: Response, next: NextFunction) => {
+  try {
+    const { tenantId } = req.params;
+    const { pageId } = req.body;
+
+    if (!pageId) {
+      return res.status(400).json({ error: 'Se requiere pageId' });
+    }
+
+    // Get the stored user token
+    const tokenData = await credentialsService.getMetaPageToken(tenantId);
+    if (!tokenData) {
+      return res.status(400).json({ error: 'Meta no está conectado. Realiza el flujo OAuth primero.' });
+    }
+
+    // Use user token to get page details including page token
+    const pages = await metaSocialService.listUserPages(tokenData.pageAccessToken);
+    const selectedPage = pages.find(p => p.id === pageId);
+
+    if (!selectedPage) {
+      return res.status(400).json({ error: 'Página no encontrada o no tienes permisos' });
+    }
+
+    // Save the permanent Page Access Token
+    await credentialsService.saveMetaCredentials(
+      tenantId,
+      selectedPage.accessToken,
+      selectedPage.id,
+      selectedPage.name,
+      selectedPage.instagramBusinessAccount?.id || null,
+      selectedPage.instagramBusinessAccount?.username || null,
+      'system'
+    );
+
+    res.json({
+      success: true,
+      pageId: selectedPage.id,
+      pageName: selectedPage.name,
+      instagramAccountId: selectedPage.instagramBusinessAccount?.id || null,
+      instagramUsername: selectedPage.instagramBusinessAccount?.username || null,
+    });
+  } catch (error) {
+    next(error);
+  }
+});
+
+/**
+ * POST /api/tenants/:tenantId/api-credentials/meta/publish
+ * Publishes to Facebook Page and/or Instagram.
+ */
+router.post('/meta/publish', async (req: Request<TenantParams>, res: Response, next: NextFunction) => {
+  try {
+    const { tenantId } = req.params;
+    const { message, imageUrl, link, targets } = req.body;
+
+    if (!message && !imageUrl) {
+      return res.status(400).json({ error: 'Se requiere mensaje o imagen' });
+    }
+
+    const tokenData = await credentialsService.getMetaPageToken(tenantId);
+    if (!tokenData || !tokenData.pageId || tokenData.pageId === 'PENDING') {
+      return res.status(400).json({ error: 'Meta no está configurado completamente. Selecciona una página primero.' });
+    }
+
+    const results: Record<string, { success: boolean; postId?: string; mediaId?: string; error?: string }> = {};
+
+    // Publish to Facebook
+    if (targets?.facebook !== false) {
+      try {
+        if (imageUrl) {
+          const fbResult = await metaSocialService.publishPhotoToPage(
+            tokenData.pageAccessToken,
+            tokenData.pageId,
+            { imageUrl, caption: message }
+          );
+          results.facebook = { success: true, postId: fbResult.postId };
+        } else {
+          const fbResult = await metaSocialService.publishToPage(
+            tokenData.pageAccessToken,
+            tokenData.pageId,
+            { message, link }
+          );
+          results.facebook = { success: true, postId: fbResult.id };
+        }
+      } catch (error: any) {
+        results.facebook = { success: false, error: error.message };
+      }
+    }
+
+    // Publish to Instagram (requires image)
+    if (targets?.instagram && tokenData.instagramAccountId) {
+      if (!imageUrl) {
+        results.instagram = { success: false, error: 'Instagram requiere una imagen' };
+      } else {
+        try {
+          const igResult = await metaSocialService.publishToInstagram(
+            tokenData.pageAccessToken,
+            tokenData.instagramAccountId,
+            { imageUrl, caption: message }
+          );
+          results.instagram = { success: true, mediaId: igResult.id };
+        } catch (error: any) {
+          results.instagram = { success: false, error: error.message };
+        }
+      }
+    }
+
+    res.json(results);
+  } catch (error) {
+    next(error);
+  }
+});
+
+/**
+ * GET /api/tenants/:tenantId/api-credentials/meta/posts
+ * Gets recent Facebook Page posts.
+ */
+router.get('/meta/posts', async (req: Request<TenantParams>, res: Response, next: NextFunction) => {
+  try {
+    const { tenantId } = req.params;
+    const limit = parseInt(req.query.limit as string) || 25;
+
+    const tokenData = await credentialsService.getMetaPageToken(tenantId);
+    if (!tokenData || !tokenData.pageId || tokenData.pageId === 'PENDING') {
+      return res.status(400).json({ error: 'Meta no está configurado completamente' });
+    }
+
+    const posts = await metaSocialService.getPagePosts(
+      tokenData.pageAccessToken,
+      tokenData.pageId,
+      limit
+    );
+
+    res.json(posts);
+  } catch (error: any) {
+    console.error('[Meta Social] Error getting posts:', error.message);
+    next(error);
+  }
+});
+
+/**
+ * GET /api/tenants/:tenantId/api-credentials/meta/instagram-media
+ * Gets recent Instagram media.
+ */
+router.get('/meta/instagram-media', async (req: Request<TenantParams>, res: Response, next: NextFunction) => {
+  try {
+    const { tenantId } = req.params;
+    const limit = parseInt(req.query.limit as string) || 25;
+
+    const tokenData = await credentialsService.getMetaPageToken(tenantId);
+    if (!tokenData || !tokenData.instagramAccountId) {
+      return res.status(400).json({ error: 'Instagram no está conectado' });
+    }
+
+    const media = await metaSocialService.getInstagramMedia(
+      tokenData.pageAccessToken,
+      tokenData.instagramAccountId,
+      limit
+    );
+
+    res.json(media);
+  } catch (error: any) {
+    console.error('[Meta Social] Error getting IG media:', error.message);
+    next(error);
+  }
+});
+
+/**
+ * GET /api/tenants/:tenantId/api-credentials/meta/posts/:postId/comments
+ * Gets comments on a post.
+ */
+router.get('/meta/posts/:postId/comments', async (req: Request<TenantParams & { postId: string }>, res: Response, next: NextFunction) => {
+  try {
+    const { tenantId, postId } = req.params;
+
+    const tokenData = await credentialsService.getMetaPageToken(tenantId);
+    if (!tokenData) {
+      return res.status(400).json({ error: 'Meta no está conectado' });
+    }
+
+    const comments = await metaSocialService.getComments(
+      tokenData.pageAccessToken,
+      postId
+    );
+
+    res.json(comments);
+  } catch (error: any) {
+    console.error('[Meta Social] Error getting comments:', error.message);
+    next(error);
+  }
+});
+
+/**
+ * POST /api/tenants/:tenantId/api-credentials/meta/comments/:commentId/reply
+ * Replies to a comment.
+ */
+router.post('/meta/comments/:commentId/reply', async (req: Request<TenantParams & { commentId: string }>, res: Response, next: NextFunction) => {
+  try {
+    const { tenantId, commentId } = req.params;
+    const { message } = req.body;
+
+    if (!message) {
+      return res.status(400).json({ error: 'Se requiere mensaje' });
+    }
+
+    const tokenData = await credentialsService.getMetaPageToken(tenantId);
+    if (!tokenData) {
+      return res.status(400).json({ error: 'Meta no está conectado' });
+    }
+
+    const result = await metaSocialService.replyToComment(
+      tokenData.pageAccessToken,
+      commentId,
+      message
+    );
+
+    res.json(result);
+  } catch (error: any) {
+    console.error('[Meta Social] Error replying to comment:', error.message);
     next(error);
   }
 });
