@@ -105,6 +105,7 @@ export interface MetaCampaign {
 
 /**
  * Gets campaigns with performance metrics for an ad account.
+ * Uses nested insights edge to fetch campaigns + metrics in a single request.
  */
 export async function getCampaigns(
   accessToken: string,
@@ -114,89 +115,66 @@ export async function getCampaigns(
   // Ensure adAccountId starts with act_
   const actId = adAccountId.startsWith('act_') ? adAccountId : `act_${adAccountId}`;
 
-  const campaignFields = 'id,name,status,objective,daily_budget,lifetime_budget,start_time,stop_time';
+  // Build the insights subfield with time_range
   const insightsFields = 'spend,impressions,clicks,ctr,cpc,reach,actions';
-
-  let timeRange = '';
+  let insightsEdge = `insights.fields(${insightsFields})`;
   if (dateRange) {
-    timeRange = `&time_range=${encodeURIComponent(JSON.stringify({
-      since: dateRange.startDate,
-      until: dateRange.endDate,
-    }))}`;
+    const timeRange = JSON.stringify({ since: dateRange.startDate, until: dateRange.endDate });
+    insightsEdge = `insights.fields(${insightsFields}).time_range(${timeRange})`;
   }
 
-  // Fetch campaigns
-  const campaignsResponse = await fetch(
-    `${GRAPH_API_BASE}/${actId}/campaigns?fields=${encodeURIComponent(campaignFields)}&limit=100`,
-    {
-      headers: { Authorization: `Bearer ${accessToken}` },
-    }
-  );
+  // Single request: campaigns with nested insights
+  const campaignFields = `id,name,status,objective,daily_budget,lifetime_budget,start_time,stop_time,${insightsEdge}`;
+
+  const url = `${GRAPH_API_BASE}/${actId}/campaigns?fields=${encodeURIComponent(campaignFields)}&limit=100`;
+  console.log('[Meta Ads] Fetching campaigns:', url.replace(/access_token=[^&]+/, 'access_token=***'));
+
+  const campaignsResponse = await fetch(url, {
+    headers: { Authorization: `Bearer ${accessToken}` },
+  });
 
   const campaignsData: any = await campaignsResponse.json();
 
   if (!campaignsResponse.ok || campaignsData.error) {
+    console.error('[Meta Ads] Campaigns API error:', JSON.stringify(campaignsData.error || campaignsData));
     throw new Error(`Failed to get campaigns: ${campaignsData.error?.message || campaignsResponse.statusText}`);
   }
 
-  const campaigns: MetaCampaign[] = (campaignsData.data || []).map((c: any) => ({
-    id: c.id,
-    name: c.name,
-    status: c.status,
-    objective: c.objective || 'UNKNOWN',
-    dailyBudget: c.daily_budget ? parseInt(c.daily_budget) / 100 : undefined,
-    lifetimeBudget: c.lifetime_budget ? parseInt(c.lifetime_budget) / 100 : undefined,
-    startTime: c.start_time,
-    stopTime: c.stop_time,
-  }));
+  return (campaignsData.data || []).map((c: any) => {
+    const campaign: MetaCampaign = {
+      id: c.id,
+      name: c.name,
+      status: c.status,
+      objective: c.objective || 'UNKNOWN',
+      dailyBudget: c.daily_budget ? parseInt(c.daily_budget) / 100 : undefined,
+      lifetimeBudget: c.lifetime_budget ? parseInt(c.lifetime_budget) / 100 : undefined,
+      startTime: c.start_time,
+      stopTime: c.stop_time,
+    };
 
-  // Fetch insights for all campaigns in batch
-  if (campaigns.length > 0) {
-    try {
-      const insightsResponse = await fetch(
-        `${GRAPH_API_BASE}/${actId}/insights?fields=${encodeURIComponent(insightsFields)}&level=campaign&limit=100${timeRange}`,
-        {
-          headers: { Authorization: `Bearer ${accessToken}` },
-        }
-      );
-
-      const insightsData: any = await insightsResponse.json();
-
-      if (insightsResponse.ok && insightsData.data) {
-        const insightsMap = new Map<string, any>();
-        for (const insight of insightsData.data) {
-          insightsMap.set(insight.campaign_id, insight);
-        }
-
-        for (const campaign of campaigns) {
-          const insight = insightsMap.get(campaign.id);
-          if (insight) {
-            campaign.spend = parseFloat(insight.spend) || 0;
-            campaign.impressions = parseInt(insight.impressions) || 0;
-            campaign.clicks = parseInt(insight.clicks) || 0;
-            campaign.ctr = parseFloat(insight.ctr) || 0;
-            campaign.cpc = parseFloat(insight.cpc) || 0;
-            campaign.reach = parseInt(insight.reach) || 0;
-            // Extract lead or purchase conversions
-            if (insight.actions) {
-              const leadAction = insight.actions.find((a: any) =>
-                a.action_type === 'lead' || a.action_type === 'onsite_conversion.lead_grouped'
-              );
-              const purchaseAction = insight.actions.find((a: any) =>
-                a.action_type === 'purchase' || a.action_type === 'offsite_conversion.fb_pixel_purchase'
-              );
-              campaign.conversions = parseInt(leadAction?.value || purchaseAction?.value || '0');
-            }
-          }
-        }
+    // Extract nested insights (comes as { data: [{ ... }] })
+    const insight = c.insights?.data?.[0];
+    if (insight) {
+      campaign.spend = parseFloat(insight.spend) || 0;
+      campaign.impressions = parseInt(insight.impressions) || 0;
+      campaign.clicks = parseInt(insight.clicks) || 0;
+      campaign.ctr = parseFloat(insight.ctr) || 0;
+      campaign.cpc = parseFloat(insight.cpc) || 0;
+      campaign.reach = parseInt(insight.reach) || 0;
+      // Extract lead or purchase conversions
+      if (insight.actions) {
+        const leadAction = insight.actions.find((a: any) =>
+          a.action_type === 'lead' || a.action_type === 'onsite_conversion.lead_grouped'
+        );
+        const purchaseAction = insight.actions.find((a: any) =>
+          a.action_type === 'purchase' || a.action_type === 'offsite_conversion.fb_pixel_purchase'
+        );
+        campaign.conversions = parseInt(leadAction?.value || purchaseAction?.value || '0');
       }
-    } catch (insightsError) {
-      // Insights may fail for various reasons (no data, permissions) - continue without them
-      console.warn('[Meta Ads] Could not fetch insights:', insightsError);
     }
-  }
 
-  return campaigns;
+    return campaign;
+  });
 }
 
 // ==================== CAMPAIGN INSIGHTS ====================
