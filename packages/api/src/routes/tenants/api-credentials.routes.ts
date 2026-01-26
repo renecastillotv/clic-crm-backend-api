@@ -513,7 +513,7 @@ router.get('/meta/auth-url', async (req: Request<TenantParams>, res: Response, n
       client_id: appId,
       redirect_uri: redirectUri,
       response_type: 'code',
-      scope: 'pages_show_list,pages_manage_posts,pages_read_engagement,pages_read_user_content,instagram_basic,instagram_content_publish,instagram_manage_comments',
+      scope: 'pages_show_list,pages_manage_posts,pages_read_engagement,instagram_basic,instagram_content_publish,instagram_manage_comments',
       state,
     });
 
