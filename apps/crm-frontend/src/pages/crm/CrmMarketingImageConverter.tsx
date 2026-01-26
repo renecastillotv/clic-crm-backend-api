@@ -1287,6 +1287,7 @@ const CrmMarketingImageConverter: React.FC = () => {
   // Imagen y plantilla
   const [uploadedImage, setUploadedImage] = useState<string | null>(null);
   const [propertyImage, setPropertyImage] = useState<HTMLImageElement | null>(null);
+  const [selectedImageIndex, setSelectedImageIndex] = useState<number>(0);
   const [selectedTemplate, setSelectedTemplate] = useState<PropertyTemplate>(propertyTemplates[0]);
   const [outputFormat, setOutputFormat] = useState<OutputFormat>('landscape');
   const [generatedImage, setGeneratedImage] = useState<string | null>(null);
@@ -1420,23 +1421,56 @@ const CrmMarketingImageConverter: React.FC = () => {
     );
   });
 
+  // Obtener todas las imágenes de una propiedad (sin duplicados)
+  const getPropertyImages = (prop: Propiedad): string[] => {
+    const images: string[] = [];
+    if (prop.imagen_principal) images.push(prop.imagen_principal);
+    if (prop.imagenes) {
+      for (const img of prop.imagenes) {
+        if (img && !images.includes(img)) images.push(img);
+      }
+    }
+    return images;
+  };
+
+  // Cargar imagen seleccionada de la galería
+  const loadPropertyImage = async (url: string) => {
+    const base64 = await loadImageAsBase64(url);
+    if (base64) {
+      const img = new window.Image();
+      img.onload = () => {
+        setPropertyImage(img);
+        setUploadedImage(base64);
+        setGeneratedImage(null);
+      };
+      img.src = base64;
+    }
+  };
+
   // Manejar selección de propiedad
   const handleSelectProperty = async (prop: Propiedad) => {
     setSelectedProperty(prop);
+    setSelectedImageIndex(0);
+    setGeneratedImage(null);
 
-    // Cargar imagen de la propiedad
-    const imgUrl = prop.imagen_principal || prop.imagenes?.[0];
-    if (imgUrl) {
-      const base64 = await loadImageAsBase64(imgUrl);
-      if (base64) {
-        const img = new window.Image();
-        img.onload = () => {
-          setPropertyImage(img);
-          setUploadedImage(base64);
-        };
-        img.src = base64;
-      }
+    // Auto-cargar la primera imagen
+    const images = getPropertyImages(prop);
+    if (images.length > 0) {
+      await loadPropertyImage(images[0]);
+    } else {
+      setPropertyImage(null);
+      setUploadedImage(null);
     }
+  };
+
+  // Manejar selección de imagen de la galería
+  const handleSelectPropertyImage = async (index: number) => {
+    if (!selectedProperty) return;
+    const images = getPropertyImages(selectedProperty);
+    if (index < 0 || index >= images.length) return;
+
+    setSelectedImageIndex(index);
+    await loadPropertyImage(images[index]);
   };
 
   // Manejar subida de imagen manual
@@ -1556,7 +1590,7 @@ const CrmMarketingImageConverter: React.FC = () => {
       {/* Header */}
       <div style={{ marginBottom: '24px' }}>
         <button
-          onClick={() => navigate(`${basePath}/marketing`)}
+          onClick={() => navigate(`${basePath}/marketing/branding`)}
           style={{
             display: 'flex',
             alignItems: 'center',
@@ -1570,7 +1604,7 @@ const CrmMarketingImageConverter: React.FC = () => {
           }}
         >
           <ArrowLeft size={18} />
-          Volver al Marketing Hub
+          Volver a Creativos
         </button>
       </div>
 
@@ -1928,7 +1962,7 @@ const CrmMarketingImageConverter: React.FC = () => {
             </div>
           )}
 
-          {/* Subir imagen */}
+          {/* Imagen - Galería de propiedad o subida manual */}
           <div
             style={{
               background: '#ffffff',
@@ -1949,6 +1983,96 @@ const CrmMarketingImageConverter: React.FC = () => {
               style={{ display: 'none' }}
             />
 
+            {/* Galería de imágenes de la propiedad seleccionada */}
+            {dataMode === 'property' && selectedProperty && getPropertyImages(selectedProperty).length > 1 && (
+              <div style={{ marginBottom: '12px' }}>
+                <p style={{ fontSize: '12px', color: '#64748b', margin: '0 0 8px 0' }}>
+                  {getPropertyImages(selectedProperty).length} imágenes disponibles
+                </p>
+                <div
+                  style={{
+                    display: 'grid',
+                    gridTemplateColumns: 'repeat(3, 1fr)',
+                    gap: '6px',
+                    maxHeight: '200px',
+                    overflowY: 'auto',
+                  }}
+                >
+                  {getPropertyImages(selectedProperty).map((imgUrl, idx) => (
+                    <div
+                      key={idx}
+                      onClick={() => handleSelectPropertyImage(idx)}
+                      style={{
+                        position: 'relative',
+                        width: '100%',
+                        paddingBottom: '100%',
+                        borderRadius: '8px',
+                        overflow: 'hidden',
+                        cursor: 'pointer',
+                        border: selectedImageIndex === idx ? '2px solid ' + (colores?.primary || '#3b82f6') : '2px solid transparent',
+                        boxShadow: selectedImageIndex === idx ? '0 0 0 1px ' + (colores?.primary || '#3b82f6') : 'none',
+                      }}
+                    >
+                      <img
+                        src={imgUrl}
+                        alt={`Imagen ${idx + 1}`}
+                        style={{
+                          position: 'absolute',
+                          top: 0,
+                          left: 0,
+                          width: '100%',
+                          height: '100%',
+                          objectFit: 'cover',
+                          opacity: selectedImageIndex === idx ? 1 : 0.7,
+                          transition: 'opacity 0.2s',
+                        }}
+                        onMouseEnter={(e) => { e.currentTarget.style.opacity = '1'; }}
+                        onMouseLeave={(e) => {
+                          if (selectedImageIndex !== idx) e.currentTarget.style.opacity = '0.7';
+                        }}
+                      />
+                      {selectedImageIndex === idx && (
+                        <div
+                          style={{
+                            position: 'absolute',
+                            top: '4px',
+                            right: '4px',
+                            width: '20px',
+                            height: '20px',
+                            borderRadius: '50%',
+                            background: colores?.primary || '#3b82f6',
+                            display: 'flex',
+                            alignItems: 'center',
+                            justifyContent: 'center',
+                          }}
+                        >
+                          <Check size={12} color="#fff" />
+                        </div>
+                      )}
+                      {idx === 0 && (
+                        <div
+                          style={{
+                            position: 'absolute',
+                            bottom: '4px',
+                            left: '4px',
+                            padding: '2px 6px',
+                            background: 'rgba(0,0,0,0.6)',
+                            borderRadius: '4px',
+                            fontSize: '9px',
+                            color: '#fff',
+                            fontWeight: 600,
+                          }}
+                        >
+                          Principal
+                        </div>
+                      )}
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
+
+            {/* Imagen seleccionada o subida */}
             {uploadedImage ? (
               <div>
                 <img
@@ -1969,7 +2093,7 @@ const CrmMarketingImageConverter: React.FC = () => {
                     cursor: 'pointer',
                   }}
                 >
-                  Cambiar imagen
+                  Subir otra imagen
                 </button>
               </div>
             ) : (
