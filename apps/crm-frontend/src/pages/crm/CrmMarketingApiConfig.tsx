@@ -7,7 +7,7 @@
  * - Email (Mailchimp, SendGrid, SMTP)
  */
 
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useState, useCallback, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { usePageHeader } from '../../layouts/CrmLayout';
 import { useAuth } from '../../contexts/AuthContext';
@@ -17,10 +17,8 @@ import {
   Link as LinkIcon,
   CheckCircle,
   XCircle,
-  ExternalLink,
   RefreshCw,
   Shield,
-  AlertTriangle,
   Mail,
   Instagram,
   Facebook,
@@ -29,9 +27,9 @@ import {
   ChevronRight,
   Loader2,
   Info,
-  Settings,
   User,
   Building,
+  X,
 } from 'lucide-react';
 
 // Interfaz para las credenciales del tenant
@@ -280,13 +278,29 @@ const Section: React.FC<SectionProps> = ({ title, subtitle, icon, color, childre
   </div>
 );
 
+// Google Ads account interface
+interface GoogleAdsAccount {
+  customerId: string;
+  descriptiveName: string;
+  currencyCode: string;
+  timeZone: string;
+  manager: boolean;
+}
+
 const CrmMarketingApiConfig: React.FC = () => {
   const navigate = useNavigate();
   const { setPageHeader } = usePageHeader();
-  const { tenantActual } = useAuth();
+  const { tenantActual, user } = useAuth();
   const [credentials, setCredentials] = useState<TenantApiCredentials | null>(null);
   const [loading, setLoading] = useState(true);
   const [actionLoading, setActionLoading] = useState<string | null>(null);
+
+  // Google Ads account selector state
+  const [showAccountSelector, setShowAccountSelector] = useState(false);
+  const [availableAccounts, setAvailableAccounts] = useState<GoogleAdsAccount[]>([]);
+  const [accountsLoading, setAccountsLoading] = useState(false);
+  const popupRef = useRef<Window | null>(null);
+  const pollTimerRef = useRef<number | null>(null);
 
   useEffect(() => {
     setPageHeader({
@@ -301,11 +315,11 @@ const CrmMarketingApiConfig: React.FC = () => {
       if (!tenantActual?.id) return;
 
       try {
-        const data = await apiFetch(`/tenants/${tenantActual.id}/api-credentials`);
+        const response = await apiFetch(`/tenants/${tenantActual.id}/api-credentials`);
+        const data = await response.json();
         setCredentials(data);
       } catch (error) {
         console.error('Error fetching API credentials:', error);
-        // Si no hay credenciales, establecer estado vacío
         setCredentials(null);
       } finally {
         setLoading(false);
@@ -315,11 +329,64 @@ const CrmMarketingApiConfig: React.FC = () => {
     fetchCredentials();
   }, [tenantActual?.id]);
 
-  // Handlers de conexión (estos abrirán modales o flujos OAuth)
+  // Listen for OAuth postMessage from popup
+  const handleOAuthMessage = useCallback(async (event: MessageEvent) => {
+    if (event.data?.type !== 'GOOGLE_ADS_OAUTH_RESULT') return;
+
+    // Clean up popup resources
+    if (pollTimerRef.current) {
+      clearInterval(pollTimerRef.current);
+      pollTimerRef.current = null;
+    }
+    popupRef.current = null;
+
+    if (event.data.success) {
+      // OAuth succeeded - now fetch available accounts
+      setAccountsLoading(true);
+      setActionLoading(null);
+
+      try {
+        const accountsResponse = await apiFetch(
+          `/tenants/${tenantActual?.id}/api-credentials/google-ads/accounts`
+        );
+        const accounts: GoogleAdsAccount[] = await accountsResponse.json();
+
+        if (accounts.length === 1 && !accounts[0].manager) {
+          // Only one non-manager account - auto-select it
+          await handleSelectAccount(accounts[0].customerId);
+        } else if (accounts.length > 0) {
+          setAvailableAccounts(accounts);
+          setShowAccountSelector(true);
+        } else {
+          alert('No se encontraron cuentas de Google Ads accesibles.');
+        }
+      } catch (error) {
+        console.error('Error fetching accounts:', error);
+        alert('OAuth exitoso, pero hubo un error al obtener las cuentas. Intenta de nuevo.');
+      } finally {
+        setAccountsLoading(false);
+      }
+    } else {
+      setActionLoading(null);
+      alert(event.data.message || 'Error en la autorización de Google Ads');
+    }
+  }, [tenantActual?.id]);
+
+  useEffect(() => {
+    window.addEventListener('message', handleOAuthMessage);
+    return () => window.removeEventListener('message', handleOAuthMessage);
+  }, [handleOAuthMessage]);
+
+  // Clean up on unmount
+  useEffect(() => {
+    return () => {
+      if (pollTimerRef.current) clearInterval(pollTimerRef.current);
+    };
+  }, []);
+
+  // Handlers de conexión
   const handleConnectGoogleSearchConsole = () => {
     setActionLoading('google-search-console');
-    // TODO: Implementar flujo OAuth de Google
-    // Por ahora, simular con un alert
     alert('El flujo de OAuth de Google Search Console se implementará próximamente.\n\nNecesitarás:\n1. Un proyecto en Google Cloud Console\n2. Search Console API habilitada\n3. Credenciales OAuth 2.0');
     setActionLoading(null);
   };
@@ -340,10 +407,79 @@ const CrmMarketingApiConfig: React.FC = () => {
     }
   };
 
-  const handleConnectGoogleAds = () => {
+  const handleConnectGoogleAds = async () => {
+    if (!tenantActual?.id) return;
+
     setActionLoading('google-ads');
-    alert('El flujo de OAuth de Google Ads se implementará próximamente.\n\nNecesitarás:\n1. Una cuenta de Google Ads\n2. Developer Token de Google Ads API\n3. OAuth 2.0 configurado');
-    setActionLoading(null);
+
+    try {
+      // 1. Get auth URL from backend
+      const userId = user?.id || 'unknown';
+      const authResponse = await apiFetch(
+        `/tenants/${tenantActual.id}/api-credentials/google-ads/auth-url?connectedBy=${userId}`
+      );
+      const { authUrl } = await authResponse.json();
+
+      // 2. Open popup centered on screen
+      const width = 600;
+      const height = 700;
+      const left = window.screenX + (window.outerWidth - width) / 2;
+      const top = window.screenY + (window.outerHeight - height) / 2;
+
+      const popup = window.open(
+        authUrl,
+        'google-ads-oauth',
+        `width=${width},height=${height},left=${left},top=${top},toolbar=no,menubar=no,scrollbars=yes`
+      );
+
+      if (!popup) {
+        alert('No se pudo abrir la ventana de autorización. Verifica que los popups no estén bloqueados.');
+        setActionLoading(null);
+        return;
+      }
+
+      popupRef.current = popup;
+
+      // 3. Poll to detect if popup was closed manually (without completing OAuth)
+      pollTimerRef.current = window.setInterval(() => {
+        if (popup.closed) {
+          if (pollTimerRef.current) {
+            clearInterval(pollTimerRef.current);
+            pollTimerRef.current = null;
+          }
+          popupRef.current = null;
+          setActionLoading(null);
+        }
+      }, 500);
+    } catch (error) {
+      console.error('Error starting OAuth:', error);
+      alert('Error al iniciar el flujo de autorización');
+      setActionLoading(null);
+    }
+  };
+
+  const handleSelectAccount = async (customerId: string) => {
+    if (!tenantActual?.id) return;
+
+    setAccountsLoading(true);
+    try {
+      await apiFetch(`/tenants/${tenantActual.id}/api-credentials/google-ads/customer-id`, {
+        method: 'PUT',
+        body: JSON.stringify({ customerId }),
+      });
+
+      // Refresh credentials
+      const refreshResponse = await apiFetch(`/tenants/${tenantActual.id}/api-credentials`);
+      const refreshedData = await refreshResponse.json();
+      setCredentials(refreshedData);
+      setShowAccountSelector(false);
+      setAvailableAccounts([]);
+    } catch (error) {
+      console.error('Error selecting account:', error);
+      alert('Error al seleccionar la cuenta');
+    } finally {
+      setAccountsLoading(false);
+    }
   };
 
   const handleDisconnectGoogleAds = async () => {
@@ -530,7 +666,13 @@ const CrmMarketingApiConfig: React.FC = () => {
           name="Google Ads"
           description="Crea y gestiona campañas de búsqueda y display para atraer compradores"
           connected={credentials?.googleAdsConnected || false}
-          connectionInfo={credentials?.googleAdsCustomerId ? `ID Cliente: ${credentials.googleAdsCustomerId}` : undefined}
+          connectionInfo={
+            credentials?.googleAdsCustomerId
+              ? credentials.googleAdsCustomerId === 'PENDING'
+                ? 'Conectado - Selecciona una cuenta'
+                : `ID Cliente: ${credentials.googleAdsCustomerId}`
+              : undefined
+          }
           color="#4285f4"
           onConnect={handleConnectGoogleAds}
           onDisconnect={handleDisconnectGoogleAds}
@@ -694,6 +836,175 @@ const CrmMarketingApiConfig: React.FC = () => {
           to { transform: rotate(360deg); }
         }
       `}</style>
+
+      {/* Google Ads Account Selector Modal */}
+      {showAccountSelector && (
+        <div
+          style={{
+            position: 'fixed',
+            inset: 0,
+            background: 'rgba(0,0,0,0.5)',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            zIndex: 1000,
+          }}
+          onClick={() => {
+            setShowAccountSelector(false);
+            setAvailableAccounts([]);
+          }}
+        >
+          <div
+            style={{
+              background: 'white',
+              borderRadius: '20px',
+              padding: '32px',
+              maxWidth: '520px',
+              width: '90%',
+              maxHeight: '80vh',
+              overflow: 'auto',
+              boxShadow: '0 24px 80px rgba(0,0,0,0.2)',
+            }}
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '24px' }}>
+              <div>
+                <h3 style={{ fontSize: '18px', fontWeight: 700, color: '#1e293b', margin: 0 }}>
+                  Selecciona una cuenta
+                </h3>
+                <p style={{ fontSize: '13px', color: '#64748b', margin: '4px 0 0 0' }}>
+                  Elige la cuenta de Google Ads que deseas conectar
+                </p>
+              </div>
+              <button
+                onClick={() => {
+                  setShowAccountSelector(false);
+                  setAvailableAccounts([]);
+                }}
+                style={{
+                  background: '#f1f5f9',
+                  border: 'none',
+                  borderRadius: '8px',
+                  padding: '8px',
+                  cursor: 'pointer',
+                  color: '#64748b',
+                }}
+              >
+                <X size={18} />
+              </button>
+            </div>
+
+            {accountsLoading ? (
+              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '40px' }}>
+                <Loader2 size={28} style={{ animation: 'spin 1s linear infinite', color: '#3b82f6' }} />
+              </div>
+            ) : (
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
+                {availableAccounts.map((account) => (
+                  <button
+                    key={account.customerId}
+                    onClick={() => handleSelectAccount(account.customerId)}
+                    disabled={accountsLoading}
+                    style={{
+                      display: 'flex',
+                      alignItems: 'center',
+                      gap: '14px',
+                      padding: '16px',
+                      background: '#f8fafc',
+                      border: '2px solid #e2e8f0',
+                      borderRadius: '12px',
+                      cursor: 'pointer',
+                      textAlign: 'left',
+                      transition: 'all 0.15s',
+                    }}
+                    onMouseEnter={(e) => {
+                      e.currentTarget.style.borderColor = '#4285f4';
+                      e.currentTarget.style.background = '#eff6ff';
+                    }}
+                    onMouseLeave={(e) => {
+                      e.currentTarget.style.borderColor = '#e2e8f0';
+                      e.currentTarget.style.background = '#f8fafc';
+                    }}
+                  >
+                    <div
+                      style={{
+                        width: '44px',
+                        height: '44px',
+                        borderRadius: '10px',
+                        background: account.manager ? '#fef3c720' : '#4285f420',
+                        display: 'flex',
+                        alignItems: 'center',
+                        justifyContent: 'center',
+                        color: account.manager ? '#92400e' : '#4285f4',
+                        flexShrink: 0,
+                      }}
+                    >
+                      {account.manager ? <Building size={20} /> : <Megaphone size={20} />}
+                    </div>
+                    <div style={{ flex: 1, minWidth: 0 }}>
+                      <div style={{ fontSize: '14px', fontWeight: 600, color: '#1e293b' }}>
+                        {account.descriptiveName}
+                      </div>
+                      <div style={{ fontSize: '12px', color: '#64748b', marginTop: '2px' }}>
+                        ID: {account.customerId}
+                        {account.manager && (
+                          <span
+                            style={{
+                              marginLeft: '8px',
+                              padding: '2px 6px',
+                              background: '#fef3c7',
+                              borderRadius: '4px',
+                              fontSize: '10px',
+                              fontWeight: 600,
+                              color: '#92400e',
+                            }}
+                          >
+                            Manager
+                          </span>
+                        )}
+                        <span style={{ marginLeft: '8px' }}>{account.currencyCode}</span>
+                      </div>
+                    </div>
+                    <ChevronRight size={16} color="#94a3b8" />
+                  </button>
+                ))}
+              </div>
+            )}
+          </div>
+        </div>
+      )}
+
+      {/* Accounts loading overlay (while fetching accounts after OAuth) */}
+      {accountsLoading && !showAccountSelector && (
+        <div
+          style={{
+            position: 'fixed',
+            inset: 0,
+            background: 'rgba(0,0,0,0.3)',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            zIndex: 999,
+          }}
+        >
+          <div
+            style={{
+              background: 'white',
+              borderRadius: '16px',
+              padding: '32px 48px',
+              display: 'flex',
+              alignItems: 'center',
+              gap: '16px',
+              boxShadow: '0 12px 40px rgba(0,0,0,0.15)',
+            }}
+          >
+            <Loader2 size={24} style={{ animation: 'spin 1s linear infinite', color: '#4285f4' }} />
+            <span style={{ fontSize: '14px', fontWeight: 500, color: '#1e293b' }}>
+              Obteniendo cuentas de Google Ads...
+            </span>
+          </div>
+        </div>
+      )}
     </div>
   );
 };

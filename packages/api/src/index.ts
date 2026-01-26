@@ -14,6 +14,7 @@ import catalogosRouter from './routes/catalogos.js';
 import ubicacionesRouter from './routes/ubicaciones.js';
 import geocodingRouter from './routes/geocoding.js';
 import importRouter from './routes/import.js';
+import oauthRouter from './routes/oauth.routes.js';
 
 // Cargar variables de entorno
 dotenv.config();
@@ -231,6 +232,9 @@ app.use('/api/geocoding', geocodingRouter);
 
 // Rutas de importación (Alterestate, EasyBroker)
 app.use('/api/import', importRouter);
+
+// Rutas OAuth (callbacks sin autenticación - Google, Meta)
+app.use('/api/oauth', oauthRouter);
 
 // Nota: Las rutas de datos dinámicos están anidadas en /api/tenants/:tenantId/dynamic-data
 

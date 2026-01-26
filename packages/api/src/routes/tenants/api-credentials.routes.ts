@@ -12,6 +12,8 @@
 
 import express, { Request, Response, NextFunction } from 'express';
 import * as credentialsService from '../../services/tenantApiCredentialsService.js';
+import { createOAuthState } from '../oauth.routes.js';
+import * as googleAdsService from '../../services/googleAdsService.js';
 
 const router = express.Router({ mergeParams: true });
 
@@ -120,6 +122,144 @@ router.delete('/google-ads', async (req: Request<TenantParams>, res: Response, n
     await credentialsService.disconnectGoogleAds(tenantId);
     res.json({ success: true, message: 'Google Ads desconectado' });
   } catch (error) {
+    next(error);
+  }
+});
+
+/**
+ * GET /api/tenants/:tenantId/api-credentials/google-ads/auth-url
+ * Generates the Google OAuth consent URL for connecting Google Ads.
+ * The frontend opens this URL in a popup window.
+ */
+router.get('/google-ads/auth-url', async (req: Request<TenantParams>, res: Response, next: NextFunction) => {
+  try {
+    const { tenantId } = req.params;
+    const connectedBy = (req.query.connectedBy as string) || 'unknown';
+
+    const clientId = process.env.GOOGLE_OAUTH_CLIENT_ID;
+    if (!clientId) {
+      return res.status(500).json({ error: 'GOOGLE_OAUTH_CLIENT_ID no configurado en el servidor' });
+    }
+
+    // Build redirect URI dynamically
+    const protocol = req.get('x-forwarded-proto') || req.protocol;
+    const host = req.get('host') || '';
+    const redirectUri = `${protocol}://${host}/api/oauth/google-ads/callback`;
+
+    // Create signed state with tenant + user info
+    const state = createOAuthState(tenantId, connectedBy);
+
+    const params = new URLSearchParams({
+      client_id: clientId,
+      redirect_uri: redirectUri,
+      response_type: 'code',
+      scope: 'https://www.googleapis.com/auth/adwords',
+      access_type: 'offline',
+      prompt: 'consent',
+      state,
+    });
+
+    const authUrl = `https://accounts.google.com/o/oauth2/v2/auth?${params.toString()}`;
+
+    res.json({ authUrl });
+  } catch (error) {
+    next(error);
+  }
+});
+
+/**
+ * PUT /api/tenants/:tenantId/api-credentials/google-ads/customer-id
+ * Updates the Google Ads Customer ID after the user selects an account.
+ * Called after OAuth when the user picks which account to connect.
+ */
+router.put('/google-ads/customer-id', async (req: Request<TenantParams>, res: Response, next: NextFunction) => {
+  try {
+    const { tenantId } = req.params;
+    const { customerId } = req.body;
+
+    if (!customerId) {
+      return res.status(400).json({ error: 'Se requiere customerId' });
+    }
+
+    // Validate format: 10 digits, optionally formatted as XXX-XXX-XXXX
+    const cleanId = customerId.replace(/-/g, '');
+    if (!/^\d{10}$/.test(cleanId)) {
+      return res.status(400).json({ error: 'Customer ID debe ser 10 dígitos (ej: 123-456-7890)' });
+    }
+
+    // Format as XXX-XXX-XXXX for storage
+    const formattedId = `${cleanId.slice(0, 3)}-${cleanId.slice(3, 6)}-${cleanId.slice(6)}`;
+
+    // Get existing token to preserve it
+    const existing = await credentialsService.getGoogleAdsToken(tenantId);
+    if (!existing) {
+      return res.status(400).json({ error: 'Google Ads no está conectado. Realiza el flujo OAuth primero.' });
+    }
+
+    // Re-save with the selected customer ID
+    await credentialsService.saveGoogleAdsCredentials(
+      tenantId,
+      existing.refreshToken,
+      formattedId,
+      null,
+      'system'
+    );
+
+    res.json({ success: true, customerId: formattedId });
+  } catch (error) {
+    next(error);
+  }
+});
+
+/**
+ * GET /api/tenants/:tenantId/api-credentials/google-ads/accounts
+ * Lists accessible Google Ads customer accounts after OAuth.
+ * Used to let the user choose which account to connect.
+ */
+router.get('/google-ads/accounts', async (req: Request<TenantParams>, res: Response, next: NextFunction) => {
+  try {
+    const { tenantId } = req.params;
+
+    const tokenData = await credentialsService.getGoogleAdsToken(tenantId);
+    if (!tokenData) {
+      return res.status(400).json({ error: 'Google Ads no está conectado' });
+    }
+
+    const accounts = await googleAdsService.listAccessibleCustomers(tokenData.refreshToken);
+    res.json(accounts);
+  } catch (error: any) {
+    console.error('[Google Ads] Error listing accounts:', error.message);
+    next(error);
+  }
+});
+
+/**
+ * GET /api/tenants/:tenantId/api-credentials/google-ads/campaigns
+ * Gets campaigns with performance metrics for the connected account.
+ */
+router.get('/google-ads/campaigns', async (req: Request<TenantParams>, res: Response, next: NextFunction) => {
+  try {
+    const { tenantId } = req.params;
+    const { startDate, endDate } = req.query;
+
+    const tokenData = await credentialsService.getGoogleAdsToken(tenantId);
+    if (!tokenData || !tokenData.customerId || tokenData.customerId === 'PENDING') {
+      return res.status(400).json({ error: 'Google Ads no está configurado completamente' });
+    }
+
+    const dateRange = startDate && endDate
+      ? { startDate: startDate as string, endDate: endDate as string }
+      : undefined;
+
+    const campaigns = await googleAdsService.getCampaigns(
+      tokenData.refreshToken,
+      tokenData.customerId,
+      dateRange
+    );
+
+    res.json(campaigns);
+  } catch (error: any) {
+    console.error('[Google Ads] Error getting campaigns:', error.message);
     next(error);
   }
 });
