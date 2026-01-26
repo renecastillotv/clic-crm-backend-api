@@ -37,6 +37,7 @@ import {
   Monitor,
   Square,
   Edit3,
+  AlertCircle,
 } from 'lucide-react';
 
 // ============================================
@@ -1314,16 +1315,21 @@ const CrmMarketingImageConverter: React.FC = () => {
   // Cargar imagen como base64 usando proxy para CORS
   const loadImageAsBase64 = useCallback(async (url: string): Promise<string | null> => {
     try {
-      const isR2Url = url.includes('r2.dev') || url.includes('cloudflarestorage.com');
-      let fetchUrl = url;
+      const apiBase = import.meta.env.VITE_API_URL || 'http://localhost:3001/api';
+      const isExternal = url.startsWith('http://') || url.startsWith('https://');
 
-      if (isR2Url && tenantActual?.id) {
-        const apiBase = import.meta.env.VITE_API_URL || 'http://localhost:3001/api';
+      // Usar proxy para todas las URLs externas (evita CORS)
+      let fetchUrl = url;
+      if (isExternal && tenantActual?.id) {
         fetchUrl = `${apiBase}/tenants/${tenantActual.id}/upload/proxy-image?url=${encodeURIComponent(url)}`;
       }
 
+      console.log('[ImageConverter] Loading image:', { original: url, fetch: fetchUrl });
       const response = await fetch(fetchUrl);
-      if (!response.ok) return null;
+      if (!response.ok) {
+        console.warn('[ImageConverter] Image fetch failed:', response.status, response.statusText);
+        return null;
+      }
 
       const blob = await response.blob();
       return new Promise((resolve) => {
@@ -1332,7 +1338,8 @@ const CrmMarketingImageConverter: React.FC = () => {
         reader.onerror = () => resolve(null);
         reader.readAsDataURL(blob);
       });
-    } catch {
+    } catch (err) {
+      console.error('[ImageConverter] Error loading image:', err);
       return null;
     }
   }, [tenantActual?.id]);
@@ -1434,7 +1441,14 @@ const CrmMarketingImageConverter: React.FC = () => {
   };
 
   // Cargar imagen seleccionada de la galería
+  const [imageLoading, setImageLoading] = useState(false);
+  const [imageError, setImageError] = useState<string | null>(null);
+
   const loadPropertyImage = async (url: string) => {
+    setImageLoading(true);
+    setImageError(null);
+    console.log('[ImageConverter] loadPropertyImage:', url);
+
     const base64 = await loadImageAsBase64(url);
     if (base64) {
       const img = new window.Image();
@@ -1442,8 +1456,18 @@ const CrmMarketingImageConverter: React.FC = () => {
         setPropertyImage(img);
         setUploadedImage(base64);
         setGeneratedImage(null);
+        setImageLoading(false);
+      };
+      img.onerror = () => {
+        console.error('[ImageConverter] Image element failed to load');
+        setImageLoading(false);
+        setImageError('Error al cargar la imagen');
       };
       img.src = base64;
+    } else {
+      setImageLoading(false);
+      setImageError('No se pudo cargar la imagen. Verifica la URL.');
+      console.warn('[ImageConverter] loadImageAsBase64 returned null for:', url);
     }
   };
 
@@ -1452,14 +1476,16 @@ const CrmMarketingImageConverter: React.FC = () => {
     setSelectedProperty(prop);
     setSelectedImageIndex(0);
     setGeneratedImage(null);
+    setPropertyImage(null);
+    setUploadedImage(null);
 
     // Auto-cargar la primera imagen
     const images = getPropertyImages(prop);
+    console.log('[ImageConverter] Property selected:', prop.titulo, '- Images found:', images.length, images);
     if (images.length > 0) {
       await loadPropertyImage(images[0]);
     } else {
-      setPropertyImage(null);
-      setUploadedImage(null);
+      setImageError('Esta propiedad no tiene imágenes');
     }
   };
 
@@ -2212,6 +2238,19 @@ const CrmMarketingImageConverter: React.FC = () => {
                   boxShadow: '0 4px 20px rgba(0,0,0,0.15)',
                 }}
               />
+            ) : imageLoading ? (
+              <div style={{ textAlign: 'center', color: '#64748b' }}>
+                <Loader2 size={48} style={{ opacity: 0.5, marginBottom: '12px', animation: 'spin 1s linear infinite' }} />
+                <p style={{ margin: 0, fontSize: '14px' }}>Cargando imagen...</p>
+              </div>
+            ) : imageError ? (
+              <div style={{ textAlign: 'center', color: '#ef4444' }}>
+                <AlertCircle size={48} style={{ opacity: 0.5, marginBottom: '12px' }} />
+                <p style={{ margin: 0, fontSize: '14px' }}>{imageError}</p>
+                <p style={{ margin: '8px 0 0', fontSize: '12px', color: '#94a3b8' }}>
+                  Intenta subir la imagen manualmente
+                </p>
+              </div>
             ) : propertyImage ? (
               <div style={{ textAlign: 'center', color: '#64748b' }}>
                 <Loader2 size={48} style={{ opacity: 0.3, marginBottom: '12px', animation: 'spin 1s linear infinite' }} />
