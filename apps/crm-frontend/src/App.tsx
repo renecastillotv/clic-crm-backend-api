@@ -106,16 +106,16 @@ import CrmProductividadConfiguracion from './pages/crm/CrmProductividadConfigura
 // Páginas de Marketing
 import CrmMarketing from './pages/crm/CrmMarketing';
 import CrmMarketingApiConfig from './pages/crm/CrmMarketingApiConfig';
-import CrmMarketingBranding from './pages/crm/CrmMarketingBranding';
+import CrmMarketingCreativos from './pages/crm/CrmMarketingCreativos';
 import CrmMarketingCampanas from './pages/crm/CrmMarketingCampanas';
 import CrmMarketingRedesSociales from './pages/crm/CrmMarketingRedesSociales';
-import CrmMarketingEmail from './pages/crm/CrmMarketingEmail';
 import CrmMarketingAnalytics from './pages/crm/CrmMarketingAnalytics';
 import CrmMarketingImageConverter from './pages/crm/CrmMarketingImageConverter';
 import CrmMarketingFlyerGenerator from './pages/crm/CrmMarketingFlyerGenerator';
 import CrmMarketingStoriesCreator from './pages/crm/CrmMarketingStoriesCreator';
 import CrmMarketingTemplates from './pages/crm/CrmMarketingTemplates';
 import CrmMarketingCampanaDetalle from './pages/crm/CrmMarketingCampanaDetalle';
+import CrmMarketingLeads from './pages/crm/CrmMarketingLeads';
 
 // Páginas de Roles del Tenant
 import CrmRoles from './pages/crm/CrmRoles';
@@ -362,19 +362,36 @@ function AppRoutes() {
         {/* Mensajería (una sola página con tabs) */}
         <Route path="mensajeria" element={<CrmMensajeria />} />
 
-        {/* Marketing Hub */}
+        {/* Marketing Centro */}
         <Route path="marketing" element={<CrmMarketing />} />
-        <Route path="marketing/branding" element={<CrmMarketingBranding />} />
+
+        {/* Creativos - wrapper con Outlet */}
+        <Route path="marketing/creativos" element={<CrmMarketingCreativos />}>
+          <Route index element={<Navigate to="artes" replace />} />
+          <Route path="artes" element={<CrmMarketingImageConverter />} />
+          <Route path="flyers" element={<CrmMarketingFlyerGenerator />} />
+          <Route path="stories" element={<CrmMarketingStoriesCreator />} />
+          <Route path="plantillas" element={<CrmMarketingTemplates />} />
+        </Route>
+
+        {/* Campanas multi-proveedor */}
         <Route path="marketing/campanas" element={<CrmMarketingCampanas />} />
         <Route path="marketing/campanas/:campaignId" element={<CrmMarketingCampanaDetalle />} />
+
+        {/* Redes, Leads, Analytics, Config */}
         <Route path="marketing/redes-sociales" element={<CrmMarketingRedesSociales />} />
-        <Route path="marketing/email" element={<CrmMarketingEmail />} />
+        <Route path="marketing/leads" element={<CrmMarketingLeads />} />
         <Route path="marketing/analytics" element={<CrmMarketingAnalytics />} />
-        <Route path="marketing/convertir-imagenes" element={<CrmMarketingImageConverter />} />
-        <Route path="marketing/flyers" element={<CrmMarketingFlyerGenerator />} />
-        <Route path="marketing/stories" element={<CrmMarketingStoriesCreator />} />
-        <Route path="marketing/plantillas" element={<CrmMarketingTemplates />} />
-        <Route path="marketing/configuracion-apis" element={<CrmMarketingApiConfig />} />
+        <Route path="marketing/configuracion" element={<CrmMarketingApiConfig />} />
+
+        {/* Redirects de compatibilidad */}
+        <Route path="marketing/branding" element={<Navigate to="../marketing/creativos" replace />} />
+        <Route path="marketing/email" element={<Navigate to="../marketing/campanas" replace />} />
+        <Route path="marketing/convertir-imagenes" element={<Navigate to="../marketing/creativos/artes" replace />} />
+        <Route path="marketing/flyers" element={<Navigate to="../marketing/creativos/flyers" replace />} />
+        <Route path="marketing/stories" element={<Navigate to="../marketing/creativos/stories" replace />} />
+        <Route path="marketing/plantillas" element={<Navigate to="../marketing/creativos/plantillas" replace />} />
+        <Route path="marketing/configuracion-apis" element={<Navigate to="../marketing/configuracion" replace />} />
 
         {/* Sistema de Fases y Productividad */}
         <Route path="sistema-fases" element={<CrmSistemaFases />} />

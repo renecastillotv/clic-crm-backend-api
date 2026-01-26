@@ -1467,7 +1467,7 @@ const CrmMarketingImageConverter: React.FC = () => {
       {/* Header */}
       <div style={{ marginBottom: '24px' }}>
         <button
-          onClick={() => navigate(`${basePath}/marketing/branding`)}
+          onClick={() => navigate(`${basePath}/marketing/creativos`)}
           style={{
             display: 'flex',
             alignItems: 'center',

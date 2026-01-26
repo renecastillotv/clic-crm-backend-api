@@ -188,7 +188,7 @@ const CrmMarketingAnalytics: React.FC = () => {
 
   const handleAction = (action: string) => {
     if (action === 'connect-apis') {
-      navigate(`${basePath}/marketing/configuracion-apis`);
+      navigate(`${basePath}/marketing/configuracion`);
       return;
     }
     if (action === 'metrics-dashboard' || action === 'campaign-roi') {

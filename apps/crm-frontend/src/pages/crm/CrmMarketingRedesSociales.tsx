@@ -190,7 +190,7 @@ const CrmMarketingRedesSociales: React.FC = () => {
     console.log('Action:', action);
 
     if (action === 'connect-apis') {
-      navigate(`${basePath}/marketing/configuracion-apis`);
+      navigate(`${basePath}/marketing/configuracion`);
       return;
     }
   };

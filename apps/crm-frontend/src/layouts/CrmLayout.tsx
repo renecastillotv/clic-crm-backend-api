@@ -416,6 +416,28 @@ const Icons = {
       <line x1="6" y1="20" x2="6" y2="14"/>
     </svg>
   ),
+  centro: (
+    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+      <rect x="3" y="3" width="7" height="7"/>
+      <rect x="14" y="3" width="7" height="7"/>
+      <rect x="14" y="14" width="7" height="7"/>
+      <rect x="3" y="14" width="7" height="7"/>
+    </svg>
+  ),
+  leads: (
+    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+      <path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2"/>
+      <circle cx="9" cy="7" r="4"/>
+      <line x1="19" y1="8" x2="19" y2="14"/>
+      <line x1="22" y1="11" x2="16" y2="11"/>
+    </svg>
+  ),
+  configuracionMkt: (
+    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+      <circle cx="12" cy="12" r="3"/>
+      <path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06A1.65 1.65 0 0 0 4.68 15a1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06A1.65 1.65 0 0 0 9 4.68a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z"/>
+    </svg>
+  ),
 };
 
 export default function CrmLayout() {
@@ -481,16 +503,24 @@ export default function CrmLayout() {
     'contenido': 'contenido',
     'mensajeria': 'mensajeria',
     'marketing': 'marketing',
-    'marketing/branding': 'marketing-branding',
+    'marketing/creativos': 'marketing-branding',
+    'marketing/creativos/artes': 'marketing-branding',
+    'marketing/creativos/flyers': 'marketing-branding',
+    'marketing/creativos/stories': 'marketing-branding',
+    'marketing/creativos/plantillas': 'marketing-branding',
     'marketing/campanas': 'marketing-campanas',
     'marketing/redes-sociales': 'marketing-redes-sociales',
-    'marketing/email': 'marketing-email',
+    'marketing/leads': 'marketing-leads',
     'marketing/analytics': 'marketing-analytics',
+    'marketing/configuracion': 'marketing-config',
+    // Backward compatibility
+    'marketing/branding': 'marketing-branding',
+    'marketing/email': 'marketing-campanas',
     'marketing/convertir-imagenes': 'marketing-branding',
     'marketing/flyers': 'marketing-branding',
     'marketing/stories': 'marketing-branding',
     'marketing/plantillas': 'marketing-branding',
-    'marketing/configuracion-apis': 'marketing',
+    'marketing/configuracion-apis': 'marketing-config',
     'clic-connect': 'clic-connect',
     'university': 'university',
     'mi-entrenamiento': 'mi-entrenamiento',
@@ -602,11 +632,13 @@ export default function CrmLayout() {
 
   // Sub-items de Marketing
   const marketingSubItems = [
-    { id: 'marketing-branding', path: 'marketing/branding', label: 'Creativos', icon: Icons.branding },
-    { id: 'marketing-campanas', path: 'marketing/campanas', label: 'Campañas', icon: Icons.campanas },
+    { id: 'marketing', path: 'marketing', label: 'Centro', icon: Icons.centro },
+    { id: 'marketing-branding', path: 'marketing/creativos', label: 'Creativos', icon: Icons.branding },
+    { id: 'marketing-campanas', path: 'marketing/campanas', label: 'Campanas', icon: Icons.campanas },
     { id: 'marketing-redes-sociales', path: 'marketing/redes-sociales', label: 'Redes Sociales', icon: Icons.redesSociales },
-    { id: 'marketing-email', path: 'marketing/email', label: 'Email', icon: Icons.emailMarketing },
+    { id: 'marketing-leads', path: 'marketing/leads', label: 'Leads', icon: Icons.leads },
     { id: 'marketing-analytics', path: 'marketing/analytics', label: 'Analytics', icon: Icons.analytics },
+    { id: 'marketing-config', path: 'marketing/configuracion', label: 'Config', icon: Icons.configuracionMkt },
   ];
 
   // Filtrar items según permisos
