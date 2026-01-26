@@ -555,7 +555,7 @@ router.get('/meta-ads/auth-url', async (req: Request<TenantParams>, res: Respons
       client_id: appId,
       redirect_uri: redirectUri,
       response_type: 'code',
-      scope: 'ads_read,read_insights,business_management',
+      scope: 'ads_read,ads_management,business_management',
       state,
     });
 
