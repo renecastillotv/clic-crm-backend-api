@@ -379,6 +379,43 @@ const Icons = {
       <line x1="12" y1="22.08" x2="12" y2="12"/>
     </svg>
   ),
+  // Marketing sub-items icons
+  branding: (
+    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+      <circle cx="13.5" cy="6.5" r="2.5"/>
+      <circle cx="6.5" cy="12" r="2.5"/>
+      <circle cx="13.5" cy="17.5" r="2.5"/>
+      <path d="M15.5 9c1.5 1 2.5 2.5 2.5 4.5 0 2-1 3.5-2.5 4.5"/>
+    </svg>
+  ),
+  campanas: (
+    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+      <path d="m3 11 18-5v12L3 14v-3z"/>
+      <path d="M11.6 16.8a3 3 0 1 1-5.8-1.6"/>
+    </svg>
+  ),
+  redesSociales: (
+    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+      <circle cx="18" cy="5" r="3"/>
+      <circle cx="6" cy="12" r="3"/>
+      <circle cx="18" cy="19" r="3"/>
+      <line x1="8.59" y1="13.51" x2="15.42" y2="17.49"/>
+      <line x1="15.41" y1="6.51" x2="8.59" y2="10.49"/>
+    </svg>
+  ),
+  emailMarketing: (
+    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+      <path d="M4 4h16c1.1 0 2 .9 2 2v12c0 1.1-.9 2-2 2H4c-1.1 0-2-.9-2-2V6c0-1.1.9-2 2-2z"/>
+      <polyline points="22,6 12,13 2,6"/>
+    </svg>
+  ),
+  analytics: (
+    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+      <line x1="18" y1="20" x2="18" y2="10"/>
+      <line x1="12" y1="20" x2="12" y2="4"/>
+      <line x1="6" y1="20" x2="6" y2="14"/>
+    </svg>
+  ),
 };
 
 export default function CrmLayout() {
@@ -392,6 +429,7 @@ export default function CrmLayout() {
   const [crmOpen, setCrmOpen] = useState(false);
   const [finanzasOpen, setFinanzasOpen] = useState(false);
   const [sistemaFasesOpen, setSistemaFasesOpen] = useState(false);
+  const [marketingOpen, setMarketingOpen] = useState(false);
   const [configOpen, setConfigOpen] = useState(false);
   const [pageHeader, setPageHeader] = useState<PageHeaderInfo | null>(null);
   const [userMenuOpen, setUserMenuOpen] = useState(false);
@@ -443,6 +481,16 @@ export default function CrmLayout() {
     'contenido': 'contenido',
     'mensajeria': 'mensajeria',
     'marketing': 'marketing',
+    'marketing/branding': 'marketing-branding',
+    'marketing/campanas': 'marketing-campanas',
+    'marketing/redes-sociales': 'marketing-redes-sociales',
+    'marketing/email': 'marketing-email',
+    'marketing/analytics': 'marketing-analytics',
+    'marketing/convertir-imagenes': 'marketing-branding',
+    'marketing/flyers': 'marketing-branding',
+    'marketing/stories': 'marketing-branding',
+    'marketing/plantillas': 'marketing-branding',
+    'marketing/configuracion-apis': 'marketing',
     'clic-connect': 'clic-connect',
     'university': 'university',
     'mi-entrenamiento': 'mi-entrenamiento',
@@ -484,19 +532,22 @@ export default function CrmLayout() {
                        location.pathname.includes('/metas');
     const isFinanzasRoute = location.pathname.includes('/finanzas');
     const isSistemaFasesRoute = location.pathname.includes('/sistema-fases') || location.pathname.includes('/productividad');
+    const isMarketingRoute = location.pathname.includes('/marketing');
 
     // Abrir solo el menú correspondiente a la ruta actual, cerrar los demás
     setCrmOpen(isCrmRoute);
     setFinanzasOpen(isFinanzasRoute);
     setSistemaFasesOpen(isSistemaFasesRoute);
+    setMarketingOpen(isMarketingRoute);
     setConfigOpen(isConfigRoute);
   }, [location.pathname]);
 
   // Función para manejar el toggle de submenús (cierra los demás al abrir uno)
-  const toggleSubmenu = (menu: 'crm' | 'finanzas' | 'sistemaFases' | 'config') => {
+  const toggleSubmenu = (menu: 'crm' | 'finanzas' | 'sistemaFases' | 'marketing' | 'config') => {
     setCrmOpen(menu === 'crm' ? !crmOpen : false);
     setFinanzasOpen(menu === 'finanzas' ? !finanzasOpen : false);
     setSistemaFasesOpen(menu === 'sistemaFases' ? !sistemaFasesOpen : false);
+    setMarketingOpen(menu === 'marketing' ? !marketingOpen : false);
     setConfigOpen(menu === 'config' ? !configOpen : false);
   };
 
@@ -549,6 +600,15 @@ export default function CrmLayout() {
     { id: 'configuracion', path: 'configuracion', label: 'General', icon: Icons.general },
   ];
 
+  // Sub-items de Marketing
+  const marketingSubItems = [
+    { id: 'marketing-branding', path: 'marketing?tab=branding', label: 'Branding', icon: Icons.branding },
+    { id: 'marketing-campanas', path: 'marketing?tab=campaigns', label: 'Campañas', icon: Icons.campanas },
+    { id: 'marketing-redes-sociales', path: 'marketing?tab=social', label: 'Redes Sociales', icon: Icons.redesSociales },
+    { id: 'marketing-email', path: 'marketing?tab=email', label: 'Email', icon: Icons.emailMarketing },
+    { id: 'marketing-analytics', path: 'marketing?tab=analytics', label: 'Analytics', icon: Icons.analytics },
+  ];
+
   // Filtrar items según permisos
   const visibleCrmItems = crmSubItems.filter(
     (item) => tieneAcceso(item.id)
@@ -569,6 +629,10 @@ export default function CrmLayout() {
     (item) => tieneAcceso(item.id)
   );
 
+  const visibleMarketingItems = marketingSubItems.filter(
+    (item) => tieneAcceso(item.id) || tieneAcceso('marketing')
+  );
+
   const hasVisibleFeatures = tieneAcceso('contenido') || tieneAcceso('clic-connect') ||
     tieneAcceso('university') || tieneAcceso('mi-entrenamiento') ||
     visibleSistemaFasesItems.length > 0;
@@ -585,6 +649,8 @@ export default function CrmLayout() {
 
   const isConfigActive = location.pathname.includes('/web/') ||
                          location.pathname.endsWith('/configuracion');
+
+  const isMarketingActive = location.pathname.includes('/marketing');
 
   return (
     <CatalogosProvider>
@@ -719,15 +785,41 @@ export default function CrmLayout() {
               </NavLink>
               )}
 
-              {/* Marketing */}
-              {tieneAcceso('marketing') && (
-              <NavLink
-                to={`${basePath}/marketing`}
-                className={({ isActive }) => `nav-item ${isActive ? 'active' : ''}`}
+              {/* Marketing con submenú */}
+              {visibleMarketingItems.length === 1 ? (
+                <NavLink
+                  to={`${basePath}/${visibleMarketingItems[0].path}`}
+                  className={({ isActive }) => `nav-item ${isActive ? 'active' : ''}`}
+                >
+                  <span className="nav-icon">{Icons.marketing}</span>
+                  <span className="nav-label">{visibleMarketingItems[0].label}</span>
+                </NavLink>
+              ) : visibleMarketingItems.length > 1 && (
+              <>
+              <button
+                className={`nav-item nav-expandable ${isMarketingActive ? 'active' : ''}`}
+                onClick={() => toggleSubmenu('marketing')}
               >
                 <span className="nav-icon">{Icons.marketing}</span>
                 <span className="nav-label">Marketing</span>
-              </NavLink>
+                <span className={`nav-chevron ${marketingOpen ? 'open' : ''}`}>
+                  {Icons.chevronDown}
+                </span>
+              </button>
+
+              <div className={`nav-submenu ${marketingOpen ? 'open' : ''}`}>
+                {visibleMarketingItems.map((item) => (
+                  <NavLink
+                    key={item.id}
+                    to={`${basePath}/${item.path}`}
+                    className={({ isActive }) => `nav-subitem ${isActive ? 'active' : ''}`}
+                  >
+                    <span className="nav-icon">{item.icon}</span>
+                    <span className="nav-label">{item.label}</span>
+                  </NavLink>
+                ))}
+              </div>
+              </>
               )}
             </div>
 

@@ -11,8 +11,10 @@
 
 import express, { Request, Response, NextFunction } from 'express';
 import * as productividadService from '../../services/productividadService.js';
+import { resolveUserScope } from '../../middleware/scopeResolver.js';
 
 const router = express.Router({ mergeParams: true });
+router.use(resolveUserScope);
 
 interface TenantParams { tenantId: string }
 interface UsuarioParams extends TenantParams { usuarioId: string }

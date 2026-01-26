@@ -12,7 +12,10 @@ import {
   createRolTenant,
   updateRolTenant,
   deleteRolTenant,
-  getUsuariosCountByRol
+  getUsuariosCountByRol,
+  getGlobalRoles,
+  getRolModulos,
+  saveRolPermisos
 } from '../../services/usuariosService.js';
 
 const router = express.Router({ mergeParams: true });
@@ -48,6 +51,56 @@ router.get('/usuarios-count', async (req: Request<TenantParams>, res: Response, 
     }
 
     res.json({ counts });
+  } catch (error) {
+    next(error);
+  }
+});
+
+/**
+ * GET /api/tenants/:tenantId/roles/global-roles
+ * Obtiene los roles globales disponibles como padres
+ */
+router.get('/global-roles', async (req: Request<TenantParams>, res: Response, next: NextFunction) => {
+  try {
+    const roles = await getGlobalRoles();
+    res.json({ roles });
+  } catch (error) {
+    next(error);
+  }
+});
+
+/**
+ * GET /api/tenants/:tenantId/roles/:rolId/permisos
+ * Obtiene los permisos (módulos) de un rol
+ */
+router.get('/:rolId/permisos', async (req: Request<TenantParams & { rolId: string }>, res: Response, next: NextFunction) => {
+  try {
+    const { rolId } = req.params;
+    const modulos = await getRolModulos(rolId);
+    res.json({ modulos });
+  } catch (error) {
+    next(error);
+  }
+});
+
+/**
+ * PUT /api/tenants/:tenantId/roles/:rolId/permisos
+ * Guarda los permisos de un rol (validando contra el padre)
+ */
+router.put('/:rolId/permisos', async (req: Request<TenantParams & { rolId: string }>, res: Response, next: NextFunction) => {
+  try {
+    const { tenantId, rolId } = req.params;
+    const { parentId, permisos } = req.body;
+
+    if (!parentId) {
+      return res.status(400).json({ error: 'Se requiere parentId (rol padre)' });
+    }
+    if (!permisos || !Array.isArray(permisos)) {
+      return res.status(400).json({ error: 'Se requiere un array de permisos' });
+    }
+
+    await saveRolPermisos(tenantId, rolId, parentId, permisos);
+    res.json({ success: true, message: 'Permisos guardados correctamente' });
   } catch (error) {
     next(error);
   }

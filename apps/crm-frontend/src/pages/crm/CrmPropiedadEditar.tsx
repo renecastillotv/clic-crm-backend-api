@@ -231,7 +231,7 @@ const generarSlug = (titulo: string): string => {
 
 export default function CrmPropiedadEditar() {
   const { tenantSlug, propiedadId } = useParams<{ tenantSlug: string; propiedadId: string }>();
-  const { tenantActual } = useAuth();
+  const { tenantActual, puedeCrear, puedeEditar } = useAuth();
   const { getToken } = useClerkAuth();
   const { etiquetasPropiedad } = useCatalogos();
   const { setPageHeader } = usePageHeader();
@@ -447,28 +447,30 @@ export default function CrmPropiedadEditar() {
   }, [form]);
 
   // Configurar header
+  const tienePermiso = isEditing ? puedeEditar('propiedades') : puedeCrear('propiedades');
+
   useEffect(() => {
     setPageHeader({
       title: isEditing ? 'Editar Propiedad' : 'Nueva Propiedad',
-      subtitle: isEditing 
-        ? 'Modifica la información de la propiedad' 
+      subtitle: isEditing
+        ? (tienePermiso ? 'Modifica la información de la propiedad' : 'Solo lectura - no tienes permiso para editar')
         : 'Agrega una nueva propiedad al inventario',
       backButton: {
         label: 'Volver a Propiedades',
         onClick: () => navigate(`/crm/${tenantSlug}/propiedades`),
       },
-      actions: (
-        <button 
-          className="btn-primary" 
+      actions: tienePermiso ? (
+        <button
+          className="btn-primary"
           onClick={handleSave}
           disabled={saving || !form.titulo.trim()}
         >
           {saving ? <Icons.loader className="spin" /> : <Icons.save />}
           {saving ? 'Guardando...' : 'Guardar Propiedad'}
         </button>
-      ),
+      ) : undefined,
     });
-  }, [setPageHeader, isEditing, tenantSlug, navigate, saving, form.titulo]);
+  }, [setPageHeader, isEditing, tenantSlug, navigate, saving, form.titulo, tienePermiso]);
 
   // Cargar datos - usamos un ref para trackear qué combinación tenant+propiedad ya fue cargado
   const loadedKeyRef = useRef<string | null>(null);

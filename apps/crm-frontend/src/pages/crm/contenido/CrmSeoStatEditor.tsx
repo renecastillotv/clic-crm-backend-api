@@ -8,7 +8,7 @@
  */
 
 import { useState, useEffect, useRef, useCallback, useMemo } from 'react';
-import { useParams, useNavigate } from 'react-router-dom';
+import { useParams, useNavigate, useSearchParams } from 'react-router-dom';
 import { useAuth } from '../../../contexts/AuthContext';
 import { usePageHeader } from '../../../layouts/CrmLayout';
 import {
@@ -132,10 +132,12 @@ const initialFormData: FormData = {
 export default function CrmSeoStatEditor() {
   const { tenantSlug, id } = useParams<{ tenantSlug: string; id: string }>();
   const navigate = useNavigate();
-  const { tenantActual } = useAuth();
+  const [searchParams] = useSearchParams();
+  const { tenantActual, puedeEditar, puedeCrear } = useAuth();
   const { setPageHeader } = usePageHeader();
 
   const isEditing = id && id !== 'nuevo';
+  const isViewOnly = searchParams.get('mode') === 'ver' || (isEditing && !puedeEditar('contenido')) || (!isEditing && !puedeCrear('contenido'));
 
   const [formData, setFormData] = useState<FormData>(initialFormData);
   const [categorias, setCategorias] = useState<any[]>([]);
@@ -163,8 +165,8 @@ export default function CrmSeoStatEditor() {
 
   useEffect(() => {
     setPageHeader({
-      title: isEditing ? 'Editar SEO Stat' : 'Nuevo SEO Stat',
-      subtitle: 'Contenido SEO con asociaciones múltiples',
+      title: isViewOnly ? 'Ver SEO Stat' : (isEditing ? 'Editar SEO Stat' : 'Nuevo SEO Stat'),
+      subtitle: isViewOnly ? 'Solo lectura' : 'Contenido SEO con asociaciones múltiples',
       actions: (
         <div style={{ display: 'flex', gap: '12px' }}>
           <button
@@ -174,18 +176,20 @@ export default function CrmSeoStatEditor() {
             {Icons.arrowLeft}
             <span>Volver</span>
           </button>
-          <button
-            onClick={() => handleSaveRef.current()}
-            className="btn-primary"
-            disabled={saving}
-          >
-            {Icons.save}
-            <span>{saving ? 'Guardando...' : 'Guardar'}</span>
-          </button>
+          {!isViewOnly && (
+            <button
+              onClick={() => handleSaveRef.current()}
+              className="btn-primary"
+              disabled={saving}
+            >
+              {Icons.save}
+              <span>{saving ? 'Guardando...' : 'Guardar'}</span>
+            </button>
+          )}
         </div>
       ),
     });
-  }, [setPageHeader, isEditing, tenantSlug, saving]);
+  }, [setPageHeader, isEditing, isViewOnly, tenantSlug, saving]);
 
   useEffect(() => {
     loadData();

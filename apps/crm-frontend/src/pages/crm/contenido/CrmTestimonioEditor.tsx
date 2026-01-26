@@ -10,7 +10,7 @@
  */
 
 import { useState, useEffect, useRef, useCallback } from 'react';
-import { useParams, useNavigate } from 'react-router-dom';
+import { useParams, useNavigate, useSearchParams } from 'react-router-dom';
 import { useAuth as useClerkAuth } from '@clerk/clerk-react';
 import { useAuth } from '../../../contexts/AuthContext';
 import { usePageHeader } from '../../../layouts/CrmLayout';
@@ -74,12 +74,14 @@ interface Traducciones {
 export default function CrmTestimonioEditor() {
   const { tenantSlug, id } = useParams<{ tenantSlug: string; id?: string }>();
   const navigate = useNavigate();
+  const [searchParams] = useSearchParams();
   const { getToken } = useClerkAuth();
-  const { tenantActual } = useAuth();
+  const { tenantActual, puedeEditar, puedeCrear } = useAuth();
   const { setPageHeader } = usePageHeader();
   const { idiomas } = useIdiomas(tenantActual?.id);
 
   const isEditing = id && id !== 'nuevo';
+  const isViewOnly = searchParams.get('mode') === 'ver' || (isEditing && !puedeEditar('contenido')) || (!isEditing && !puedeCrear('contenido'));
 
   const [contactos, setContactos] = useState<Contacto[]>([]);
   const [propiedades, setPropiedades] = useState<Propiedad[]>([]);
@@ -124,22 +126,24 @@ export default function CrmTestimonioEditor() {
   // Header - usa el ref para evitar stale closure
   useEffect(() => {
     setPageHeader({
-      title: isEditing ? 'Editar Testimonio' : 'Nuevo Testimonio',
-      subtitle: isEditing ? 'Actualiza el testimonio' : 'Agrega un nuevo testimonio de cliente',
+      title: isViewOnly ? 'Ver Testimonio' : (isEditing ? 'Editar Testimonio' : 'Nuevo Testimonio'),
+      subtitle: isViewOnly ? 'Solo lectura' : (isEditing ? 'Actualiza el testimonio' : 'Agrega un nuevo testimonio de cliente'),
       actions: (
         <div style={{ display: 'flex', gap: '12px' }}>
           <button onClick={() => navigate(`/crm/${tenantSlug}/contenido?tab=testimonios`)} className="btn-secondary">
             {Icons.back}
             <span>Volver</span>
           </button>
-          <button onClick={() => handleSaveRef.current()} className="btn-primary" disabled={saving}>
-            {Icons.save}
-            <span>{saving ? 'Guardando...' : 'Guardar'}</span>
-          </button>
+          {!isViewOnly && (
+            <button onClick={() => handleSaveRef.current()} className="btn-primary" disabled={saving}>
+              {Icons.save}
+              <span>{saving ? 'Guardando...' : 'Guardar'}</span>
+            </button>
+          )}
         </div>
       ),
     });
-  }, [setPageHeader, isEditing, saving, tenantSlug]);
+  }, [setPageHeader, isEditing, isViewOnly, saving, tenantSlug]);
 
   // Cargar datos
   useEffect(() => {

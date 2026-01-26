@@ -8,7 +8,7 @@
  */
 
 import { useState, useEffect, useRef, useCallback } from 'react';
-import { useParams, useNavigate } from 'react-router-dom';
+import { useParams, useNavigate, useSearchParams } from 'react-router-dom';
 import { useAuth } from '../../../contexts/AuthContext';
 import { usePageHeader } from '../../../layouts/CrmLayout';
 import {
@@ -53,11 +53,13 @@ interface Traducciones {
 export default function CrmFaqEditor() {
   const { tenantSlug, id } = useParams<{ tenantSlug: string; id?: string }>();
   const navigate = useNavigate();
-  const { tenantActual } = useAuth();
+  const [searchParams] = useSearchParams();
+  const { tenantActual, puedeEditar, puedeCrear } = useAuth();
   const { setPageHeader } = usePageHeader();
   const { idiomas } = useIdiomas(tenantActual?.id);
 
   const isEditing = id && id !== 'nuevo';
+  const isViewOnly = searchParams.get('mode') === 'ver' || (isEditing && !puedeEditar('contenido')) || (!isEditing && !puedeCrear('contenido'));
 
   const [categorias, setCategorias] = useState<CategoriaContenido[]>([]);
   const [loading, setLoading] = useState(true);
@@ -87,22 +89,24 @@ export default function CrmFaqEditor() {
   // Header - usa el ref para evitar stale closure
   useEffect(() => {
     setPageHeader({
-      title: isEditing ? 'Editar FAQ' : 'Nueva FAQ',
-      subtitle: isEditing ? 'Actualiza la pregunta frecuente' : 'Crea una nueva pregunta frecuente',
+      title: isViewOnly ? 'Ver FAQ' : (isEditing ? 'Editar FAQ' : 'Nueva FAQ'),
+      subtitle: isViewOnly ? 'Solo lectura' : (isEditing ? 'Actualiza la pregunta frecuente' : 'Crea una nueva pregunta frecuente'),
       actions: (
         <div style={{ display: 'flex', gap: '12px' }}>
           <button onClick={() => navigate(`/crm/${tenantSlug}/contenido?tab=faqs`)} className="btn-secondary">
             {Icons.back}
             <span>Volver</span>
           </button>
-          <button onClick={() => handleSaveRef.current()} className="btn-primary" disabled={saving}>
-            {Icons.save}
-            <span>{saving ? 'Guardando...' : 'Guardar'}</span>
-          </button>
+          {!isViewOnly && (
+            <button onClick={() => handleSaveRef.current()} className="btn-primary" disabled={saving}>
+              {Icons.save}
+              <span>{saving ? 'Guardando...' : 'Guardar'}</span>
+            </button>
+          )}
         </div>
       ),
     });
-  }, [setPageHeader, isEditing, saving, tenantSlug, navigate]);
+  }, [setPageHeader, isEditing, isViewOnly, saving, tenantSlug, navigate]);
 
   // Cargar datos
   useEffect(() => {

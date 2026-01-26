@@ -141,35 +141,36 @@ export async function createClerkUser(data: {
   lastName?: string;
 }) {
   try {
-    // Crear usuario con email pre-verificado para que pueda loguearse inmediatamente
+    // Crear usuario con password checks deshabilitados (admin puede poner cualquier password)
     const user = await clerkClient.users.createUser({
       emailAddress: [data.email],
       password: data.password,
       firstName: data.firstName,
       lastName: data.lastName,
-      skipPasswordChecks: false, // Validar que la contraseña cumpla requisitos
+      skipPasswordChecks: true,
     });
 
     // Si el email no está verificado, verificarlo automáticamente
     const primaryEmail = user.emailAddresses.find(e => e.emailAddress === data.email);
     if (primaryEmail && primaryEmail.verification?.status !== 'verified') {
       try {
-        // Usar la API de Clerk para preparar la verificación
-        // y luego actualizar el usuario para marcar el email como verificado
         await clerkClient.emailAddresses.updateEmailAddress(primaryEmail.id, {
           verified: true,
         });
-        console.log(`✅ Email ${data.email} verificado automáticamente para usuario creado por admin`);
       } catch (verifyError: any) {
-        // Si falla la verificación, loguear pero no fallar la creación
-        console.warn(`⚠️ No se pudo verificar automáticamente el email: ${verifyError.message}`);
+        console.warn(`⚠️ No se pudo verificar email: ${verifyError.message}`);
       }
     }
 
     return user;
   } catch (error: any) {
-    console.error('Error al crear usuario en Clerk:', error);
-    throw new Error(`Error al crear usuario: ${error.message}`);
+    // Extraer detalles de error de Clerk
+    const clerkErrors = error.errors || error.clerkError?.errors;
+    if (clerkErrors && Array.isArray(clerkErrors)) {
+      const messages = clerkErrors.map((e: any) => e.longMessage || e.message).join('; ');
+      throw new Error(messages);
+    }
+    throw new Error(error.message || 'Error desconocido al crear usuario en Clerk');
   }
 }
 

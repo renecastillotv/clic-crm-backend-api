@@ -8,6 +8,7 @@
 import express from 'express'
 import { query } from '../../utils/db.js';
 import { getTasasCambio, updateTasasCambio } from '../../services/tasasCambioService.js';
+import { resolveUserScope } from '../../middleware/scopeResolver.js';
 
 // Tipos para params con mergeParams
 interface RouteParams { [key: string]: string | undefined;
@@ -16,6 +17,7 @@ interface RouteParams { [key: string]: string | undefined;
 }
 
 const router = express.Router({ mergeParams: true });
+router.use(resolveUserScope);
 
 /**
  * GET /api/tenants/:tenantId/configuracion

@@ -7,7 +7,7 @@
 
 import { Router, Request, Response, NextFunction } from 'express';
 import { query } from '../../utils/db.js';
-import { resolveUserScope, getOwnFilter } from '../../middleware/scopeResolver.js';
+import { resolveUserScope, getOwnFilter, requirePermission } from '../../middleware/scopeResolver.js';
 
 const router = Router({ mergeParams: true });
 

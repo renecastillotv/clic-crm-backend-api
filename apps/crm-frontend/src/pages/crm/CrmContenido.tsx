@@ -63,6 +63,7 @@ const Icons = {
   search: <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>,
   plus: <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>,
   edit: <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/></svg>,
+  eye: <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/></svg>,
   trash: <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><polyline points="3 6 5 6 21 6"/><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/></svg>,
   x: <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>,
   link: <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M10 13a5 5 0 0 0 7.54.54l3-3a5 5 0 0 0-7.07-7.07l-1.72 1.71"/><path d="M14 11a5 5 0 0 0-7.54-.54l-3 3a5 5 0 0 0 7.07 7.07l1.71-1.71"/></svg>,
@@ -126,7 +127,10 @@ export default function CrmContenido() {
   const { tenantSlug } = useParams<{ tenantSlug: string }>();
   const navigate = useNavigate();
   const [searchParams, setSearchParams] = useSearchParams();
-  const { tenantActual } = useAuth();
+  const { tenantActual, puedeCrear, puedeEditar, puedeEliminar } = useAuth();
+  const canCreate = puedeCrear('contenido');
+  const canEdit = puedeEditar('contenido');
+  const canDelete = puedeEliminar('contenido');
   const { setPageHeader } = usePageHeader();
 
   // Idiomas del tenant (para traducciones)
@@ -216,62 +220,62 @@ export default function CrmContenido() {
         articulos: {
           title: 'Artículos',
           subtitle: 'Gestiona los artículos de tu blog',
-          action: (
+          action: canCreate ? (
             <button onClick={() => navigate(`/crm/${tenantSlug}/contenido/articulos/nuevo`)} className="btn-primary">
               <span className="icon">{Icons.plus}</span>
               Nuevo Artículo
             </button>
-          ),
+          ) : undefined,
         },
         videos: {
           title: 'Videos',
           subtitle: 'Gestiona tu galería de videos',
-          action: (
+          action: canCreate ? (
             <button onClick={() => navigate(`/crm/${tenantSlug}/contenido/videos/nuevo`)} className="btn-primary">
               <span className="icon">{Icons.plus}</span>
               Nuevo Video
             </button>
-          ),
+          ) : undefined,
         },
         faqs: {
           title: 'FAQs',
           subtitle: 'Gestiona las preguntas frecuentes',
-          action: (
+          action: canCreate ? (
             <button onClick={() => navigate(`/crm/${tenantSlug}/contenido/faqs/nuevo`)} className="btn-primary">
               <span className="icon">{Icons.plus}</span>
               Nueva FAQ
             </button>
-          ),
+          ) : undefined,
         },
         testimonios: {
           title: 'Testimonios',
           subtitle: 'Gestiona los testimonios de tus clientes',
-          action: (
+          action: canCreate ? (
             <button onClick={() => navigate(`/crm/${tenantSlug}/contenido/testimonios/nuevo`)} className="btn-primary">
               <span className="icon">{Icons.plus}</span>
               Nuevo Testimonio
             </button>
-          ),
+          ) : undefined,
         },
         seo: {
           title: 'SEO Stats',
           subtitle: 'Contenido enriquecido para SEO',
-          action: (
+          action: canCreate ? (
             <button onClick={() => navigate(`/crm/${tenantSlug}/contenido/seo-stats/nuevo`)} className="btn-primary">
               <span className="icon">{Icons.plus}</span>
               Nuevo SEO Stat
             </button>
-          ),
+          ) : undefined,
         },
         categorias: {
           title: 'Categorías',
           subtitle: 'Organiza tu contenido por categorías',
-          action: (
+          action: canCreate ? (
             <button onClick={() => { setEditingCategoria(null); resetCategoriaForm(); setShowCategoriaModal(true); }} className="btn-primary">
               <span className="icon">{Icons.plus}</span>
               Nueva Categoría
             </button>
-          ),
+          ) : undefined,
         },
         relacionar: {
           title: 'Relacionar Contenido',
@@ -287,7 +291,7 @@ export default function CrmContenido() {
       subtitle: config.subtitle,
       actions: config.action,
     });
-  }, [activeTab, setPageHeader, navigate, tenantSlug]);
+  }, [activeTab, setPageHeader, navigate, tenantSlug, canCreate]);
 
   // Cargar datos según tab activo
   useEffect(() => {
@@ -789,8 +793,9 @@ export default function CrmContenido() {
                   <td>{categorias.find(c => c.id === categoriaId)?.nombre || '-'}</td>
                   <td>
                     <button
-                      onClick={() => handleTogglePublicado('articulo', art.id, art.publicado)}
+                      onClick={() => canEdit && handleTogglePublicado('articulo', art.id, art.publicado)}
                       className={`status-btn ${art.publicado ? 'published' : 'draft'}`}
+                      style={!canEdit ? { cursor: 'default', opacity: 0.7 } : undefined}
                     >
                       {art.publicado ? 'Publicado' : 'Borrador'}
                     </button>
@@ -798,8 +803,8 @@ export default function CrmContenido() {
                   <td>{art.vistas || 0}</td>
                   <td>
                     <div className="row-actions">
-                      <button onClick={() => navigate(`/crm/${tenantSlug}/contenido/articulos/${art.id}`)} className="action-btn">{Icons.edit}</button>
-                      <button onClick={() => setDeleteConfirm({ tipo: 'articulo', id: art.id })} className="action-btn action-btn-danger">{Icons.trash}</button>
+                      <button onClick={() => navigate(`/crm/${tenantSlug}/contenido/articulos/${art.id}${!canEdit ? '?mode=ver' : ''}`)} className="action-btn" title={canEdit ? 'Editar' : 'Ver'}>{canEdit ? Icons.edit : Icons.eye}</button>
+                      {canDelete && <button onClick={() => setDeleteConfirm({ tipo: 'articulo', id: art.id })} className="action-btn action-btn-danger">{Icons.trash}</button>}
                     </div>
                   </td>
                 </tr>
@@ -859,8 +864,9 @@ export default function CrmContenido() {
                   <td>{tipoVideo}</td>
                   <td>
                     <button
-                      onClick={() => handleTogglePublicado('video', vid.id, vid.publicado)}
+                      onClick={() => canEdit && handleTogglePublicado('video', vid.id, vid.publicado)}
                       className={`status-btn ${vid.publicado ? 'published' : 'draft'}`}
+                      style={!canEdit ? { cursor: 'default', opacity: 0.7 } : undefined}
                     >
                       {vid.publicado ? 'Publicado' : 'Borrador'}
                     </button>
@@ -868,8 +874,8 @@ export default function CrmContenido() {
                   <td>{vid.vistas || 0}</td>
                   <td>
                     <div className="row-actions">
-                      <button onClick={() => navigate(`/crm/${tenantSlug}/contenido/videos/${vid.id}`)} className="action-btn">{Icons.edit}</button>
-                      <button onClick={() => setDeleteConfirm({ tipo: 'video', id: vid.id })} className="action-btn action-btn-danger">{Icons.trash}</button>
+                      <button onClick={() => navigate(`/crm/${tenantSlug}/contenido/videos/${vid.id}${!canEdit ? '?mode=ver' : ''}`)} className="action-btn" title={canEdit ? 'Editar' : 'Ver'}>{canEdit ? Icons.edit : Icons.eye}</button>
+                      {canDelete && <button onClick={() => setDeleteConfirm({ tipo: 'video', id: vid.id })} className="action-btn action-btn-danger">{Icons.trash}</button>}
                     </div>
                   </td>
                 </tr>
@@ -910,16 +916,17 @@ export default function CrmContenido() {
                   <td>{faq.contexto || '-'}</td>
                   <td>
                     <button
-                      onClick={() => handleTogglePublicado('faq', faq.id, faq.publicado)}
+                      onClick={() => canEdit && handleTogglePublicado('faq', faq.id, faq.publicado)}
                       className={`status-btn ${faq.publicado ? 'published' : 'draft'}`}
+                      style={!canEdit ? { cursor: 'default', opacity: 0.7 } : undefined}
                     >
                       {faq.publicado ? 'Publicado' : 'Borrador'}
                     </button>
                   </td>
                   <td>
                     <div className="row-actions">
-                      <button onClick={() => navigate(`/crm/${tenantSlug}/contenido/faqs/${faq.id}`)} className="action-btn">{Icons.edit}</button>
-                      <button onClick={() => setDeleteConfirm({ tipo: 'faq', id: faq.id })} className="action-btn action-btn-danger">{Icons.trash}</button>
+                      <button onClick={() => navigate(`/crm/${tenantSlug}/contenido/faqs/${faq.id}${!canEdit ? '?mode=ver' : ''}`)} className="action-btn" title={canEdit ? 'Editar' : 'Ver'}>{canEdit ? Icons.edit : Icons.eye}</button>
+                      {canDelete && <button onClick={() => setDeleteConfirm({ tipo: 'faq', id: faq.id })} className="action-btn action-btn-danger">{Icons.trash}</button>}
                     </div>
                   </td>
                 </tr>
@@ -1119,14 +1126,15 @@ export default function CrmContenido() {
                   {/* Estado + Acciones */}
                   <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
                     <button
-                      onClick={() => handleTogglePublicado('testimonio', test.id, publicado)}
+                      onClick={() => canEdit && handleTogglePublicado('testimonio', test.id, publicado)}
                       style={{
                         padding: '4px 10px',
                         borderRadius: '6px',
                         fontSize: '12px',
                         fontWeight: '500',
                         border: 'none',
-                        cursor: 'pointer',
+                        cursor: canEdit ? 'pointer' : 'default',
+                        opacity: canEdit ? 1 : 0.7,
                         background: publicado ? 'linear-gradient(135deg, #10b981 0%, #059669 100%)' : '#fef3c7',
                         color: publicado ? 'white' : '#92400e'
                       }}
@@ -1134,7 +1142,8 @@ export default function CrmContenido() {
                       {publicado ? 'Publicado' : 'Borrador'}
                     </button>
                     <button
-                      onClick={() => navigate(`/crm/${tenantSlug}/contenido/testimonios/${test.id}`)}
+                      onClick={() => navigate(`/crm/${tenantSlug}/contenido/testimonios/${test.id}${!canEdit ? '?mode=ver' : ''}`)}
+                      title={canEdit ? 'Editar' : 'Ver'}
                       style={{
                         padding: '6px',
                         borderRadius: '6px',
@@ -1156,9 +1165,9 @@ export default function CrmContenido() {
                         e.currentTarget.style.color = '#64748b';
                       }}
                     >
-                      {Icons.edit}
+                      {canEdit ? Icons.edit : Icons.eye}
                     </button>
-                    <button
+                    {canDelete && <button
                       onClick={() => setDeleteConfirm({ tipo: 'testimonio', id: test.id })}
                       style={{
                         padding: '6px',
@@ -1182,7 +1191,7 @@ export default function CrmContenido() {
                       }}
                     >
                       {Icons.trash}
-                    </button>
+                    </button>}
                   </div>
                 </div>
               </div>
@@ -1277,8 +1286,9 @@ export default function CrmContenido() {
                         </td>
                         <td style={{ textAlign: 'center' }}>
                           <button
-                            onClick={() => handleTogglePublicado('testimonio', test.id, publicado)}
+                            onClick={() => canEdit && handleTogglePublicado('testimonio', test.id, publicado)}
                             className={`status-btn ${publicado ? 'published' : 'draft'}`}
+                            style={!canEdit ? { cursor: 'default', opacity: 0.7 } : undefined}
                           >
                             {publicado ? 'Publicado' : 'Borrador'}
                           </button>
@@ -1287,18 +1297,18 @@ export default function CrmContenido() {
                           <div className="action-buttons">
                             <button
                               className="action-btn"
-                              onClick={() => navigate(`/crm/${tenantSlug}/contenido/testimonios/${test.id}`)}
-                              title="Editar"
+                              onClick={() => navigate(`/crm/${tenantSlug}/contenido/testimonios/${test.id}${!canEdit ? '?mode=ver' : ''}`)}
+                              title={canEdit ? 'Editar' : 'Ver'}
                             >
-                              {Icons.edit}
+                              {canEdit ? Icons.edit : Icons.eye}
                             </button>
-                            <button
+                            {canDelete && <button
                               className="action-btn action-btn-danger"
                               onClick={() => setDeleteConfirm({ tipo: 'testimonio', id: test.id })}
                               title="Eliminar"
                             >
                               {Icons.trash}
-                            </button>
+                            </button>}
                           </div>
                         </td>
                       </tr>
@@ -1347,16 +1357,17 @@ export default function CrmContenido() {
                     <td>{asociacionNombre}</td>
                     <td>
                       <button
-                        onClick={() => handleTogglePublicado('seo', seo.id, seo.publicado)}
+                        onClick={() => canEdit && handleTogglePublicado('seo', seo.id, seo.publicado)}
                         className={`status-btn ${seo.publicado ? 'published' : 'draft'}`}
+                        style={!canEdit ? { cursor: 'default', opacity: 0.7 } : undefined}
                       >
                         {seo.publicado ? 'Publicado' : 'Borrador'}
                       </button>
                     </td>
                     <td>
                       <div className="row-actions">
-                        <button onClick={() => navigate(`/crm/${tenantSlug}/contenido/seo-stats/${seo.id}`)} className="action-btn">{Icons.edit}</button>
-                        <button onClick={() => setDeleteConfirm({ tipo: 'seo', id: seo.id })} className="action-btn action-btn-danger">{Icons.trash}</button>
+                        <button onClick={() => navigate(`/crm/${tenantSlug}/contenido/seo-stats/${seo.id}${!canEdit ? '?mode=ver' : ''}`)} className="action-btn" title={canEdit ? 'Editar' : 'Ver'}>{canEdit ? Icons.edit : Icons.eye}</button>
+                        {canDelete && <button onClick={() => setDeleteConfirm({ tipo: 'seo', id: seo.id })} className="action-btn action-btn-danger">{Icons.trash}</button>}
                       </div>
                     </td>
                   </tr>
@@ -1413,8 +1424,8 @@ export default function CrmContenido() {
                   </td>
                   <td>
                     <div className="row-actions">
-                      <button onClick={() => handleEditCategoria(cat)} className="action-btn">{Icons.edit}</button>
-                      <button onClick={() => setDeleteConfirm({ tipo: 'categoria', id: cat.id })} className="action-btn action-btn-danger">{Icons.trash}</button>
+                      {canEdit && <button onClick={() => handleEditCategoria(cat)} className="action-btn" title="Editar">{Icons.edit}</button>}
+                      {canDelete && <button onClick={() => setDeleteConfirm({ tipo: 'categoria', id: cat.id })} className="action-btn action-btn-danger">{Icons.trash}</button>}
                     </div>
                   </td>
                 </tr>
@@ -1468,7 +1479,7 @@ export default function CrmContenido() {
   ];
 
   // Verificar si se puede crear relación
-  const puedeCrearRelacion = contenidoOrigenSeleccionado && tipoContenidoDestino &&
+  const puedeCrearRelacion = canCreate && contenidoOrigenSeleccionado && tipoContenidoDestino &&
     (tipoContenidoDestino === 'propiedad' ? propiedadesSeleccionadas.length > 0 : contenidoDestinoSeleccionado);
 
   const renderRelacionar = () => (
@@ -1590,13 +1601,13 @@ export default function CrmContenido() {
                             <span className="rel-existing-name" title={nombreRelacionado}>
                               {nombreRelacionado}
                             </span>
-                            <button
+                            {canDelete && <button
                               onClick={() => handleEliminarRelacion(rel.id)}
                               className="rel-delete-mini"
                               title="Eliminar relación"
                             >
                               {Icons.trash}
-                            </button>
+                            </button>}
                           </div>
                         );
                       })}
@@ -1627,13 +1638,13 @@ export default function CrmContenido() {
                             <span className="rel-existing-name" title={nombreRelacionado}>
                               {nombreRelacionado}
                             </span>
-                            <button
+                            {canDelete && <button
                               onClick={() => handleEliminarRelacion(rel.id)}
                               className="rel-delete-mini"
                               title="Eliminar relación"
                             >
                               {Icons.trash}
-                            </button>
+                            </button>}
                           </div>
                         );
                       })}

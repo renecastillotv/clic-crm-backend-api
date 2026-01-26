@@ -8,8 +8,10 @@
 
 import express, { Request, Response, NextFunction } from 'express';
 import { getPaginaCompleta } from '../../services/paginasService.js';
+import { resolveUserScope } from '../../middleware/scopeResolver.js';
 
 const router = express.Router({ mergeParams: true });
+router.use(resolveUserScope);
 
 // Tipos para request con tenantId del parent router
 interface TenantParams { tenantId: string }

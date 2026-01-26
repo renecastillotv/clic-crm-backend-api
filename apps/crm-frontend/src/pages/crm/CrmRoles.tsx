@@ -368,8 +368,8 @@ export default function CrmRoles() {
             </button>
             <button
               type="button"
-              className={`tab-button ${activeTab === 'crear' ? 'active' : ''}`}
-              onClick={() => setActiveTab('crear')}
+              className={`tab-button`}
+              onClick={() => navigate(`/crm/${tenantSlug}/roles/nuevo`)}
             >
               <Icons.plus />
               Crear Rol
@@ -436,6 +436,13 @@ export default function CrmRoles() {
                                 </div>
                                 <div className="role-actions">
                                   <button
+                                    className="edit-btn"
+                                    onClick={() => navigate(`/crm/${tenantSlug}/roles/${rol.id}`)}
+                                    title="Editar permisos"
+                                  >
+                                    <Icons.edit />
+                                  </button>
+                                  <button
                                     className={`toggle-btn ${rol.activo ? 'activo' : 'inactivo'}`}
                                     onClick={() => handleToggleActivo(rol)}
                                     disabled={toggling === rol.id}
@@ -489,103 +496,6 @@ export default function CrmRoles() {
               </div>
             )}
 
-            {/* Tab: Crear Rol */}
-            {activeTab === 'crear' && (
-              <div className="tab-panel">
-                <form
-                  onSubmit={(e) => {
-                    e.preventDefault();
-                    handleCrearRol();
-                  }}
-                >
-                  <div className="form-section">
-                    <div className="form-group">
-                      <label>Nombre del Rol *</label>
-                      <input
-                        type="text"
-                        value={form.nombre}
-                        onChange={(e) => setForm(prev => ({ ...prev, nombre: e.target.value }))}
-                        placeholder="Ej: Asesor Inmobiliario"
-                        required
-                      />
-                      <p className="form-hint">El nombre que se mostrará para este rol</p>
-                    </div>
-
-                    <div className="form-group">
-                      <label>Código del Rol *</label>
-                      <input
-                        type="text"
-                        value={form.codigo}
-                        onChange={(e) => setForm(prev => ({ ...prev, codigo: e.target.value.toLowerCase().replace(/[^a-z0-9_]/g, '_') }))}
-                        placeholder="Ej: asesor_inmobiliario"
-                        required
-                        pattern="[a-z0-9_]+"
-                      />
-                      <p className="form-hint">Código único del rol (solo letras minúsculas, números y guiones bajos)</p>
-                    </div>
-
-                    <div className="form-group">
-                      <label>Descripción</label>
-                      <textarea
-                        value={form.descripcion}
-                        onChange={(e) => setForm(prev => ({ ...prev, descripcion: e.target.value }))}
-                        placeholder="Describe las responsabilidades y permisos de este rol"
-                        rows={4}
-                      />
-                    </div>
-
-                    <div className="form-group">
-                      <label>Color</label>
-                      <div className="color-input-group">
-                        <input
-                          type="color"
-                          value={form.color}
-                          onChange={(e) => setForm(prev => ({ ...prev, color: e.target.value }))}
-                        />
-                        <input
-                          type="text"
-                          value={form.color}
-                          onChange={(e) => setForm(prev => ({ ...prev, color: e.target.value }))}
-                          placeholder="#667eea"
-                          pattern="^#[0-9A-Fa-f]{6}$"
-                        />
-                      </div>
-                      <p className="form-hint">Color para identificar este rol en la interfaz</p>
-                    </div>
-                  </div>
-
-                  <div className="form-actions">
-                    <button
-                      type="button"
-                      className="btn-cancel"
-                      onClick={() => {
-                        setForm({ nombre: '', codigo: '', descripcion: '', color: '#667eea' });
-                        setActiveTab('existentes');
-                      }}
-                    >
-                      Cancelar
-                    </button>
-                    <button
-                      type="submit"
-                      className="btn-primary"
-                      disabled={saving || !form.nombre.trim() || !form.codigo.trim()}
-                    >
-                      {saving ? (
-                        <>
-                          <Icons.loader className="spinner" />
-                          Creando...
-                        </>
-                      ) : (
-                        <>
-                          <Icons.plus />
-                          Crear Rol
-                        </>
-                      )}
-                    </button>
-                  </div>
-                </form>
-              </div>
-            )}
           </div>
         </div>
       </div>
@@ -816,6 +726,26 @@ const styles = `
     cursor: pointer;
     transition: all 0.2s;
     font-size: 1rem;
+  }
+
+  .edit-btn {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 32px;
+    height: 32px;
+    border: 1px solid #e2e8f0;
+    border-radius: 8px;
+    background: white;
+    cursor: pointer;
+    transition: all 0.2s;
+    color: #64748b;
+  }
+
+  .edit-btn:hover {
+    background: #eff6ff;
+    border-color: #93c5fd;
+    color: #2563eb;
   }
 
   .toggle-btn:hover {
