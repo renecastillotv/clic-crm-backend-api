@@ -116,12 +116,51 @@ const CrmMarketingRedesSociales: React.FC = () => {
   const [replyingTo, setReplyingTo] = useState<string | null>(null);
   const [replyLoading, setReplyLoading] = useState(false);
 
+  const isFullyConnected = credentials?.metaConnected && credentials?.metaPageId && credentials.metaPageId !== 'PENDING';
+  const hasInstagram = !!credentials?.metaInstagramBusinessAccountId;
+
+  // Build header with connection status in actions slot
   useEffect(() => {
+    if (!isFullyConnected) {
+      setPageHeader({
+        title: 'Redes Sociales',
+        subtitle: 'Publica en Facebook e Instagram',
+      });
+      return;
+    }
+
     setPageHeader({
       title: 'Redes Sociales',
       subtitle: 'Publica en Facebook e Instagram',
+      actions: (
+        <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+            <div style={{ width: '28px', height: '28px', borderRadius: '7px', background: '#1877f215', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#1877f2' }}>
+              <Facebook size={14} />
+            </div>
+            <span style={{ fontSize: '13px', fontWeight: 600, color: '#1e293b' }}>{credentials?.metaPageName}</span>
+            <CheckCircle size={12} color="#16a34a" />
+          </div>
+          {hasInstagram && (
+            <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+              <div style={{ width: '28px', height: '28px', borderRadius: '7px', background: '#e11d4815', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#e11d48' }}>
+                <Instagram size={14} />
+              </div>
+              <span style={{ fontSize: '13px', fontWeight: 600, color: '#1e293b' }}>@{credentials?.metaInstagramUsername}</span>
+              <CheckCircle size={12} color="#16a34a" />
+            </div>
+          )}
+          <button
+            onClick={() => navigate(`${basePath}/marketing/configuracion`)}
+            style={{ display: 'flex', alignItems: 'center', gap: '5px', padding: '6px 12px', background: '#f1f5f9', border: 'none', borderRadius: '8px', fontSize: '12px', fontWeight: 500, color: '#64748b', cursor: 'pointer' }}
+          >
+            <Settings size={13} />
+            Config
+          </button>
+        </div>
+      ),
     });
-  }, [setPageHeader]);
+  }, [setPageHeader, isFullyConnected, hasInstagram, credentials, navigate, basePath]);
 
   // Load credentials
   useEffect(() => {
@@ -145,9 +184,6 @@ const CrmMarketingRedesSociales: React.FC = () => {
     };
     fetchCredentials();
   }, [tenantActual?.id]);
-
-  const isFullyConnected = credentials?.metaConnected && credentials?.metaPageId && credentials.metaPageId !== 'PENDING';
-  const hasInstagram = !!credentials?.metaInstagramBusinessAccountId;
 
   // Load FB posts when tab changes
   const loadFbPosts = useCallback(async () => {
@@ -279,7 +315,7 @@ const CrmMarketingRedesSociales: React.FC = () => {
   // Not connected - show CTA
   if (!isFullyConnected) {
     return (
-      <div style={{ padding: '24px', maxWidth: '700px', margin: '0 auto' }}>
+      <div style={{ padding: '24px' }}>
         <div
           style={{
             background: 'white',
@@ -364,96 +400,7 @@ const CrmMarketingRedesSociales: React.FC = () => {
 
   // Connected - full UI
   return (
-    <div style={{ padding: '24px', maxWidth: '1000px' }}>
-      {/* Connection status bar */}
-      <div
-        style={{
-          background: 'white',
-          borderRadius: '16px',
-          padding: '16px 24px',
-          border: '1px solid #e2e8f0',
-          display: 'flex',
-          alignItems: 'center',
-          gap: '16px',
-          marginBottom: '24px',
-          flexWrap: 'wrap',
-        }}
-      >
-        <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
-          <div
-            style={{
-              width: '40px',
-              height: '40px',
-              borderRadius: '10px',
-              background: '#1877f215',
-              display: 'flex',
-              alignItems: 'center',
-              justifyContent: 'center',
-              color: '#1877f2',
-            }}
-          >
-            <Facebook size={20} />
-          </div>
-          <div>
-            <div style={{ fontSize: '14px', fontWeight: 600, color: '#1e293b' }}>
-              {credentials.metaPageName}
-            </div>
-            <div style={{ fontSize: '12px', color: '#16a34a', display: 'flex', alignItems: 'center', gap: '4px' }}>
-              <CheckCircle size={12} /> Conectado
-            </div>
-          </div>
-        </div>
-
-        {hasInstagram && (
-          <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
-            <div
-              style={{
-                width: '40px',
-                height: '40px',
-                borderRadius: '10px',
-                background: '#e11d4815',
-                display: 'flex',
-                alignItems: 'center',
-                justifyContent: 'center',
-                color: '#e11d48',
-              }}
-            >
-              <Instagram size={20} />
-            </div>
-            <div>
-              <div style={{ fontSize: '14px', fontWeight: 600, color: '#1e293b' }}>
-                @{credentials.metaInstagramUsername}
-              </div>
-              <div style={{ fontSize: '12px', color: '#16a34a', display: 'flex', alignItems: 'center', gap: '4px' }}>
-                <CheckCircle size={12} /> Conectado
-              </div>
-            </div>
-          </div>
-        )}
-
-        <div style={{ marginLeft: 'auto' }}>
-          <button
-            onClick={() => navigate(`${basePath}/marketing/configuracion`)}
-            style={{
-              display: 'flex',
-              alignItems: 'center',
-              gap: '6px',
-              padding: '8px 14px',
-              background: '#f1f5f9',
-              border: 'none',
-              borderRadius: '8px',
-              fontSize: '12px',
-              fontWeight: 500,
-              color: '#64748b',
-              cursor: 'pointer',
-            }}
-          >
-            <Settings size={14} />
-            Configuracion
-          </button>
-        </div>
-      </div>
-
+    <div style={{ padding: '24px' }}>
       {/* Tab bar */}
       <div
         style={{
