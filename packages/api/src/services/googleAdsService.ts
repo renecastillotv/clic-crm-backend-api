@@ -12,7 +12,7 @@ const GOOGLE_CLIENT_ID = process.env.GOOGLE_OAUTH_CLIENT_ID || '';
 const GOOGLE_CLIENT_SECRET = process.env.GOOGLE_OAUTH_CLIENT_SECRET || '';
 const DEVELOPER_TOKEN = process.env.GOOGLE_ADS_DEVELOPER_TOKEN || '';
 
-const GOOGLE_ADS_API_VERSION = 'v18';
+const GOOGLE_ADS_API_VERSION = 'v20';
 const GOOGLE_ADS_BASE_URL = `https://googleads.googleapis.com/${GOOGLE_ADS_API_VERSION}`;
 
 // ==================== TOKEN MANAGEMENT ====================
