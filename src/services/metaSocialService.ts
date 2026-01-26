@@ -243,7 +243,7 @@ export async function getPagePosts(
   // Using 'reactions' instead of 'likes' for broader engagement data
   const fields = 'id,message,full_picture,created_time,permalink_url,reactions.summary(true),comments.summary(true),shares';
 
-  const url = `${GRAPH_API_BASE}/${pageId}/posts?fields=${encodeURIComponent(fields)}&limit=${limit}`;
+  const url = `${GRAPH_API_BASE}/${pageId}/published_posts?fields=${encodeURIComponent(fields)}&limit=${limit}`;
   console.log('[Meta Social] Fetching page posts:', url.replace(/access_token=[^&]+/, 'access_token=***'));
 
   const response = await fetch(url, {
