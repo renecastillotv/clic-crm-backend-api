@@ -22,17 +22,9 @@ import {
   Loader2,
   Search,
   Home,
-  MapPin,
   Check,
   Building2,
-  Bed,
-  Bath,
-  Car,
-  Ruler,
-  Phone,
-  Tag,
   Sparkles,
-  FileImage,
   Smartphone,
   Monitor,
   Square,
@@ -88,6 +80,8 @@ interface TemplateOptions {
   showBadge: boolean;
   badgeText: string;
   ctaText: string;
+  customTitle: string;
+  customSubtitle: string;
 }
 
 type DataMode = 'property' | 'manual';
@@ -133,184 +127,6 @@ const roundRect = (
   ctx.closePath();
 };
 
-// Dibujar ícono de cama (bed) profesional
-const drawBedIcon = (ctx: CanvasRenderingContext2D, x: number, y: number, size: number, color: string) => {
-  ctx.save();
-  ctx.strokeStyle = color;
-  ctx.fillStyle = color;
-  ctx.lineWidth = size * 0.08;
-  ctx.lineCap = 'round';
-  ctx.lineJoin = 'round';
-
-  const w = size;
-  const h = size * 0.7;
-
-  // Base de la cama
-  ctx.beginPath();
-  ctx.moveTo(x, y + h * 0.95);
-  ctx.lineTo(x + w, y + h * 0.95);
-  ctx.stroke();
-
-  // Patas
-  ctx.beginPath();
-  ctx.moveTo(x + w * 0.1, y + h * 0.95);
-  ctx.lineTo(x + w * 0.1, y + h);
-  ctx.moveTo(x + w * 0.9, y + h * 0.95);
-  ctx.lineTo(x + w * 0.9, y + h);
-  ctx.stroke();
-
-  // Colchón
-  roundRect(ctx, x, y + h * 0.5, w, h * 0.4, size * 0.05);
-  ctx.stroke();
-
-  // Cabecera
-  roundRect(ctx, x, y, w * 0.3, h * 0.55, size * 0.05);
-  ctx.fill();
-
-  // Almohada
-  roundRect(ctx, x + w * 0.35, y + h * 0.55, w * 0.25, h * 0.2, size * 0.03);
-  ctx.stroke();
-
-  ctx.restore();
-};
-
-// Dibujar ícono de baño profesional
-const drawBathIcon = (ctx: CanvasRenderingContext2D, x: number, y: number, size: number, color: string) => {
-  ctx.save();
-  ctx.strokeStyle = color;
-  ctx.fillStyle = color;
-  ctx.lineWidth = size * 0.08;
-  ctx.lineCap = 'round';
-  ctx.lineJoin = 'round';
-
-  const w = size;
-  const h = size * 0.8;
-
-  // Ducha (cabezal)
-  ctx.beginPath();
-  ctx.arc(x + w * 0.7, y + h * 0.15, size * 0.12, 0, Math.PI * 2);
-  ctx.stroke();
-
-  // Tubo de ducha
-  ctx.beginPath();
-  ctx.moveTo(x + w * 0.7, y + h * 0.27);
-  ctx.lineTo(x + w * 0.7, y + h * 0.45);
-  ctx.lineTo(x + w * 0.9, y + h * 0.45);
-  ctx.lineTo(x + w * 0.9, y + h * 0.1);
-  ctx.stroke();
-
-  // Bañera/base
-  ctx.beginPath();
-  ctx.moveTo(x, y + h * 0.5);
-  ctx.lineTo(x + w, y + h * 0.5);
-  ctx.stroke();
-
-  // Tina
-  roundRect(ctx, x + w * 0.05, y + h * 0.5, w * 0.9, h * 0.35, size * 0.08);
-  ctx.stroke();
-
-  // Patas
-  ctx.beginPath();
-  ctx.moveTo(x + w * 0.15, y + h * 0.85);
-  ctx.lineTo(x + w * 0.15, y + h);
-  ctx.moveTo(x + w * 0.85, y + h * 0.85);
-  ctx.lineTo(x + w * 0.85, y + h);
-  ctx.stroke();
-
-  ctx.restore();
-};
-
-// Dibujar ícono de estacionamiento profesional
-const drawCarIcon = (ctx: CanvasRenderingContext2D, x: number, y: number, size: number, color: string) => {
-  ctx.save();
-  ctx.strokeStyle = color;
-  ctx.fillStyle = color;
-  ctx.lineWidth = size * 0.07;
-  ctx.lineCap = 'round';
-  ctx.lineJoin = 'round';
-
-  const w = size;
-  const h = size * 0.6;
-
-  // Cuerpo del auto
-  ctx.beginPath();
-  ctx.moveTo(x + w * 0.1, y + h * 0.7);
-  ctx.lineTo(x + w * 0.15, y + h * 0.35);
-  ctx.lineTo(x + w * 0.3, y + h * 0.1);
-  ctx.lineTo(x + w * 0.7, y + h * 0.1);
-  ctx.lineTo(x + w * 0.85, y + h * 0.35);
-  ctx.lineTo(x + w * 0.9, y + h * 0.7);
-  ctx.closePath();
-  ctx.stroke();
-
-  // Ventanas
-  ctx.beginPath();
-  ctx.moveTo(x + w * 0.25, y + h * 0.35);
-  ctx.lineTo(x + w * 0.35, y + h * 0.18);
-  ctx.lineTo(x + w * 0.65, y + h * 0.18);
-  ctx.lineTo(x + w * 0.75, y + h * 0.35);
-  ctx.closePath();
-  ctx.stroke();
-
-  // Línea divisoria ventanas
-  ctx.beginPath();
-  ctx.moveTo(x + w * 0.5, y + h * 0.18);
-  ctx.lineTo(x + w * 0.5, y + h * 0.35);
-  ctx.stroke();
-
-  // Ruedas
-  ctx.beginPath();
-  ctx.arc(x + w * 0.25, y + h * 0.8, size * 0.1, 0, Math.PI * 2);
-  ctx.fill();
-  ctx.beginPath();
-  ctx.arc(x + w * 0.75, y + h * 0.8, size * 0.1, 0, Math.PI * 2);
-  ctx.fill();
-
-  ctx.restore();
-};
-
-// Dibujar ícono de metros cuadrados profesional
-const drawAreaIcon = (ctx: CanvasRenderingContext2D, x: number, y: number, size: number, color: string) => {
-  ctx.save();
-  ctx.strokeStyle = color;
-  ctx.fillStyle = color;
-  ctx.lineWidth = size * 0.07;
-  ctx.lineCap = 'round';
-  ctx.lineJoin = 'round';
-
-  const w = size * 0.85;
-  const h = size * 0.85;
-
-  // Cuadrado exterior
-  ctx.strokeRect(x, y, w, h);
-
-  // Flechas de medición
-  const arrowSize = size * 0.12;
-
-  // Flecha horizontal inferior
-  ctx.beginPath();
-  ctx.moveTo(x + w * 0.15, y + h + size * 0.12);
-  ctx.lineTo(x + w * 0.85, y + h + size * 0.12);
-  ctx.stroke();
-
-  // Puntas flecha horizontal
-  ctx.beginPath();
-  ctx.moveTo(x + w * 0.15, y + h + size * 0.12);
-  ctx.lineTo(x + w * 0.15 + arrowSize, y + h + size * 0.08);
-  ctx.moveTo(x + w * 0.15, y + h + size * 0.12);
-  ctx.lineTo(x + w * 0.15 + arrowSize, y + h + size * 0.16);
-  ctx.stroke();
-
-  ctx.beginPath();
-  ctx.moveTo(x + w * 0.85, y + h + size * 0.12);
-  ctx.lineTo(x + w * 0.85 - arrowSize, y + h + size * 0.08);
-  ctx.moveTo(x + w * 0.85, y + h + size * 0.12);
-  ctx.lineTo(x + w * 0.85 - arrowSize, y + h + size * 0.16);
-  ctx.stroke();
-
-  ctx.restore();
-};
-
 // Dibujar ícono de ubicación profesional
 const drawLocationIcon = (ctx: CanvasRenderingContext2D, x: number, y: number, size: number, color: string) => {
   ctx.save();
@@ -337,32 +153,6 @@ const drawLocationIcon = (ctx: CanvasRenderingContext2D, x: number, y: number, s
   ctx.restore();
 };
 
-// Dibujar ícono de teléfono profesional
-const drawPhoneIcon = (ctx: CanvasRenderingContext2D, x: number, y: number, size: number, color: string) => {
-  ctx.save();
-  ctx.fillStyle = color;
-
-  const w = size * 0.5;
-  const h = size * 0.9;
-
-  // Cuerpo del teléfono
-  roundRect(ctx, x, y, w, h, size * 0.08);
-  ctx.fill();
-
-  // Pantalla (recorte interior)
-  ctx.fillStyle = '#ffffff';
-  roundRect(ctx, x + w * 0.12, y + h * 0.12, w * 0.76, h * 0.65, size * 0.04);
-  ctx.fill();
-
-  // Botón inferior
-  ctx.fillStyle = '#ffffff';
-  ctx.beginPath();
-  ctx.arc(x + w / 2, y + h * 0.88, size * 0.06, 0, Math.PI * 2);
-  ctx.fill();
-
-  ctx.restore();
-};
-
 // Texto con sombra profesional
 const drawTextWithShadow = (
   ctx: CanvasRenderingContext2D,
@@ -379,84 +169,6 @@ const drawTextWithShadow = (
   ctx.shadowOffsetY = 2;
   ctx.fillText(text, x, y);
   ctx.restore();
-};
-
-// Badge profesional con degradado
-const drawBadge = (
-  ctx: CanvasRenderingContext2D,
-  text: string,
-  x: number,
-  y: number,
-  color: string,
-  style: 'pill' | 'ribbon' | 'corner' = 'pill'
-) => {
-  ctx.save();
-  ctx.font = 'bold 22px "Segoe UI", Arial, sans-serif';
-  const textWidth = ctx.measureText(text).width;
-
-  if (style === 'pill') {
-    const padding = 20;
-    const height = 36;
-    const width = textWidth + padding * 2;
-
-    // Sombra
-    ctx.shadowColor = 'rgba(0,0,0,0.3)';
-    ctx.shadowBlur = 10;
-    ctx.shadowOffsetY = 4;
-
-    // Fondo con degradado
-    const gradient = ctx.createLinearGradient(x, y, x, y + height);
-    gradient.addColorStop(0, color);
-    gradient.addColorStop(1, shadeColor(color, -20));
-    ctx.fillStyle = gradient;
-
-    roundRect(ctx, x, y, width, height, height / 2);
-    ctx.fill();
-
-    // Texto
-    ctx.shadowColor = 'transparent';
-    ctx.fillStyle = '#ffffff';
-    ctx.textAlign = 'center';
-    ctx.textBaseline = 'middle';
-    ctx.fillText(text, x + width / 2, y + height / 2 + 1);
-  } else if (style === 'ribbon') {
-    const height = 40;
-    const width = textWidth + 50;
-
-    ctx.fillStyle = color;
-    ctx.beginPath();
-    ctx.moveTo(x, y);
-    ctx.lineTo(x + width, y);
-    ctx.lineTo(x + width + 15, y + height / 2);
-    ctx.lineTo(x + width, y + height);
-    ctx.lineTo(x, y + height);
-    ctx.closePath();
-    ctx.fill();
-
-    ctx.fillStyle = '#ffffff';
-    ctx.textAlign = 'center';
-    ctx.textBaseline = 'middle';
-    ctx.fillText(text, x + width / 2, y + height / 2 + 1);
-  }
-
-  ctx.restore();
-};
-
-// Oscurecer/aclarar color
-const shadeColor = (color: string, percent: number): string => {
-  const num = parseInt(color.replace('#', ''), 16);
-  const amt = Math.round(2.55 * percent);
-  const R = (num >> 16) + amt;
-  const G = ((num >> 8) & 0x00ff) + amt;
-  const B = (num & 0x0000ff) + amt;
-  return `#${(
-    0x1000000 +
-    (R < 255 ? (R < 1 ? 0 : R) : 255) * 0x10000 +
-    (G < 255 ? (G < 1 ? 0 : G) : 255) * 0x100 +
-    (B < 255 ? (B < 1 ? 0 : B) : 255)
-  )
-    .toString(16)
-    .slice(1)}`;
 };
 
 // Labels de tipo y operación
@@ -516,146 +228,174 @@ interface PropertyTemplate {
   ) => void;
 }
 
+// Helper: dibujar imagen de fondo cubriendo todo el canvas
+const drawFullImage = (ctx: CanvasRenderingContext2D, img: HTMLImageElement, w: number, h: number) => {
+  const scale = Math.max(w / img.width, h / img.height);
+  const iw = img.width * scale;
+  const ih = img.height * scale;
+  ctx.drawImage(img, (w - iw) / 2, (h - ih) / 2, iw, ih);
+};
+
+// Helper: dibujar frosted glass panel
+const drawGlassPanel = (
+  ctx: CanvasRenderingContext2D,
+  x: number, y: number, w: number, h: number,
+  radius: number,
+  opacity = 0.65,
+  color = '0,0,0'
+) => {
+  ctx.save();
+  ctx.fillStyle = `rgba(${color},${opacity})`;
+  roundRect(ctx, x, y, w, h, radius);
+  ctx.fill();
+  // Sutil borde de luz
+  ctx.strokeStyle = `rgba(255,255,255,0.12)`;
+  ctx.lineWidth = 1;
+  roundRect(ctx, x, y, w, h, radius);
+  ctx.stroke();
+  ctx.restore();
+};
+
+// Helper: dibujar features inline como texto
+const drawFeaturesInline = (
+  ctx: CanvasRenderingContext2D,
+  data: { habitaciones: number; banos: number; estacionamientos: number; metros: number },
+  x: number, y: number, color: string, fontSize = 22
+) => {
+  const parts: string[] = [];
+  if (data.habitaciones > 0) parts.push(`${data.habitaciones} Hab`);
+  if (data.banos > 0) parts.push(`${data.banos} Baños`);
+  if (data.estacionamientos > 0) parts.push(`${data.estacionamientos} Est`);
+  if (data.metros > 0) parts.push(`${data.metros} m²`);
+  ctx.fillStyle = color;
+  ctx.font = `500 ${fontSize}px "Segoe UI", Arial, sans-serif`;
+  ctx.fillText(parts.join('  ·  '), x, y);
+};
+
 const propertyTemplates: PropertyTemplate[] = [
-  // 1. ELEGANTE MINIMALISTA
+  // 1. ELEGANTE — Full-bleed image, glass panel bottom
   {
     id: 'elegante',
     name: 'Elegante',
-    description: 'Diseño limpio y sofisticado con barra lateral',
+    description: 'Imagen protagonista con panel glass inferior',
     icon: '✨',
     defaultFormat: 'landscape',
     render: (ctx, canvas, propertyImage, logoImg, colores, contactInfo, data, options) => {
       const w = canvas.width;
       const h = canvas.height;
       const primary = colores?.primary || '#1a1a2e';
-      const sidebarWidth = w * 0.35;
 
-      // Imagen principal (lado derecho)
-      const imgAreaW = w - sidebarWidth;
-      const imgScale = Math.max(imgAreaW / propertyImage.width, h / propertyImage.height);
-      const imgW = propertyImage.width * imgScale;
-      const imgH = propertyImage.height * imgScale;
-      ctx.drawImage(
-        propertyImage,
-        sidebarWidth + (imgAreaW - imgW) / 2,
-        (h - imgH) / 2,
-        imgW,
-        imgH
-      );
+      // Imagen full-bleed
+      drawFullImage(ctx, propertyImage, w, h);
 
-      // Overlay suave sobre imagen
-      const imgOverlay = ctx.createLinearGradient(sidebarWidth, 0, sidebarWidth + 150, 0);
-      imgOverlay.addColorStop(0, 'rgba(0,0,0,0.4)');
-      imgOverlay.addColorStop(1, 'rgba(0,0,0,0)');
-      ctx.fillStyle = imgOverlay;
-      ctx.fillRect(sidebarWidth, 0, 150, h);
+      // Overlay gradiente sutil (solo abajo)
+      const grad = ctx.createLinearGradient(0, h * 0.4, 0, h);
+      grad.addColorStop(0, 'rgba(0,0,0,0)');
+      grad.addColorStop(0.6, 'rgba(0,0,0,0.15)');
+      grad.addColorStop(1, 'rgba(0,0,0,0.55)');
+      ctx.fillStyle = grad;
+      ctx.fillRect(0, 0, w, h);
 
-      // Sidebar con degradado
-      const sideGradient = ctx.createLinearGradient(0, 0, 0, h);
-      sideGradient.addColorStop(0, primary);
-      sideGradient.addColorStop(1, shadeColor(primary, -30));
-      ctx.fillStyle = sideGradient;
-      ctx.fillRect(0, 0, sidebarWidth, h);
+      const pad = 50;
 
-      // Línea decorativa dorada
-      ctx.fillStyle = '#d4af37';
-      ctx.fillRect(sidebarWidth - 4, 0, 4, h);
-
-      const padding = 50;
-      let yPos = padding + 30;
-
-      // Logo
+      // Logo esquina superior izquierda con fondo glass
       if (logoImg) {
-        const logoH = 60;
+        const logoH = 50;
         const logoW = (logoImg.width / logoImg.height) * logoH;
-        ctx.drawImage(logoImg, padding, yPos, Math.min(logoW, sidebarWidth - padding * 2), logoH);
-        yPos += logoH + 50;
+        drawGlassPanel(ctx, pad - 10, pad - 10, logoW + 20, logoH + 20, 12, 0.5);
+        ctx.drawImage(logoImg, pad, pad, logoW, logoH);
       }
 
-      // Tipo y operación
-      ctx.fillStyle = 'rgba(255,255,255,0.7)';
-      ctx.font = '500 24px "Segoe UI", Arial, sans-serif';
-      ctx.textAlign = 'left';
+      // Badge superior derecho
+      if (options.showBadge && options.badgeText) {
+        ctx.font = 'bold 20px "Segoe UI", Arial, sans-serif';
+        const bw = ctx.measureText(options.badgeText.toUpperCase()).width + 36;
+        drawGlassPanel(ctx, w - pad - bw, pad, bw, 38, 19, 0.8, '0,0,0');
+        ctx.fillStyle = primary;
+        roundRect(ctx, w - pad - bw, pad, bw, 38, 19);
+        ctx.fill();
+        ctx.fillStyle = '#fff';
+        ctx.textAlign = 'center';
+        ctx.textBaseline = 'middle';
+        ctx.fillText(options.badgeText.toUpperCase(), w - pad - bw / 2, pad + 19);
+        ctx.textAlign = 'left';
+      }
+
+      // Custom title (glass tag top-center)
+      if (options.customTitle) {
+        ctx.font = 'bold 26px "Segoe UI", Arial, sans-serif';
+        const tw = ctx.measureText(options.customTitle).width + 48;
+        const tx = (w - tw) / 2;
+        drawGlassPanel(ctx, tx, pad, tw, 44, 22, 0.7);
+        ctx.fillStyle = '#fff';
+        ctx.textAlign = 'center';
+        ctx.textBaseline = 'middle';
+        ctx.fillText(options.customTitle, w / 2, pad + 22);
+        ctx.textAlign = 'left';
+      }
+
+      // Panel glass inferior
+      const panelH = 180;
+      const panelY = h - panelH - pad;
+      drawGlassPanel(ctx, pad, panelY, w - pad * 2, panelH, 20, 0.6);
+
+      const px = pad + 30;
+      let py = panelY + 28;
+
+      // Tipo operación
+      ctx.fillStyle = primary;
+      ctx.font = 'bold 20px "Segoe UI", Arial, sans-serif';
       ctx.textBaseline = 'top';
-      ctx.fillText(`${getTipoLabel(data.tipo)} ${getOperacionLabel(data.operacion)}`.toUpperCase(), padding, yPos);
-      yPos += 45;
+      ctx.fillText(`${getTipoLabel(data.tipo)} ${getOperacionLabel(data.operacion)}`.toUpperCase(), px, py);
+
+      // Custom subtitle
+      if (options.customSubtitle) {
+        ctx.fillStyle = 'rgba(255,255,255,0.7)';
+        ctx.font = '500 18px "Segoe UI", Arial, sans-serif';
+        ctx.fillText(options.customSubtitle, px + ctx.measureText(`${getTipoLabel(data.tipo)} ${getOperacionLabel(data.operacion)}`.toUpperCase()).width + 20, py + 2);
+      }
+      py += 35;
 
       // Precio
       if (options.showPrice && data.precio > 0) {
-        ctx.fillStyle = '#d4af37';
-        ctx.font = 'bold 52px "Segoe UI", Arial, sans-serif';
-        ctx.fillText(formatPriceFull(data.precio, data.moneda), padding, yPos);
-        yPos += 70;
-
-        // Línea bajo precio
-        ctx.fillStyle = 'rgba(212, 175, 55, 0.3)';
-        ctx.fillRect(padding, yPos, sidebarWidth - padding * 2, 2);
-        yPos += 40;
+        ctx.fillStyle = '#fff';
+        ctx.font = 'bold 48px "Segoe UI", Arial, sans-serif';
+        ctx.fillText(formatPriceFull(data.precio, data.moneda), px, py);
+        py += 60;
       }
 
-      // Ubicación
+      // Ubicación + Features en una línea
+      ctx.textBaseline = 'top';
       if (options.showLocation && data.ubicacion) {
-        ctx.fillStyle = '#ffffff';
-        ctx.font = '500 26px "Segoe UI", Arial, sans-serif';
-
-        // Ícono de ubicación
-        drawLocationIcon(ctx, padding, yPos - 5, 28, '#d4af37');
-        ctx.fillText(data.ubicacion, padding + 40, yPos);
-        yPos += 60;
-      }
-
-      // Características
-      if (options.showFeatures) {
-        const iconSize = 32;
-        const iconColor = '#ffffff';
-        const spacing = 75;
-        let featX = padding;
-
-        ctx.fillStyle = '#ffffff';
-        ctx.font = '600 28px "Segoe UI", Arial, sans-serif';
-
-        if (data.habitaciones > 0) {
-          drawBedIcon(ctx, featX, yPos, iconSize, iconColor);
-          ctx.fillText(String(data.habitaciones), featX + iconSize + 10, yPos + iconSize * 0.6);
-          featX += spacing;
-        }
-        if (data.banos > 0) {
-          drawBathIcon(ctx, featX, yPos, iconSize, iconColor);
-          ctx.fillText(String(data.banos), featX + iconSize + 10, yPos + iconSize * 0.6);
-          featX += spacing;
-        }
-        if (data.estacionamientos > 0) {
-          drawCarIcon(ctx, featX, yPos, iconSize, iconColor);
-          ctx.fillText(String(data.estacionamientos), featX + iconSize + 10, yPos + iconSize * 0.6);
-          featX += spacing;
-        }
-        yPos += iconSize + 50;
-
-        if (data.metros > 0) {
-          drawAreaIcon(ctx, padding, yPos, iconSize, iconColor);
-          ctx.fillText(`${data.metros} m²`, padding + iconSize + 15, yPos + iconSize * 0.5);
-        }
-      }
-
-      // Contacto en la parte inferior
-      if (contactInfo.telefono || contactInfo.whatsapp) {
-        ctx.fillStyle = 'rgba(255,255,255,0.8)';
+        drawLocationIcon(ctx, px, py + 2, 20, 'rgba(255,255,255,0.8)');
+        ctx.fillStyle = 'rgba(255,255,255,0.9)';
         ctx.font = '500 22px "Segoe UI", Arial, sans-serif';
-        ctx.fillText(contactInfo.telefono || contactInfo.whatsapp || '', padding, h - padding);
+        ctx.fillText(data.ubicacion, px + 28, py);
       }
 
-      // Badge si aplica (en la imagen)
-      if (options.showBadge && options.badgeText) {
-        drawBadge(ctx, options.badgeText.toUpperCase(), sidebarWidth + 30, 30, data.exclusiva ? '#c41e3a' : '#d4af37', 'pill');
+      if (options.showFeatures) {
+        ctx.textAlign = 'right';
+        drawFeaturesInline(ctx, data, w - pad - 30, py, 'rgba(255,255,255,0.85)', 20);
+        ctx.textAlign = 'left';
+      }
+
+      // Contacto pequeño abajo-derecha
+      if (contactInfo.telefono || contactInfo.whatsapp) {
+        ctx.fillStyle = 'rgba(255,255,255,0.6)';
+        ctx.font = '500 18px "Segoe UI", Arial, sans-serif';
+        ctx.textAlign = 'right';
+        ctx.textBaseline = 'bottom';
+        ctx.fillText(contactInfo.telefono || contactInfo.whatsapp || '', w - pad, panelY - 10);
+        ctx.textAlign = 'left';
       }
     },
   },
 
-  // 2. MODERNO BOLD
+  // 2. MODERNO — Full-bleed, gradient bottom strip
   {
     id: 'moderno',
     name: 'Moderno',
-    description: 'Diseño impactante con tipografía grande',
+    description: 'Gradiente inferior con tipografía bold',
     icon: '🔥',
     defaultFormat: 'square',
     render: (ctx, canvas, propertyImage, logoImg, colores, contactInfo, data, options) => {
@@ -663,104 +403,130 @@ const propertyTemplates: PropertyTemplate[] = [
       const h = canvas.height;
       const primary = colores?.primary || '#ff6b35';
 
-      // Imagen de fondo completa
-      const imgScale = Math.max(w / propertyImage.width, h / propertyImage.height);
-      const imgW = propertyImage.width * imgScale;
-      const imgH = propertyImage.height * imgScale;
-      ctx.drawImage(propertyImage, (w - imgW) / 2, (h - imgH) / 2, imgW, imgH);
+      // Imagen full-bleed
+      drawFullImage(ctx, propertyImage, w, h);
 
-      // Overlay degradado dramático
-      const gradient = ctx.createLinearGradient(0, 0, 0, h);
-      gradient.addColorStop(0, 'rgba(0,0,0,0.2)');
-      gradient.addColorStop(0.5, 'rgba(0,0,0,0.1)');
-      gradient.addColorStop(0.75, 'rgba(0,0,0,0.6)');
-      gradient.addColorStop(1, 'rgba(0,0,0,0.95)');
-      ctx.fillStyle = gradient;
+      // Overlay gradiente: transparente arriba → oscuro abajo
+      const grad = ctx.createLinearGradient(0, 0, 0, h);
+      grad.addColorStop(0, 'rgba(0,0,0,0)');
+      grad.addColorStop(0.45, 'rgba(0,0,0,0)');
+      grad.addColorStop(0.7, 'rgba(0,0,0,0.4)');
+      grad.addColorStop(1, 'rgba(0,0,0,0.85)');
+      ctx.fillStyle = grad;
       ctx.fillRect(0, 0, w, h);
 
-      const padding = 50;
+      // Tinte de color primario sutil
+      const colorGrad = ctx.createLinearGradient(0, h * 0.75, 0, h);
+      colorGrad.addColorStop(0, 'rgba(0,0,0,0)');
+      colorGrad.addColorStop(1, `${primary}40`);
+      ctx.fillStyle = colorGrad;
+      ctx.fillRect(0, 0, w, h);
 
-      // Badge superior
-      if (options.showBadge && options.badgeText) {
-        drawBadge(ctx, options.badgeText.toUpperCase(), padding, padding, primary, 'ribbon');
+      const pad = 45;
+
+      // Logo top-left glass
+      if (logoImg) {
+        const logoH = 45;
+        const logoW = (logoImg.width / logoImg.height) * logoH;
+        drawGlassPanel(ctx, pad - 8, pad - 8, logoW + 16, logoH + 16, 10, 0.45);
+        ctx.drawImage(logoImg, pad, pad, logoW, logoH);
       }
 
-      // Logo esquina superior derecha
-      if (logoImg) {
-        const logoH = 50;
-        const logoW = (logoImg.width / logoImg.height) * logoH;
-        ctx.drawImage(logoImg, w - padding - logoW, padding, logoW, logoH);
+      // Badge superior (ribbon con glass)
+      if (options.showBadge && options.badgeText) {
+        ctx.font = 'bold 18px "Segoe UI", Arial, sans-serif';
+        const bw = ctx.measureText(options.badgeText.toUpperCase()).width + 32;
+        const bx = logoImg ? pad + (logoImg.width / logoImg.height) * 45 + 30 : pad;
+        ctx.fillStyle = primary;
+        roundRect(ctx, bx, pad + 5, bw, 34, 17);
+        ctx.fill();
+        ctx.fillStyle = '#fff';
+        ctx.textAlign = 'center';
+        ctx.textBaseline = 'middle';
+        ctx.fillText(options.badgeText.toUpperCase(), bx + bw / 2, pad + 22);
+        ctx.textAlign = 'left';
+      }
+
+      // Custom title tag
+      if (options.customTitle) {
+        ctx.font = 'bold 24px "Segoe UI", Arial, sans-serif';
+        const tw = ctx.measureText(options.customTitle).width + 40;
+        drawGlassPanel(ctx, w - pad - tw, pad, tw, 40, 20, 0.6);
+        ctx.fillStyle = '#fff';
+        ctx.textAlign = 'center';
+        ctx.textBaseline = 'middle';
+        ctx.fillText(options.customTitle, w - pad - tw / 2, pad + 20);
+        ctx.textAlign = 'left';
       }
 
       // Contenido inferior
-      const bottomY = h - padding;
+      const bottom = h - pad;
+      ctx.textBaseline = 'bottom';
 
-      // Precio GRANDE
-      if (options.showPrice && data.precio > 0) {
-        ctx.fillStyle = '#ffffff';
-        ctx.font = 'bold 72px "Segoe UI", Arial, sans-serif';
-        ctx.textAlign = 'left';
-        ctx.textBaseline = 'bottom';
-        drawTextWithShadow(ctx, formatPriceFull(data.precio, data.moneda), padding, bottomY - 120);
+      // Tipo operación
+      ctx.fillStyle = primary;
+      ctx.font = 'bold 24px "Segoe UI", Arial, sans-serif';
+      ctx.fillText(`${getTipoLabel(data.tipo)} ${getOperacionLabel(data.operacion)}`.toUpperCase(), pad, bottom - 130);
+
+      // Custom subtitle
+      if (options.customSubtitle) {
+        ctx.fillStyle = 'rgba(255,255,255,0.6)';
+        ctx.font = '500 20px "Segoe UI", Arial, sans-serif';
+        ctx.fillText(options.customSubtitle, pad, bottom - 105);
       }
 
-      // Tipo y operación
-      ctx.fillStyle = primary;
-      ctx.font = 'bold 28px "Segoe UI", Arial, sans-serif';
-      ctx.textBaseline = 'bottom';
-      ctx.fillText(`${getTipoLabel(data.tipo)} ${getOperacionLabel(data.operacion)}`.toUpperCase(), padding, bottomY - 70);
+      // Precio
+      if (options.showPrice && data.precio > 0) {
+        ctx.fillStyle = '#fff';
+        ctx.font = 'bold 60px "Segoe UI", Arial, sans-serif';
+        drawTextWithShadow(ctx, formatPriceFull(data.precio, data.moneda), pad, bottom - 50);
+      }
 
       // Ubicación
       if (options.showLocation && data.ubicacion) {
-        ctx.fillStyle = 'rgba(255,255,255,0.9)';
-        ctx.font = '500 26px "Segoe UI", Arial, sans-serif';
-        drawLocationIcon(ctx, padding, bottomY - 52, 24, primary);
-        ctx.fillText(data.ubicacion, padding + 35, bottomY - 35);
+        drawLocationIcon(ctx, pad, bottom - 25, 20, 'rgba(255,255,255,0.7)');
+        ctx.fillStyle = 'rgba(255,255,255,0.85)';
+        ctx.font = '500 22px "Segoe UI", Arial, sans-serif';
+        ctx.fillText(data.ubicacion, pad + 28, bottom - 10);
       }
 
-      // Características en línea
+      // Features derecha
       if (options.showFeatures) {
-        const iconSize = 28;
-        const iconColor = 'rgba(255,255,255,0.9)';
-        let featX = w - padding;
         ctx.textAlign = 'right';
-        ctx.font = '600 24px "Segoe UI", Arial, sans-serif';
-        ctx.fillStyle = '#ffffff';
-
-        const features: string[] = [];
-        if (data.habitaciones > 0) features.push(`${data.habitaciones} Hab`);
-        if (data.banos > 0) features.push(`${data.banos} Baños`);
-        if (data.estacionamientos > 0) features.push(`${data.estacionamientos} Est`);
-        if (data.metros > 0) features.push(`${data.metros} m²`);
-
-        ctx.fillText(features.join('  •  '), featX, bottomY - 35);
+        drawFeaturesInline(ctx, data, w - pad, bottom - 12, 'rgba(255,255,255,0.8)', 20);
+        ctx.textAlign = 'left';
       }
 
-      // Contacto / CTA
+      // CTA botón
       if (options.ctaText) {
-        const ctaWidth = 220;
-        const ctaHeight = 50;
-        const ctaX = w - padding - ctaWidth;
-        const ctaY = bottomY - 130;
-
-        // Fondo del botón
-        const btnGradient = ctx.createLinearGradient(ctaX, ctaY, ctaX + ctaWidth, ctaY);
-        btnGradient.addColorStop(0, primary);
-        btnGradient.addColorStop(1, shadeColor(primary, 20));
-        ctx.fillStyle = btnGradient;
-        roundRect(ctx, ctaX, ctaY, ctaWidth, ctaHeight, 25);
+        const cw = 200;
+        const ch = 46;
+        const cx = w - pad - cw;
+        const cy = bottom - 130 - ch;
+        ctx.fillStyle = primary;
+        roundRect(ctx, cx, cy, cw, ch, 23);
         ctx.fill();
-
-        ctx.fillStyle = '#ffffff';
-        ctx.font = 'bold 20px "Segoe UI", Arial, sans-serif';
+        ctx.fillStyle = '#fff';
+        ctx.font = 'bold 18px "Segoe UI", Arial, sans-serif';
         ctx.textAlign = 'center';
         ctx.textBaseline = 'middle';
-        ctx.fillText(options.ctaText, ctaX + ctaWidth / 2, ctaY + ctaHeight / 2);
+        ctx.fillText(options.ctaText, cx + cw / 2, cy + ch / 2);
+        ctx.textAlign = 'left';
+      }
+
+      // Contacto sutil
+      if (contactInfo.telefono || contactInfo.whatsapp) {
+        ctx.fillStyle = 'rgba(255,255,255,0.5)';
+        ctx.font = '500 16px "Segoe UI", Arial, sans-serif';
+        ctx.textAlign = 'right';
+        ctx.textBaseline = 'top';
+        ctx.fillText(contactInfo.telefono || contactInfo.whatsapp || '', w - pad, pad);
+        ctx.textAlign = 'left';
       }
     },
   },
 
-  // 3. STORY VERTICAL
+  // 3. STORY — Vertical optimizado para Instagram/Facebook Stories
   {
     id: 'story',
     name: 'Story',
@@ -772,367 +538,379 @@ const propertyTemplates: PropertyTemplate[] = [
       const h = canvas.height;
       const primary = colores?.primary || '#6366f1';
 
-      // Imagen de fondo completa
-      const imgScale = Math.max(w / propertyImage.width, h / propertyImage.height);
-      const imgW = propertyImage.width * imgScale;
-      const imgH = propertyImage.height * imgScale;
-      ctx.drawImage(propertyImage, (w - imgW) / 2, (h - imgH) / 2, imgW, imgH);
+      // Imagen full-bleed
+      drawFullImage(ctx, propertyImage, w, h);
 
-      // Overlay degradado vertical
-      const gradient = ctx.createLinearGradient(0, 0, 0, h);
-      gradient.addColorStop(0, 'rgba(0,0,0,0.6)');
-      gradient.addColorStop(0.3, 'rgba(0,0,0,0.1)');
-      gradient.addColorStop(0.7, 'rgba(0,0,0,0.1)');
-      gradient.addColorStop(1, 'rgba(0,0,0,0.85)');
-      ctx.fillStyle = gradient;
+      // Overlay: oscuro arriba y abajo, transparente en medio
+      const grad = ctx.createLinearGradient(0, 0, 0, h);
+      grad.addColorStop(0, 'rgba(0,0,0,0.55)');
+      grad.addColorStop(0.25, 'rgba(0,0,0,0.05)');
+      grad.addColorStop(0.65, 'rgba(0,0,0,0.05)');
+      grad.addColorStop(1, 'rgba(0,0,0,0.7)');
+      ctx.fillStyle = grad;
       ctx.fillRect(0, 0, w, h);
 
-      const padding = 60;
-
-      // Parte superior
-      let topY = padding + 40;
+      const pad = 50;
 
       // Logo centrado arriba
       if (logoImg) {
-        const logoH = 70;
+        const logoH = 55;
         const logoW = (logoImg.width / logoImg.height) * logoH;
-        ctx.drawImage(logoImg, (w - logoW) / 2, topY, logoW, logoH);
-        topY += logoH + 40;
+        drawGlassPanel(ctx, (w - logoW - 24) / 2, pad - 8, logoW + 24, logoH + 16, 14, 0.45);
+        ctx.drawImage(logoImg, (w - logoW) / 2, pad, logoW, logoH);
       }
 
-      // Badge
+      // Badge centrado
       if (options.showBadge && options.badgeText) {
-        ctx.font = 'bold 26px "Segoe UI", Arial, sans-serif';
-        const badgeWidth = ctx.measureText(options.badgeText.toUpperCase()).width + 50;
-        drawBadge(ctx, options.badgeText.toUpperCase(), (w - badgeWidth) / 2, topY, primary, 'pill');
+        const badgeY = logoImg ? pad + 75 : pad + 10;
+        ctx.font = 'bold 22px "Segoe UI", Arial, sans-serif';
+        const bw = ctx.measureText(options.badgeText.toUpperCase()).width + 40;
+        ctx.fillStyle = primary;
+        roundRect(ctx, (w - bw) / 2, badgeY, bw, 40, 20);
+        ctx.fill();
+        ctx.fillStyle = '#fff';
+        ctx.textAlign = 'center';
+        ctx.textBaseline = 'middle';
+        ctx.fillText(options.badgeText.toUpperCase(), w / 2, badgeY + 20);
       }
 
-      // Parte inferior
-      const bottomPadding = 180;
-      let bottomY = h - bottomPadding;
+      // Custom title grande arriba
+      if (options.customTitle) {
+        const titleY = logoImg ? pad + 130 : pad + 60;
+        ctx.fillStyle = '#fff';
+        ctx.font = 'bold 40px "Segoe UI", Arial, sans-serif';
+        ctx.textAlign = 'center';
+        ctx.textBaseline = 'top';
+        drawTextWithShadow(ctx, options.customTitle, w / 2, titleY);
+
+        if (options.customSubtitle) {
+          ctx.fillStyle = 'rgba(255,255,255,0.7)';
+          ctx.font = '500 24px "Segoe UI", Arial, sans-serif';
+          ctx.fillText(options.customSubtitle, w / 2, titleY + 50);
+        }
+      }
+
+      // Panel glass inferior
+      const panelH = 280;
+      const panelY = h - panelH - pad;
+      drawGlassPanel(ctx, pad - 10, panelY, w - (pad - 10) * 2, panelH, 24, 0.55);
+
+      const px = pad + 15;
+      let py = panelY + 25;
 
       // Tipo
-      ctx.fillStyle = 'rgba(255,255,255,0.8)';
-      ctx.font = '500 28px "Segoe UI", Arial, sans-serif';
-      ctx.textAlign = 'center';
-      ctx.textBaseline = 'bottom';
-      ctx.fillText(`${getTipoLabel(data.tipo)} ${getOperacionLabel(data.operacion)}`.toUpperCase(), w / 2, bottomY);
-      bottomY += 60;
+      ctx.fillStyle = primary;
+      ctx.font = 'bold 22px "Segoe UI", Arial, sans-serif';
+      ctx.textAlign = 'left';
+      ctx.textBaseline = 'top';
+      ctx.fillText(`${getTipoLabel(data.tipo)} ${getOperacionLabel(data.operacion)}`.toUpperCase(), px, py);
+      py += 35;
 
       // Precio
       if (options.showPrice && data.precio > 0) {
-        ctx.fillStyle = '#ffffff';
-        ctx.font = 'bold 64px "Segoe UI", Arial, sans-serif';
-        drawTextWithShadow(ctx, formatPriceFull(data.precio, data.moneda), w / 2, bottomY);
-        bottomY += 50;
+        ctx.fillStyle = '#fff';
+        ctx.font = 'bold 52px "Segoe UI", Arial, sans-serif';
+        ctx.fillText(formatPriceFull(data.precio, data.moneda), px, py);
+        py += 65;
       }
 
       // Ubicación
       if (options.showLocation && data.ubicacion) {
+        drawLocationIcon(ctx, px, py + 2, 22, 'rgba(255,255,255,0.7)');
         ctx.fillStyle = 'rgba(255,255,255,0.9)';
-        ctx.font = '500 28px "Segoe UI", Arial, sans-serif';
-        ctx.fillText(data.ubicacion, w / 2, bottomY);
-        bottomY += 60;
+        ctx.font = '500 24px "Segoe UI", Arial, sans-serif';
+        ctx.fillText(data.ubicacion, px + 30, py);
+        py += 40;
       }
 
-      // Características centradas
+      // Features
       if (options.showFeatures) {
-        const iconSize = 32;
-        const iconColor = '#ffffff';
-        const features: { icon: string; value: number }[] = [];
-
-        if (data.habitaciones > 0) features.push({ icon: 'bed', value: data.habitaciones });
-        if (data.banos > 0) features.push({ icon: 'bath', value: data.banos });
-        if (data.estacionamientos > 0) features.push({ icon: 'car', value: data.estacionamientos });
-        if (data.metros > 0) features.push({ icon: 'area', value: data.metros });
-
-        const featureWidth = 80;
-        const totalWidth = features.length * featureWidth;
-        let featX = (w - totalWidth) / 2;
-
-        ctx.font = '600 26px "Segoe UI", Arial, sans-serif';
-        ctx.fillStyle = '#ffffff';
-        ctx.textAlign = 'center';
-
-        features.forEach((f) => {
-          const iconX = featX + featureWidth / 2 - iconSize / 2;
-          if (f.icon === 'bed') drawBedIcon(ctx, iconX, bottomY, iconSize, iconColor);
-          else if (f.icon === 'bath') drawBathIcon(ctx, iconX, bottomY, iconSize, iconColor);
-          else if (f.icon === 'car') drawCarIcon(ctx, iconX, bottomY, iconSize, iconColor);
-          else if (f.icon === 'area') drawAreaIcon(ctx, iconX, bottomY, iconSize, iconColor);
-
-          ctx.fillText(f.icon === 'area' ? `${f.value}m²` : String(f.value), featX + featureWidth / 2, bottomY + iconSize + 30);
-          featX += featureWidth;
-        });
+        drawFeaturesInline(ctx, data, px, py, 'rgba(255,255,255,0.75)', 22);
+        py += 35;
       }
-
-      // Swipe up / CTA
-      ctx.fillStyle = 'rgba(255,255,255,0.6)';
-      ctx.font = '400 22px "Segoe UI", Arial, sans-serif';
-      ctx.textAlign = 'center';
-      ctx.fillText('↑ Desliza para más info', w / 2, h - 50);
 
       // Contacto
       if (contactInfo.telefono || contactInfo.whatsapp) {
         ctx.fillStyle = primary;
-        ctx.font = 'bold 24px "Segoe UI", Arial, sans-serif';
-        ctx.fillText(contactInfo.telefono || contactInfo.whatsapp || '', w / 2, h - 90);
+        ctx.font = 'bold 22px "Segoe UI", Arial, sans-serif';
+        ctx.textAlign = 'center';
+        ctx.fillText(contactInfo.telefono || contactInfo.whatsapp || '', w / 2, py + 10);
+        ctx.textAlign = 'left';
       }
+
+      // Swipe up
+      ctx.fillStyle = 'rgba(255,255,255,0.4)';
+      ctx.font = '400 18px "Segoe UI", Arial, sans-serif';
+      ctx.textAlign = 'center';
+      ctx.textBaseline = 'bottom';
+      ctx.fillText('↑ Desliza para más info', w / 2, h - 20);
+      ctx.textAlign = 'left';
     },
   },
 
-  // 4. TARJETA PROFESIONAL
+  // 4. TARJETA — Image top, clean info below, glass badges
   {
     id: 'tarjeta',
     name: 'Tarjeta',
-    description: 'Diseño tipo tarjeta con información clara',
+    description: 'Diseño tipo tarjeta limpio y profesional',
     icon: '📋',
     defaultFormat: 'square',
     render: (ctx, canvas, propertyImage, logoImg, colores, contactInfo, data, options) => {
       const w = canvas.width;
       const h = canvas.height;
       const primary = colores?.primary || '#2563eb';
-      const cardPadding = 40;
 
       // Fondo blanco
       ctx.fillStyle = '#f8fafc';
       ctx.fillRect(0, 0, w, h);
 
-      // Imagen en la parte superior (60%)
-      const imgAreaH = h * 0.58;
-      const imgScale = Math.max(w / propertyImage.width, imgAreaH / propertyImage.height);
-      const imgW = propertyImage.width * imgScale;
-      const imgH = propertyImage.height * imgScale;
+      const cp = 40;
+      const imgH = h * 0.58;
 
-      // Clip para imagen
+      // Imagen con esquinas redondeadas
       ctx.save();
-      roundRect(ctx, cardPadding, cardPadding, w - cardPadding * 2, imgAreaH, 20);
+      roundRect(ctx, cp, cp, w - cp * 2, imgH, 20);
       ctx.clip();
-      ctx.drawImage(
-        propertyImage,
-        cardPadding + (w - cardPadding * 2 - imgW) / 2,
-        cardPadding + (imgAreaH - imgH) / 2,
-        imgW,
-        imgH
-      );
+      drawFullImage(ctx, propertyImage, w - cp * 2, imgH);
+      // offset draw
       ctx.restore();
 
-      // Overlay sutil sobre imagen
+      // Re-draw clipped
       ctx.save();
-      roundRect(ctx, cardPadding, cardPadding, w - cardPadding * 2, imgAreaH, 20);
+      roundRect(ctx, cp, cp, w - cp * 2, imgH, 20);
       ctx.clip();
-      const imgOverlay = ctx.createLinearGradient(0, cardPadding, 0, cardPadding + imgAreaH);
-      imgOverlay.addColorStop(0, 'rgba(0,0,0,0.1)');
-      imgOverlay.addColorStop(0.7, 'rgba(0,0,0,0)');
-      imgOverlay.addColorStop(1, 'rgba(0,0,0,0.4)');
-      ctx.fillStyle = imgOverlay;
-      ctx.fillRect(cardPadding, cardPadding, w - cardPadding * 2, imgAreaH);
+      const sc = Math.max((w - cp * 2) / propertyImage.width, imgH / propertyImage.height);
+      const iw = propertyImage.width * sc;
+      const ih = propertyImage.height * sc;
+      ctx.drawImage(propertyImage, cp + (w - cp * 2 - iw) / 2, cp + (imgH - ih) / 2, iw, ih);
+
+      // Overlay sutil para legibilidad de badges
+      const igr = ctx.createLinearGradient(0, cp, 0, cp + imgH);
+      igr.addColorStop(0, 'rgba(0,0,0,0.15)');
+      igr.addColorStop(0.5, 'rgba(0,0,0,0)');
+      igr.addColorStop(1, 'rgba(0,0,0,0.25)');
+      ctx.fillStyle = igr;
+      ctx.fillRect(cp, cp, w - cp * 2, imgH);
       ctx.restore();
 
-      // Badge en imagen
+      // Badge glass sobre imagen
       if (options.showBadge && options.badgeText) {
-        drawBadge(ctx, options.badgeText.toUpperCase(), cardPadding + 20, cardPadding + 20, primary, 'pill');
-      }
-
-      // Logo en imagen (esquina inferior derecha de la imagen)
-      if (logoImg) {
-        const logoH = 45;
-        const logoW = (logoImg.width / logoImg.height) * logoH;
-
-        // Fondo semi-transparente para logo
-        ctx.fillStyle = 'rgba(255,255,255,0.9)';
-        roundRect(ctx, w - cardPadding - logoW - 30, cardPadding + imgAreaH - logoH - 30, logoW + 20, logoH + 10, 8);
+        ctx.font = 'bold 18px "Segoe UI", Arial, sans-serif';
+        const bw = ctx.measureText(options.badgeText.toUpperCase()).width + 30;
+        ctx.fillStyle = primary;
+        roundRect(ctx, cp + 18, cp + 18, bw, 34, 17);
         ctx.fill();
-
-        ctx.drawImage(logoImg, w - cardPadding - logoW - 20, cardPadding + imgAreaH - logoH - 25, logoW, logoH);
+        ctx.fillStyle = '#fff';
+        ctx.textAlign = 'center';
+        ctx.textBaseline = 'middle';
+        ctx.fillText(options.badgeText.toUpperCase(), cp + 18 + bw / 2, cp + 35);
+        ctx.textAlign = 'left';
       }
 
-      // Área de información
-      const infoY = cardPadding + imgAreaH + 30;
-      const infoX = cardPadding + 20;
+      // Custom title sobre imagen
+      if (options.customTitle) {
+        ctx.font = 'bold 28px "Segoe UI", Arial, sans-serif';
+        const tw = ctx.measureText(options.customTitle).width + 40;
+        drawGlassPanel(ctx, (w - tw) / 2, cp + imgH - 60, tw, 44, 22, 0.65);
+        ctx.fillStyle = '#fff';
+        ctx.textAlign = 'center';
+        ctx.textBaseline = 'middle';
+        ctx.fillText(options.customTitle, w / 2, cp + imgH - 38);
+        ctx.textAlign = 'left';
+      }
 
-      // Tipo y operación
+      // Logo esquina inferior derecha de imagen
+      if (logoImg) {
+        const logoH = 40;
+        const logoW = (logoImg.width / logoImg.height) * logoH;
+        drawGlassPanel(ctx, w - cp - logoW - 28, cp + imgH - logoH - 26, logoW + 16, logoH + 12, 8, 0.7, '255,255,255');
+        ctx.drawImage(logoImg, w - cp - logoW - 20, cp + imgH - logoH - 20, logoW, logoH);
+      }
+
+      // Info area
+      const infoY = cp + imgH + 25;
+      const ix = cp + 20;
+
+      // Tipo
       ctx.fillStyle = primary;
-      ctx.font = 'bold 22px "Segoe UI", Arial, sans-serif';
-      ctx.textAlign = 'left';
+      ctx.font = 'bold 20px "Segoe UI", Arial, sans-serif';
       ctx.textBaseline = 'top';
-      ctx.fillText(`${getTipoLabel(data.tipo)} ${getOperacionLabel(data.operacion)}`.toUpperCase(), infoX, infoY);
+      ctx.fillText(`${getTipoLabel(data.tipo)} ${getOperacionLabel(data.operacion)}`.toUpperCase(), ix, infoY);
+
+      // Custom subtitle
+      if (options.customSubtitle) {
+        ctx.fillStyle = '#94a3b8';
+        ctx.font = '500 18px "Segoe UI", Arial, sans-serif';
+        ctx.textAlign = 'right';
+        ctx.fillText(options.customSubtitle, w - cp - 20, infoY + 2);
+        ctx.textAlign = 'left';
+      }
 
       // Precio
       if (options.showPrice && data.precio > 0) {
         ctx.fillStyle = '#1e293b';
-        ctx.font = 'bold 48px "Segoe UI", Arial, sans-serif';
-        ctx.fillText(formatPriceFull(data.precio, data.moneda), infoX, infoY + 35);
+        ctx.font = 'bold 44px "Segoe UI", Arial, sans-serif';
+        ctx.fillText(formatPriceFull(data.precio, data.moneda), ix, infoY + 32);
       }
 
       // Ubicación
       if (options.showLocation && data.ubicacion) {
+        drawLocationIcon(ctx, ix, infoY + 92, 20, '#94a3b8');
         ctx.fillStyle = '#64748b';
-        ctx.font = '500 24px "Segoe UI", Arial, sans-serif';
-        drawLocationIcon(ctx, infoX, infoY + 100, 22, '#64748b');
-        ctx.fillText(data.ubicacion, infoX + 30, infoY + 102);
+        ctx.font = '500 22px "Segoe UI", Arial, sans-serif';
+        ctx.fillText(data.ubicacion, ix + 28, infoY + 92);
       }
 
-      // Características en barra inferior
+      // Features barra inferior
       if (options.showFeatures) {
-        const featY = h - cardPadding - 70;
-        const iconSize = 28;
-        const iconColor = primary;
-
-        // Barra de fondo
+        const fy = h - cp - 60;
         ctx.fillStyle = '#f1f5f9';
-        roundRect(ctx, cardPadding, featY - 10, w - cardPadding * 2, 70, 12);
+        roundRect(ctx, cp, fy - 8, w - cp * 2, 60, 12);
         ctx.fill();
-
-        const features: { draw: (x: number, y: number) => void; label: string }[] = [];
-        if (data.habitaciones > 0) features.push({ draw: (x, y) => drawBedIcon(ctx, x, y, iconSize, iconColor), label: `${data.habitaciones}` });
-        if (data.banos > 0) features.push({ draw: (x, y) => drawBathIcon(ctx, x, y, iconSize, iconColor), label: `${data.banos}` });
-        if (data.estacionamientos > 0) features.push({ draw: (x, y) => drawCarIcon(ctx, x, y, iconSize, iconColor), label: `${data.estacionamientos}` });
-        if (data.metros > 0) features.push({ draw: (x, y) => drawAreaIcon(ctx, x, y, iconSize, iconColor), label: `${data.metros}m²` });
-
-        const featureSpacing = (w - cardPadding * 2) / features.length;
-        ctx.font = '600 22px "Segoe UI", Arial, sans-serif';
-        ctx.fillStyle = '#1e293b';
         ctx.textAlign = 'center';
-
-        features.forEach((f, i) => {
-          const fx = cardPadding + featureSpacing * i + featureSpacing / 2;
-          f.draw(fx - iconSize / 2, featY + 5);
-          ctx.fillText(f.label, fx, featY + iconSize + 20);
-        });
+        drawFeaturesInline(ctx, data, w / 2, fy + 14, '#475569', 20);
+        ctx.textAlign = 'left';
       }
 
       // Contacto
       if (contactInfo.telefono || contactInfo.whatsapp) {
-        ctx.fillStyle = '#64748b';
-        ctx.font = '500 20px "Segoe UI", Arial, sans-serif';
+        ctx.fillStyle = '#94a3b8';
+        ctx.font = '500 18px "Segoe UI", Arial, sans-serif';
         ctx.textAlign = 'right';
-        ctx.fillText(contactInfo.telefono || contactInfo.whatsapp || '', w - cardPadding - 20, infoY + 105);
+        ctx.fillText(contactInfo.telefono || contactInfo.whatsapp || '', w - cp - 20, infoY + 95);
+        ctx.textAlign = 'left';
       }
     },
   },
 
-  // 5. BANNER HORIZONTAL
+  // 5. BANNER — Horizontal, full image, slim glass bottom bar
   {
     id: 'banner',
     name: 'Banner',
-    description: 'Formato horizontal para web y Facebook',
+    description: 'Horizontal para web, Facebook y portales',
     icon: '🖼️',
     defaultFormat: 'landscape',
     render: (ctx, canvas, propertyImage, logoImg, colores, contactInfo, data, options) => {
       const w = canvas.width;
       const h = canvas.height;
       const primary = colores?.primary || '#059669';
-      const panelWidth = w * 0.4;
 
-      // Imagen (lado derecho, 60%)
-      const imgAreaW = w - panelWidth;
-      const imgScale = Math.max(imgAreaW / propertyImage.width, h / propertyImage.height);
-      const imgW = propertyImage.width * imgScale;
-      const imgH = propertyImage.height * imgScale;
-      ctx.drawImage(
-        propertyImage,
-        panelWidth + (imgAreaW - imgW) / 2,
-        (h - imgH) / 2,
-        imgW,
-        imgH
-      );
+      // Imagen full-bleed
+      drawFullImage(ctx, propertyImage, w, h);
 
-      // Panel izquierdo
-      ctx.fillStyle = '#ffffff';
-      ctx.fillRect(0, 0, panelWidth, h);
+      // Overlay gradiente
+      const grad = ctx.createLinearGradient(0, 0, 0, h);
+      grad.addColorStop(0, 'rgba(0,0,0,0.1)');
+      grad.addColorStop(0.5, 'rgba(0,0,0,0)');
+      grad.addColorStop(0.8, 'rgba(0,0,0,0.3)');
+      grad.addColorStop(1, 'rgba(0,0,0,0.7)');
+      ctx.fillStyle = grad;
+      ctx.fillRect(0, 0, w, h);
 
-      // Barra de color superior
-      ctx.fillStyle = primary;
-      ctx.fillRect(0, 0, panelWidth, 8);
+      const pad = 40;
 
-      const padding = 50;
-      let yPos = 60;
-
-      // Logo
+      // Logo top-left
       if (logoImg) {
-        const logoH = 55;
+        const logoH = 45;
         const logoW = (logoImg.width / logoImg.height) * logoH;
-        ctx.drawImage(logoImg, padding, yPos, Math.min(logoW, panelWidth - padding * 2), logoH);
-        yPos += logoH + 45;
+        drawGlassPanel(ctx, pad - 8, pad - 8, logoW + 16, logoH + 16, 10, 0.45);
+        ctx.drawImage(logoImg, pad, pad, logoW, logoH);
       }
 
-      // Tipo y operación
+      // Badge
+      if (options.showBadge && options.badgeText) {
+        ctx.font = 'bold 18px "Segoe UI", Arial, sans-serif';
+        const bw = ctx.measureText(options.badgeText.toUpperCase()).width + 30;
+        ctx.fillStyle = primary;
+        roundRect(ctx, w - pad - bw, pad, bw, 34, 17);
+        ctx.fill();
+        ctx.fillStyle = '#fff';
+        ctx.textAlign = 'center';
+        ctx.textBaseline = 'middle';
+        ctx.fillText(options.badgeText.toUpperCase(), w - pad - bw / 2, pad + 17);
+        ctx.textAlign = 'left';
+      }
+
+      // Custom title top center
+      if (options.customTitle) {
+        ctx.font = 'bold 30px "Segoe UI", Arial, sans-serif';
+        const tw = ctx.measureText(options.customTitle).width + 48;
+        drawGlassPanel(ctx, (w - tw) / 2, pad, tw, 48, 24, 0.6);
+        ctx.fillStyle = '#fff';
+        ctx.textAlign = 'center';
+        ctx.textBaseline = 'middle';
+        ctx.fillText(options.customTitle, w / 2, pad + 24);
+        ctx.textAlign = 'left';
+      }
+
+      // Barra glass inferior
+      const barH = 100;
+      const barY = h - barH;
+      drawGlassPanel(ctx, 0, barY, w, barH, 0, 0.55);
+
+      // Línea primaria arriba de la barra
       ctx.fillStyle = primary;
-      ctx.font = 'bold 24px "Segoe UI", Arial, sans-serif';
-      ctx.textAlign = 'left';
+      ctx.fillRect(0, barY, w, 3);
+
+      const bx = pad;
+      const by = barY + 20;
+
+      // Tipo
+      ctx.fillStyle = primary;
+      ctx.font = 'bold 20px "Segoe UI", Arial, sans-serif';
       ctx.textBaseline = 'top';
-      ctx.fillText(`${getTipoLabel(data.tipo)} ${getOperacionLabel(data.operacion)}`.toUpperCase(), padding, yPos);
-      yPos += 45;
+      ctx.fillText(`${getTipoLabel(data.tipo)} ${getOperacionLabel(data.operacion)}`.toUpperCase(), bx, by);
+
+      // Subtitle
+      if (options.customSubtitle) {
+        ctx.fillStyle = 'rgba(255,255,255,0.6)';
+        ctx.font = '500 16px "Segoe UI", Arial, sans-serif';
+        const typeW = ctx.measureText(`${getTipoLabel(data.tipo)} ${getOperacionLabel(data.operacion)}`.toUpperCase()).width;
+        ctx.font = '500 16px "Segoe UI", Arial, sans-serif';
+        ctx.fillText(options.customSubtitle, bx + typeW + 16, by + 3);
+      }
 
       // Precio
       if (options.showPrice && data.precio > 0) {
-        ctx.fillStyle = '#111827';
-        ctx.font = 'bold 48px "Segoe UI", Arial, sans-serif';
-        ctx.fillText(formatPriceFull(data.precio, data.moneda), padding, yPos);
-        yPos += 70;
+        ctx.fillStyle = '#fff';
+        ctx.font = 'bold 40px "Segoe UI", Arial, sans-serif';
+        ctx.fillText(formatPriceFull(data.precio, data.moneda), bx, by + 30);
       }
 
-      // Ubicación
+      // Ubicación centrado
       if (options.showLocation && data.ubicacion) {
-        ctx.fillStyle = '#6b7280';
-        ctx.font = '500 24px "Segoe UI", Arial, sans-serif';
-        drawLocationIcon(ctx, padding, yPos, 24, '#6b7280');
-        ctx.fillText(data.ubicacion, padding + 35, yPos + 2);
-        yPos += 60;
+        const ux = w / 2;
+        drawLocationIcon(ctx, ux - 12, by + 35, 20, 'rgba(255,255,255,0.6)');
+        ctx.fillStyle = 'rgba(255,255,255,0.85)';
+        ctx.font = '500 22px "Segoe UI", Arial, sans-serif';
+        ctx.textAlign = 'center';
+        ctx.fillText(data.ubicacion, ux + 16, by + 35);
+        ctx.textAlign = 'left';
       }
 
-      // Línea separadora
-      ctx.fillStyle = '#e5e7eb';
-      ctx.fillRect(padding, yPos, panelWidth - padding * 2, 2);
-      yPos += 30;
-
-      // Características en grid 2x2
+      // Features derecha
       if (options.showFeatures) {
-        const iconSize = 30;
-        const iconColor = primary;
-        const colWidth = (panelWidth - padding * 2) / 2;
-
-        ctx.font = '600 22px "Segoe UI", Arial, sans-serif';
-        ctx.fillStyle = '#374151';
-
-        const features: { draw: (x: number, y: number) => void; label: string }[] = [];
-        if (data.habitaciones > 0) features.push({ draw: (x, y) => drawBedIcon(ctx, x, y, iconSize, iconColor), label: `${data.habitaciones} Habitaciones` });
-        if (data.banos > 0) features.push({ draw: (x, y) => drawBathIcon(ctx, x, y, iconSize, iconColor), label: `${data.banos} Baños` });
-        if (data.estacionamientos > 0) features.push({ draw: (x, y) => drawCarIcon(ctx, x, y, iconSize, iconColor), label: `${data.estacionamientos} Estac.` });
-        if (data.metros > 0) features.push({ draw: (x, y) => drawAreaIcon(ctx, x, y, iconSize, iconColor), label: `${data.metros} m²` });
-
-        features.forEach((f, i) => {
-          const col = i % 2;
-          const row = Math.floor(i / 2);
-          const fx = padding + col * colWidth;
-          const fy = yPos + row * 55;
-
-          f.draw(fx, fy);
-          ctx.fillText(f.label, fx + iconSize + 12, fy + iconSize * 0.65);
-        });
+        ctx.textAlign = 'right';
+        drawFeaturesInline(ctx, data, w - pad, by + 38, 'rgba(255,255,255,0.8)', 20);
+        ctx.textAlign = 'left';
       }
 
-      // Contacto en la parte inferior
-      ctx.fillStyle = '#f3f4f6';
-      ctx.fillRect(0, h - 70, panelWidth, 70);
-
-      ctx.fillStyle = '#374151';
-      ctx.font = '600 22px "Segoe UI", Arial, sans-serif';
-      ctx.fillText(contactInfo.telefono || contactInfo.whatsapp || '', padding, h - 35);
-
-      // Badge en la imagen
-      if (options.showBadge && options.badgeText) {
-        drawBadge(ctx, options.badgeText.toUpperCase(), panelWidth + 30, 30, primary, 'pill');
+      // Contacto
+      if (contactInfo.telefono || contactInfo.whatsapp) {
+        ctx.fillStyle = 'rgba(255,255,255,0.9)';
+        ctx.font = 'bold 20px "Segoe UI", Arial, sans-serif';
+        ctx.textAlign = 'right';
+        ctx.fillText(contactInfo.telefono || contactInfo.whatsapp || '', w - pad, by);
+        ctx.textAlign = 'left';
       }
     },
   },
 
-  // 6. DESCUENTO / OFERTA
+  // 6. OFERTA — Full image, accent color overlays, diagonal ribbon
   {
     id: 'oferta',
     name: 'Oferta',
-    description: 'Ideal para propiedades con descuento',
+    description: 'Ideal para descuentos y promociones',
     icon: '💰',
     defaultFormat: 'square',
     render: (ctx, canvas, propertyImage, logoImg, colores, contactInfo, data, options) => {
@@ -1141,30 +919,31 @@ const propertyTemplates: PropertyTemplate[] = [
       const primary = colores?.primary || '#dc2626';
       const accent = '#fbbf24';
 
-      // Imagen de fondo
-      const imgScale = Math.max(w / propertyImage.width, h / propertyImage.height);
-      const imgW = propertyImage.width * imgScale;
-      const imgH = propertyImage.height * imgScale;
-      ctx.drawImage(propertyImage, (w - imgW) / 2, (h - imgH) / 2, imgW, imgH);
+      // Imagen full-bleed
+      drawFullImage(ctx, propertyImage, w, h);
 
       // Overlay oscuro
-      const gradient = ctx.createLinearGradient(0, 0, 0, h);
-      gradient.addColorStop(0, 'rgba(0,0,0,0.4)');
-      gradient.addColorStop(0.5, 'rgba(0,0,0,0.3)');
-      gradient.addColorStop(1, 'rgba(0,0,0,0.9)');
-      ctx.fillStyle = gradient;
+      const grad = ctx.createLinearGradient(0, 0, 0, h);
+      grad.addColorStop(0, 'rgba(0,0,0,0.3)');
+      grad.addColorStop(0.4, 'rgba(0,0,0,0.1)');
+      grad.addColorStop(0.7, 'rgba(0,0,0,0.35)');
+      grad.addColorStop(1, 'rgba(0,0,0,0.8)');
+      ctx.fillStyle = grad;
       ctx.fillRect(0, 0, w, h);
 
-      const padding = 50;
+      const pad = 50;
 
-      // Banner de "OFERTA" diagonal
+      // Ribbon diagonal
       ctx.save();
-      ctx.translate(w - 150, 80);
+      ctx.translate(w - 130, 65);
       ctx.rotate(Math.PI / 4);
       ctx.fillStyle = primary;
-      ctx.fillRect(-150, -25, 300, 50);
-      ctx.fillStyle = '#ffffff';
-      ctx.font = 'bold 26px "Segoe UI", Arial, sans-serif';
+      ctx.shadowColor = 'rgba(0,0,0,0.4)';
+      ctx.shadowBlur = 10;
+      ctx.fillRect(-160, -22, 320, 44);
+      ctx.shadowColor = 'transparent';
+      ctx.fillStyle = '#fff';
+      ctx.font = 'bold 22px "Segoe UI", Arial, sans-serif';
       ctx.textAlign = 'center';
       ctx.textBaseline = 'middle';
       ctx.fillText(options.badgeText || '¡OFERTA!', 0, 0);
@@ -1172,73 +951,93 @@ const propertyTemplates: PropertyTemplate[] = [
 
       // Logo
       if (logoImg) {
-        const logoH = 50;
+        const logoH = 45;
         const logoW = (logoImg.width / logoImg.height) * logoH;
-        ctx.drawImage(logoImg, padding, padding, logoW, logoH);
+        drawGlassPanel(ctx, pad - 8, pad - 8, logoW + 16, logoH + 16, 10, 0.45);
+        ctx.drawImage(logoImg, pad, pad, logoW, logoH);
       }
+
+      // Custom title grande
+      if (options.customTitle) {
+        ctx.fillStyle = accent;
+        ctx.font = 'bold 38px "Segoe UI", Arial, sans-serif';
+        ctx.textAlign = 'left';
+        ctx.textBaseline = 'top';
+        drawTextWithShadow(ctx, options.customTitle, pad, pad + 80);
+      }
+
+      if (options.customSubtitle) {
+        ctx.fillStyle = 'rgba(255,255,255,0.7)';
+        ctx.font = '500 22px "Segoe UI", Arial, sans-serif';
+        ctx.textBaseline = 'top';
+        ctx.fillText(options.customSubtitle, pad, pad + 125);
+      }
+
+      // Contenido inferior glass
+      const panelH = 160;
+      const panelY = h - panelH - pad;
+      drawGlassPanel(ctx, pad, panelY, w - pad * 2, panelH, 20, 0.55);
+
+      const px = pad + 25;
+      let py = panelY + 22;
 
       // Tipo
       ctx.fillStyle = accent;
-      ctx.font = 'bold 26px "Segoe UI", Arial, sans-serif';
+      ctx.font = 'bold 22px "Segoe UI", Arial, sans-serif';
+      ctx.textBaseline = 'top';
       ctx.textAlign = 'left';
-      ctx.textBaseline = 'bottom';
-      ctx.fillText(`${getTipoLabel(data.tipo)} ${getOperacionLabel(data.operacion)}`.toUpperCase(), padding, h - 240);
+      ctx.fillText(`${getTipoLabel(data.tipo)} ${getOperacionLabel(data.operacion)}`.toUpperCase(), px, py);
+      py += 32;
 
-      // Precio nuevo GRANDE
+      // Precio GRANDE
       if (options.showPrice && data.precio > 0) {
-        ctx.fillStyle = '#ffffff';
-        ctx.font = 'bold 72px "Segoe UI", Arial, sans-serif';
-        drawTextWithShadow(ctx, formatPriceFull(data.precio, data.moneda), padding, h - 160);
+        ctx.fillStyle = '#fff';
+        ctx.font = 'bold 52px "Segoe UI", Arial, sans-serif';
+        ctx.fillText(formatPriceFull(data.precio, data.moneda), px, py);
+        py += 60;
       }
 
-      // Ubicación
+      // Ubicación + Features
       if (options.showLocation && data.ubicacion) {
+        drawLocationIcon(ctx, px, py + 2, 20, accent);
         ctx.fillStyle = 'rgba(255,255,255,0.9)';
-        ctx.font = '500 26px "Segoe UI", Arial, sans-serif';
-        ctx.textBaseline = 'bottom';
-        drawLocationIcon(ctx, padding, h - 105, 24, accent);
-        ctx.fillText(data.ubicacion, padding + 35, h - 85);
+        ctx.font = '500 22px "Segoe UI", Arial, sans-serif';
+        ctx.fillText(data.ubicacion, px + 28, py);
       }
-
-      // Características
       if (options.showFeatures) {
-        const features: string[] = [];
-        if (data.habitaciones > 0) features.push(`${data.habitaciones} Hab`);
-        if (data.banos > 0) features.push(`${data.banos} Baños`);
-        if (data.estacionamientos > 0) features.push(`${data.estacionamientos} Est`);
-        if (data.metros > 0) features.push(`${data.metros}m²`);
-
-        ctx.fillStyle = 'rgba(255,255,255,0.8)';
-        ctx.font = '500 24px "Segoe UI", Arial, sans-serif';
+        ctx.textAlign = 'right';
+        drawFeaturesInline(ctx, data, w - pad - 25, py, 'rgba(255,255,255,0.75)', 20);
         ctx.textAlign = 'left';
-        ctx.fillText(features.join('  •  '), padding, h - 50);
       }
 
-      // CTA / Botón
+      // CTA
       if (options.ctaText) {
-        const ctaWidth = 240;
-        const ctaHeight = 55;
-        const ctaX = w - padding - ctaWidth;
-        const ctaY = h - padding - ctaHeight - 30;
-
+        const cw = 220;
+        const ch = 48;
+        const cx = w - pad - cw - 25;
+        const cy = panelY - ch - 15;
         ctx.fillStyle = accent;
-        roundRect(ctx, ctaX, ctaY, ctaWidth, ctaHeight, 28);
+        ctx.shadowColor = 'rgba(0,0,0,0.3)';
+        ctx.shadowBlur = 8;
+        roundRect(ctx, cx, cy, cw, ch, 24);
         ctx.fill();
-
+        ctx.shadowColor = 'transparent';
         ctx.fillStyle = '#1e1e1e';
-        ctx.font = 'bold 22px "Segoe UI", Arial, sans-serif';
+        ctx.font = 'bold 20px "Segoe UI", Arial, sans-serif';
         ctx.textAlign = 'center';
         ctx.textBaseline = 'middle';
-        ctx.fillText(options.ctaText, ctaX + ctaWidth / 2, ctaY + ctaHeight / 2);
+        ctx.fillText(options.ctaText, cx + cw / 2, cy + ch / 2);
+        ctx.textAlign = 'left';
       }
 
       // Contacto
       if (contactInfo.telefono || contactInfo.whatsapp) {
-        ctx.fillStyle = '#ffffff';
-        ctx.font = 'bold 24px "Segoe UI", Arial, sans-serif';
+        ctx.fillStyle = 'rgba(255,255,255,0.5)';
+        ctx.font = '500 18px "Segoe UI", Arial, sans-serif';
         ctx.textAlign = 'right';
         ctx.textBaseline = 'bottom';
-        ctx.fillText(contactInfo.telefono || contactInfo.whatsapp || '', w - padding, h - 50);
+        ctx.fillText(contactInfo.telefono || contactInfo.whatsapp || '', w - pad, panelY - 8);
+        ctx.textAlign = 'left';
       }
     },
   },
@@ -1301,6 +1100,8 @@ const CrmMarketingImageConverter: React.FC = () => {
     showBadge: false,
     badgeText: 'EXCLUSIVA',
     ctaText: 'Consulta Ahora',
+    customTitle: '',
+    customSubtitle: '',
   });
 
   const basePath = tenantActual?.slug ? `/crm/${tenantActual.slug}` : '/crm';
@@ -2449,6 +2250,44 @@ const CrmMarketingImageConverter: React.FC = () => {
                   </select>
                 </div>
               )}
+
+              <div style={{ marginTop: '8px' }}>
+                <label style={{ fontSize: '12px', fontWeight: 600, color: '#64748b', marginBottom: '6px', display: 'block' }}>
+                  Título personalizado
+                </label>
+                <input
+                  type="text"
+                  value={templateOptions.customTitle}
+                  onChange={(e) => setTemplateOptions({ ...templateOptions, customTitle: e.target.value })}
+                  placeholder="Ej: Inversión Premium"
+                  style={{
+                    width: '100%',
+                    padding: '8px 12px',
+                    border: '1px solid #e2e8f0',
+                    borderRadius: '8px',
+                    fontSize: '13px',
+                  }}
+                />
+              </div>
+
+              <div style={{ marginTop: '8px' }}>
+                <label style={{ fontSize: '12px', fontWeight: 600, color: '#64748b', marginBottom: '6px', display: 'block' }}>
+                  Subtítulo personalizado
+                </label>
+                <input
+                  type="text"
+                  value={templateOptions.customSubtitle}
+                  onChange={(e) => setTemplateOptions({ ...templateOptions, customSubtitle: e.target.value })}
+                  placeholder="Ej: Entrega inmediata"
+                  style={{
+                    width: '100%',
+                    padding: '8px 12px',
+                    border: '1px solid #e2e8f0',
+                    borderRadius: '8px',
+                    fontSize: '13px',
+                  }}
+                />
+              </div>
 
               <div style={{ marginTop: '8px' }}>
                 <label style={{ fontSize: '12px', fontWeight: 600, color: '#64748b', marginBottom: '6px', display: 'block' }}>
