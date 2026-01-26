@@ -287,6 +287,12 @@ interface GoogleAdsAccount {
   manager: boolean;
 }
 
+// Google Search Console site interface
+interface SearchConsoleSite {
+  siteUrl: string;
+  permissionLevel: string;
+}
+
 const CrmMarketingApiConfig: React.FC = () => {
   const navigate = useNavigate();
   const { setPageHeader } = usePageHeader();
@@ -301,6 +307,11 @@ const CrmMarketingApiConfig: React.FC = () => {
   const [accountsLoading, setAccountsLoading] = useState(false);
   const popupRef = useRef<Window | null>(null);
   const pollTimerRef = useRef<number | null>(null);
+
+  // Google Search Console site selector state
+  const [showSiteSelector, setShowSiteSelector] = useState(false);
+  const [availableSites, setAvailableSites] = useState<SearchConsoleSite[]>([]);
+  const [sitesLoading, setSitesLoading] = useState(false);
 
   useEffect(() => {
     setPageHeader({
@@ -329,9 +340,10 @@ const CrmMarketingApiConfig: React.FC = () => {
     fetchCredentials();
   }, [tenantActual?.id]);
 
-  // Listen for OAuth postMessage from popup
+  // Listen for OAuth postMessage from popup (Google Ads + GSC)
   const handleOAuthMessage = useCallback(async (event: MessageEvent) => {
-    if (event.data?.type !== 'GOOGLE_ADS_OAUTH_RESULT') return;
+    const type = event.data?.type;
+    if (type !== 'GOOGLE_ADS_OAUTH_RESULT' && type !== 'GSC_OAUTH_RESULT') return;
 
     // Clean up popup resources
     if (pollTimerRef.current) {
@@ -340,35 +352,62 @@ const CrmMarketingApiConfig: React.FC = () => {
     }
     popupRef.current = null;
 
-    if (event.data.success) {
-      // OAuth succeeded - now fetch available accounts
-      setAccountsLoading(true);
-      setActionLoading(null);
-
-      try {
-        const accountsResponse = await apiFetch(
-          `/tenants/${tenantActual?.id}/api-credentials/google-ads/accounts`
-        );
-        const accounts: GoogleAdsAccount[] = await accountsResponse.json();
-
-        if (accounts.length === 1 && !accounts[0].manager) {
-          // Only one non-manager account - auto-select it
-          await handleSelectAccount(accounts[0].customerId);
-        } else if (accounts.length > 0) {
-          setAvailableAccounts(accounts);
-          setShowAccountSelector(true);
-        } else {
-          alert('No se encontraron cuentas de Google Ads accesibles.');
+    if (type === 'GOOGLE_ADS_OAUTH_RESULT') {
+      if (event.data.success) {
+        setAccountsLoading(true);
+        setActionLoading(null);
+        try {
+          const accountsResponse = await apiFetch(
+            `/tenants/${tenantActual?.id}/api-credentials/google-ads/accounts`
+          );
+          const accounts: GoogleAdsAccount[] = await accountsResponse.json();
+          if (accounts.length === 1 && !accounts[0].manager) {
+            await handleSelectAccount(accounts[0].customerId);
+          } else if (accounts.length > 0) {
+            setAvailableAccounts(accounts);
+            setShowAccountSelector(true);
+          } else {
+            alert('No se encontraron cuentas de Google Ads accesibles.');
+          }
+        } catch (error) {
+          console.error('Error fetching accounts:', error);
+          alert('OAuth exitoso, pero hubo un error al obtener las cuentas. Intenta de nuevo.');
+        } finally {
+          setAccountsLoading(false);
         }
-      } catch (error) {
-        console.error('Error fetching accounts:', error);
-        alert('OAuth exitoso, pero hubo un error al obtener las cuentas. Intenta de nuevo.');
-      } finally {
-        setAccountsLoading(false);
+      } else {
+        setActionLoading(null);
+        alert(event.data.message || 'Error en la autorización de Google Ads');
       }
-    } else {
-      setActionLoading(null);
-      alert(event.data.message || 'Error en la autorización de Google Ads');
+    }
+
+    if (type === 'GSC_OAUTH_RESULT') {
+      if (event.data.success) {
+        setSitesLoading(true);
+        setActionLoading(null);
+        try {
+          const sitesResponse = await apiFetch(
+            `/tenants/${tenantActual?.id}/api-credentials/google-search-console/sites`
+          );
+          const sites: SearchConsoleSite[] = await sitesResponse.json();
+          if (sites.length === 1) {
+            await handleSelectSite(sites[0].siteUrl);
+          } else if (sites.length > 0) {
+            setAvailableSites(sites);
+            setShowSiteSelector(true);
+          } else {
+            alert('No se encontraron sitios verificados en Search Console.');
+          }
+        } catch (error) {
+          console.error('Error fetching sites:', error);
+          alert('OAuth exitoso, pero hubo un error al obtener los sitios. Intenta de nuevo.');
+        } finally {
+          setSitesLoading(false);
+        }
+      } else {
+        setActionLoading(null);
+        alert(event.data.message || 'Error en la autorización de Search Console');
+      }
     }
   }, [tenantActual?.id]);
 
@@ -385,10 +424,75 @@ const CrmMarketingApiConfig: React.FC = () => {
   }, []);
 
   // Handlers de conexión
-  const handleConnectGoogleSearchConsole = () => {
+  const handleConnectGoogleSearchConsole = async () => {
+    if (!tenantActual?.id) return;
+
     setActionLoading('google-search-console');
-    alert('El flujo de OAuth de Google Search Console se implementará próximamente.\n\nNecesitarás:\n1. Un proyecto en Google Cloud Console\n2. Search Console API habilitada\n3. Credenciales OAuth 2.0');
-    setActionLoading(null);
+
+    try {
+      const userId = user?.id || 'unknown';
+      const authResponse = await apiFetch(
+        `/tenants/${tenantActual.id}/api-credentials/google-search-console/auth-url?connectedBy=${userId}`
+      );
+      const { authUrl } = await authResponse.json();
+
+      const width = 600;
+      const height = 700;
+      const left = window.screenX + (window.outerWidth - width) / 2;
+      const top = window.screenY + (window.outerHeight - height) / 2;
+
+      const popup = window.open(
+        authUrl,
+        'gsc-oauth',
+        `width=${width},height=${height},left=${left},top=${top},toolbar=no,menubar=no,scrollbars=yes`
+      );
+
+      if (!popup) {
+        alert('No se pudo abrir la ventana de autorización. Verifica que los popups no estén bloqueados.');
+        setActionLoading(null);
+        return;
+      }
+
+      popupRef.current = popup;
+
+      pollTimerRef.current = window.setInterval(() => {
+        if (popup.closed) {
+          if (pollTimerRef.current) {
+            clearInterval(pollTimerRef.current);
+            pollTimerRef.current = null;
+          }
+          popupRef.current = null;
+          setActionLoading(null);
+        }
+      }, 500);
+    } catch (error) {
+      console.error('Error starting GSC OAuth:', error);
+      alert('Error al iniciar el flujo de autorización');
+      setActionLoading(null);
+    }
+  };
+
+  const handleSelectSite = async (siteUrl: string) => {
+    if (!tenantActual?.id) return;
+
+    setSitesLoading(true);
+    try {
+      await apiFetch(`/tenants/${tenantActual.id}/api-credentials/google-search-console/site-url`, {
+        method: 'PUT',
+        body: JSON.stringify({ siteUrl }),
+      });
+
+      const refreshResponse = await apiFetch(`/tenants/${tenantActual.id}/api-credentials`);
+      const refreshedData = await refreshResponse.json();
+      setCredentials(refreshedData);
+      setShowSiteSelector(false);
+      setAvailableSites([]);
+    } catch (error) {
+      console.error('Error selecting site:', error);
+      alert('Error al seleccionar el sitio');
+    } finally {
+      setSitesLoading(false);
+    }
   };
 
   const handleDisconnectGoogleSearchConsole = async () => {
@@ -655,7 +759,13 @@ const CrmMarketingApiConfig: React.FC = () => {
           name="Google Search Console"
           description="Monitorea la indexación y posicionamiento de tus páginas de propiedades en Google"
           connected={credentials?.googleSearchConsoleConnected || false}
-          connectionInfo={credentials?.googleSearchConsoleSiteUrl ? `Sitio: ${credentials.googleSearchConsoleSiteUrl}` : undefined}
+          connectionInfo={
+            credentials?.googleSearchConsoleSiteUrl
+              ? credentials.googleSearchConsoleSiteUrl === 'PENDING'
+                ? 'Conectado - Selecciona un sitio'
+                : `Sitio: ${credentials.googleSearchConsoleSiteUrl}`
+              : undefined
+          }
           color="#16a34a"
           onConnect={handleConnectGoogleSearchConsole}
           onDisconnect={handleDisconnectGoogleSearchConsole}
@@ -1001,6 +1111,159 @@ const CrmMarketingApiConfig: React.FC = () => {
             <Loader2 size={24} style={{ animation: 'spin 1s linear infinite', color: '#4285f4' }} />
             <span style={{ fontSize: '14px', fontWeight: 500, color: '#1e293b' }}>
               Obteniendo cuentas de Google Ads...
+            </span>
+          </div>
+        </div>
+      )}
+
+      {/* Google Search Console Site Selector Modal */}
+      {showSiteSelector && (
+        <div
+          style={{
+            position: 'fixed',
+            inset: 0,
+            background: 'rgba(0,0,0,0.5)',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            zIndex: 1000,
+          }}
+          onClick={() => {
+            setShowSiteSelector(false);
+            setAvailableSites([]);
+          }}
+        >
+          <div
+            style={{
+              background: 'white',
+              borderRadius: '20px',
+              padding: '32px',
+              maxWidth: '520px',
+              width: '90%',
+              maxHeight: '80vh',
+              overflow: 'auto',
+              boxShadow: '0 24px 80px rgba(0,0,0,0.2)',
+            }}
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '24px' }}>
+              <div>
+                <h3 style={{ fontSize: '18px', fontWeight: 700, color: '#1e293b', margin: 0 }}>
+                  Selecciona un sitio
+                </h3>
+                <p style={{ fontSize: '13px', color: '#64748b', margin: '4px 0 0 0' }}>
+                  Elige el sitio que deseas monitorear en Search Console
+                </p>
+              </div>
+              <button
+                onClick={() => {
+                  setShowSiteSelector(false);
+                  setAvailableSites([]);
+                }}
+                style={{
+                  background: '#f1f5f9',
+                  border: 'none',
+                  borderRadius: '8px',
+                  padding: '8px',
+                  cursor: 'pointer',
+                  color: '#64748b',
+                }}
+              >
+                <X size={18} />
+              </button>
+            </div>
+
+            {sitesLoading ? (
+              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '40px' }}>
+                <Loader2 size={28} style={{ animation: 'spin 1s linear infinite', color: '#16a34a' }} />
+              </div>
+            ) : (
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
+                {availableSites.map((site) => (
+                  <button
+                    key={site.siteUrl}
+                    onClick={() => handleSelectSite(site.siteUrl)}
+                    disabled={sitesLoading}
+                    style={{
+                      display: 'flex',
+                      alignItems: 'center',
+                      gap: '14px',
+                      padding: '16px',
+                      background: '#f8fafc',
+                      border: '2px solid #e2e8f0',
+                      borderRadius: '12px',
+                      cursor: 'pointer',
+                      textAlign: 'left',
+                      transition: 'all 0.15s',
+                    }}
+                    onMouseEnter={(e) => {
+                      e.currentTarget.style.borderColor = '#16a34a';
+                      e.currentTarget.style.background = '#f0fdf4';
+                    }}
+                    onMouseLeave={(e) => {
+                      e.currentTarget.style.borderColor = '#e2e8f0';
+                      e.currentTarget.style.background = '#f8fafc';
+                    }}
+                  >
+                    <div
+                      style={{
+                        width: '44px',
+                        height: '44px',
+                        borderRadius: '10px',
+                        background: '#16a34a20',
+                        display: 'flex',
+                        alignItems: 'center',
+                        justifyContent: 'center',
+                        color: '#16a34a',
+                        flexShrink: 0,
+                      }}
+                    >
+                      <Search size={20} />
+                    </div>
+                    <div style={{ flex: 1, minWidth: 0 }}>
+                      <div style={{ fontSize: '14px', fontWeight: 600, color: '#1e293b', wordBreak: 'break-all' }}>
+                        {site.siteUrl}
+                      </div>
+                      <div style={{ fontSize: '12px', color: '#64748b', marginTop: '2px' }}>
+                        Permiso: {site.permissionLevel}
+                      </div>
+                    </div>
+                    <ChevronRight size={16} color="#94a3b8" />
+                  </button>
+                ))}
+              </div>
+            )}
+          </div>
+        </div>
+      )}
+
+      {/* Sites loading overlay (while fetching sites after OAuth) */}
+      {sitesLoading && !showSiteSelector && (
+        <div
+          style={{
+            position: 'fixed',
+            inset: 0,
+            background: 'rgba(0,0,0,0.3)',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            zIndex: 999,
+          }}
+        >
+          <div
+            style={{
+              background: 'white',
+              borderRadius: '16px',
+              padding: '32px 48px',
+              display: 'flex',
+              alignItems: 'center',
+              gap: '16px',
+              boxShadow: '0 12px 40px rgba(0,0,0,0.15)',
+            }}
+          >
+            <Loader2 size={24} style={{ animation: 'spin 1s linear infinite', color: '#16a34a' }} />
+            <span style={{ fontSize: '14px', fontWeight: 500, color: '#1e293b' }}>
+              Obteniendo sitios de Search Console...
             </span>
           </div>
         </div>

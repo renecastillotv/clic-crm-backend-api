@@ -157,18 +157,15 @@ const CrmMarketingCampanas: React.FC = () => {
     const checkProviders = async () => {
       try {
         const res = await apiFetch(`/tenants/${tenantActual.id}/api-credentials`);
-        if (!res.ok) {
-          setProviderStatus({ googleAds: false, meta: false, email: false, loading: false });
-          return;
-        }
         const data = await res.json();
         setProviderStatus({
-          googleAds: !!(data.googleAdsConnected && data.googleAdsCustomerId && data.googleAdsCustomerId !== 'PENDING'),
+          googleAds: !!data.googleAdsConnected,
           meta: !!data.metaAdsConnected,
           email: !!data.emailConnected,
           loading: false,
         });
-      } catch {
+      } catch (err) {
+        console.error('[Campanas] Error checking provider status:', err);
         setProviderStatus({ googleAds: false, meta: false, email: false, loading: false });
       }
     };

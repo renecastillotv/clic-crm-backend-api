@@ -65,18 +65,15 @@ const CrmMarketing: React.FC = () => {
     const check = async () => {
       try {
         const res = await apiFetch(`/tenants/${tenantActual.id}/api-credentials`);
-        if (!res.ok) {
-          setConnections({ googleAds: false, meta: false, email: false, loading: false });
-          return;
-        }
         const data = await res.json();
         setConnections({
-          googleAds: !!(data.googleAdsConnected && data.googleAdsCustomerId && data.googleAdsCustomerId !== 'PENDING'),
+          googleAds: !!data.googleAdsConnected,
           meta: !!data.metaAdsConnected,
           email: !!data.emailConnected,
           loading: false,
         });
-      } catch {
+      } catch (err) {
+        console.error('[Marketing Centro] Error checking connections:', err);
         setConnections({ googleAds: false, meta: false, email: false, loading: false });
       }
     };
