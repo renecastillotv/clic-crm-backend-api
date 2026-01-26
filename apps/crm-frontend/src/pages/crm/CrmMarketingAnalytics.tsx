@@ -13,7 +13,6 @@ import { useNavigate } from 'react-router-dom';
 import { usePageHeader } from '../../layouts/CrmLayout';
 import { useAuth } from '../../contexts/AuthContext';
 import {
-  ArrowLeft,
   BarChart3,
   PieChart,
   TrendingUp,
@@ -198,29 +197,6 @@ const CrmMarketingAnalytics: React.FC = () => {
 
   return (
     <div style={{ padding: '24px', maxWidth: '1200px' }}>
-      {/* Header con botón de volver */}
-      <div style={{ marginBottom: '24px' }}>
-        <button
-          onClick={() => navigate(`${basePath}/marketing`)}
-          style={{
-            display: 'flex',
-            alignItems: 'center',
-            gap: '8px',
-            padding: '8px 16px',
-            background: '#f1f5f9',
-            border: 'none',
-            borderRadius: '8px',
-            color: '#64748b',
-            fontSize: '13px',
-            fontWeight: 500,
-            cursor: 'pointer',
-          }}
-        >
-          <ArrowLeft size={16} />
-          Volver al Marketing Hub
-        </button>
-      </div>
-
       {/* Título de sección */}
       <div
         style={{

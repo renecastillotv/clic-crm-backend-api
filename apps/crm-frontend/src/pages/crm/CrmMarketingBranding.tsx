@@ -8,8 +8,7 @@
  * - Redes sociales
  */
 
-import React, { useEffect, useState } from 'react';
-import { useNavigate } from 'react-router-dom';
+import React, { useEffect, useState, useRef } from 'react';
 import { useAuth as useClerkAuth } from '@clerk/clerk-react';
 import { usePageHeader } from '../../layouts/CrmLayout';
 import { useAuth } from '../../contexts/AuthContext';
@@ -23,12 +22,10 @@ import {
 } from '../../services/api';
 import SingleImageUploader from '../../components/SingleImageUploader';
 import {
-  ArrowLeft,
   Save,
   Loader2,
   Image,
   Palette,
-  Phone,
   Share2,
   CheckCircle,
   AlertCircle,
@@ -194,7 +191,6 @@ const ColorPicker: React.FC<ColorPickerProps> = ({ label, value, onChange }) => 
 );
 
 const CrmMarketingBranding: React.FC = () => {
-  const navigate = useNavigate();
   const { setPageHeader } = usePageHeader();
   const { tenantActual } = useAuth();
   const { getToken } = useClerkAuth();
@@ -237,15 +233,6 @@ const CrmMarketingBranding: React.FC = () => {
     tiktok_url: null,
     youtube_url: null,
   });
-
-  const basePath = tenantActual?.slug ? `/crm/${tenantActual.slug}` : '/crm';
-
-  useEffect(() => {
-    setPageHeader({
-      title: 'Branding de Empresa',
-      subtitle: 'Configura la identidad visual de tu empresa para los creativos',
-    });
-  }, [setPageHeader]);
 
   // Cargar datos
   useEffect(() => {
@@ -325,6 +312,55 @@ const CrmMarketingBranding: React.FC = () => {
     }
   };
 
+  // Ref para mantener handleSave actualizado sin re-render del header
+  const handleSaveRef = useRef(handleSave);
+  handleSaveRef.current = handleSave;
+
+  // Header con botón de guardar
+  useEffect(() => {
+    setPageHeader({
+      title: 'Branding de Empresa',
+      subtitle: 'Configura la identidad visual de tu empresa para los creativos',
+      actions: (
+        <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+          {saveSuccess && (
+            <div style={{ display: 'flex', alignItems: 'center', gap: '6px', color: '#16a34a', fontSize: '13px' }}>
+              <CheckCircle size={16} />
+              Guardado
+            </div>
+          )}
+          {saveError && (
+            <div style={{ display: 'flex', alignItems: 'center', gap: '6px', color: '#ef4444', fontSize: '13px' }}>
+              <AlertCircle size={16} />
+              {saveError}
+            </div>
+          )}
+          <button
+            onClick={() => handleSaveRef.current()}
+            disabled={!hasChanges || saving}
+            style={{
+              display: 'flex',
+              alignItems: 'center',
+              gap: '8px',
+              padding: '8px 16px',
+              background: hasChanges ? '#3b82f6' : '#94a3b8',
+              color: 'white',
+              border: 'none',
+              borderRadius: '8px',
+              fontSize: '13px',
+              fontWeight: 600,
+              cursor: hasChanges ? 'pointer' : 'default',
+              opacity: saving ? 0.7 : 1,
+            }}
+          >
+            {saving ? <Loader2 size={16} style={{ animation: 'spin 1s linear infinite' }} /> : <Save size={16} />}
+            {saving ? 'Guardando...' : 'Guardar'}
+          </button>
+        </div>
+      ),
+    });
+  }, [setPageHeader, hasChanges, saving, saveSuccess, saveError]);
+
   if (loading) {
     return (
       <div style={{ padding: '24px', display: 'flex', justifyContent: 'center', alignItems: 'center', minHeight: '400px' }}>
@@ -335,72 +371,6 @@ const CrmMarketingBranding: React.FC = () => {
 
   return (
     <div style={{ padding: '24px', maxWidth: '1000px' }}>
-      {/* Header con botones */}
-      <div
-        style={{
-          display: 'flex',
-          alignItems: 'center',
-          justifyContent: 'space-between',
-          marginBottom: '24px',
-        }}
-      >
-        <button
-          onClick={() => navigate(`${basePath}/marketing`)}
-          style={{
-            display: 'flex',
-            alignItems: 'center',
-            gap: '8px',
-            padding: '8px 16px',
-            background: '#f1f5f9',
-            border: 'none',
-            borderRadius: '8px',
-            color: '#64748b',
-            fontSize: '13px',
-            fontWeight: 500,
-            cursor: 'pointer',
-          }}
-        >
-          <ArrowLeft size={16} />
-          Volver al Marketing Hub
-        </button>
-
-        <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
-          {saveSuccess && (
-            <div style={{ display: 'flex', alignItems: 'center', gap: '6px', color: '#16a34a', fontSize: '13px' }}>
-              <CheckCircle size={16} />
-              Guardado exitosamente
-            </div>
-          )}
-          {saveError && (
-            <div style={{ display: 'flex', alignItems: 'center', gap: '6px', color: '#ef4444', fontSize: '13px' }}>
-              <AlertCircle size={16} />
-              {saveError}
-            </div>
-          )}
-          <button
-            onClick={handleSave}
-            disabled={!hasChanges || saving}
-            style={{
-              display: 'flex',
-              alignItems: 'center',
-              gap: '8px',
-              padding: '10px 20px',
-              background: hasChanges ? '#3b82f6' : '#94a3b8',
-              color: 'white',
-              border: 'none',
-              borderRadius: '10px',
-              fontSize: '14px',
-              fontWeight: 600,
-              cursor: hasChanges ? 'pointer' : 'default',
-              opacity: saving ? 0.7 : 1,
-            }}
-          >
-            {saving ? <Loader2 size={16} style={{ animation: 'spin 1s linear infinite' }} /> : <Save size={16} />}
-            {saving ? 'Guardando...' : 'Guardar Cambios'}
-          </button>
-        </div>
-      </div>
-
       {/* Sección: Logos e Identidad Visual */}
       <Section
         title="Logos e Identidad Visual"
