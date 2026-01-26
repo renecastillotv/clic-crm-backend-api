@@ -362,34 +362,42 @@ export async function saveMetaCredentials(
   pageName: string,
   instagramAccountId: string | null,
   instagramUsername: string | null,
-  connectedBy: string
+  connectedBy?: string | null
 ): Promise<void> {
   const encryptedToken = await encryptValue(pageAccessToken);
 
-  const sql = `
-    UPDATE tenant_api_credentials
-    SET
-      meta_page_access_token_encrypted = $1,
-      meta_page_id = $2,
-      meta_page_name = $3,
-      meta_instagram_business_account_id = $4,
-      meta_instagram_username = $5,
-      meta_connected = true,
-      meta_token_expires_at = NOW() + INTERVAL '60 days',
-      connected_by = $6,
-      updated_at = NOW()
-    WHERE tenant_id = $7
-  `;
-
-  await query(sql, [
-    encryptedToken,
-    pageId,
-    pageName,
-    instagramAccountId,
-    instagramUsername,
-    connectedBy,
-    tenantId
-  ]);
+  if (connectedBy) {
+    const sql = `
+      UPDATE tenant_api_credentials
+      SET
+        meta_page_access_token_encrypted = $1,
+        meta_page_id = $2,
+        meta_page_name = $3,
+        meta_instagram_business_account_id = $4,
+        meta_instagram_username = $5,
+        meta_connected = true,
+        meta_token_expires_at = NOW() + INTERVAL '60 days',
+        connected_by = $6,
+        updated_at = NOW()
+      WHERE tenant_id = $7
+    `;
+    await query(sql, [encryptedToken, pageId, pageName, instagramAccountId, instagramUsername, connectedBy, tenantId]);
+  } else {
+    const sql = `
+      UPDATE tenant_api_credentials
+      SET
+        meta_page_access_token_encrypted = $1,
+        meta_page_id = $2,
+        meta_page_name = $3,
+        meta_instagram_business_account_id = $4,
+        meta_instagram_username = $5,
+        meta_connected = true,
+        meta_token_expires_at = NOW() + INTERVAL '60 days',
+        updated_at = NOW()
+      WHERE tenant_id = $6
+    `;
+    await query(sql, [encryptedToken, pageId, pageName, instagramAccountId, instagramUsername, tenantId]);
+  }
 }
 
 /**
