@@ -10,7 +10,7 @@
  */
 
 import React, { useEffect, useState } from 'react';
-import { useNavigate, useSearchParams } from 'react-router-dom';
+import { useNavigate } from 'react-router-dom';
 import { usePageHeader } from '../../layouts/CrmLayout';
 import { useAuth } from '../../contexts/AuthContext';
 import {
@@ -327,24 +327,12 @@ const CrmMarketing: React.FC = () => {
   const { setPageHeader } = usePageHeader();
   const navigate = useNavigate();
   const { tenantActual } = useAuth();
-  const [searchParams, setSearchParams] = useSearchParams();
 
-  // Get initial tab from URL or default to 'all'
-  const tabFromUrl = searchParams.get('tab') as 'all' | 'branding' | 'campaigns' | 'social' | 'email' | 'analytics' | null;
-  const [activeTab, setActiveTab] = useState<'all' | 'branding' | 'campaigns' | 'social' | 'email' | 'analytics'>(
-    tabFromUrl && ['all', 'branding', 'campaigns', 'social', 'email', 'analytics'].includes(tabFromUrl) ? tabFromUrl : 'all'
-  );
+  // Tab state for internal filtering (no URL params)
+  const [activeTab, setActiveTab] = useState<'all' | 'branding' | 'campaigns' | 'social' | 'email' | 'analytics'>('all');
 
   // Calcular base path basado en el tenant
   const basePath = tenantActual?.slug ? `/crm/${tenantActual.slug}` : '/crm';
-
-  // Update tab when URL changes
-  useEffect(() => {
-    const newTab = searchParams.get('tab') as typeof activeTab | null;
-    if (newTab && ['all', 'branding', 'campaigns', 'social', 'email', 'analytics'].includes(newTab)) {
-      setActiveTab(newTab);
-    }
-  }, [searchParams]);
 
   useEffect(() => {
     setPageHeader({
@@ -353,14 +341,9 @@ const CrmMarketing: React.FC = () => {
     });
   }, [setPageHeader]);
 
-  // Handle tab change - update both state and URL
+  // Handle tab change
   const handleTabChange = (tab: typeof activeTab) => {
     setActiveTab(tab);
-    if (tab === 'all') {
-      setSearchParams({});
-    } else {
-      setSearchParams({ tab });
-    }
   };
 
   // Funciones para las acciones

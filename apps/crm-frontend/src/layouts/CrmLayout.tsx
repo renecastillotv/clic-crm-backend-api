@@ -602,11 +602,11 @@ export default function CrmLayout() {
 
   // Sub-items de Marketing
   const marketingSubItems = [
-    { id: 'marketing-branding', path: 'marketing?tab=branding', label: 'Branding', icon: Icons.branding },
-    { id: 'marketing-campanas', path: 'marketing?tab=campaigns', label: 'Campañas', icon: Icons.campanas },
-    { id: 'marketing-redes-sociales', path: 'marketing?tab=social', label: 'Redes Sociales', icon: Icons.redesSociales },
-    { id: 'marketing-email', path: 'marketing?tab=email', label: 'Email', icon: Icons.emailMarketing },
-    { id: 'marketing-analytics', path: 'marketing?tab=analytics', label: 'Analytics', icon: Icons.analytics },
+    { id: 'marketing-branding', path: 'marketing/branding', label: 'Branding', icon: Icons.branding },
+    { id: 'marketing-campanas', path: 'marketing/campanas', label: 'Campañas', icon: Icons.campanas },
+    { id: 'marketing-redes-sociales', path: 'marketing/redes-sociales', label: 'Redes Sociales', icon: Icons.redesSociales },
+    { id: 'marketing-email', path: 'marketing/email', label: 'Email', icon: Icons.emailMarketing },
+    { id: 'marketing-analytics', path: 'marketing/analytics', label: 'Analytics', icon: Icons.analytics },
   ];
 
   // Filtrar items según permisos

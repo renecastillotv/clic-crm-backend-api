@@ -107,6 +107,10 @@ import CrmProductividadConfiguracion from './pages/crm/CrmProductividadConfigura
 import CrmMarketing from './pages/crm/CrmMarketing';
 import CrmMarketingApiConfig from './pages/crm/CrmMarketingApiConfig';
 import CrmMarketingBranding from './pages/crm/CrmMarketingBranding';
+import CrmMarketingCampanas from './pages/crm/CrmMarketingCampanas';
+import CrmMarketingRedesSociales from './pages/crm/CrmMarketingRedesSociales';
+import CrmMarketingEmail from './pages/crm/CrmMarketingEmail';
+import CrmMarketingAnalytics from './pages/crm/CrmMarketingAnalytics';
 import CrmMarketingImageConverter from './pages/crm/CrmMarketingImageConverter';
 import CrmMarketingFlyerGenerator from './pages/crm/CrmMarketingFlyerGenerator';
 import CrmMarketingStoriesCreator from './pages/crm/CrmMarketingStoriesCreator';
@@ -360,6 +364,10 @@ function AppRoutes() {
         {/* Marketing Hub */}
         <Route path="marketing" element={<CrmMarketing />} />
         <Route path="marketing/branding" element={<CrmMarketingBranding />} />
+        <Route path="marketing/campanas" element={<CrmMarketingCampanas />} />
+        <Route path="marketing/redes-sociales" element={<CrmMarketingRedesSociales />} />
+        <Route path="marketing/email" element={<CrmMarketingEmail />} />
+        <Route path="marketing/analytics" element={<CrmMarketingAnalytics />} />
         <Route path="marketing/convertir-imagenes" element={<CrmMarketingImageConverter />} />
         <Route path="marketing/flyers" element={<CrmMarketingFlyerGenerator />} />
         <Route path="marketing/stories" element={<CrmMarketingStoriesCreator />} />
