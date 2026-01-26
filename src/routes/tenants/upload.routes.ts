@@ -188,10 +188,10 @@ router.post('/file', uploadFileMiddleware.single('file'), async (req: Request<Te
 /**
  * GET /api/tenants/:tenantId/upload/proxy-image
  *
- * Proxy para obtener imágenes de R2 (evita CORS para uso en Canvas)
+ * Proxy para obtener imágenes externas (evita CORS para uso en Canvas)
  * Retorna la imagen directamente con headers CORS apropiados
  * Query params:
- * - url: URL de la imagen a obtener (debe ser de R2)
+ * - url: URL de la imagen a obtener (HTTP/HTTPS)
  */
 router.get('/proxy-image', async (req: Request<TenantParams>, res: Response, next: NextFunction) => {
   try {
@@ -204,23 +204,16 @@ router.get('/proxy-image', async (req: Request<TenantParams>, res: Response, nex
       });
     }
 
-    // Validar que la URL sea de nuestro bucket R2
-    const allowedDomains = [
-      'pub-b7a3dee69f6541d3b2ab6a935184789c.r2.dev',
-      'r2.cloudflarestorage.com'
-    ];
-
+    // Validar que la URL sea HTTPS
     const urlObj = new URL(url);
-    const isAllowedDomain = allowedDomains.some(domain => urlObj.hostname.includes(domain));
-
-    if (!isAllowedDomain) {
+    if (!['http:', 'https:'].includes(urlObj.protocol)) {
       return res.status(403).json({
-        error: 'Dominio no permitido',
-        message: 'Solo se pueden obtener imágenes del almacenamiento autorizado',
+        error: 'Protocolo no permitido',
+        message: 'Solo se permiten URLs HTTP/HTTPS',
       });
     }
 
-    // Fetch de la imagen desde R2
+    // Fetch de la imagen
     const response = await fetch(url);
 
     if (!response.ok) {
