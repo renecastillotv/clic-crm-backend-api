@@ -9,11 +9,14 @@
 import express, { Request, Response } from 'express';
 import { createHmac, randomBytes, timingSafeEqual } from 'crypto';
 import * as credentialsService from '../services/tenantApiCredentialsService.js';
+import * as metaAdsService from '../services/metaAdsService.js';
 
 const router = express.Router();
 
 const GOOGLE_CLIENT_ID = process.env.GOOGLE_OAUTH_CLIENT_ID || '';
 const GOOGLE_CLIENT_SECRET = process.env.GOOGLE_OAUTH_CLIENT_SECRET || '';
+const META_APP_ID = process.env.META_APP_ID || '';
+const META_APP_SECRET = process.env.META_APP_SECRET || '';
 const STATE_SECRET = process.env.OAUTH_STATE_SECRET || process.env.API_CREDENTIALS_SECRET || 'dev-state-secret';
 
 // ==================== STATE HELPERS ====================
@@ -196,6 +199,73 @@ router.get('/google-search-console/callback', async (req: Request, res: Response
   } catch (err: any) {
     console.error('[OAuth] GSC callback error:', err);
     return res.send(buildPopupHTML(false, 'Error interno al procesar la autorización', 'GSC_OAUTH_RESULT'));
+  }
+});
+
+// ==================== META ADS CALLBACK ====================
+
+/**
+ * GET /api/oauth/meta/callback
+ *
+ * Facebook redirects here after user grants consent.
+ * Exchanges the code for a long-lived token and saves it.
+ */
+router.get('/meta/callback', async (req: Request, res: Response) => {
+  const { code, state, error, error_reason } = req.query;
+
+  if (error) {
+    const msg = error_reason === 'user_denied'
+      ? 'El usuario canceló la autorización'
+      : `Error: ${error}`;
+    return res.send(buildPopupHTML(false, msg, 'META_ADS_OAUTH_RESULT'));
+  }
+
+  if (!code || !state || typeof code !== 'string' || typeof state !== 'string') {
+    return res.send(buildPopupHTML(false, 'Parámetros inválidos', 'META_ADS_OAUTH_RESULT'));
+  }
+
+  const stateData = verifyOAuthState(state);
+  if (!stateData) {
+    return res.send(buildPopupHTML(false, 'Estado de seguridad inválido o expirado', 'META_ADS_OAUTH_RESULT'));
+  }
+
+  try {
+    const protocol = req.get('x-forwarded-proto') || req.protocol;
+    const host = req.get('host') || '';
+    const redirectUri = `${protocol}://${host}/api/oauth/meta/callback`;
+
+    // 1. Exchange code for short-lived token
+    const tokenParams = new URLSearchParams({
+      client_id: META_APP_ID,
+      client_secret: META_APP_SECRET,
+      redirect_uri: redirectUri,
+      code,
+    });
+
+    const tokenResponse = await fetch(`https://graph.facebook.com/v21.0/oauth/access_token?${tokenParams.toString()}`);
+    const tokenData: any = await tokenResponse.json();
+
+    if (!tokenResponse.ok || tokenData.error) {
+      console.error('[OAuth] Meta token exchange error:', tokenData);
+      return res.send(buildPopupHTML(false, `Error: ${tokenData.error?.message || 'Token exchange failed'}`, 'META_ADS_OAUTH_RESULT'));
+    }
+
+    // 2. Exchange short-lived token for long-lived token (~60 days)
+    const longLived = await metaAdsService.exchangeForLongLivedToken(tokenData.access_token);
+
+    // 3. Save long-lived token with PENDING ad account
+    await credentialsService.saveMetaAdsCredentials(
+      stateData.tenantId,
+      longLived.accessToken,
+      'PENDING',
+      null,
+      stateData.userId
+    );
+
+    return res.send(buildPopupHTML(true, 'Meta Ads conectado exitosamente', 'META_ADS_OAUTH_RESULT'));
+  } catch (err: any) {
+    console.error('[OAuth] Meta callback error:', err);
+    return res.send(buildPopupHTML(false, 'Error interno al procesar la autorización', 'META_ADS_OAUTH_RESULT'));
   }
 });
 

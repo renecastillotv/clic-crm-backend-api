@@ -15,6 +15,7 @@ import * as credentialsService from '../../services/tenantApiCredentialsService.
 import { createOAuthState } from '../oauth.routes.js';
 import * as googleAdsService from '../../services/googleAdsService.js';
 import * as gscService from '../../services/googleSearchConsoleService.js';
+import * as metaAdsService from '../../services/metaAdsService.js';
 
 const router = express.Router({ mergeParams: true });
 
@@ -526,6 +527,149 @@ router.delete('/meta-ads', async (req: Request<TenantParams>, res: Response, nex
     await credentialsService.disconnectMetaAds(tenantId);
     res.json({ success: true, message: 'Meta Ads desconectado' });
   } catch (error) {
+    next(error);
+  }
+});
+
+/**
+ * GET /api/tenants/:tenantId/api-credentials/meta-ads/auth-url
+ * Generates the Facebook OAuth consent URL for Meta Ads.
+ */
+router.get('/meta-ads/auth-url', async (req: Request<TenantParams>, res: Response, next: NextFunction) => {
+  try {
+    const { tenantId } = req.params;
+    const connectedBy = (req.query.connectedBy as string) || 'unknown';
+
+    const appId = process.env.META_APP_ID;
+    if (!appId) {
+      return res.status(500).json({ error: 'META_APP_ID no configurado en el servidor' });
+    }
+
+    const protocol = req.get('x-forwarded-proto') || req.protocol;
+    const host = req.get('host') || '';
+    const redirectUri = `${protocol}://${host}/api/oauth/meta/callback`;
+
+    const state = createOAuthState(tenantId, connectedBy);
+
+    const params = new URLSearchParams({
+      client_id: appId,
+      redirect_uri: redirectUri,
+      response_type: 'code',
+      scope: 'ads_read,read_insights,business_management',
+      state,
+    });
+
+    const authUrl = `https://www.facebook.com/v21.0/dialog/oauth?${params.toString()}`;
+    res.json({ authUrl });
+  } catch (error) {
+    next(error);
+  }
+});
+
+/**
+ * GET /api/tenants/:tenantId/api-credentials/meta-ads/ad-accounts
+ * Lists accessible ad accounts after OAuth.
+ */
+router.get('/meta-ads/ad-accounts', async (req: Request<TenantParams>, res: Response, next: NextFunction) => {
+  try {
+    const { tenantId } = req.params;
+
+    const tokenData = await credentialsService.getMetaAdsToken(tenantId);
+    if (!tokenData) {
+      return res.status(400).json({ error: 'Meta Ads no está conectado' });
+    }
+
+    const accounts = await metaAdsService.listAdAccounts(tokenData.accessToken);
+    res.json(accounts);
+  } catch (error: any) {
+    console.error('[Meta Ads] Error listing ad accounts:', error.message);
+    next(error);
+  }
+});
+
+/**
+ * PUT /api/tenants/:tenantId/api-credentials/meta-ads/ad-account
+ * Updates the selected ad account ID after the user picks one.
+ */
+router.put('/meta-ads/ad-account', async (req: Request<TenantParams>, res: Response, next: NextFunction) => {
+  try {
+    const { tenantId } = req.params;
+    const { adAccountId, businessId } = req.body;
+
+    if (!adAccountId) {
+      return res.status(400).json({ error: 'Se requiere adAccountId' });
+    }
+
+    const tokenData = await credentialsService.getMetaAdsToken(tenantId);
+    if (!tokenData) {
+      return res.status(400).json({ error: 'Meta Ads no está conectado. Realiza el flujo OAuth primero.' });
+    }
+
+    await credentialsService.updateMetaAdsAdAccountId(tenantId, adAccountId, businessId || null);
+    res.json({ success: true, adAccountId });
+  } catch (error) {
+    next(error);
+  }
+});
+
+/**
+ * GET /api/tenants/:tenantId/api-credentials/meta-ads/campaigns
+ * Gets campaigns with performance metrics for the connected ad account.
+ */
+router.get('/meta-ads/campaigns', async (req: Request<TenantParams>, res: Response, next: NextFunction) => {
+  try {
+    const { tenantId } = req.params;
+    const { startDate, endDate } = req.query;
+
+    const tokenData = await credentialsService.getMetaAdsToken(tenantId);
+    if (!tokenData || !tokenData.adAccountId || tokenData.adAccountId === 'PENDING') {
+      return res.status(400).json({ error: 'Meta Ads no está configurado completamente' });
+    }
+
+    const dateRange = startDate && endDate
+      ? { startDate: startDate as string, endDate: endDate as string }
+      : undefined;
+
+    const campaigns = await metaAdsService.getCampaigns(
+      tokenData.accessToken,
+      tokenData.adAccountId,
+      dateRange
+    );
+
+    res.json(campaigns);
+  } catch (error: any) {
+    console.error('[Meta Ads] Error getting campaigns:', error.message);
+    next(error);
+  }
+});
+
+/**
+ * GET /api/tenants/:tenantId/api-credentials/meta-ads/campaigns/:campaignId/stats
+ * Gets daily performance stats for a specific Meta campaign.
+ */
+router.get('/meta-ads/campaigns/:campaignId/stats', async (req: Request<TenantParams & { campaignId: string }>, res: Response, next: NextFunction) => {
+  try {
+    const { tenantId, campaignId } = req.params;
+    const { startDate, endDate } = req.query;
+
+    const tokenData = await credentialsService.getMetaAdsToken(tenantId);
+    if (!tokenData || !tokenData.adAccountId || tokenData.adAccountId === 'PENDING') {
+      return res.status(400).json({ error: 'Meta Ads no está configurado completamente' });
+    }
+
+    const dateRange = startDate && endDate
+      ? { startDate: startDate as string, endDate: endDate as string }
+      : undefined;
+
+    const stats = await metaAdsService.getCampaignStats(
+      tokenData.accessToken,
+      campaignId,
+      dateRange
+    );
+
+    res.json(stats);
+  } catch (error: any) {
+    console.error('[Meta Ads] Error getting campaign stats:', error.message);
     next(error);
   }
 });
