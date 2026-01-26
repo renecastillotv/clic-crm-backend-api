@@ -133,14 +133,80 @@ router.get('/google-ads/callback', async (req: Request, res: Response) => {
   }
 });
 
+// ==================== GOOGLE SEARCH CONSOLE CALLBACK ====================
+
+/**
+ * GET /api/oauth/google-search-console/callback
+ *
+ * Google redirects here after user grants Search Console access.
+ */
+router.get('/google-search-console/callback', async (req: Request, res: Response) => {
+  const { code, state, error } = req.query;
+
+  if (error) {
+    return res.send(buildPopupHTML(false, 'El usuario canceló la autorización', 'GSC_OAUTH_RESULT'));
+  }
+
+  if (!code || !state || typeof code !== 'string' || typeof state !== 'string') {
+    return res.send(buildPopupHTML(false, 'Parámetros inválidos', 'GSC_OAUTH_RESULT'));
+  }
+
+  const stateData = verifyOAuthState(state);
+  if (!stateData) {
+    return res.send(buildPopupHTML(false, 'Estado de seguridad inválido o expirado', 'GSC_OAUTH_RESULT'));
+  }
+
+  try {
+    const protocol = req.get('x-forwarded-proto') || req.protocol;
+    const host = req.get('host') || '';
+    const redirectUri = `${protocol}://${host}/api/oauth/google-search-console/callback`;
+
+    // Exchange code for tokens
+    const tokenResponse = await fetch('https://oauth2.googleapis.com/token', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+      body: new URLSearchParams({
+        code,
+        client_id: GOOGLE_CLIENT_ID,
+        client_secret: GOOGLE_CLIENT_SECRET,
+        redirect_uri: redirectUri,
+        grant_type: 'authorization_code',
+      }),
+    });
+
+    const tokens: any = await tokenResponse.json();
+
+    if (!tokenResponse.ok || !tokens.refresh_token) {
+      console.error('[OAuth] GSC token exchange error:', tokens);
+      const msg = !tokens.refresh_token && tokenResponse.ok
+        ? 'No se obtuvo refresh token. Revoca el acceso en myaccount.google.com/permissions y vuelve a intentar.'
+        : `Error: ${tokens.error_description || tokens.error || 'Unknown'}`;
+      return res.send(buildPopupHTML(false, msg, 'GSC_OAUTH_RESULT'));
+    }
+
+    // Save refresh token (site URL = PENDING until user selects a site)
+    await credentialsService.saveGoogleSearchConsoleCredentials(
+      stateData.tenantId,
+      tokens.refresh_token,
+      'PENDING',
+      stateData.userId
+    );
+
+    return res.send(buildPopupHTML(true, 'Google Search Console conectado exitosamente', 'GSC_OAUTH_RESULT'));
+  } catch (err: any) {
+    console.error('[OAuth] GSC callback error:', err);
+    return res.send(buildPopupHTML(false, 'Error interno al procesar la autorización', 'GSC_OAUTH_RESULT'));
+  }
+});
+
 // ==================== HELPERS ====================
 
-function buildPopupHTML(success: boolean, message: string): string {
+function buildPopupHTML(success: boolean, message: string, messageType: string = 'GOOGLE_ADS_OAUTH_RESULT'): string {
   const escapedMessage = message.replace(/'/g, "\\'").replace(/"/g, '&quot;');
   return `<!DOCTYPE html>
 <html>
 <head>
-  <title>Google Ads - Autorización</title>
+  <title>Google - Autorización</title>
   <style>
     body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; display: flex; align-items: center; justify-content: center; min-height: 100vh; margin: 0; background: #f8fafc; }
     .card { background: white; border-radius: 16px; padding: 40px; text-align: center; box-shadow: 0 4px 24px rgba(0,0,0,0.08); max-width: 400px; }
@@ -159,7 +225,7 @@ function buildPopupHTML(success: boolean, message: string): string {
   <script>
     if (window.opener) {
       window.opener.postMessage({
-        type: 'GOOGLE_ADS_OAUTH_RESULT',
+        type: '${messageType}',
         success: ${success},
         message: '${escapedMessage}'
       }, '*');

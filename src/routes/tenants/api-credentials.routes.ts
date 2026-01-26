@@ -14,6 +14,7 @@ import express, { Request, Response, NextFunction } from 'express';
 import * as credentialsService from '../../services/tenantApiCredentialsService.js';
 import { createOAuthState } from '../oauth.routes.js';
 import * as googleAdsService from '../../services/googleAdsService.js';
+import * as gscService from '../../services/googleSearchConsoleService.js';
 
 const router = express.Router({ mergeParams: true });
 
@@ -79,6 +80,147 @@ router.delete('/google-search-console', async (req: Request<TenantParams>, res: 
     await credentialsService.disconnectGoogleSearchConsole(tenantId);
     res.json({ success: true, message: 'Google Search Console desconectado' });
   } catch (error) {
+    next(error);
+  }
+});
+
+/**
+ * GET /api/tenants/:tenantId/api-credentials/google-search-console/auth-url
+ * Generates the Google OAuth consent URL for Search Console.
+ */
+router.get('/google-search-console/auth-url', async (req: Request<TenantParams>, res: Response, next: NextFunction) => {
+  try {
+    const { tenantId } = req.params;
+    const connectedBy = (req.query.connectedBy as string) || 'unknown';
+
+    const clientId = process.env.GOOGLE_OAUTH_CLIENT_ID;
+    if (!clientId) {
+      return res.status(500).json({ error: 'GOOGLE_OAUTH_CLIENT_ID no configurado en el servidor' });
+    }
+
+    const protocol = req.get('x-forwarded-proto') || req.protocol;
+    const host = req.get('host') || '';
+    const redirectUri = `${protocol}://${host}/api/oauth/google-search-console/callback`;
+
+    const state = createOAuthState(tenantId, connectedBy);
+
+    const params = new URLSearchParams({
+      client_id: clientId,
+      redirect_uri: redirectUri,
+      response_type: 'code',
+      scope: 'https://www.googleapis.com/auth/webmasters.readonly',
+      access_type: 'offline',
+      prompt: 'consent',
+      state,
+    });
+
+    const authUrl = `https://accounts.google.com/o/oauth2/v2/auth?${params.toString()}`;
+    res.json({ authUrl });
+  } catch (error) {
+    next(error);
+  }
+});
+
+/**
+ * GET /api/tenants/:tenantId/api-credentials/google-search-console/sites
+ * Lists all sites the user has access to in Search Console.
+ */
+router.get('/google-search-console/sites', async (req: Request<TenantParams>, res: Response, next: NextFunction) => {
+  try {
+    const { tenantId } = req.params;
+    const refreshToken = await credentialsService.getGoogleSearchConsoleToken(tenantId);
+
+    if (!refreshToken) {
+      return res.status(400).json({ error: 'Google Search Console no está conectado' });
+    }
+
+    const sites = await gscService.listSites(refreshToken);
+    res.json(sites);
+  } catch (error: any) {
+    console.error('[GSC] Error listing sites:', error.message);
+    next(error);
+  }
+});
+
+/**
+ * PUT /api/tenants/:tenantId/api-credentials/google-search-console/site-url
+ * Updates the selected site URL after the user picks a site.
+ */
+router.put('/google-search-console/site-url', async (req: Request<TenantParams>, res: Response, next: NextFunction) => {
+  try {
+    const { tenantId } = req.params;
+    const { siteUrl } = req.body;
+
+    if (!siteUrl) {
+      return res.status(400).json({ error: 'Se requiere siteUrl' });
+    }
+
+    const refreshToken = await credentialsService.getGoogleSearchConsoleToken(tenantId);
+    if (!refreshToken) {
+      return res.status(400).json({ error: 'Google Search Console no está conectado. Realiza el flujo OAuth primero.' });
+    }
+
+    // Re-save with the selected site URL
+    await credentialsService.saveGoogleSearchConsoleCredentials(
+      tenantId,
+      refreshToken,
+      siteUrl,
+      'system'
+    );
+
+    res.json({ success: true, siteUrl });
+  } catch (error) {
+    next(error);
+  }
+});
+
+/**
+ * GET /api/tenants/:tenantId/api-credentials/google-search-console/performance
+ * Gets search analytics data (clicks, impressions, CTR, position).
+ * Query params: startDate, endDate, dimension (query|page|date), limit
+ */
+router.get('/google-search-console/performance', async (req: Request<TenantParams>, res: Response, next: NextFunction) => {
+  try {
+    const { tenantId } = req.params;
+    const { startDate, endDate, dimension, limit: rowLimit } = req.query;
+
+    const tokenData = await credentialsService.getGoogleSearchConsoleToken(tenantId);
+    if (!tokenData) {
+      return res.status(400).json({ error: 'Google Search Console no está conectado' });
+    }
+
+    // Get the selected site URL
+    const credentials = await credentialsService.getTenantApiCredentials(tenantId);
+    if (!credentials || !credentials.googleSearchConsoleSiteUrl || credentials.googleSearchConsoleSiteUrl === 'PENDING') {
+      return res.status(400).json({ error: 'No se ha seleccionado un sitio en Search Console' });
+    }
+
+    // Default to last 28 days
+    const end = endDate as string || new Date().toISOString().split('T')[0];
+    const start = startDate as string || (() => {
+      const d = new Date();
+      d.setDate(d.getDate() - 28);
+      return d.toISOString().split('T')[0];
+    })();
+
+    const dim = (dimension as string) || 'query';
+    const lim = parseInt(rowLimit as string) || 25;
+
+    let result;
+    if (dim === 'date') {
+      const rows = await gscService.getDailyPerformance(tokenData, credentials.googleSearchConsoleSiteUrl, start, end);
+      result = { rows, totals: null };
+    } else if (dim === 'page') {
+      const rows = await gscService.getTopPages(tokenData, credentials.googleSearchConsoleSiteUrl, start, end, lim);
+      result = { rows };
+    } else {
+      const rows = await gscService.getTopQueries(tokenData, credentials.googleSearchConsoleSiteUrl, start, end, lim);
+      result = { rows };
+    }
+
+    res.json(result);
+  } catch (error: any) {
+    console.error('[GSC] Error getting performance:', error.message);
     next(error);
   }
 });
