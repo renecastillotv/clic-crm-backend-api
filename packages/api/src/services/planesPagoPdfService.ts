@@ -296,44 +296,27 @@ export async function generarPdfPlanPago(plan: PlanPago): Promise<Buffer> {
         doc.fontSize(8).fillColor(gray).text(plan.condiciones, 50, tableY + 14, { width: 512 });
       }
 
-      // ========== PREPARED BY ==========
-      if (usuarioInfo || plan.usuario_creador) {
-        // Position after content, with minimum spacing
-        const prepY = Math.max(tableY + 25, 500);
-
-        // If it would go past footer, skip (single page only)
-        if (prepY < 680) {
-          doc.fontSize(9).fillColor(gray).text('Preparado por:', 50, prepY);
-
-          const asesorName = usuarioInfo
-            ? `${usuarioInfo.nombre || ''} ${usuarioInfo.apellido || ''}`.trim()
-            : plan.usuario_creador
-              ? `${plan.usuario_creador.nombre || ''} ${plan.usuario_creador.apellido || ''}`.trim()
-              : '';
-
-          if (asesorName) {
-            doc.fontSize(10).fillColor(dark).text(asesorName, 50, prepY + 12);
-          }
-          if (usuarioInfo?.titulo_profesional) {
-            doc.fontSize(8).fillColor(gray).text(usuarioInfo.titulo_profesional, 50, prepY + 24);
-          }
-          if (usuarioInfo?.email || plan.usuario_creador?.email) {
-            doc.fontSize(8).fillColor(gray).text(usuarioInfo?.email || plan.usuario_creador?.email || '', 50, prepY + 34);
-          }
-
-          // Signature line
-          doc.moveTo(50, prepY + 55).lineTo(180, prepY + 55).strokeColor('#e5e7eb').stroke();
-          doc.fontSize(7).fillColor(gray).text('Firma', 50, prepY + 58);
-        }
-      }
-
-      // ========== FOOTER (simple, one line) ==========
+      // ========== FOOTER ==========
       const disclaimer = 'NOTA: Este documento es informativo y no constituye contrato. Precios sujetos a cambios.';
       const dateStr = new Date().toLocaleDateString('es-ES', { day: 'numeric', month: 'long', year: 'numeric' });
+
+      // Asesor name (one line)
+      const asesorName = usuarioInfo
+        ? `${usuarioInfo.nombre || ''} ${usuarioInfo.apellido || ''}`.trim()
+        : plan.usuario_creador
+          ? `${plan.usuario_creador.nombre || ''} ${plan.usuario_creador.apellido || ''}`.trim()
+          : '';
 
       const pages = doc.bufferedPageRange();
       for (let i = 0; i < pages.count; i++) {
         doc.switchToPage(i);
+
+        // Preparado por (simple, one line)
+        if (asesorName) {
+          doc.fontSize(8).fillColor(gray).text(`Preparado por: ${asesorName}`, 50, 710);
+        }
+
+        // Disclaimer + date
         doc.fontSize(7).fillColor('#9ca3af').text(disclaimer, 50, 730, { width: 400 });
         doc.fontSize(7).fillColor('#9ca3af').text(`${dateStr} | Pág. ${i + 1}/${pages.count}`, 460, 730, { width: 100, align: 'right' });
       }
