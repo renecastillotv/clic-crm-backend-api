@@ -70,6 +70,13 @@ async function getUsuarioInfo(usuarioId: string): Promise<UsuarioInfo | null> {
 
 async function fetchImage(url: string): Promise<Buffer | null> {
   if (!url) return null;
+
+  // pdfkit doesn't support WebP - skip if webp
+  if (url.includes('.webp')) {
+    console.log('Logo is WebP format - not supported by pdfkit');
+    return null;
+  }
+
   try {
     console.log('Fetching logo from:', url);
     const response = await fetch(url);
@@ -289,10 +296,10 @@ export async function generarPdfPlanPago(plan: PlanPago): Promise<Buffer> {
         doc.fontSize(8).fillColor(gray).text(plan.condiciones, 50, tableY + 14, { width: 512 });
       }
 
-      // ========== PREPARED BY ==========
-      if ((usuarioInfo || plan.usuario_creador) && tableY < 580) {
-        tableY = Math.max(tableY + 40, 550);
-        doc.fontSize(9).fillColor(gray).text('Preparado por:', 50, tableY);
+      // ========== PREPARED BY (always at bottom) ==========
+      if (usuarioInfo || plan.usuario_creador) {
+        const prepY = 620; // Fixed position near bottom
+        doc.fontSize(9).fillColor(gray).text('Preparado por:', 50, prepY);
 
         const asesorName = usuarioInfo
           ? `${usuarioInfo.nombre || ''} ${usuarioInfo.apellido || ''}`.trim()
@@ -301,18 +308,18 @@ export async function generarPdfPlanPago(plan: PlanPago): Promise<Buffer> {
             : '';
 
         if (asesorName) {
-          doc.fontSize(10).fillColor(dark).text(asesorName, 50, tableY + 12);
+          doc.fontSize(10).fillColor(dark).text(asesorName, 50, prepY + 12);
         }
         if (usuarioInfo?.titulo_profesional) {
-          doc.fontSize(8).fillColor(gray).text(usuarioInfo.titulo_profesional, 50, tableY + 24);
+          doc.fontSize(8).fillColor(gray).text(usuarioInfo.titulo_profesional, 50, prepY + 24);
         }
         if (usuarioInfo?.email || plan.usuario_creador?.email) {
-          doc.fontSize(8).fillColor(gray).text(usuarioInfo?.email || plan.usuario_creador?.email || '', 50, tableY + 34);
+          doc.fontSize(8).fillColor(gray).text(usuarioInfo?.email || plan.usuario_creador?.email || '', 50, prepY + 34);
         }
 
         // Signature line
-        doc.moveTo(50, tableY + 60).lineTo(180, tableY + 60).strokeColor('#e5e7eb').stroke();
-        doc.fontSize(7).fillColor(gray).text('Firma', 50, tableY + 63);
+        doc.moveTo(50, prepY + 55).lineTo(180, prepY + 55).strokeColor('#e5e7eb').stroke();
+        doc.fontSize(7).fillColor(gray).text('Firma', 50, prepY + 58);
       }
 
       // ========== FOOTER (simple, one line) ==========
