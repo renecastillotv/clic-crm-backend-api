@@ -100,11 +100,15 @@ export async function listUserPages(userAccessToken: string): Promise<MetaPage[]
 export async function publishToPage(
   pageAccessToken: string,
   pageId: string,
-  options: { message?: string; link?: string }
+  options: { message?: string; link?: string; scheduledPublishTime?: number }
 ): Promise<{ id: string }> {
-  const body: Record<string, string> = {};
+  const body: Record<string, any> = {};
   if (options.message) body.message = options.message;
   if (options.link) body.link = options.link;
+  if (options.scheduledPublishTime) {
+    body.scheduled_publish_time = options.scheduledPublishTime;
+    body.published = false;
+  }
 
   const response = await fetch(`${GRAPH_API_BASE}/${pageId}/feed`, {
     method: 'POST',
@@ -130,12 +134,16 @@ export async function publishToPage(
 export async function publishPhotoToPage(
   pageAccessToken: string,
   pageId: string,
-  options: { imageUrl: string; caption?: string }
+  options: { imageUrl: string; caption?: string; scheduledPublishTime?: number }
 ): Promise<{ id: string; postId: string }> {
-  const body: Record<string, string> = {
+  const body: Record<string, any> = {
     url: options.imageUrl,
   };
   if (options.caption) body.message = options.caption;
+  if (options.scheduledPublishTime) {
+    body.scheduled_publish_time = options.scheduledPublishTime;
+    body.published = false;
+  }
 
   const response = await fetch(`${GRAPH_API_BASE}/${pageId}/photos`, {
     method: 'POST',
@@ -368,4 +376,31 @@ export async function replyToComment(
   }
 
   return { id: data.id };
+}
+
+// ==================== SCHEDULED POST MANAGEMENT ====================
+
+/**
+ * Deletes a scheduled post from Facebook.
+ * Used when cancelling a scheduled post.
+ */
+export async function deleteScheduledPost(
+  pageAccessToken: string,
+  postId: string
+): Promise<boolean> {
+  const response = await fetch(`${GRAPH_API_BASE}/${postId}`, {
+    method: 'DELETE',
+    headers: {
+      Authorization: `Bearer ${pageAccessToken}`,
+    },
+  });
+
+  const data: any = await response.json();
+
+  if (!response.ok || data.error) {
+    console.error('[Meta Social] Failed to delete scheduled post:', data.error?.message);
+    return false;
+  }
+
+  return data.success === true;
 }
