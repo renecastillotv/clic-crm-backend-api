@@ -160,13 +160,8 @@ router.put('/google-search-console/site-url', async (req: Request<TenantParams>,
       return res.status(400).json({ error: 'Google Search Console no está conectado. Realiza el flujo OAuth primero.' });
     }
 
-    // Re-save with the selected site URL
-    await credentialsService.saveGoogleSearchConsoleCredentials(
-      tenantId,
-      refreshToken,
-      siteUrl,
-      'system'
-    );
+    // Update only the site URL (token and connected_by stay unchanged)
+    await credentialsService.updateGoogleSearchConsoleSiteUrl(tenantId, siteUrl);
 
     res.json({ success: true, siteUrl });
   } catch (error) {
