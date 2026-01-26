@@ -579,15 +579,14 @@ router.put('/meta/page', async (req: Request<TenantParams>, res: Response, next:
       return res.status(400).json({ error: 'Página no encontrada o no tienes permisos' });
     }
 
-    // Save the permanent Page Access Token
+    // Save the permanent Page Access Token (connected_by already set during OAuth)
     await credentialsService.saveMetaCredentials(
       tenantId,
       selectedPage.accessToken,
       selectedPage.id,
       selectedPage.name,
       selectedPage.instagramBusinessAccount?.id || null,
-      selectedPage.instagramBusinessAccount?.username || null,
-      'system'
+      selectedPage.instagramBusinessAccount?.username || null
     );
 
     res.json({
