@@ -115,6 +115,7 @@ import CrmMarketingImageConverter from './pages/crm/CrmMarketingImageConverter';
 import CrmMarketingFlyerGenerator from './pages/crm/CrmMarketingFlyerGenerator';
 import CrmMarketingStoriesCreator from './pages/crm/CrmMarketingStoriesCreator';
 import CrmMarketingTemplates from './pages/crm/CrmMarketingTemplates';
+import CrmMarketingCampanaDetalle from './pages/crm/CrmMarketingCampanaDetalle';
 
 // Páginas de Roles del Tenant
 import CrmRoles from './pages/crm/CrmRoles';
@@ -365,6 +366,7 @@ function AppRoutes() {
         <Route path="marketing" element={<CrmMarketing />} />
         <Route path="marketing/branding" element={<CrmMarketingBranding />} />
         <Route path="marketing/campanas" element={<CrmMarketingCampanas />} />
+        <Route path="marketing/campanas/:campaignId" element={<CrmMarketingCampanaDetalle />} />
         <Route path="marketing/redes-sociales" element={<CrmMarketingRedesSociales />} />
         <Route path="marketing/email" element={<CrmMarketingEmail />} />
         <Route path="marketing/analytics" element={<CrmMarketingAnalytics />} />

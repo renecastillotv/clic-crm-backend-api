@@ -264,6 +264,38 @@ router.get('/google-ads/campaigns', async (req: Request<TenantParams>, res: Resp
   }
 });
 
+/**
+ * GET /api/tenants/:tenantId/api-credentials/google-ads/campaigns/:campaignId/stats
+ * Gets daily performance stats for a specific campaign.
+ */
+router.get('/google-ads/campaigns/:campaignId/stats', async (req: Request<TenantParams & { campaignId: string }>, res: Response, next: NextFunction) => {
+  try {
+    const { tenantId, campaignId } = req.params;
+    const { startDate, endDate } = req.query;
+
+    const tokenData = await credentialsService.getGoogleAdsToken(tenantId);
+    if (!tokenData || !tokenData.customerId || tokenData.customerId === 'PENDING') {
+      return res.status(400).json({ error: 'Google Ads no está configurado completamente' });
+    }
+
+    const dateRange = startDate && endDate
+      ? { startDate: startDate as string, endDate: endDate as string }
+      : undefined;
+
+    const stats = await googleAdsService.getCampaignStats(
+      tokenData.refreshToken,
+      tokenData.customerId,
+      campaignId,
+      dateRange
+    );
+
+    res.json(stats);
+  } catch (error: any) {
+    console.error('[Google Ads] Error getting campaign stats:', error.message);
+    next(error);
+  }
+});
+
 // ==================== META (FACEBOOK/INSTAGRAM) ====================
 
 /**

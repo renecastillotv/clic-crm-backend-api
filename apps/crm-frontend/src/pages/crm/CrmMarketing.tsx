@@ -386,7 +386,17 @@ const CrmMarketing: React.FC = () => {
       return;
     }
 
-    // Aquí irán las navegaciones o modales para otras acciones
+    // Navegación a campañas Google Ads
+    if (action === 'google-ads') {
+      navigate(`${basePath}/marketing/campanas`);
+      return;
+    }
+
+    // Navegación a analytics / métricas
+    if (action === 'metrics-dashboard' || action === 'campaign-roi') {
+      navigate(`${basePath}/marketing/campanas`);
+      return;
+    }
   };
 
   return (
