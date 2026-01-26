@@ -8,8 +8,9 @@
  * - Read and reply to comments
  */
 
-import React, { useEffect, useState, useCallback } from 'react';
+import React, { useEffect, useState, useCallback, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
+import { useAuth as useClerkAuth } from '@clerk/clerk-react';
 import { usePageHeader } from '../../layouts/CrmLayout';
 import { useAuth } from '../../contexts/AuthContext';
 import { apiFetch } from '../../services/api';
@@ -18,6 +19,8 @@ import {
   Facebook,
   Send,
   Image,
+  Upload,
+  X,
   Link as LinkIcon,
   MessageSquare,
   ThumbsUp,
@@ -83,8 +86,10 @@ const CrmMarketingRedesSociales: React.FC = () => {
   const navigate = useNavigate();
   const { setPageHeader } = usePageHeader();
   const { tenantActual } = useAuth();
+  const { getToken } = useClerkAuth();
 
   const basePath = tenantActual?.slug ? `/crm/${tenantActual.slug}` : '/crm';
+  const fileInputRef = useRef<HTMLInputElement>(null);
 
   // Connection state
   const [credentials, setCredentials] = useState<Credentials | null>(null);
@@ -101,6 +106,12 @@ const CrmMarketingRedesSociales: React.FC = () => {
   const [targetInstagram, setTargetInstagram] = useState(false);
   const [publishing, setPublishing] = useState(false);
   const [publishResult, setPublishResult] = useState<Record<string, { success: boolean; error?: string }> | null>(null);
+
+  // Image upload state
+  const [imageFile, setImageFile] = useState<File | null>(null);
+  const [imagePreview, setImagePreview] = useState<string>('');
+  const [uploadingImage, setUploadingImage] = useState(false);
+  const [imageUploadError, setImageUploadError] = useState<string>('');
 
   // Posts state
   const [fbPosts, setFbPosts] = useState<MetaPost[]>([]);
@@ -219,6 +230,63 @@ const CrmMarketingRedesSociales: React.FC = () => {
     if (activeTab === 'instagram' && igMedia.length === 0) loadIgMedia();
   }, [activeTab, loadFbPosts, loadIgMedia, fbPosts.length, igMedia.length]);
 
+  // Image upload handler
+  const handleImageSelect = async (file: File) => {
+    if (!file || !tenantActual?.id) return;
+
+    if (!file.type.startsWith('image/')) {
+      setImageUploadError('Solo se permiten imagenes');
+      return;
+    }
+
+    if (file.size > 10 * 1024 * 1024) {
+      setImageUploadError('La imagen no debe superar 10MB');
+      return;
+    }
+
+    setImageFile(file);
+    setImagePreview(URL.createObjectURL(file));
+    setImageUploadError('');
+    setUploadingImage(true);
+
+    try {
+      const token = await getToken();
+      const formData = new FormData();
+      formData.append('image', file);
+      formData.append('folder', 'social-posts');
+
+      const response = await fetch(
+        `${import.meta.env.VITE_API_URL || 'http://localhost:3001/api'}/tenants/${tenantActual.id}/upload/image`,
+        {
+          method: 'POST',
+          headers: { Authorization: `Bearer ${token}` },
+          body: formData,
+        }
+      );
+
+      if (!response.ok) throw new Error('Error al subir imagen');
+
+      const data = await response.json();
+      setImageUrl(data.url);
+    } catch (err: any) {
+      console.error('Error uploading image:', err);
+      setImageUploadError(err.message || 'Error al subir imagen');
+      setImageFile(null);
+      setImagePreview('');
+    } finally {
+      setUploadingImage(false);
+    }
+  };
+
+  const handleRemoveImage = () => {
+    if (imagePreview) URL.revokeObjectURL(imagePreview);
+    setImageFile(null);
+    setImagePreview('');
+    setImageUrl('');
+    setImageUploadError('');
+    if (fileInputRef.current) fileInputRef.current.value = '';
+  };
+
   // Publish handler
   const handlePublish = async () => {
     if (!tenantActual?.id) return;
@@ -247,6 +315,10 @@ const CrmMarketingRedesSociales: React.FC = () => {
         setMessage('');
         setImageUrl('');
         setLinkUrl('');
+        if (imagePreview) URL.revokeObjectURL(imagePreview);
+        setImageFile(null);
+        setImagePreview('');
+        if (fileInputRef.current) fileInputRef.current.value = '';
         // Reload posts
         if (targetFacebook) setTimeout(loadFbPosts, 2000);
         if (targetInstagram) setTimeout(loadIgMedia, 2000);
@@ -485,34 +557,110 @@ const CrmMarketingRedesSociales: React.FC = () => {
                 onBlur={(e) => { e.currentTarget.style.borderColor = '#e2e8f0'; }}
               />
 
-              {/* Image URL */}
-              <div style={{ marginTop: '16px', display: 'flex', gap: '12px' }}>
-                <div style={{ flex: 1 }}>
-                  <label style={{ fontSize: '12px', fontWeight: 600, color: '#64748b', display: 'flex', alignItems: 'center', gap: '6px', marginBottom: '6px' }}>
-                    <Image size={14} />
-                    URL de imagen {targetInstagram ? '(requerida para IG)' : '(opcional)'}
-                  </label>
-                  <input
-                    type="url"
-                    value={imageUrl}
-                    onChange={(e) => setImageUrl(e.target.value)}
-                    placeholder="https://ejemplo.com/imagen.jpg"
-                    style={{
-                      width: '100%',
-                      padding: '10px 14px',
-                      border: '1px solid #e2e8f0',
-                      borderRadius: '8px',
-                      fontSize: '13px',
-                      color: '#1e293b',
-                      outline: 'none',
-                      boxSizing: 'border-box',
+              {/* Image upload */}
+              <div style={{ marginTop: '16px' }}>
+                <label style={{ fontSize: '12px', fontWeight: 600, color: '#64748b', display: 'flex', alignItems: 'center', gap: '6px', marginBottom: '6px' }}>
+                  <Image size={14} />
+                  Imagen {targetInstagram ? '(requerida para IG)' : '(opcional)'}
+                </label>
+
+                {imagePreview || imageUrl ? (
+                  <div style={{ position: 'relative', display: 'inline-block' }}>
+                    <img
+                      src={imagePreview || imageUrl}
+                      alt="Preview"
+                      style={{
+                        maxWidth: '240px',
+                        maxHeight: '240px',
+                        borderRadius: '12px',
+                        border: '1px solid #e2e8f0',
+                        objectFit: 'cover',
+                        display: 'block',
+                      }}
+                    />
+                    {uploadingImage && (
+                      <div style={{
+                        position: 'absolute', inset: 0, background: 'rgba(0,0,0,0.5)', borderRadius: '12px',
+                        display: 'flex', alignItems: 'center', justifyContent: 'center', flexDirection: 'column', gap: '8px',
+                      }}>
+                        <Loader2 size={24} color="white" style={{ animation: 'spin 1s linear infinite' }} />
+                        <span style={{ fontSize: '12px', color: 'white', fontWeight: 500 }}>Subiendo...</span>
+                      </div>
+                    )}
+                    {!uploadingImage && (
+                      <button
+                        onClick={handleRemoveImage}
+                        style={{
+                          position: 'absolute', top: '8px', right: '8px',
+                          width: '28px', height: '28px', borderRadius: '50%',
+                          background: 'rgba(0,0,0,0.6)', border: 'none', color: 'white',
+                          display: 'flex', alignItems: 'center', justifyContent: 'center',
+                          cursor: 'pointer', backdropFilter: 'blur(4px)',
+                        }}
+                      >
+                        <X size={14} />
+                      </button>
+                    )}
+                    {imageUrl && !uploadingImage && (
+                      <div style={{
+                        position: 'absolute', bottom: '8px', left: '8px',
+                        padding: '4px 8px', background: 'rgba(22,163,106,0.9)', borderRadius: '6px',
+                        display: 'flex', alignItems: 'center', gap: '4px',
+                      }}>
+                        <CheckCircle size={12} color="white" />
+                        <span style={{ fontSize: '11px', color: 'white', fontWeight: 500 }}>Lista</span>
+                      </div>
+                    )}
+                  </div>
+                ) : (
+                  <div
+                    onClick={() => fileInputRef.current?.click()}
+                    onDragOver={(e) => { e.preventDefault(); e.currentTarget.style.borderColor = '#3b82f6'; e.currentTarget.style.background = '#eff6ff'; }}
+                    onDragLeave={(e) => { e.currentTarget.style.borderColor = '#e2e8f0'; e.currentTarget.style.background = '#f8fafc'; }}
+                    onDrop={(e) => {
+                      e.preventDefault();
+                      e.currentTarget.style.borderColor = '#e2e8f0';
+                      e.currentTarget.style.background = '#f8fafc';
+                      const file = e.dataTransfer.files[0];
+                      if (file) handleImageSelect(file);
                     }}
-                  />
-                </div>
+                    style={{
+                      border: '2px dashed #e2e8f0', borderRadius: '12px', background: '#f8fafc',
+                      padding: '24px', display: 'flex', flexDirection: 'column', alignItems: 'center',
+                      gap: '8px', cursor: 'pointer', transition: 'all 0.15s',
+                    }}
+                  >
+                    <Upload size={24} color="#94a3b8" />
+                    <span style={{ fontSize: '13px', color: '#64748b', fontWeight: 500 }}>
+                      Arrastra una imagen o haz clic para seleccionar
+                    </span>
+                    <span style={{ fontSize: '11px', color: '#94a3b8' }}>
+                      JPG, PNG, WebP (max 10MB)
+                    </span>
+                  </div>
+                )}
+
+                <input
+                  ref={fileInputRef}
+                  type="file"
+                  accept="image/jpeg,image/png,image/webp,image/gif"
+                  onChange={(e) => {
+                    const file = e.target.files?.[0];
+                    if (file) handleImageSelect(file);
+                  }}
+                  style={{ display: 'none' }}
+                />
+
+                {imageUploadError && (
+                  <div style={{ marginTop: '8px', display: 'flex', alignItems: 'center', gap: '6px' }}>
+                    <AlertCircle size={13} color="#ef4444" />
+                    <span style={{ fontSize: '12px', color: '#ef4444' }}>{imageUploadError}</span>
+                  </div>
+                )}
               </div>
 
               {/* Link URL (FB only) */}
-              {!imageUrl && targetFacebook && (
+              {!imageFile && !imageUrl && targetFacebook && (
                 <div style={{ marginTop: '12px' }}>
                   <label style={{ fontSize: '12px', fontWeight: 600, color: '#64748b', display: 'flex', alignItems: 'center', gap: '6px', marginBottom: '6px' }}>
                     <LinkIcon size={14} />
@@ -533,24 +681,6 @@ const CrmMarketingRedesSociales: React.FC = () => {
                       outline: 'none',
                       boxSizing: 'border-box',
                     }}
-                  />
-                </div>
-              )}
-
-              {/* Image preview */}
-              {imageUrl && (
-                <div style={{ marginTop: '12px' }}>
-                  <img
-                    src={imageUrl}
-                    alt="Preview"
-                    style={{
-                      maxWidth: '200px',
-                      maxHeight: '200px',
-                      borderRadius: '8px',
-                      border: '1px solid #e2e8f0',
-                      objectFit: 'cover',
-                    }}
-                    onError={(e) => { (e.target as HTMLImageElement).style.display = 'none'; }}
                   />
                 </div>
               )}
@@ -587,7 +717,7 @@ const CrmMarketingRedesSociales: React.FC = () => {
               </div>
 
               {/* Instagram image warning */}
-              {targetInstagram && !imageUrl && (
+              {targetInstagram && !imageUrl && !imageFile && (
                 <div
                   style={{
                     marginTop: '12px',
@@ -601,7 +731,7 @@ const CrmMarketingRedesSociales: React.FC = () => {
                 >
                   <AlertCircle size={14} color="#92400e" />
                   <span style={{ fontSize: '12px', color: '#92400e' }}>
-                    Instagram requiere una imagen publica accesible por URL
+                    Instagram requiere una imagen para publicar
                   </span>
                 </div>
               )}
@@ -610,13 +740,13 @@ const CrmMarketingRedesSociales: React.FC = () => {
               <div style={{ marginTop: '20px', display: 'flex', alignItems: 'center', gap: '12px' }}>
                 <button
                   onClick={handlePublish}
-                  disabled={publishing || (!message && !imageUrl) || (!targetFacebook && !targetInstagram)}
+                  disabled={publishing || uploadingImage || (!message && !imageUrl) || (!targetFacebook && !targetInstagram)}
                   style={{
                     display: 'flex',
                     alignItems: 'center',
                     gap: '8px',
                     padding: '12px 24px',
-                    background: publishing || (!message && !imageUrl) || (!targetFacebook && !targetInstagram)
+                    background: publishing || uploadingImage || (!message && !imageUrl) || (!targetFacebook && !targetInstagram)
                       ? '#94a3b8'
                       : 'linear-gradient(135deg, #1877f2 0%, #e11d48 100%)',
                     color: 'white',
@@ -624,7 +754,7 @@ const CrmMarketingRedesSociales: React.FC = () => {
                     borderRadius: '10px',
                     fontSize: '14px',
                     fontWeight: 600,
-                    cursor: publishing || (!message && !imageUrl) || (!targetFacebook && !targetInstagram) ? 'not-allowed' : 'pointer',
+                    cursor: publishing || uploadingImage || (!message && !imageUrl) || (!targetFacebook && !targetInstagram) ? 'not-allowed' : 'pointer',
                   }}
                 >
                   {publishing ? (
