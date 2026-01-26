@@ -223,6 +223,24 @@ export async function saveGoogleSearchConsoleCredentials(
 }
 
 /**
+ * Actualiza solo el site URL de Google Search Console (sin tocar token ni connected_by)
+ */
+export async function updateGoogleSearchConsoleSiteUrl(
+  tenantId: string,
+  siteUrl: string
+): Promise<void> {
+  const sql = `
+    UPDATE tenant_api_credentials
+    SET
+      google_search_console_site_url = $1,
+      updated_at = NOW()
+    WHERE tenant_id = $2
+  `;
+
+  await query(sql, [siteUrl, tenantId]);
+}
+
+/**
  * Obtiene el refresh token de Google Search Console (desencriptado)
  */
 export async function getGoogleSearchConsoleToken(tenantId: string): Promise<string | null> {
