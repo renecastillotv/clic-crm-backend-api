@@ -190,19 +190,19 @@ const CrmMarketingBranding: React.FC = () => {
     console.log('Action:', action);
 
     if (action === 'convert-images') {
-      navigate(`${basePath}/marketing/branding/convertir-imagenes`);
+      navigate(`${basePath}/marketing/convertir-imagenes`);
       return;
     }
     if (action === 'flyer-generator') {
-      navigate(`${basePath}/marketing/branding/flyers`);
+      navigate(`${basePath}/marketing/flyers`);
       return;
     }
     if (action === 'stories-creator') {
-      navigate(`${basePath}/marketing/branding/stories`);
+      navigate(`${basePath}/marketing/stories`);
       return;
     }
     if (action === 'templates-bank') {
-      navigate(`${basePath}/marketing/branding/plantillas`);
+      navigate(`${basePath}/marketing/plantillas`);
       return;
     }
   };
