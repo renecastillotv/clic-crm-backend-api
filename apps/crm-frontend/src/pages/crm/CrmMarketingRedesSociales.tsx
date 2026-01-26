@@ -170,6 +170,8 @@ const CrmMarketingRedesSociales: React.FC = () => {
   const [propertySearch, setPropertySearch] = useState('');
   const [propertyResults, setPropertyResults] = useState<PropertyResult[]>([]);
   const [propertySearching, setPropertySearching] = useState(false);
+  const [propertySearchError, setPropertySearchError] = useState('');
+  const [hasSearchedProperties, setHasSearchedProperties] = useState(false);
   const [selectedProperty, setSelectedProperty] = useState<PropertyResult | null>(null);
   const [showPropertySearch, setShowPropertySearch] = useState(false);
   const [selectedPropertyImage, setSelectedPropertyImage] = useState<string>('');
@@ -312,15 +314,22 @@ const CrmMarketingRedesSociales: React.FC = () => {
   const searchProperties = useCallback(async (searchTerm: string) => {
     if (!tenantActual?.id || searchTerm.length < 2) {
       setPropertyResults([]);
+      setHasSearchedProperties(false);
       return;
     }
     setPropertySearching(true);
+    setPropertySearchError('');
     try {
       const response = await apiFetch(`/tenants/${tenantActual.id}/propiedades?busqueda=${encodeURIComponent(searchTerm)}&limit=8`);
       const data = await response.json();
-      setPropertyResults(Array.isArray(data.data) ? data.data : Array.isArray(data) ? data : []);
-    } catch (error) {
+      const results = Array.isArray(data.data) ? data.data : Array.isArray(data) ? data : [];
+      setPropertyResults(results);
+      setHasSearchedProperties(true);
+    } catch (error: any) {
       console.error('Error searching properties:', error);
+      setPropertyResults([]);
+      setPropertySearchError(error?.message || 'Error al buscar propiedades');
+      setHasSearchedProperties(true);
     } finally {
       setPropertySearching(false);
     }
@@ -338,6 +347,8 @@ const CrmMarketingRedesSociales: React.FC = () => {
     setShowPropertySearch(false);
     setPropertySearch('');
     setPropertyResults([]);
+    setHasSearchedProperties(false);
+    setPropertySearchError('');
 
     // Auto-fill description
     if (property.descripcion) {
@@ -570,6 +581,8 @@ const CrmMarketingRedesSociales: React.FC = () => {
     if (fileInputRef.current) fileInputRef.current.value = '';
     setSelectedProperty(null);
     setSelectedPropertyImage('');
+    setPropertySearchError('');
+    setHasSearchedProperties(false);
     setCopySuggestions([]);
     setScheduleEnabled(false);
     setScheduleDate('');
@@ -911,7 +924,16 @@ const CrmMarketingRedesSociales: React.FC = () => {
                             <div style={{ padding: '20px', textAlign: 'center' }}>
                               <Loader2 size={18} style={{ animation: 'spin 1s linear infinite', color: '#94a3b8' }} />
                             </div>
-                          ) : propertyResults.length === 0 && propertySearch.length >= 2 ? (
+                          ) : propertySearchError ? (
+                            <div style={{ padding: '16px', textAlign: 'center', fontSize: '12px', color: '#ef4444' }}>
+                              <AlertCircle size={16} style={{ marginBottom: '4px' }} />
+                              <div>{propertySearchError}</div>
+                            </div>
+                          ) : propertySearch.length < 2 ? (
+                            <div style={{ padding: '20px', textAlign: 'center', fontSize: '13px', color: '#94a3b8' }}>
+                              Escribe al menos 2 caracteres para buscar
+                            </div>
+                          ) : propertyResults.length === 0 && hasSearchedProperties ? (
                             <div style={{ padding: '20px', textAlign: 'center', fontSize: '13px', color: '#94a3b8' }}>
                               No se encontraron propiedades
                             </div>
@@ -949,7 +971,7 @@ const CrmMarketingRedesSociales: React.FC = () => {
 
                         <div style={{ padding: '8px 12px', borderTop: '1px solid #f1f5f9' }}>
                           <button
-                            onClick={() => { setShowPropertySearch(false); setPropertySearch(''); setPropertyResults([]); }}
+                            onClick={() => { setShowPropertySearch(false); setPropertySearch(''); setPropertyResults([]); setHasSearchedProperties(false); setPropertySearchError(''); }}
                             style={{ fontSize: '12px', color: '#64748b', background: 'none', border: 'none', cursor: 'pointer', padding: '4px' }}
                           >
                             Cerrar
