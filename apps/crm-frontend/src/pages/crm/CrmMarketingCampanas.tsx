@@ -48,6 +48,22 @@ interface GoogleAdsCampaign {
   endDate?: string;
 }
 
+interface MetaAdsCampaign {
+  id: string;
+  name: string;
+  status: string;
+  objective: string;
+  dailyBudget?: number;
+  lifetimeBudget?: number;
+  spend?: number;
+  impressions?: number;
+  clicks?: number;
+  ctr?: number;
+  cpc?: number;
+  reach?: number;
+  conversions?: number;
+}
+
 type DateRangePreset = '7d' | '30d' | '90d';
 type CampaignTab = 'resumen' | 'google' | 'meta' | 'email';
 
@@ -98,6 +114,30 @@ const TYPE_LABELS: Record<string, string> = {
   UNKNOWN: 'Otro',
 };
 
+const META_STATUS_LABELS: Record<string, { label: string; color: string; bg: string }> = {
+  ACTIVE: { label: 'Activa', color: '#16a34a', bg: '#dcfce7' },
+  PAUSED: { label: 'Pausada', color: '#d97706', bg: '#fef3c7' },
+  DELETED: { label: 'Eliminada', color: '#dc2626', bg: '#fee2e2' },
+  ARCHIVED: { label: 'Archivada', color: '#64748b', bg: '#f1f5f9' },
+};
+
+const META_OBJECTIVE_LABELS: Record<string, string> = {
+  OUTCOME_TRAFFIC: 'Trafico',
+  OUTCOME_LEADS: 'Leads',
+  OUTCOME_SALES: 'Ventas',
+  OUTCOME_ENGAGEMENT: 'Interaccion',
+  OUTCOME_AWARENESS: 'Reconocimiento',
+  OUTCOME_APP_PROMOTION: 'App',
+  LINK_CLICKS: 'Clicks',
+  LEAD_GENERATION: 'Leads',
+  CONVERSIONS: 'Conversiones',
+  BRAND_AWARENESS: 'Reconocimiento',
+  REACH: 'Alcance',
+  POST_ENGAGEMENT: 'Interaccion',
+  VIDEO_VIEWS: 'Video',
+  MESSAGES: 'Mensajes',
+};
+
 const TABS: { id: CampaignTab; label: string; icon: React.ReactNode }[] = [
   { id: 'resumen', label: 'Resumen', icon: <Megaphone size={16} /> },
   {
@@ -141,7 +181,9 @@ const CrmMarketingCampanas: React.FC = () => {
     loading: true,
   });
   const [campaigns, setCampaigns] = useState<GoogleAdsCampaign[]>([]);
+  const [metaCampaigns, setMetaCampaigns] = useState<MetaAdsCampaign[]>([]);
   const [loading, setLoading] = useState(false);
+  const [metaLoading, setMetaLoading] = useState(false);
   const [dateRange, setDateRange] = useState<DateRangePreset>('30d');
 
   useEffect(() => {
@@ -197,6 +239,28 @@ const CrmMarketingCampanas: React.FC = () => {
   useEffect(() => {
     loadCampaigns();
   }, [loadCampaigns]);
+
+  // Load Meta Ads campaigns
+  const loadMetaCampaigns = useCallback(async () => {
+    if (!tenantActual?.id || !providerStatus.meta) return;
+    setMetaLoading(true);
+    try {
+      const { startDate, endDate } = getDateRange(dateRange);
+      const res = await apiFetch(
+        `/tenants/${tenantActual.id}/api-credentials/meta-ads/campaigns?startDate=${startDate}&endDate=${endDate}`
+      );
+      const data = await res.json();
+      setMetaCampaigns(data);
+    } catch {
+      setMetaCampaigns([]);
+    } finally {
+      setMetaLoading(false);
+    }
+  }, [tenantActual?.id, providerStatus.meta, dateRange]);
+
+  useEffect(() => {
+    loadMetaCampaigns();
+  }, [loadMetaCampaigns]);
 
   // Compute totals
   const totals = campaigns.reduce(
@@ -875,6 +939,393 @@ const CrmMarketingCampanas: React.FC = () => {
     );
   };
 
+  // ==================== RENDER: META ADS TAB ====================
+  const renderMetaAds = () => {
+    if (providerStatus.loading) {
+      return (
+        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '80px 0' }}>
+          <Loader2 size={32} color="#1877f2" style={{ animation: 'spin 1s linear infinite' }} />
+        </div>
+      );
+    }
+
+    if (!providerStatus.meta) {
+      return (
+        <div
+          style={{
+            background: 'white',
+            borderRadius: '20px',
+            border: '1px solid #e2e8f0',
+            padding: '60px 40px',
+            textAlign: 'center',
+            maxWidth: '560px',
+            margin: '40px auto',
+          }}
+        >
+          <div
+            style={{
+              width: '72px',
+              height: '72px',
+              borderRadius: '18px',
+              background: '#1877f215',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              margin: '0 auto 24px',
+              color: '#1877f2',
+            }}
+          >
+            {TABS[2].icon}
+          </div>
+          <h2 style={{ fontSize: '22px', fontWeight: 700, color: '#1e293b', marginBottom: '12px' }}>
+            Conecta Meta Ads
+          </h2>
+          <p style={{ fontSize: '14px', color: '#64748b', lineHeight: 1.6, marginBottom: '28px' }}>
+            Para gestionar tus campanas de Facebook e Instagram Ads, conecta tu cuenta de Meta Business.
+          </p>
+          <button
+            onClick={() => navigate(`${basePath}/marketing/configuracion`)}
+            style={{
+              display: 'inline-flex',
+              alignItems: 'center',
+              gap: '8px',
+              padding: '14px 28px',
+              background: 'linear-gradient(135deg, #1877f2 0%, #1565c0 100%)',
+              color: 'white',
+              border: 'none',
+              borderRadius: '12px',
+              fontSize: '15px',
+              fontWeight: 600,
+              cursor: 'pointer',
+              transition: 'all 0.2s',
+            }}
+            onMouseEnter={(e) => {
+              e.currentTarget.style.transform = 'translateY(-2px)';
+              e.currentTarget.style.boxShadow = '0 8px 24px rgba(24, 119, 242, 0.35)';
+            }}
+            onMouseLeave={(e) => {
+              e.currentTarget.style.transform = 'translateY(0)';
+              e.currentTarget.style.boxShadow = 'none';
+            }}
+          >
+            <Settings size={18} />
+            Configurar Meta Ads
+            <ChevronRight size={16} />
+          </button>
+        </div>
+      );
+    }
+
+    // Compute Meta totals
+    const metaTotals = metaCampaigns.reduce(
+      (acc, c) => ({
+        spend: acc.spend + (c.spend || 0),
+        impressions: acc.impressions + (c.impressions || 0),
+        clicks: acc.clicks + (c.clicks || 0),
+        reach: acc.reach + (c.reach || 0),
+        conversions: acc.conversions + (c.conversions || 0),
+      }),
+      { spend: 0, impressions: 0, clicks: 0, reach: 0, conversions: 0 }
+    );
+
+    return (
+      <div>
+        {/* Header row */}
+        <div
+          style={{
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'space-between',
+            marginBottom: '24px',
+            flexWrap: 'wrap',
+            gap: '16px',
+          }}
+        >
+          <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+            <div
+              style={{
+                width: '44px',
+                height: '44px',
+                borderRadius: '12px',
+                background: '#1877f215',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                color: '#1877f2',
+              }}
+            >
+              {TABS[2].icon}
+            </div>
+            <div>
+              <h2 style={{ fontSize: '18px', fontWeight: 700, color: '#1e293b', margin: 0 }}>
+                Meta Ads
+              </h2>
+              <p style={{ fontSize: '13px', color: '#64748b', margin: '2px 0 0 0' }}>
+                Rendimiento de campanas en Facebook e Instagram
+              </p>
+            </div>
+          </div>
+
+          <div style={{ display: 'flex', gap: '6px' }}>
+            {([
+              { key: '7d', label: '7 dias' },
+              { key: '30d', label: '30 dias' },
+              { key: '90d', label: '90 dias' },
+            ] as const).map((opt) => (
+              <button
+                key={opt.key}
+                onClick={() => setDateRange(opt.key)}
+                style={{
+                  padding: '8px 16px',
+                  borderRadius: '20px',
+                  border: 'none',
+                  background: dateRange === opt.key ? '#1e293b' : '#f1f5f9',
+                  color: dateRange === opt.key ? 'white' : '#64748b',
+                  fontSize: '13px',
+                  fontWeight: 600,
+                  cursor: 'pointer',
+                  transition: 'all 0.2s',
+                }}
+              >
+                {opt.label}
+              </button>
+            ))}
+          </div>
+        </div>
+
+        {/* KPI Summary */}
+        <div
+          style={{
+            display: 'grid',
+            gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))',
+            gap: '16px',
+            marginBottom: '28px',
+          }}
+        >
+          {[
+            { label: 'Gasto Total', value: formatCurrency(metaTotals.spend), icon: <DollarSign size={22} />, color: '#f59e0b' },
+            { label: 'Impresiones', value: formatNumber(metaTotals.impressions), icon: <Eye size={22} />, color: '#3b82f6' },
+            { label: 'Clicks', value: formatNumber(metaTotals.clicks), icon: <MousePointer size={22} />, color: '#22c55e' },
+            { label: 'Alcance', value: formatNumber(metaTotals.reach), icon: <Target size={22} />, color: '#8b5cf6' },
+            { label: 'Conversiones', value: formatNumber(metaTotals.conversions), icon: <Target size={22} />, color: '#ef4444' },
+          ].map((kpi) => (
+            <div
+              key={kpi.label}
+              style={{
+                background: 'white',
+                borderRadius: '14px',
+                padding: '20px',
+                border: '1px solid #e2e8f0',
+                display: 'flex',
+                alignItems: 'center',
+                gap: '16px',
+                transition: 'all 0.2s',
+              }}
+              onMouseEnter={(e) => {
+                e.currentTarget.style.transform = 'translateY(-2px)';
+                e.currentTarget.style.boxShadow = '0 4px 16px rgba(0,0,0,0.08)';
+              }}
+              onMouseLeave={(e) => {
+                e.currentTarget.style.transform = 'translateY(0)';
+                e.currentTarget.style.boxShadow = 'none';
+              }}
+            >
+              <div
+                style={{
+                  width: '48px',
+                  height: '48px',
+                  borderRadius: '12px',
+                  background: `${kpi.color}15`,
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  color: kpi.color,
+                  flexShrink: 0,
+                }}
+              >
+                {kpi.icon}
+              </div>
+              <div>
+                <div style={{ fontSize: '11px', color: '#94a3b8', fontWeight: 500, marginBottom: '4px' }}>
+                  {kpi.label}
+                </div>
+                <span style={{ fontSize: '22px', fontWeight: 700, color: '#1e293b' }}>
+                  {metaLoading ? '—' : kpi.value}
+                </span>
+              </div>
+            </div>
+          ))}
+        </div>
+
+        {/* Campaign List */}
+        {metaLoading ? (
+          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '60px 0' }}>
+            <Loader2 size={28} color="#1877f2" style={{ animation: 'spin 1s linear infinite' }} />
+          </div>
+        ) : metaCampaigns.length === 0 ? (
+          <div
+            style={{
+              background: 'white',
+              borderRadius: '16px',
+              border: '1px solid #e2e8f0',
+              padding: '60px 40px',
+              textAlign: 'center',
+            }}
+          >
+            <div
+              style={{
+                width: '64px',
+                height: '64px',
+                borderRadius: '16px',
+                background: '#f1f5f9',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                margin: '0 auto 20px',
+                color: '#94a3b8',
+              }}
+            >
+              <Megaphone size={28} />
+            </div>
+            <h3 style={{ fontSize: '16px', fontWeight: 600, color: '#1e293b', marginBottom: '8px' }}>
+              No se encontraron campanas
+            </h3>
+            <p style={{ fontSize: '14px', color: '#64748b', margin: 0 }}>
+              No hay campanas en los ultimos {dateRange === '7d' ? '7' : dateRange === '30d' ? '30' : '90'} dias.
+            </p>
+          </div>
+        ) : (
+          <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
+            <div style={{ fontSize: '13px', color: '#94a3b8', fontWeight: 500, marginBottom: '-4px' }}>
+              {metaCampaigns.length} campana{metaCampaigns.length !== 1 ? 's' : ''} encontrada{metaCampaigns.length !== 1 ? 's' : ''}
+            </div>
+            {metaCampaigns.map((campaign) => {
+              const statusInfo = META_STATUS_LABELS[campaign.status] || META_STATUS_LABELS.ACTIVE;
+              const objectiveLabel = META_OBJECTIVE_LABELS[campaign.objective] || campaign.objective;
+              return (
+                <div
+                  key={campaign.id}
+                  style={{
+                    background: 'white',
+                    borderRadius: '16px',
+                    border: '1px solid #e2e8f0',
+                    padding: '20px 24px',
+                    transition: 'all 0.2s ease',
+                  }}
+                  onMouseEnter={(e) => {
+                    e.currentTarget.style.transform = 'translateY(-2px)';
+                    e.currentTarget.style.boxShadow = '0 8px 24px rgba(0,0,0,0.08)';
+                    e.currentTarget.style.borderColor = '#1877f2';
+                  }}
+                  onMouseLeave={(e) => {
+                    e.currentTarget.style.transform = 'translateY(0)';
+                    e.currentTarget.style.boxShadow = 'none';
+                    e.currentTarget.style.borderColor = '#e2e8f0';
+                  }}
+                >
+                  <div
+                    style={{
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'space-between',
+                      marginBottom: '16px',
+                      flexWrap: 'wrap',
+                      gap: '8px',
+                    }}
+                  >
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '10px', flexWrap: 'wrap' }}>
+                      <h3 style={{ fontSize: '16px', fontWeight: 600, color: '#1e293b', margin: 0 }}>
+                        {campaign.name}
+                      </h3>
+                      <span
+                        style={{
+                          padding: '3px 10px',
+                          borderRadius: '20px',
+                          fontSize: '11px',
+                          fontWeight: 600,
+                          color: statusInfo.color,
+                          background: statusInfo.bg,
+                        }}
+                      >
+                        {statusInfo.label}
+                      </span>
+                      <span
+                        style={{
+                          padding: '3px 10px',
+                          borderRadius: '20px',
+                          fontSize: '11px',
+                          fontWeight: 500,
+                          color: '#64748b',
+                          background: '#f1f5f9',
+                        }}
+                      >
+                        {objectiveLabel}
+                      </span>
+                    </div>
+                  </div>
+
+                  <div
+                    style={{
+                      display: 'grid',
+                      gridTemplateColumns: 'repeat(auto-fit, minmax(120px, 1fr))',
+                      gap: '16px',
+                    }}
+                  >
+                    {[
+                      { label: 'Gasto', value: campaign.spend != null ? formatCurrency(campaign.spend) : '—' },
+                      { label: 'Impresiones', value: campaign.impressions != null ? formatNumber(campaign.impressions) : '—' },
+                      { label: 'Clicks', value: campaign.clicks != null ? formatNumber(campaign.clicks) : '—' },
+                      { label: 'CTR', value: campaign.ctr != null ? `${campaign.ctr.toFixed(2)}%` : '—' },
+                      { label: 'Alcance', value: campaign.reach != null ? formatNumber(campaign.reach) : '—' },
+                      { label: 'Conversiones', value: campaign.conversions != null ? formatNumber(campaign.conversions) : '—' },
+                    ].map((m) => (
+                      <div key={m.label}>
+                        <div style={{ fontSize: '11px', color: '#94a3b8', fontWeight: 500, marginBottom: '4px' }}>
+                          {m.label}
+                        </div>
+                        <div style={{ fontSize: '15px', fontWeight: 600, color: '#1e293b' }}>
+                          {m.value}
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+        )}
+
+        {/* Info note */}
+        <div
+          style={{
+            background: 'linear-gradient(135deg, #eff6ff 0%, #dbeafe 100%)',
+            border: '1px solid #93c5fd',
+            borderRadius: '16px',
+            padding: '20px 24px',
+            display: 'flex',
+            alignItems: 'flex-start',
+            gap: '14px',
+            marginTop: '28px',
+          }}
+        >
+          <AlertCircle size={20} color="#3b82f6" style={{ flexShrink: 0, marginTop: '2px' }} />
+          <p style={{ fontSize: '13px', color: '#3b82f6', margin: 0, lineHeight: 1.6 }}>
+            Las metricas se obtienen directamente de tu cuenta de Meta Ads.
+            Para crear o editar campanas, usa el{' '}
+            <a
+              href="https://business.facebook.com/adsmanager"
+              target="_blank"
+              rel="noopener noreferrer"
+              style={{ color: '#1d4ed8', fontWeight: 600, textDecoration: 'underline' }}
+            >
+              Administrador de Anuncios de Meta
+            </a>.
+          </p>
+        </div>
+      </div>
+    );
+  };
+
   // ==================== RENDER: PLACEHOLDER TAB ====================
   const renderPlaceholderTab = (
     name: string,
@@ -958,14 +1409,7 @@ const CrmMarketingCampanas: React.FC = () => {
 
       {activeTab === 'resumen' && renderResumen()}
       {activeTab === 'google' && renderGoogleAds()}
-      {activeTab === 'meta' &&
-        renderPlaceholderTab(
-          'Meta Ads',
-          TABS[2].icon,
-          '#1877f2',
-          providerStatus.meta,
-          'Para gestionar tus campanas de Facebook e Instagram Ads, conecta tu cuenta de Meta Business.'
-        )}
+      {activeTab === 'meta' && renderMetaAds()}
       {activeTab === 'email' &&
         renderPlaceholderTab(
           'Email Marketing',

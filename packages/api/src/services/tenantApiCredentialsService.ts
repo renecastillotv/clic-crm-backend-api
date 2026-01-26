@@ -471,6 +471,55 @@ export async function saveMetaAdsCredentials(
 }
 
 /**
+ * Obtiene el access token de Meta Ads (desencriptado)
+ */
+export async function getMetaAdsToken(tenantId: string): Promise<{
+  accessToken: string;
+  adAccountId: string;
+  businessId?: string;
+} | null> {
+  const sql = `
+    SELECT
+      meta_ads_access_token_encrypted,
+      meta_ad_account_id,
+      meta_business_id
+    FROM tenant_api_credentials
+    WHERE tenant_id = $1 AND meta_ads_connected = true
+  `;
+
+  const result = await query(sql, [tenantId]);
+  if (!result.rows[0]?.meta_ads_access_token_encrypted) {
+    return null;
+  }
+
+  return {
+    accessToken: await decryptValue(result.rows[0].meta_ads_access_token_encrypted),
+    adAccountId: result.rows[0].meta_ad_account_id,
+    businessId: result.rows[0].meta_business_id || undefined
+  };
+}
+
+/**
+ * Actualiza solo el ad account ID de Meta Ads (sin tocar token ni connected_by)
+ */
+export async function updateMetaAdsAdAccountId(
+  tenantId: string,
+  adAccountId: string,
+  businessId: string | null
+): Promise<void> {
+  const sql = `
+    UPDATE tenant_api_credentials
+    SET
+      meta_ad_account_id = $1,
+      meta_business_id = $2,
+      updated_at = NOW()
+    WHERE tenant_id = $3
+  `;
+
+  await query(sql, [adAccountId, businessId, tenantId]);
+}
+
+/**
  * Desconecta Meta Ads
  */
 export async function disconnectMetaAds(tenantId: string): Promise<void> {

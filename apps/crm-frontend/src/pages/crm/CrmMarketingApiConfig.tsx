@@ -313,6 +313,11 @@ const CrmMarketingApiConfig: React.FC = () => {
   const [availableSites, setAvailableSites] = useState<SearchConsoleSite[]>([]);
   const [sitesLoading, setSitesLoading] = useState(false);
 
+  // Meta Ads ad account selector state
+  const [showAdAccountSelector, setShowAdAccountSelector] = useState(false);
+  const [availableAdAccounts, setAvailableAdAccounts] = useState<{ id: string; accountId: string; name: string; accountStatus: number; currency: string; businessName?: string }[]>([]);
+  const [adAccountsLoading, setAdAccountsLoading] = useState(false);
+
   useEffect(() => {
     setPageHeader({
       title: 'Configuración de APIs',
@@ -340,10 +345,10 @@ const CrmMarketingApiConfig: React.FC = () => {
     fetchCredentials();
   }, [tenantActual?.id]);
 
-  // Listen for OAuth postMessage from popup (Google Ads + GSC)
+  // Listen for OAuth postMessage from popup (Google Ads + GSC + Meta Ads)
   const handleOAuthMessage = useCallback(async (event: MessageEvent) => {
     const type = event.data?.type;
-    if (type !== 'GOOGLE_ADS_OAUTH_RESULT' && type !== 'GSC_OAUTH_RESULT') return;
+    if (type !== 'GOOGLE_ADS_OAUTH_RESULT' && type !== 'GSC_OAUTH_RESULT' && type !== 'META_ADS_OAUTH_RESULT') return;
 
     // Clean up popup resources
     if (pollTimerRef.current) {
@@ -407,6 +412,35 @@ const CrmMarketingApiConfig: React.FC = () => {
       } else {
         setActionLoading(null);
         alert(event.data.message || 'Error en la autorización de Search Console');
+      }
+    }
+
+    if (type === 'META_ADS_OAUTH_RESULT') {
+      if (event.data.success) {
+        setAdAccountsLoading(true);
+        setActionLoading(null);
+        try {
+          const accountsResponse = await apiFetch(
+            `/tenants/${tenantActual?.id}/api-credentials/meta-ads/ad-accounts`
+          );
+          const accounts = await accountsResponse.json();
+          if (accounts.length === 1) {
+            await handleSelectAdAccount(accounts[0].id, accounts[0].businessName);
+          } else if (accounts.length > 0) {
+            setAvailableAdAccounts(accounts);
+            setShowAdAccountSelector(true);
+          } else {
+            alert('No se encontraron cuentas publicitarias de Meta.');
+          }
+        } catch (error) {
+          console.error('Error fetching ad accounts:', error);
+          alert('OAuth exitoso, pero hubo un error al obtener las cuentas. Intenta de nuevo.');
+        } finally {
+          setAdAccountsLoading(false);
+        }
+      } else {
+        setActionLoading(null);
+        alert(event.data.message || 'Error en la autorización de Meta Ads');
       }
     }
   }, [tenantActual?.id]);
@@ -631,10 +665,75 @@ const CrmMarketingApiConfig: React.FC = () => {
     }
   };
 
-  const handleConnectMetaAds = () => {
+  const handleConnectMetaAds = async () => {
+    if (!tenantActual?.id) return;
+
     setActionLoading('meta-ads');
-    alert('El flujo de OAuth de Meta Ads se implementará próximamente.\n\nNecesitarás:\n1. Una cuenta publicitaria en Meta Ads Manager\n2. Permisos de ads_management');
-    setActionLoading(null);
+
+    try {
+      const userId = user?.id || 'unknown';
+      const authResponse = await apiFetch(
+        `/tenants/${tenantActual.id}/api-credentials/meta-ads/auth-url?connectedBy=${userId}`
+      );
+      const { authUrl } = await authResponse.json();
+
+      const width = 600;
+      const height = 700;
+      const left = window.screenX + (window.outerWidth - width) / 2;
+      const top = window.screenY + (window.outerHeight - height) / 2;
+
+      const popup = window.open(
+        authUrl,
+        'meta-ads-oauth',
+        `width=${width},height=${height},left=${left},top=${top},toolbar=no,menubar=no,scrollbars=yes`
+      );
+
+      if (!popup) {
+        alert('No se pudo abrir la ventana de autorización. Verifica que los popups no estén bloqueados.');
+        setActionLoading(null);
+        return;
+      }
+
+      popupRef.current = popup;
+
+      pollTimerRef.current = window.setInterval(() => {
+        if (popup.closed) {
+          if (pollTimerRef.current) {
+            clearInterval(pollTimerRef.current);
+            pollTimerRef.current = null;
+          }
+          popupRef.current = null;
+          setActionLoading(null);
+        }
+      }, 500);
+    } catch (error) {
+      console.error('Error starting Meta Ads OAuth:', error);
+      alert('Error al iniciar el flujo de autorización');
+      setActionLoading(null);
+    }
+  };
+
+  const handleSelectAdAccount = async (adAccountId: string, businessName?: string) => {
+    if (!tenantActual?.id) return;
+
+    setAdAccountsLoading(true);
+    try {
+      await apiFetch(`/tenants/${tenantActual.id}/api-credentials/meta-ads/ad-account`, {
+        method: 'PUT',
+        body: JSON.stringify({ adAccountId, businessId: businessName || null }),
+      });
+
+      const refreshResponse = await apiFetch(`/tenants/${tenantActual.id}/api-credentials`);
+      const refreshedData = await refreshResponse.json();
+      setCredentials(refreshedData);
+      setShowAdAccountSelector(false);
+      setAvailableAdAccounts([]);
+    } catch (error) {
+      console.error('Error selecting ad account:', error);
+      alert('Error al seleccionar la cuenta publicitaria');
+    } finally {
+      setAdAccountsLoading(false);
+    }
   };
 
   const handleDisconnectMetaAds = async () => {
@@ -827,7 +926,13 @@ const CrmMarketingApiConfig: React.FC = () => {
           name="Meta Ads"
           description="Lanza campañas publicitarias en Facebook e Instagram con audiencias segmentadas"
           connected={credentials?.metaAdsConnected || false}
-          connectionInfo={credentials?.metaAdAccountId ? `Cuenta: ${credentials.metaAdAccountId}` : undefined}
+          connectionInfo={
+            credentials?.metaAdAccountId
+              ? credentials.metaAdAccountId === 'PENDING'
+                ? 'Conectado - Selecciona una cuenta publicitaria'
+                : `Cuenta: ${credentials.metaAdAccountId}`
+              : undefined
+          }
           color="#1877f2"
           onConnect={handleConnectMetaAds}
           onDisconnect={handleDisconnectMetaAds}
@@ -1264,6 +1369,178 @@ const CrmMarketingApiConfig: React.FC = () => {
             <Loader2 size={24} style={{ animation: 'spin 1s linear infinite', color: '#16a34a' }} />
             <span style={{ fontSize: '14px', fontWeight: 500, color: '#1e293b' }}>
               Obteniendo sitios de Search Console...
+            </span>
+          </div>
+        </div>
+      )}
+
+      {/* Meta Ads Ad Account Selector Modal */}
+      {showAdAccountSelector && (
+        <div
+          style={{
+            position: 'fixed',
+            inset: 0,
+            background: 'rgba(0,0,0,0.5)',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            zIndex: 1000,
+          }}
+          onClick={() => {
+            setShowAdAccountSelector(false);
+            setAvailableAdAccounts([]);
+          }}
+        >
+          <div
+            style={{
+              background: 'white',
+              borderRadius: '20px',
+              padding: '32px',
+              maxWidth: '520px',
+              width: '90%',
+              maxHeight: '80vh',
+              overflow: 'auto',
+              boxShadow: '0 24px 80px rgba(0,0,0,0.2)',
+            }}
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '24px' }}>
+              <div>
+                <h3 style={{ fontSize: '18px', fontWeight: 700, color: '#1e293b', margin: 0 }}>
+                  Selecciona una cuenta publicitaria
+                </h3>
+                <p style={{ fontSize: '13px', color: '#64748b', margin: '4px 0 0 0' }}>
+                  Elige la cuenta de Meta Ads que deseas conectar
+                </p>
+              </div>
+              <button
+                onClick={() => {
+                  setShowAdAccountSelector(false);
+                  setAvailableAdAccounts([]);
+                }}
+                style={{
+                  background: '#f1f5f9',
+                  border: 'none',
+                  borderRadius: '8px',
+                  padding: '8px',
+                  cursor: 'pointer',
+                  color: '#64748b',
+                }}
+              >
+                <X size={18} />
+              </button>
+            </div>
+
+            {adAccountsLoading ? (
+              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '40px' }}>
+                <Loader2 size={28} style={{ animation: 'spin 1s linear infinite', color: '#1877f2' }} />
+              </div>
+            ) : (
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
+                {availableAdAccounts.map((account) => (
+                  <button
+                    key={account.id}
+                    onClick={() => handleSelectAdAccount(account.id, account.businessName)}
+                    disabled={adAccountsLoading}
+                    style={{
+                      display: 'flex',
+                      alignItems: 'center',
+                      gap: '14px',
+                      padding: '16px',
+                      background: '#f8fafc',
+                      border: '2px solid #e2e8f0',
+                      borderRadius: '12px',
+                      cursor: 'pointer',
+                      textAlign: 'left',
+                      transition: 'all 0.15s',
+                    }}
+                    onMouseEnter={(e) => {
+                      e.currentTarget.style.borderColor = '#1877f2';
+                      e.currentTarget.style.background = '#eff6ff';
+                    }}
+                    onMouseLeave={(e) => {
+                      e.currentTarget.style.borderColor = '#e2e8f0';
+                      e.currentTarget.style.background = '#f8fafc';
+                    }}
+                  >
+                    <div
+                      style={{
+                        width: '44px',
+                        height: '44px',
+                        borderRadius: '10px',
+                        background: '#1877f220',
+                        display: 'flex',
+                        alignItems: 'center',
+                        justifyContent: 'center',
+                        color: '#1877f2',
+                        flexShrink: 0,
+                      }}
+                    >
+                      <Megaphone size={20} />
+                    </div>
+                    <div style={{ flex: 1, minWidth: 0 }}>
+                      <div style={{ fontSize: '14px', fontWeight: 600, color: '#1e293b' }}>
+                        {account.name}
+                      </div>
+                      <div style={{ fontSize: '12px', color: '#64748b', marginTop: '2px' }}>
+                        ID: {account.accountId}
+                        {account.businessName && (
+                          <span style={{ marginLeft: '8px' }}>{account.businessName}</span>
+                        )}
+                        <span style={{ marginLeft: '8px' }}>{account.currency}</span>
+                        {account.accountStatus !== 1 && (
+                          <span
+                            style={{
+                              marginLeft: '8px',
+                              padding: '2px 6px',
+                              background: '#fef3c7',
+                              borderRadius: '4px',
+                              fontSize: '10px',
+                              fontWeight: 600,
+                              color: '#92400e',
+                            }}
+                          >
+                            Inactiva
+                          </span>
+                        )}
+                      </div>
+                    </div>
+                    <ChevronRight size={16} color="#94a3b8" />
+                  </button>
+                ))}
+              </div>
+            )}
+          </div>
+        </div>
+      )}
+
+      {/* Ad accounts loading overlay (while fetching accounts after OAuth) */}
+      {adAccountsLoading && !showAdAccountSelector && (
+        <div
+          style={{
+            position: 'fixed',
+            inset: 0,
+            background: 'rgba(0,0,0,0.3)',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            zIndex: 999,
+          }}
+        >
+          <div
+            style={{
+              background: 'white',
+              borderRadius: '16px',
+              padding: '32px 48px',
+              display: 'flex',
+              alignItems: 'center',
+              gap: '16px',
+              boxShadow: '0 12px 40px rgba(0,0,0,0.15)',
+            }}
+          >
+            <Loader2 size={24} style={{ animation: 'spin 1s linear infinite', color: '#1877f2' }} />
+            <span style={{ fontSize: '14px', fontWeight: 500, color: '#1e293b' }}>
+              Obteniendo cuentas publicitarias de Meta...
             </span>
           </div>
         </div>
