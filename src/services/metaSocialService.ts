@@ -239,27 +239,34 @@ export async function getPagePosts(
   pageId: string,
   limit: number = 25
 ): Promise<MetaPost[]> {
-  const fields = 'id,message,full_picture,created_time,type,permalink_url,likes.summary(true),comments.summary(true),shares';
+  // Note: 'type' field was deprecated in Graph API v12.0+
+  // Using 'reactions' instead of 'likes' for broader engagement data
+  const fields = 'id,message,full_picture,created_time,permalink_url,reactions.summary(true),comments.summary(true),shares';
 
-  const response = await fetch(
-    `${GRAPH_API_BASE}/${pageId}/posts?fields=${encodeURIComponent(fields)}&limit=${limit}`,
-    { headers: { Authorization: `Bearer ${pageAccessToken}` } }
-  );
+  const url = `${GRAPH_API_BASE}/${pageId}/posts?fields=${encodeURIComponent(fields)}&limit=${limit}`;
+  console.log('[Meta Social] Fetching page posts:', url.replace(/access_token=[^&]+/, 'access_token=***'));
+
+  const response = await fetch(url, {
+    headers: { Authorization: `Bearer ${pageAccessToken}` },
+  });
 
   const data: any = await response.json();
 
   if (!response.ok || data.error) {
+    console.error('[Meta Social] Posts API error:', JSON.stringify(data.error || data));
     throw new Error(`Failed to get posts: ${data.error?.message || response.statusText}`);
   }
+
+  console.log(`[Meta Social] Got ${(data.data || []).length} posts`);
 
   return (data.data || []).map((post: any) => ({
     id: post.id,
     message: post.message,
     fullPicture: post.full_picture,
     createdTime: post.created_time,
-    type: post.type || 'status',
+    type: 'status',
     permalink: post.permalink_url,
-    likes: post.likes?.summary?.total_count || 0,
+    likes: post.reactions?.summary?.total_count || 0,
     comments: post.comments?.summary?.total_count || 0,
     shares: post.shares?.count || 0,
   }));
