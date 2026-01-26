@@ -213,8 +213,13 @@ router.get('/proxy-image', async (req: Request<TenantParams>, res: Response, nex
       });
     }
 
-    // Fetch de la imagen
-    const response = await fetch(url);
+    // Fetch de la imagen con headers apropiados (CloudFront puede requerir User-Agent)
+    const response = await fetch(url, {
+      headers: {
+        'User-Agent': 'Mozilla/5.0 (compatible; CLICBot/1.0)',
+        'Accept': 'image/*,*/*',
+      },
+    });
 
     if (!response.ok) {
       return res.status(response.status).json({

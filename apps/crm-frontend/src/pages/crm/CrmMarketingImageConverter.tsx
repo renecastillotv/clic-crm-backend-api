@@ -1449,25 +1449,68 @@ const CrmMarketingImageConverter: React.FC = () => {
     setImageError(null);
     console.log('[ImageConverter] loadPropertyImage:', url);
 
-    const base64 = await loadImageAsBase64(url);
-    if (base64) {
-      const img = new window.Image();
-      img.onload = () => {
-        setPropertyImage(img);
-        setUploadedImage(base64);
-        setGeneratedImage(null);
-        setImageLoading(false);
-      };
-      img.onerror = () => {
-        console.error('[ImageConverter] Image element failed to load');
-        setImageLoading(false);
-        setImageError('Error al cargar la imagen');
-      };
-      img.src = base64;
+    // Estrategia 1: Cargar directamente con CORS (rápido, sin proxy)
+    const tryDirectCORS = (): Promise<HTMLImageElement> =>
+      new Promise((resolve, reject) => {
+        const img = new window.Image();
+        img.crossOrigin = 'anonymous';
+        img.onload = () => {
+          // Verificar que canvas puede acceder a la imagen (no tainted)
+          try {
+            const testCanvas = document.createElement('canvas');
+            testCanvas.width = 1;
+            testCanvas.height = 1;
+            const ctx = testCanvas.getContext('2d');
+            if (ctx) {
+              ctx.drawImage(img, 0, 0, 1, 1);
+              testCanvas.toDataURL(); // Lanza error si está tainted
+            }
+            resolve(img);
+          } catch {
+            reject(new Error('Canvas tainted'));
+          }
+        };
+        img.onerror = () => reject(new Error('Direct CORS load failed'));
+        img.src = url;
+      });
+
+    // Estrategia 2: Cargar via proxy del backend
+    const tryProxy = async (): Promise<HTMLImageElement> => {
+      const base64 = await loadImageAsBase64(url);
+      if (!base64) throw new Error('Proxy returned null');
+      return new Promise((resolve, reject) => {
+        const img = new window.Image();
+        img.onload = () => resolve(img);
+        img.onerror = () => reject(new Error('Base64 image failed'));
+        img.src = base64;
+      });
+    };
+
+    // Intentar ambas estrategias
+    let loadedImg: HTMLImageElement | null = null;
+
+    try {
+      console.log('[ImageConverter] Trying direct CORS load...');
+      loadedImg = await tryDirectCORS();
+      console.log('[ImageConverter] Direct CORS load succeeded');
+    } catch (e) {
+      console.log('[ImageConverter] Direct CORS failed:', (e as Error).message, '- trying proxy...');
+      try {
+        loadedImg = await tryProxy();
+        console.log('[ImageConverter] Proxy load succeeded');
+      } catch (e2) {
+        console.error('[ImageConverter] Proxy also failed:', (e2 as Error).message);
+      }
+    }
+
+    if (loadedImg) {
+      setPropertyImage(loadedImg);
+      setUploadedImage(loadedImg.src);
+      setGeneratedImage(null);
+      setImageLoading(false);
     } else {
       setImageLoading(false);
-      setImageError('No se pudo cargar la imagen. Verifica la URL.');
-      console.warn('[ImageConverter] loadImageAsBase64 returned null for:', url);
+      setImageError('No se pudo cargar la imagen');
     }
   };
 
