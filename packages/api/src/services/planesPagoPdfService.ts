@@ -9,10 +9,8 @@ import { query } from '../utils/db.js';
 interface TenantInfo {
   nombre: string;
   logo_url?: string;
-  isotipo_url?: string;
-  telefono_principal?: string;
-  email_principal?: string;
-  direccion?: string;
+  telefono?: string;
+  email?: string;
   ciudad?: string;
   pais?: string;
   tipo?: string;
@@ -22,18 +20,9 @@ interface UsuarioInfo {
   nombre: string;
   apellido?: string;
   email?: string;
-  telefono?: string;
   titulo_profesional?: string;
 }
 
-/**
- * Obtiene información del tenant para el PDF
- * Estructura de info_negocio:
- * - logo, isotipo, logoBlanco
- * - nombreComercial
- * - contacto: { telefono, email, whatsapp }
- * - ubicacion: { ciudad, pais, direccion, provincia }
- */
 async function getTenantInfo(tenantId: string): Promise<TenantInfo | null> {
   try {
     const result = await query(
@@ -48,29 +37,25 @@ async function getTenantInfo(tenantId: string): Promise<TenantInfo | null> {
     const ubicacion = info.ubicacion || {};
 
     return {
-      nombre: info.nombreComercial || info.nombre || row.nombre,
-      logo_url: info.logo,
-      isotipo_url: info.isotipo,
-      telefono_principal: contacto.telefono,
-      email_principal: contacto.email,
-      direccion: ubicacion.direccion,
-      ciudad: ubicacion.ciudad,
-      pais: ubicacion.pais,
+      nombre: info.nombreComercial || row.nombre,
+      logo_url: info.logo || null,
+      telefono: contacto.telefono || null,
+      email: contacto.email || null,
+      ciudad: ubicacion.ciudad || null,
+      pais: ubicacion.pais || null,
       tipo: row.tipo,
     };
-  } catch {
+  } catch (e) {
+    console.error('Error getting tenant info:', e);
     return null;
   }
 }
 
-/**
- * Obtiene información del usuario creador del plan
- */
 async function getUsuarioInfo(usuarioId: string): Promise<UsuarioInfo | null> {
   if (!usuarioId) return null;
   try {
     const result = await query(
-      `SELECT u.nombre, u.apellido, u.email, u.telefono, pa.titulo_profesional
+      `SELECT u.nombre, u.apellido, u.email, pa.titulo_profesional
        FROM usuarios u
        LEFT JOIN perfiles_asesor pa ON pa.usuario_id = u.id
        WHERE u.id = $1`,
@@ -83,48 +68,41 @@ async function getUsuarioInfo(usuarioId: string): Promise<UsuarioInfo | null> {
   }
 }
 
-/**
- * Descarga una imagen desde URL y la convierte a buffer
- */
-async function fetchImageAsBuffer(url: string): Promise<Buffer | null> {
+async function fetchImage(url: string): Promise<Buffer | null> {
   if (!url) return null;
   try {
+    console.log('Fetching logo from:', url);
     const response = await fetch(url);
-    if (!response.ok) return null;
+    if (!response.ok) {
+      console.log('Logo fetch failed:', response.status);
+      return null;
+    }
     const arrayBuffer = await response.arrayBuffer();
+    console.log('Logo fetched, size:', arrayBuffer.byteLength);
     return Buffer.from(arrayBuffer);
-  } catch {
+  } catch (e) {
+    console.error('Error fetching logo:', e);
     return null;
   }
 }
 
-/**
- * Genera un PDF del plan de pago
- */
 export async function generarPdfPlanPago(plan: PlanPago): Promise<Buffer> {
-  // Obtener info adicional
   const tenantInfo = await getTenantInfo(plan.tenant_id);
   const usuarioInfo = plan.usuario_creador_id ? await getUsuarioInfo(plan.usuario_creador_id) : null;
-
-  // Determinar si es Connect (sin branding)
   const isConnect = tenantInfo?.tipo === 'connect';
 
-  // Descargar logo si existe y no es Connect
+  // Fetch logo
   let logoBuffer: Buffer | null = null;
   if (!isConnect && tenantInfo?.logo_url) {
-    logoBuffer = await fetchImageAsBuffer(tenantInfo.logo_url);
+    logoBuffer = await fetchImage(tenantInfo.logo_url);
   }
 
   return new Promise((resolve, reject) => {
     try {
       const doc = new PDFDocument({
         size: 'LETTER',
-        margins: { top: 50, bottom: 80, left: 50, right: 50 },
+        margin: 50,
         bufferPages: true,
-        info: {
-          Title: plan.titulo || 'Plan de Pago',
-          Author: tenantInfo?.nombre || 'CRM',
-        },
       });
 
       const chunks: Buffer[] = [];
@@ -132,393 +110,247 @@ export async function generarPdfPlanPago(plan: PlanPago): Promise<Buffer> {
       doc.on('end', () => resolve(Buffer.concat(chunks)));
       doc.on('error', reject);
 
-      // Colores
-      const primaryColor = '#1e40af';
-      const textColor = '#1f2937';
-      const lightGray = '#f3f4f6';
-      const borderColor = '#e5e7eb';
-      const mutedColor = '#6b7280';
+      const blue = '#1e40af';
+      const gray = '#6b7280';
+      const dark = '#1f2937';
 
-      // Page dimensions
-      const pageWidth = 612;
-      const marginLeft = 50;
-      const contentWidth = pageWidth - 100;
-      const maxContentY = 680; // Leave space for footer
-
-      // Helper to check if we need a new page
-      const checkNewPage = (neededSpace: number = 50) => {
-        if (doc.y > maxContentY - neededSpace) {
-          doc.addPage();
-          return true;
-        }
-        return false;
-      };
-
-      // ============================================
-      // HEADER CON BRANDING (si no es Connect)
-      // ============================================
-      let headerHeight = 50;
+      // ========== HEADER ==========
+      let startY = 50;
 
       if (!isConnect && tenantInfo) {
-        const headerY = 30;
-
-        // Logo en la izquierda
+        // Logo on left
         if (logoBuffer) {
           try {
-            doc.image(logoBuffer, marginLeft, headerY, { height: 45 });
-          } catch {
-            // Si falla el logo, continuar sin él
+            doc.image(logoBuffer, 50, 40, { height: 40 });
+          } catch (e) {
+            console.error('Error embedding logo:', e);
           }
         }
 
-        // Información de contacto en la derecha (estilo hoja membretada)
-        const rightX = pageWidth - marginLeft - 200;
-        doc.fontSize(12).fillColor(primaryColor).text(
-          tenantInfo.nombre,
-          rightX,
-          headerY,
-          { width: 200, align: 'right' }
-        );
+        // Company info on right
+        doc.fontSize(11).fillColor(blue).text(tenantInfo.nombre, 350, 40, { width: 200, align: 'right' });
 
-        const contactParts: string[] = [];
-        if (tenantInfo.telefono_principal) contactParts.push(tenantInfo.telefono_principal);
-        if (tenantInfo.email_principal) contactParts.push(tenantInfo.email_principal);
-
-        if (contactParts.length > 0) {
-          doc.fontSize(8).fillColor(mutedColor);
-          let contactY = headerY + 16;
-          for (const part of contactParts) {
-            doc.text(part, rightX, contactY, { width: 200, align: 'right' });
-            contactY += 10;
-          }
+        let infoY = 54;
+        if (tenantInfo.telefono) {
+          doc.fontSize(8).fillColor(gray).text(tenantInfo.telefono, 350, infoY, { width: 200, align: 'right' });
+          infoY += 10;
+        }
+        if (tenantInfo.email) {
+          doc.fontSize(8).fillColor(gray).text(tenantInfo.email, 350, infoY, { width: 200, align: 'right' });
+          infoY += 10;
+        }
+        if (tenantInfo.ciudad || tenantInfo.pais) {
+          const loc = [tenantInfo.ciudad, tenantInfo.pais].filter(Boolean).join(', ');
+          doc.fontSize(8).fillColor(gray).text(loc, 350, infoY, { width: 200, align: 'right' });
         }
 
-        const locationParts = [tenantInfo.ciudad, tenantInfo.pais].filter(Boolean);
-        if (locationParts.length > 0) {
-          doc.fontSize(8).fillColor(mutedColor).text(
-            locationParts.join(', '),
-            rightX,
-            headerY + 38,
-            { width: 200, align: 'right' }
-          );
-        }
-
-        // Línea separadora del header
-        doc.moveTo(marginLeft, 85).lineTo(pageWidth - marginLeft, 85).strokeColor(borderColor).stroke();
-        headerHeight = 95;
+        // Header line
+        doc.moveTo(50, 90).lineTo(562, 90).strokeColor('#e5e7eb').stroke();
+        startY = 105;
       }
 
-      doc.y = headerHeight;
-
-      // ============================================
-      // TÍTULO DEL DOCUMENTO
-      // ============================================
-      doc.fontSize(22).fillColor(primaryColor).text('Plan de Pago', marginLeft, doc.y, {
-        align: 'center',
-        width: contentWidth
-      });
-
+      // ========== TITLE ==========
+      doc.fontSize(20).fillColor(blue).text('Plan de Pago', 50, startY, { align: 'center', width: 512 });
       if (plan.titulo) {
-        doc.moveDown(0.2);
-        doc.fontSize(10).fillColor(mutedColor).text(plan.titulo, marginLeft, doc.y, {
-          align: 'center',
-          width: contentWidth
-        });
+        doc.fontSize(9).fillColor(gray).text(plan.titulo, 50, startY + 25, { align: 'center', width: 512 });
       }
-      doc.moveDown(1.2);
 
-      // ============================================
-      // INFO PROPIEDAD Y CLIENTE (en dos columnas)
-      // ============================================
-      const infoStartY = doc.y;
-      const colWidth = (contentWidth - 30) / 2;
+      // ========== PROPERTY & CLIENT ==========
+      const infoTop = startY + 55;
 
-      // Columna izquierda - Propiedad
       if (plan.propiedad) {
-        doc.fontSize(8).fillColor(mutedColor).text('PROPIEDAD', marginLeft, infoStartY);
-        doc.fontSize(10).fillColor(textColor).text(
-          truncateText(plan.propiedad.titulo || '-', 40),
-          marginLeft,
-          infoStartY + 12,
-          { width: colWidth }
-        );
+        doc.fontSize(8).fillColor(gray).text('PROPIEDAD', 50, infoTop);
+        doc.fontSize(10).fillColor(dark).text(plan.propiedad.titulo || '-', 50, infoTop + 12, { width: 230 });
         if (plan.propiedad.codigo) {
-          doc.fontSize(8).fillColor(mutedColor).text(
-            `Código: ${plan.propiedad.codigo}`,
-            marginLeft,
-            infoStartY + 26
-          );
+          doc.fontSize(8).fillColor(gray).text(`Código: ${plan.propiedad.codigo}`, 50, infoTop + 26);
         }
       }
 
-      // Columna derecha - Cliente
-      const rightColX = marginLeft + colWidth + 30;
       if (plan.contacto) {
-        doc.fontSize(8).fillColor(mutedColor).text('CLIENTE', rightColX, infoStartY);
-        const nombreCompleto = [plan.contacto.nombre, plan.contacto.apellido].filter(Boolean).join(' ');
-        doc.fontSize(10).fillColor(textColor).text(
-          nombreCompleto || '-',
-          rightColX,
-          infoStartY + 12,
-          { width: colWidth }
-        );
-
-        let contactY = infoStartY + 26;
+        doc.fontSize(8).fillColor(gray).text('CLIENTE', 310, infoTop);
+        const clientName = [plan.contacto.nombre, plan.contacto.apellido].filter(Boolean).join(' ');
+        doc.fontSize(10).fillColor(dark).text(clientName || '-', 310, infoTop + 12, { width: 230 });
+        let cy = infoTop + 26;
         if (plan.contacto.email) {
-          doc.fontSize(8).fillColor(mutedColor).text(plan.contacto.email, rightColX, contactY);
-          contactY += 10;
+          doc.fontSize(8).fillColor(gray).text(plan.contacto.email, 310, cy);
+          cy += 10;
         }
         if (plan.contacto.telefono) {
-          doc.fontSize(8).fillColor(mutedColor).text(plan.contacto.telefono, rightColX, contactY);
+          doc.fontSize(8).fillColor(gray).text(plan.contacto.telefono, 310, cy);
         }
       }
 
-      doc.y = infoStartY + 55;
+      // Separator
+      doc.moveTo(50, infoTop + 50).lineTo(562, infoTop + 50).strokeColor('#e5e7eb').stroke();
 
-      // Línea separadora
-      doc.moveTo(marginLeft, doc.y).lineTo(pageWidth - marginLeft, doc.y).strokeColor(borderColor).stroke();
-      doc.y += 15;
+      // ========== TOTAL PRICE ==========
+      const priceY = infoTop + 65;
+      doc.fontSize(11).fillColor(dark).text('Precio Total:', 50, priceY);
+      doc.fontSize(18).fillColor(blue).text(formatMoney(plan.precio_total, plan.moneda), 50, priceY + 14);
 
-      // ============================================
-      // PRECIO TOTAL
-      // ============================================
-      doc.fontSize(12).fillColor(textColor).text('Precio Total:', marginLeft, doc.y);
-      doc.fontSize(20).fillColor(primaryColor).text(formatMoney(plan.precio_total, plan.moneda), marginLeft, doc.y + 15);
-      doc.y += 50;
-
-      // ============================================
-      // TABLA DE DESGLOSE
-      // ============================================
+      // ========== BREAKDOWN TABLE ==========
       const detalle = plan.plan_detalle || {};
-      const valoresCalc = detalle.valores_calculados || {};
+      const calc = detalle.valores_calculados || {};
 
-      const tableTop = doc.y;
-      const rowHeight = 26;
-      const tableWidth = contentWidth;
+      let tableY = priceY + 50;
+      const rowH = 24;
 
-      // Header de tabla
-      doc.rect(marginLeft, tableTop, tableWidth, rowHeight).fillColor(lightGray).fill();
-      doc.fontSize(9).fillColor(mutedColor);
-      doc.text('CONCEPTO', marginLeft + 10, tableTop + 8, { lineBreak: false });
-      doc.text('DETALLE', marginLeft + 180, tableTop + 8, { lineBreak: false });
-      doc.text('MONTO', marginLeft + tableWidth - 100, tableTop + 8, { width: 90, align: 'right', lineBreak: false });
+      // Header row
+      doc.rect(50, tableY, 512, rowH).fillColor('#f3f4f6').fill();
+      doc.fontSize(8).fillColor(gray);
+      doc.text('CONCEPTO', 60, tableY + 8);
+      doc.text('DETALLE', 230, tableY + 8);
+      doc.text('MONTO', 460, tableY + 8, { width: 90, align: 'right' });
+      tableY += rowH;
 
-      let currentY = tableTop + rowHeight;
+      // Separación row
+      const sepInfo = typeof detalle.separacion === 'object' ? detalle.separacion : { tipo: 'valor', valor: detalle.separacion || 0 };
+      const sepMonto = calc.separacion_monto || (sepInfo.tipo === 'porcentaje' ? plan.precio_total * sepInfo.valor / 100 : sepInfo.valor) || 0;
 
-      // Separación
-      const separacionInfo = typeof detalle.separacion === 'object' ? detalle.separacion : { tipo: 'valor', valor: detalle.separacion || 0 };
-      const separacionMonto = valoresCalc.separacion_monto || (separacionInfo.tipo === 'porcentaje' ? (plan.precio_total * separacionInfo.valor / 100) : separacionInfo.valor) || 0;
-
-      if (separacionMonto > 0) {
-        doc.rect(marginLeft, currentY, tableWidth, rowHeight).strokeColor(borderColor).stroke();
-        doc.fontSize(10).fillColor(textColor);
-        doc.text('Separación', marginLeft + 10, currentY + 8, { lineBreak: false });
-        doc.text(separacionInfo.tipo === 'porcentaje' ? `${separacionInfo.valor}%` : 'Valor fijo', marginLeft + 180, currentY + 8, { lineBreak: false });
-        doc.text(formatMoney(separacionMonto, plan.moneda), marginLeft + tableWidth - 100, currentY + 8, { width: 90, align: 'right', lineBreak: false });
-        currentY += rowHeight;
+      if (sepMonto > 0) {
+        doc.rect(50, tableY, 512, rowH).strokeColor('#e5e7eb').stroke();
+        doc.fontSize(9).fillColor(dark);
+        doc.text('Separación', 60, tableY + 7);
+        doc.text(sepInfo.tipo === 'porcentaje' ? `${sepInfo.valor}%` : 'Valor fijo', 230, tableY + 7);
+        doc.text(formatMoney(sepMonto, plan.moneda), 460, tableY + 7, { width: 90, align: 'right' });
+        tableY += rowH;
       }
 
-      // Inicial
-      const inicialInfo = typeof detalle.inicial === 'object' ? detalle.inicial : { tipo: 'valor', valor: detalle.inicial || 0 };
-      const inicialMonto = valoresCalc.inicial_monto || (inicialInfo.tipo === 'porcentaje' ? (plan.precio_total * inicialInfo.valor / 100) : inicialInfo.valor) || 0;
+      // Inicial row
+      const iniInfo = typeof detalle.inicial === 'object' ? detalle.inicial : { tipo: 'valor', valor: detalle.inicial || 0 };
+      const iniMonto = calc.inicial_monto || (iniInfo.tipo === 'porcentaje' ? plan.precio_total * iniInfo.valor / 100 : iniInfo.valor) || 0;
 
-      if (inicialMonto > 0) {
-        doc.rect(marginLeft, currentY, tableWidth, rowHeight).strokeColor(borderColor).stroke();
-        doc.fontSize(10).fillColor(textColor);
-        doc.text('Inicial', marginLeft + 10, currentY + 8, { lineBreak: false });
-        doc.text(inicialInfo.tipo === 'porcentaje' ? `${inicialInfo.valor}%` : 'Valor fijo', marginLeft + 180, currentY + 8, { lineBreak: false });
-        doc.text(formatMoney(inicialMonto, plan.moneda), marginLeft + tableWidth - 100, currentY + 8, { width: 90, align: 'right', lineBreak: false });
-        currentY += rowHeight;
+      if (iniMonto > 0) {
+        doc.rect(50, tableY, 512, rowH).strokeColor('#e5e7eb').stroke();
+        doc.fontSize(9).fillColor(dark);
+        doc.text('Inicial', 60, tableY + 7);
+        doc.text(iniInfo.tipo === 'porcentaje' ? `${iniInfo.valor}%` : 'Valor fijo', 230, tableY + 7);
+        doc.text(formatMoney(iniMonto, plan.moneda), 460, tableY + 7, { width: 90, align: 'right' });
+        tableY += rowH;
       }
 
-      // Cuotas mensuales
+      // Cuotas row
       const numCuotas = detalle.num_cuotas || 12;
-      const cuotaMonto = valoresCalc.cuota_monto || (valoresCalc.total_cuotas ? valoresCalc.total_cuotas / numCuotas : 0);
-      const totalCuotas = valoresCalc.total_cuotas || (cuotaMonto * numCuotas);
+      const cuotaMonto = calc.cuota_monto || 0;
+      const totalCuotas = calc.total_cuotas || 0;
 
       if (totalCuotas > 0) {
-        doc.rect(marginLeft, currentY, tableWidth, rowHeight).strokeColor(borderColor).stroke();
-        doc.fontSize(10).fillColor(textColor);
-        doc.text('Cuotas mensuales', marginLeft + 10, currentY + 8, { lineBreak: false });
-        doc.text(`${numCuotas} cuotas de ${formatMoney(cuotaMonto, plan.moneda)}`, marginLeft + 180, currentY + 8, { lineBreak: false });
-        doc.text(formatMoney(totalCuotas, plan.moneda), marginLeft + tableWidth - 100, currentY + 8, { width: 90, align: 'right', lineBreak: false });
-        currentY += rowHeight;
+        doc.rect(50, tableY, 512, rowH).strokeColor('#e5e7eb').stroke();
+        doc.fontSize(9).fillColor(dark);
+        doc.text('Cuotas mensuales', 60, tableY + 7);
+        doc.text(`${numCuotas} cuotas de ${formatMoney(cuotaMonto, plan.moneda)}`, 230, tableY + 7);
+        doc.text(formatMoney(totalCuotas, plan.moneda), 460, tableY + 7, { width: 90, align: 'right' });
+        tableY += rowH;
       }
 
       // Total row
-      doc.rect(marginLeft, currentY, tableWidth, rowHeight).fillColor(primaryColor).fill();
-      doc.fontSize(11).fillColor('white');
-      doc.text('TOTAL A PAGAR', marginLeft + 10, currentY + 8, { lineBreak: false });
-      doc.text(formatMoney(plan.precio_total, plan.moneda), marginLeft + tableWidth - 100, currentY + 8, { width: 90, align: 'right', lineBreak: false });
+      doc.rect(50, tableY, 512, rowH).fillColor(blue).fill();
+      doc.fontSize(10).fillColor('white');
+      doc.text('TOTAL A PAGAR', 60, tableY + 7);
+      doc.text(formatMoney(plan.precio_total, plan.moneda), 460, tableY + 7, { width: 90, align: 'right' });
+      tableY += rowH + 20;
 
-      doc.y = currentY + rowHeight + 20;
+      // ========== PAYMENT CALENDAR ==========
+      const cuotas = detalle.cuotas_generadas || [];
+      if (cuotas.length > 0) {
+        doc.fontSize(11).fillColor(dark).text('Calendario de Pagos', 50, tableY, { underline: true });
+        tableY += 18;
 
-      // ============================================
-      // CALENDARIO DE PAGOS
-      // ============================================
-      const cuotasGeneradas = detalle.cuotas_generadas || [];
-      if (cuotasGeneradas.length > 0) {
-        checkNewPage(100);
+        // Calendar header
+        doc.rect(50, tableY, 512, 20).fillColor('#f3f4f6').fill();
+        doc.fontSize(8).fillColor(gray);
+        doc.text('#', 60, tableY + 6);
+        doc.text('FECHA', 100, tableY + 6);
+        doc.text('MONTO', 460, tableY + 6, { width: 90, align: 'right' });
+        tableY += 20;
 
-        doc.fontSize(12).fillColor(textColor).text('Calendario de Pagos', marginLeft, doc.y, { underline: true });
-        doc.y += 15;
-
-        const cuotasAMostrar = cuotasGeneradas.slice(0, 24);
-        const cuotaTableTop = doc.y;
-
-        doc.rect(marginLeft, cuotaTableTop, tableWidth, 20).fillColor(lightGray).fill();
-        doc.fontSize(8).fillColor(mutedColor);
-        doc.text('#', marginLeft + 10, cuotaTableTop + 6, { lineBreak: false });
-        doc.text('FECHA', marginLeft + 60, cuotaTableTop + 6, { lineBreak: false });
-        doc.text('MONTO', marginLeft + tableWidth - 100, cuotaTableTop + 6, { width: 90, align: 'right', lineBreak: false });
-
-        let cuotaY = cuotaTableTop + 20;
-
-        for (const cuota of cuotasAMostrar) {
-          if (cuotaY > maxContentY - 20) {
-            doc.addPage();
-            cuotaY = 50;
-          }
-
-          doc.rect(marginLeft, cuotaY, tableWidth, 18).strokeColor(borderColor).stroke();
-          doc.fontSize(9).fillColor(textColor);
-          doc.text(String(cuota.numero), marginLeft + 10, cuotaY + 5, { lineBreak: false });
-          doc.text(formatDate(cuota.fecha), marginLeft + 60, cuotaY + 5, { lineBreak: false });
-          doc.text(formatMoney(cuota.monto, plan.moneda), marginLeft + tableWidth - 100, cuotaY + 5, { width: 90, align: 'right', lineBreak: false });
-          cuotaY += 18;
+        // Show max 12 cuotas on first page
+        const maxShow = Math.min(cuotas.length, 12);
+        for (let i = 0; i < maxShow; i++) {
+          const c = cuotas[i];
+          doc.rect(50, tableY, 512, 18).strokeColor('#e5e7eb').stroke();
+          doc.fontSize(8).fillColor(dark);
+          doc.text(String(c.numero), 60, tableY + 5);
+          doc.text(formatDate(c.fecha), 100, tableY + 5);
+          doc.text(formatMoney(c.monto, plan.moneda), 460, tableY + 5, { width: 90, align: 'right' });
+          tableY += 18;
         }
 
-        if (cuotasGeneradas.length > 24) {
-          doc.fontSize(8).fillColor(mutedColor).text(
-            `... y ${cuotasGeneradas.length - 24} cuotas más`,
-            marginLeft + 10,
-            cuotaY + 5,
-            { lineBreak: false }
-          );
-          cuotaY += 15;
+        if (cuotas.length > 12) {
+          doc.fontSize(8).fillColor(gray).text(`... y ${cuotas.length - 12} cuotas más`, 60, tableY + 3);
+          tableY += 15;
         }
-
-        doc.y = cuotaY + 10;
       }
 
-      // ============================================
-      // CONDICIONES
-      // ============================================
-      if (plan.condiciones) {
-        checkNewPage(80);
-        doc.fontSize(11).fillColor(textColor).text('Condiciones', marginLeft, doc.y, { underline: true });
-        doc.y += 12;
-        doc.fontSize(9).fillColor('#4b5563').text(plan.condiciones, marginLeft, doc.y, {
-          width: contentWidth,
-          align: 'left',
-        });
-        doc.y += 15;
+      // ========== CONDITIONS ==========
+      if (plan.condiciones && tableY < 620) {
+        tableY += 15;
+        doc.fontSize(10).fillColor(dark).text('Condiciones', 50, tableY, { underline: true });
+        doc.fontSize(8).fillColor(gray).text(plan.condiciones, 50, tableY + 14, { width: 512 });
       }
 
-      // ============================================
-      // PREPARADO POR (si hay usuario creador)
-      // ============================================
-      if (usuarioInfo || plan.usuario_creador) {
-        checkNewPage(100);
-        doc.y += 20;
-        doc.fontSize(10).fillColor(mutedColor).text('Preparado por:', marginLeft, doc.y);
-        doc.y += 12;
+      // ========== PREPARED BY ==========
+      if ((usuarioInfo || plan.usuario_creador) && tableY < 580) {
+        tableY = Math.max(tableY + 40, 550);
+        doc.fontSize(9).fillColor(gray).text('Preparado por:', 50, tableY);
 
-        const nombreAsesor = usuarioInfo
+        const asesorName = usuarioInfo
           ? `${usuarioInfo.nombre || ''} ${usuarioInfo.apellido || ''}`.trim()
           : plan.usuario_creador
             ? `${plan.usuario_creador.nombre || ''} ${plan.usuario_creador.apellido || ''}`.trim()
             : '';
 
-        if (nombreAsesor) {
-          doc.fontSize(11).fillColor(textColor).text(nombreAsesor, marginLeft, doc.y);
-          doc.y += 14;
+        if (asesorName) {
+          doc.fontSize(10).fillColor(dark).text(asesorName, 50, tableY + 12);
         }
-
         if (usuarioInfo?.titulo_profesional) {
-          doc.fontSize(9).fillColor(mutedColor).text(usuarioInfo.titulo_profesional, marginLeft, doc.y);
-          doc.y += 12;
+          doc.fontSize(8).fillColor(gray).text(usuarioInfo.titulo_profesional, 50, tableY + 24);
+        }
+        if (usuarioInfo?.email || plan.usuario_creador?.email) {
+          doc.fontSize(8).fillColor(gray).text(usuarioInfo?.email || plan.usuario_creador?.email || '', 50, tableY + 34);
         }
 
-        const contactoAsesor = usuarioInfo?.email || plan.usuario_creador?.email;
-        if (contactoAsesor) {
-          doc.fontSize(9).fillColor(mutedColor).text(contactoAsesor, marginLeft, doc.y);
-          doc.y += 12;
-        }
-
-        // Línea para firma
-        doc.y += 25;
-        doc.moveTo(marginLeft, doc.y).lineTo(marginLeft + 150, doc.y).strokeColor(borderColor).stroke();
-        doc.fontSize(8).fillColor(mutedColor).text('Firma', marginLeft, doc.y + 3, { lineBreak: false });
+        // Signature line
+        doc.moveTo(50, tableY + 60).lineTo(180, tableY + 60).strokeColor('#e5e7eb').stroke();
+        doc.fontSize(7).fillColor(gray).text('Firma', 50, tableY + 63);
       }
 
-      // ============================================
-      // FOOTER EN TODAS LAS PÁGINAS
-      // ============================================
-      const disclaimer = 'NOTA: Este documento es únicamente de carácter informativo y no constituye un contrato de compraventa ni compromiso legal. Los precios y condiciones presentados son referenciales y están sujetos a cambios sin previo aviso.';
-      const dateStr = new Date().toLocaleDateString('es-MX');
+      // ========== FOOTER (simple, one line) ==========
+      const disclaimer = 'NOTA: Este documento es informativo y no constituye contrato. Precios sujetos a cambios.';
+      const dateStr = new Date().toLocaleDateString('es-ES', { day: 'numeric', month: 'long', year: 'numeric' });
 
-      const range = doc.bufferedPageRange();
-      for (let i = 0; i < range.count; i++) {
+      const pages = doc.bufferedPageRange();
+      for (let i = 0; i < pages.count; i++) {
         doc.switchToPage(i);
-
-        // Save current position
-        const savedY = doc.y;
-
-        // Draw footer line
-        doc.moveTo(marginLeft, 695).lineTo(pageWidth - marginLeft, 695).strokeColor(borderColor).stroke();
-
-        // Disclaimer text
-        doc.fontSize(7).fillColor('#9ca3af');
-        doc.text(disclaimer, marginLeft, 700, {
-          width: contentWidth,
-          align: 'justify',
-          lineBreak: true
-        });
-
-        // Page number
-        doc.fontSize(8).fillColor('#9ca3af');
-        doc.text(
-          `Generado el ${dateStr} | Página ${i + 1} de ${range.count}`,
-          marginLeft,
-          750,
-          { width: contentWidth, align: 'center', lineBreak: false }
-        );
-
-        // Restore position
-        doc.y = savedY;
+        doc.fontSize(7).fillColor('#9ca3af').text(disclaimer, 50, 730, { width: 400 });
+        doc.fontSize(7).fillColor('#9ca3af').text(`${dateStr} | Pág. ${i + 1}/${pages.count}`, 460, 730, { width: 100, align: 'right' });
       }
 
       doc.end();
     } catch (error) {
+      console.error('PDF generation error:', error);
       reject(error);
     }
   });
 }
 
 function formatMoney(value: number, currency: string = 'USD'): string {
-  return new Intl.NumberFormat('es-MX', {
-    style: 'currency',
-    currency,
+  if (!value && value !== 0) return '$0';
+
+  const formatted = new Intl.NumberFormat('en-US', {
+    minimumFractionDigits: 0,
     maximumFractionDigits: 0,
-  }).format(value || 0);
+  }).format(value);
+
+  const symbol = currency === 'USD' ? 'USD' : currency === 'DOP' ? 'RD$' : currency;
+  return `${symbol} ${formatted}`;
 }
 
 function formatDate(dateStr: string): string {
+  if (!dateStr) return '-';
   try {
-    const date = new Date(dateStr);
-    return date.toLocaleDateString('es-MX', {
-      day: 'numeric',
-      month: 'short',
-      year: 'numeric',
-    });
+    return new Date(dateStr).toLocaleDateString('es-ES', { day: 'numeric', month: 'short', year: 'numeric' });
   } catch {
     return dateStr;
   }
-}
-
-function truncateText(text: string, maxLength: number): string {
-  if (!text) return '';
-  if (text.length <= maxLength) return text;
-  return text.substring(0, maxLength - 3) + '...';
 }
