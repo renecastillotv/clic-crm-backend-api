@@ -698,8 +698,8 @@ const CrmMarketing: React.FC = () => {
         />
         <ActionCard
           icon={<Palette size={24} />}
-          title="Branding de Empresa"
-          description="Configura logo, colores, fuentes y datos de contacto para los creativos"
+          title="Información del Negocio"
+          description="Configura logo, datos de contacto y redes sociales que se usan en los creativos"
           color="#475569"
           onClick={() => handleAction('company-branding')}
         />

@@ -602,7 +602,7 @@ export default function CrmLayout() {
 
   // Sub-items de Marketing
   const marketingSubItems = [
-    { id: 'marketing-branding', path: 'marketing/branding', label: 'Branding', icon: Icons.branding },
+    { id: 'marketing-branding', path: 'marketing/branding', label: 'Creativos', icon: Icons.branding },
     { id: 'marketing-campanas', path: 'marketing/campanas', label: 'Campañas', icon: Icons.campanas },
     { id: 'marketing-redes-sociales', path: 'marketing/redes-sociales', label: 'Redes Sociales', icon: Icons.redesSociales },
     { id: 'marketing-email', path: 'marketing/email', label: 'Email', icon: Icons.emailMarketing },
