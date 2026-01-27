@@ -2768,7 +2768,7 @@ const CrmMarketingRedesSociales: React.FC = () => {
                                   </span>
                                 </div>
                                 {/* Engagement bar */}
-                                <div style={{ marginTop: '6px', height: '4px', background: '#f1f5f9', borderRadius: '2px', overflow: 'hidden' }}>
+                                <div style={{ marginTop: '6px', height: '4px', background: '#f1f5f9', borderRadius: '2px', overflow: 'hidden', maxWidth: '220px' }}>
                                   <div style={{
                                     height: '100%', borderRadius: '2px',
                                     width: `${(post.score / maxScore) * 100}%`,
