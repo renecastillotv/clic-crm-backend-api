@@ -140,9 +140,9 @@ export default function CrmMensajeriaCorreo() {
   const [showSetup, setShowSetup] = useState(false);
   const [setupEmail, setSetupEmail] = useState('');
   const [setupDisplayName, setSetupDisplayName] = useState('');
-  const [setupImapHost, setSetupImapHost] = useState('');
+  const [setupImapHost, setSetupImapHost] = useState('witcher.mxrouting.net');
   const [setupImapPort, setSetupImapPort] = useState('993');
-  const [setupSmtpHost, setSetupSmtpHost] = useState('');
+  const [setupSmtpHost, setSetupSmtpHost] = useState('witcher.mxrouting.net');
   const [setupSmtpPort, setSetupSmtpPort] = useState('465');
   const [setupPassword, setSetupPassword] = useState('');
   const [setupTesting, setSetupTesting] = useState(false);
