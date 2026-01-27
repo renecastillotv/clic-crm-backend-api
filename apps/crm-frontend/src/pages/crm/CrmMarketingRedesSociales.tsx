@@ -1116,7 +1116,7 @@ const CrmMarketingRedesSociales: React.FC = () => {
 
   // Connected - full UI
   return (
-    <div style={{ padding: '24px' }}>
+    <div style={{ padding: '24px', overflow: 'hidden' }}>
       {/* Tab bar */}
       <div
         style={{
@@ -2862,7 +2862,7 @@ const CrmMarketingRedesSociales: React.FC = () => {
 
       {/* ==================== ANALYTICS TAB ==================== */}
       {activeTab === 'analytics' && (
-        <div>
+        <div style={{ overflow: 'hidden' }}>
           <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '16px' }}>
             <h3 style={{ fontSize: '16px', fontWeight: 600, color: '#1e293b', margin: 0 }}>Analiticas de publicaciones</h3>
             <div style={{ display: 'flex', gap: '8px' }}>
