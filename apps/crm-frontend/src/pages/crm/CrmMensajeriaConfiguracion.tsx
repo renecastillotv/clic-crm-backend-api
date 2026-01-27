@@ -7,6 +7,7 @@
  */
 
 import { useState, useEffect, useCallback } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { usePageHeader } from '../../layouts/CrmLayout';
 import { useAuth } from '../../contexts/AuthContext';
 import { apiFetch } from '../../services/api';
@@ -113,6 +114,7 @@ const Icons = {
 export default function CrmMensajeriaConfiguracion() {
   const { setPageHeader } = usePageHeader();
   const { user, tenantActual } = useAuth();
+  const navigate = useNavigate();
 
   const tenantId = tenantActual?.id;
   const userId = user?.id;
@@ -350,6 +352,21 @@ export default function CrmMensajeriaConfiguracion() {
                     <span className="status-disconnected">No configurado</span>
                   )}
                 </div>
+                {!integ.conectado && (
+                  <button
+                    className="btn-config-integ"
+                    onClick={() => {
+                      if (integ.tipo === 'email') navigate('../correo');
+                      else if (integ.tipo === 'whatsapp' || integ.tipo === 'instagram' || integ.tipo === 'facebook') navigate('../../marketing/configuracion');
+                      else if (integ.tipo === 'web_chat') navigate('../../marketing/configuracion');
+                    }}
+                  >
+                    Configurar
+                  </button>
+                )}
+                {integ.conectado && integ.tipo === 'email' && (
+                  <button className="btn-config-integ btn-config-ver" onClick={() => navigate('../correo')}>Ir a Correo</button>
+                )}
               </div>
             ))}
           </div>
@@ -434,6 +451,10 @@ export default function CrmMensajeriaConfiguracion() {
         .status-connected { display: flex; align-items: center; justify-content: center; gap: 3px; color: #16a34a; font-size: 0.75rem; font-weight: 500; }
         .status-disconnected { color: #94a3b8; font-size: 0.75rem; }
         .integration-account { font-size: 0.6875rem; color: #64748b; }
+        .btn-config-integ { margin-top: 8px; padding: 4px 12px; background: #3b82f6; color: white; border: none; border-radius: 5px; font-size: 0.75rem; font-weight: 500; cursor: pointer; transition: background 0.15s; }
+        .btn-config-integ:hover { background: #2563eb; }
+        .btn-config-ver { background: #f1f5f9; color: #3b82f6; border: 1px solid #e2e8f0; }
+        .btn-config-ver:hover { background: #e2e8f0; }
 
         .etiquetas-list { display: flex; flex-direction: column; gap: 6px; margin-bottom: 16px; }
         .etiqueta-item { display: flex; align-items: center; gap: 10px; padding: 8px 12px; background: #f8fafc; border-radius: 6px; }

@@ -96,6 +96,10 @@ router.post('/credentials', async (req: Request<TenantParams>, res: Response, ne
       return res.status(400).json({ error: 'usuario_id y email_address son requeridos' });
     }
 
+    if (!data.imap_host || !data.smtp_host) {
+      return res.status(400).json({ error: 'imap_host y smtp_host son requeridos. Revisa tu panel de correo (cPanel/MXRoute) para obtener el hostname correcto.' });
+    }
+
     const saved = await saveCredentials(tenantId, usuario_id, data);
 
     // Return without encrypted passwords

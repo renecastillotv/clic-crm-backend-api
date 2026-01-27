@@ -140,9 +140,9 @@ export default function CrmMensajeriaCorreo() {
   const [showSetup, setShowSetup] = useState(false);
   const [setupEmail, setSetupEmail] = useState('');
   const [setupDisplayName, setSetupDisplayName] = useState('');
-  const [setupImapHost, setSetupImapHost] = useState('mail.mxroute.com');
+  const [setupImapHost, setSetupImapHost] = useState('');
   const [setupImapPort, setSetupImapPort] = useState('993');
-  const [setupSmtpHost, setSetupSmtpHost] = useState('mail.mxroute.com');
+  const [setupSmtpHost, setSetupSmtpHost] = useState('');
   const [setupSmtpPort, setSetupSmtpPort] = useState('465');
   const [setupPassword, setSetupPassword] = useState('');
   const [setupTesting, setSetupTesting] = useState(false);
@@ -347,19 +347,20 @@ export default function CrmMensajeriaCorreo() {
                 <div className="setup-field"><label>Correo electrónico:</label><input type="email" value={setupEmail} onChange={e => setSetupEmail(e.target.value)} placeholder="tu@dominio.com" /></div>
                 <div className="setup-field"><label>Nombre visible:</label><input type="text" value={setupDisplayName} onChange={e => setSetupDisplayName(e.target.value)} placeholder="Tu Nombre" /></div>
                 <div className="setup-field"><label>Contraseña:</label><input type="password" value={setupPassword} onChange={e => setSetupPassword(e.target.value)} placeholder="Contraseña del email" /></div>
+                <p className="setup-hint">Los datos de IMAP y SMTP los encuentras en el panel de tu proveedor de correo (cPanel, MXRoute, etc). NO uses "mail.mxroute.com" — usa el hostname real de tu servidor.</p>
                 <div className="setup-row">
-                  <div className="setup-field"><label>IMAP Host:</label><input type="text" value={setupImapHost} onChange={e => setSetupImapHost(e.target.value)} /></div>
+                  <div className="setup-field"><label>IMAP Host:</label><input type="text" value={setupImapHost} onChange={e => setSetupImapHost(e.target.value)} placeholder="ej: echo.mxrouting.net" /></div>
                   <div className="setup-field"><label>Puerto:</label><input type="text" value={setupImapPort} onChange={e => setSetupImapPort(e.target.value)} /></div>
                 </div>
                 <div className="setup-row">
-                  <div className="setup-field"><label>SMTP Host:</label><input type="text" value={setupSmtpHost} onChange={e => setSetupSmtpHost(e.target.value)} /></div>
+                  <div className="setup-field"><label>SMTP Host:</label><input type="text" value={setupSmtpHost} onChange={e => setSetupSmtpHost(e.target.value)} placeholder="ej: echo.mxrouting.net" /></div>
                   <div className="setup-field"><label>Puerto:</label><input type="text" value={setupSmtpPort} onChange={e => setSetupSmtpPort(e.target.value)} /></div>
                 </div>
                 {setupError && <p className="setup-error">{setupError}</p>}
                 {setupSuccess && <p className="setup-success">{setupSuccess}</p>}
               </div>
               <div className="modal-actions">
-                <button className="btn-primary" onClick={handleSaveCredentials} disabled={setupTesting || !setupEmail || !setupPassword}>{setupTesting ? 'Verificando...' : 'Guardar y verificar'}</button>
+                <button className="btn-primary" onClick={handleSaveCredentials} disabled={setupTesting || !setupEmail || !setupPassword || !setupImapHost || !setupSmtpHost}>{setupTesting ? 'Verificando...' : 'Guardar y verificar'}</button>
                 <button className="btn-secondary" onClick={() => setShowSetup(false)}>Cancelar</button>
               </div>
             </div>
@@ -488,19 +489,20 @@ export default function CrmMensajeriaCorreo() {
               <div className="setup-field"><label>Correo electrónico:</label><input type="email" value={setupEmail} onChange={e => setSetupEmail(e.target.value)} placeholder="tu@dominio.com" /></div>
               <div className="setup-field"><label>Nombre visible:</label><input type="text" value={setupDisplayName} onChange={e => setSetupDisplayName(e.target.value)} placeholder="Tu Nombre" /></div>
               <div className="setup-field"><label>Contraseña:</label><input type="password" value={setupPassword} onChange={e => setSetupPassword(e.target.value)} placeholder="Contraseña del email" /></div>
+              <p className="setup-hint">Los datos de IMAP y SMTP los encuentras en el panel de tu proveedor de correo (cPanel, MXRoute, etc). NO uses "mail.mxroute.com" — usa el hostname real de tu servidor.</p>
               <div className="setup-row">
-                <div className="setup-field"><label>IMAP Host:</label><input type="text" value={setupImapHost} onChange={e => setSetupImapHost(e.target.value)} /></div>
+                <div className="setup-field"><label>IMAP Host:</label><input type="text" value={setupImapHost} onChange={e => setSetupImapHost(e.target.value)} placeholder="ej: echo.mxrouting.net" /></div>
                 <div className="setup-field"><label>Puerto:</label><input type="text" value={setupImapPort} onChange={e => setSetupImapPort(e.target.value)} /></div>
               </div>
               <div className="setup-row">
-                <div className="setup-field"><label>SMTP Host:</label><input type="text" value={setupSmtpHost} onChange={e => setSetupSmtpHost(e.target.value)} /></div>
+                <div className="setup-field"><label>SMTP Host:</label><input type="text" value={setupSmtpHost} onChange={e => setSetupSmtpHost(e.target.value)} placeholder="ej: echo.mxrouting.net" /></div>
                 <div className="setup-field"><label>Puerto:</label><input type="text" value={setupSmtpPort} onChange={e => setSetupSmtpPort(e.target.value)} /></div>
               </div>
               {setupError && <p className="setup-error">{setupError}</p>}
               {setupSuccess && <p className="setup-success">{setupSuccess}</p>}
             </div>
             <div className="modal-actions">
-              <button className="btn-primary" onClick={handleSaveCredentials} disabled={setupTesting || !setupEmail || !setupPassword}>{setupTesting ? 'Verificando...' : 'Guardar y verificar'}</button>
+              <button className="btn-primary" onClick={handleSaveCredentials} disabled={setupTesting || !setupEmail || !setupPassword || !setupImapHost || !setupSmtpHost}>{setupTesting ? 'Verificando...' : 'Guardar y verificar'}</button>
               <button className="btn-secondary" onClick={() => setShowSetup(false)}>Cancelar</button>
             </div>
           </div>
@@ -602,6 +604,7 @@ const styles = `
   .setup-field input:focus { border-color: #3b82f6; }
   .setup-row { display: flex; gap: 10px; }
   .setup-row .setup-field { flex: 1; }
+  .setup-hint { color: #94a3b8; font-size: 0.75rem; font-style: italic; margin: 0; padding: 4px 0; background: #f8fafc; border-radius: 4px; padding: 6px 8px; }
   .setup-error { color: #ef4444; font-size: 0.8125rem; margin: 0; }
   .setup-success { color: #10b981; font-size: 0.8125rem; margin: 0; }
 
