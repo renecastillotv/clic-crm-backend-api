@@ -84,8 +84,18 @@ export interface AsesorSocialAccount {
   lastUsedAt?: Date;
   lastError?: string;
   scopes?: string[];
+  metaIgAccountId?: string;
+  metaIgUsername?: string;
   createdAt: Date;
   updatedAt: Date;
+}
+
+export interface UserMetaCredentials {
+  pageAccessToken: string;
+  pageId: string;
+  pageName?: string;
+  instagramAccountId?: string;
+  instagramUsername?: string;
 }
 
 // ==================== ENCRIPTACIÓN ====================
@@ -874,6 +884,189 @@ export async function logAsesorSocialError(
   `;
 
   await query(sql, [error, usuarioId, platform]);
+}
+
+// ==================== META CREDENTIALS PER USER ====================
+
+/**
+ * Saves Meta page credentials for a specific user.
+ * Uses asesor_social_accounts with platform='facebook' to store
+ * page access token, page ID, and linked Instagram account info.
+ */
+export async function saveUserMetaCredentials(
+  tenantId: string,
+  usuarioId: string,
+  pageAccessToken: string,
+  pageId: string,
+  pageName: string,
+  igAccountId: string | null,
+  igUsername: string | null,
+  tokenExpiresAt: Date | null,
+  scopes: string[]
+): Promise<AsesorSocialAccount> {
+  const encryptedToken = await encryptValue(pageAccessToken);
+
+  const sql = `
+    INSERT INTO asesor_social_accounts (
+      tenant_id, usuario_id, platform,
+      access_token_encrypted, account_id, account_name,
+      meta_ig_account_id, meta_ig_username,
+      token_expires_at, scopes, is_active
+    ) VALUES ($1, $2, 'facebook', $3, $4, $5, $6, $7, $8, $9, true)
+    ON CONFLICT (usuario_id, platform)
+    DO UPDATE SET
+      tenant_id = $1,
+      access_token_encrypted = $3,
+      account_id = $4,
+      account_name = $5,
+      meta_ig_account_id = $6,
+      meta_ig_username = $7,
+      token_expires_at = $8,
+      scopes = $9,
+      is_active = true,
+      last_error = NULL,
+      updated_at = NOW()
+    RETURNING
+      id,
+      tenant_id as "tenantId",
+      usuario_id as "usuarioId",
+      platform,
+      account_id as "accountId",
+      account_name as "accountName",
+      meta_ig_account_id as "metaIgAccountId",
+      meta_ig_username as "metaIgUsername",
+      token_expires_at as "tokenExpiresAt",
+      is_active as "isActive",
+      scopes,
+      created_at as "createdAt",
+      updated_at as "updatedAt"
+  `;
+
+  const result = await query(sql, [
+    tenantId, usuarioId, encryptedToken,
+    pageId, pageName, igAccountId, igUsername,
+    tokenExpiresAt, scopes
+  ]);
+
+  return result.rows[0];
+}
+
+/**
+ * Gets Meta credentials for a specific user within a tenant.
+ * Returns decrypted page access token + page/IG info.
+ */
+export async function getUserMetaCredentials(
+  tenantId: string,
+  usuarioId: string
+): Promise<UserMetaCredentials | null> {
+  const sql = `
+    SELECT
+      access_token_encrypted,
+      account_id,
+      account_name,
+      meta_ig_account_id,
+      meta_ig_username
+    FROM asesor_social_accounts
+    WHERE tenant_id = $1 AND usuario_id = $2 AND platform = 'facebook' AND is_active = true
+  `;
+
+  const result = await query(sql, [tenantId, usuarioId]);
+  if (!result.rows[0]?.access_token_encrypted) {
+    return null;
+  }
+
+  // Update last_used_at
+  await query(`
+    UPDATE asesor_social_accounts
+    SET last_used_at = NOW()
+    WHERE tenant_id = $1 AND usuario_id = $2 AND platform = 'facebook'
+  `, [tenantId, usuarioId]);
+
+  const row = result.rows[0];
+  return {
+    pageAccessToken: await decryptValue(row.access_token_encrypted),
+    pageId: row.account_id,
+    pageName: row.account_name || undefined,
+    instagramAccountId: row.meta_ig_account_id || undefined,
+    instagramUsername: row.meta_ig_username || undefined,
+  };
+}
+
+/**
+ * Gets Meta credentials by user ID only (no tenant filter).
+ * Used by cron job which only has created_by user ID.
+ * The unique constraint (usuario_id, platform) guarantees at most one row.
+ */
+export async function getUserMetaCredentialsByUserId(
+  usuarioId: string
+): Promise<UserMetaCredentials | null> {
+  const sql = `
+    SELECT
+      access_token_encrypted,
+      account_id,
+      account_name,
+      meta_ig_account_id,
+      meta_ig_username
+    FROM asesor_social_accounts
+    WHERE usuario_id = $1 AND platform = 'facebook' AND is_active = true
+  `;
+
+  const result = await query(sql, [usuarioId]);
+  if (!result.rows[0]?.access_token_encrypted) {
+    return null;
+  }
+
+  // Update last_used_at
+  await query(`
+    UPDATE asesor_social_accounts SET last_used_at = NOW()
+    WHERE usuario_id = $1 AND platform = 'facebook'
+  `, [usuarioId]);
+
+  const row = result.rows[0];
+  return {
+    pageAccessToken: await decryptValue(row.access_token_encrypted),
+    pageId: row.account_id,
+    pageName: row.account_name || undefined,
+    instagramAccountId: row.meta_ig_account_id || undefined,
+    instagramUsername: row.meta_ig_username || undefined,
+  };
+}
+
+/**
+ * Disconnects a user's Meta account (sets is_active = false).
+ */
+export async function disconnectUserMeta(usuarioId: string): Promise<void> {
+  await query(`
+    UPDATE asesor_social_accounts
+    SET is_active = false, updated_at = NOW()
+    WHERE usuario_id = $1 AND platform = 'facebook'
+  `, [usuarioId]);
+}
+
+/**
+ * Gets Meta credentials with fallback: tries user credentials first,
+ * then falls back to tenant-level credentials.
+ * Returns source ('user' | 'tenant') to indicate which was used.
+ */
+export async function getMetaCredentialsWithFallback(
+  tenantId: string,
+  usuarioId: string | undefined
+): Promise<(UserMetaCredentials & { source: 'user' | 'tenant' }) | null> {
+  // Try user credentials first
+  if (usuarioId) {
+    const userCreds = await getUserMetaCredentials(tenantId, usuarioId);
+    if (userCreds && userCreds.pageId && userCreds.pageId !== 'PENDING') {
+      return { ...userCreds, source: 'user' };
+    }
+  }
+
+  // Fallback to tenant credentials
+  const tenantCreds = await getMetaPageToken(tenantId);
+  if (tenantCreds) {
+    return { ...tenantCreds, source: 'tenant' };
+  }
+
+  return null;
 }
 
 // ==================== LOGS DE USO ====================

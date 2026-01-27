@@ -41,10 +41,16 @@ router.get('/process-scheduled-posts', async (req: Request, res: Response) => {
 
     for (const post of duePosts) {
       try {
-        // Get tenant Meta credentials
-        const tokenData = await credentialsService.getMetaPageToken(post.tenantId);
+        // Get Meta credentials: try post creator's credentials first, then tenant fallback
+        let tokenData = null;
+        if (post.createdBy) {
+          tokenData = await credentialsService.getUserMetaCredentialsByUserId(post.createdBy);
+        }
+        if (!tokenData) {
+          tokenData = await credentialsService.getMetaPageToken(post.tenantId);
+        }
         if (!tokenData || !tokenData.instagramAccountId) {
-          await scheduledPostsService.updatePostStatus(post.tenantId, post.id, 'failed', undefined, 'Instagram no está conectado para este tenant');
+          await scheduledPostsService.updatePostStatus(post.tenantId, post.id, 'failed', undefined, 'Instagram no está conectado para este usuario/tenant');
           results.push({ id: post.id, status: 'failed', error: 'No IG credentials' });
           continue;
         }

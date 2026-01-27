@@ -321,15 +321,18 @@ router.get('/meta-social/callback', async (req: Request, res: Response) => {
     // 2. Exchange short-lived token for long-lived token (~60 days)
     const longLived = await metaAdsService.exchangeForLongLivedToken(tokenData.access_token);
 
-    // 3. Save long-lived USER token with PENDING page (user will select a page in the frontend)
-    await credentialsService.saveMetaCredentials(
+    // 3. Save long-lived USER token to per-user account (asesor_social_accounts)
+    //    Page is PENDING until user selects one in the frontend
+    await credentialsService.saveUserMetaCredentials(
       stateData.tenantId,
+      stateData.userId,
       longLived.accessToken,
       'PENDING',
       'Seleccionar página',
       null,
       null,
-      stateData.userId
+      new Date(Date.now() + 60 * 24 * 60 * 60 * 1000), // 60 days
+      ['pages_show_list', 'pages_manage_posts', 'pages_read_engagement', 'instagram_basic', 'instagram_content_publish', 'instagram_manage_comments']
     );
 
     return res.send(buildPopupHTML(true, 'Meta conectado exitosamente', 'META_SOCIAL_OAUTH_RESULT'));
