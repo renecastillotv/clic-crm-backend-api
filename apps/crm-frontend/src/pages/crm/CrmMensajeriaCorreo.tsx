@@ -193,7 +193,7 @@ function fileToBase64(file: File): Promise<string> {
   });
 }
 
-function buildPropertyUrl(prop: PropertyItem, domain?: string): string {
+function buildPropertyUrl(prop: PropertyItem, domain?: string, ref?: string): string {
   const hasVenta = prop.precio_venta && prop.precio_venta > 0;
   const operation = hasVenta ? 'comprar' : (prop.operacion === 'alquiler' ? 'alquilar' : 'comprar');
   const catSlug = prop.categoria_slug || 'propiedad';
@@ -202,11 +202,15 @@ function buildPropertyUrl(prop: PropertyItem, domain?: string): string {
   if (catSlug) path += `/${catSlug}`;
   if (locSlug) path += `/${locSlug}`;
   if (prop.slug) path += `/${prop.slug}`;
-  const base = domain ? `https://${domain}` : '';
-  return `${base}${path}`;
+  // Clean domain: strip protocol prefix and trailing slashes
+  const cleanDomain = domain ? domain.replace(/^https?:\/\//, '').replace(/\/+$/, '') : '';
+  const base = cleanDomain ? `https://${cleanDomain}` : '';
+  let url = `${base}${path}`;
+  if (ref) url += `?ref=${encodeURIComponent(ref)}`;
+  return url;
 }
 
-function buildPropertyHtml(prop: PropertyItem, domain?: string): string {
+function buildPropertyHtml(prop: PropertyItem, domain?: string, ref?: string): string {
   const details = [
     prop.codigo_publico ? `#${prop.codigo_publico}` : '',
     prop.ciudad,
@@ -216,8 +220,8 @@ function buildPropertyHtml(prop: PropertyItem, domain?: string): string {
     prop.m2_terreno ? `${prop.m2_terreno} m\u00B2 terreno` : '',
   ].filter(Boolean).join(' &middot; ');
   const price = prop.precio ? `${prop.moneda || '$'} ${prop.precio.toLocaleString()}` : '';
-  const url = buildPropertyUrl(prop, domain);
-  return `<table width="100%" cellpadding="0" cellspacing="0" style="margin:12px 0;border:1px solid #e2e8f0;border-radius:8px;overflow:hidden;font-family:sans-serif;"><tr>${prop.imagen_principal ? `<td style="padding:0;"><a href="${url}" target="_blank" rel="noopener" style="display:block;"><img src="${prop.imagen_principal}" alt="" style="width:100%;max-height:180px;object-fit:cover;display:block;"/></a></td>` : ''}</tr><tr><td style="padding:16px;"><a href="${url}" target="_blank" rel="noopener" style="text-decoration:none;color:inherit;"><div style="font-size:16px;font-weight:600;color:#0f172a;margin:0 0 4px;">${prop.titulo}</div></a><div style="font-size:13px;color:#64748b;margin:0 0 6px;">${details}</div>${price ? `<div style="font-size:18px;font-weight:700;color:#2563eb;margin:0 0 8px;">${price}</div>` : ''}<a href="${url}" target="_blank" rel="noopener" style="display:inline-block;padding:8px 20px;background:#3b82f6;color:white;text-decoration:none;border-radius:6px;font-size:14px;font-weight:600;">Ver propiedad</a></td></tr></table>`;
+  const url = buildPropertyUrl(prop, domain, ref);
+  return `<table cellpadding="0" cellspacing="0" style="margin:12px 0;max-width:420px;width:100%;border:1px solid #e2e8f0;border-radius:8px;overflow:hidden;font-family:sans-serif;"><tr>${prop.imagen_principal ? `<td style="padding:0;"><a href="${url}" target="_blank" rel="noopener" style="display:block;"><img src="${prop.imagen_principal}" alt="" style="width:100%;max-width:420px;max-height:160px;object-fit:cover;display:block;"/></a></td>` : ''}</tr><tr><td style="padding:14px;"><a href="${url}" target="_blank" rel="noopener" style="text-decoration:none;color:inherit;"><div style="font-size:15px;font-weight:600;color:#0f172a;margin:0 0 4px;">${prop.titulo}</div></a><div style="font-size:12px;color:#64748b;margin:0 0 6px;">${details}</div>${price ? `<div style="font-size:17px;font-weight:700;color:#2563eb;margin:0 0 8px;">${price}</div>` : ''}<a href="${url}" target="_blank" rel="noopener" style="display:inline-block;padding:7px 18px;background:#3b82f6;color:white;text-decoration:none;border-radius:6px;font-size:13px;font-weight:600;">Ver propiedad</a></td></tr></table>`;
 }
 
 function stripHtml(html: string): string {
@@ -268,8 +272,9 @@ export default function CrmMensajeriaCorreo() {
   const [propertyQuery, setPropertyQuery] = useState('');
   const savedSelectionRef = useRef<Range | null>(null);
 
-  // Tenant domain for property URLs
+  // Tenant domain + asesor ref for property URLs
   const [tenantDomain, setTenantDomain] = useState('');
+  const [asesorRef, setAsesorRef] = useState('');
 
   // Contact picker modal
   const [showContactModal, setShowContactModal] = useState(false);
@@ -379,9 +384,24 @@ export default function CrmMensajeriaCorreo() {
     if (!tenantId) return;
     apiFetch(`/tenants/${tenantId}/configuracion`)
       .then(res => res.json())
-      .then(data => { if (data?.dominio_personalizado) setTenantDomain(data.dominio_personalizado); })
+      .then(data => {
+        if (data?.dominio_personalizado) {
+          // Strip protocol and trailing slashes
+          const clean = data.dominio_personalizado.replace(/^https?:\/\//, '').replace(/\/+$/, '');
+          setTenantDomain(clean);
+        }
+      })
       .catch(() => {});
   }, [tenantId]);
+
+  // Fetch asesor ref for property URL tracking
+  useEffect(() => {
+    if (!tenantId || !userId) return;
+    apiFetch(`/auth/me?tenantId=${tenantId}`)
+      .then(res => res.json())
+      .then(data => { if (data?.perfilAsesor?.ref) setAsesorRef(data.perfilAsesor.ref); })
+      .catch(() => {});
+  }, [tenantId, userId]);
 
   // Override parent .crm-content overflow so each column scrolls independently
   useEffect(() => {
@@ -634,7 +654,7 @@ export default function CrmMensajeriaCorreo() {
   };
 
   const handleInsertProperty = (prop: PropertyItem) => {
-    const html = buildPropertyHtml(prop, tenantDomain || undefined);
+    const html = buildPropertyHtml(prop, tenantDomain || undefined, asesorRef || undefined);
     if (editorRef.current) {
       restoreEditorSelection();
       document.execCommand('insertHTML', false, html);

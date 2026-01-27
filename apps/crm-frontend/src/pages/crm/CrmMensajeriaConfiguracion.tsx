@@ -37,11 +37,15 @@ interface Firma {
 }
 
 interface InfoNegocio {
-  nombre_negocio?: string;
-  isotipo?: string;
+  nombre?: string;
   isotipo_url?: string;
+  logo_url?: string;
+  direccion?: string;
   ciudad?: string;
+  estado_provincia?: string;
   pais?: string;
+  telefono_principal?: string;
+  email_principal?: string;
 }
 
 // ==================== ICONS ====================
@@ -298,7 +302,8 @@ export default function CrmMensajeriaConfiguracion() {
     try {
       const res = await apiFetch(`/tenants/${tenantId}/info-negocio`);
       const data = await res.json();
-      setInfoNegocio(data);
+      // API returns { infoNegocio: { nombre, ciudad, pais, isotipo_url, ... } }
+      setInfoNegocio(data?.infoNegocio || data);
     } catch {
       setInfoNegocio(null);
     }
@@ -396,9 +401,9 @@ export default function CrmMensajeriaConfiguracion() {
 
   // Timbrado inmobiliaria
   const insertTimbrado = () => {
-    const nombreNegocio = infoNegocio?.nombre_negocio || 'Tu Inmobiliaria';
-    const logoUrl = infoNegocio?.isotipo || infoNegocio?.isotipo_url || '';
-    const ubicacion = [infoNegocio?.ciudad, infoNegocio?.pais].filter(Boolean).join(', ');
+    const nombreNegocio = infoNegocio?.nombre || 'Tu Inmobiliaria';
+    const logoUrl = infoNegocio?.isotipo_url || infoNegocio?.logo_url || '';
+    const ubicacion = [infoNegocio?.direccion, infoNegocio?.ciudad, infoNegocio?.estado_provincia, infoNegocio?.pais].filter(Boolean).join(', ');
     const nombreUsuario = user?.nombre
       ? `${user.nombre}${user.apellido ? ' ' + user.apellido : ''}`
       : 'Asesor';
