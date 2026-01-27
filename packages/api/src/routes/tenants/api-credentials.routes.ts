@@ -899,7 +899,7 @@ router.post('/meta/schedule', async (req: Request<TenantParams>, res: Response, 
         linkUrl: linkUrl || undefined,
         propiedadId: propiedadId || undefined,
         scheduledFor: scheduledForISO,
-        createdBy: (req as any).userId || undefined,
+        createdBy: (req as any).scope?.dbUserId || undefined,
       });
 
       return res.json({ scheduledPost });
@@ -938,7 +938,7 @@ router.post('/meta/schedule', async (req: Request<TenantParams>, res: Response, 
       linkUrl: linkUrl || undefined,
       propiedadId: propiedadId || undefined,
       scheduledFor: scheduledForISO,
-      createdBy: (req as any).userId || undefined,
+      createdBy: (req as any).scope?.dbUserId || undefined,
       metaResponse: metaResult,
     });
 
@@ -1133,7 +1133,7 @@ router.post('/meta/hashtag-groups', async (req: Request<TenantParams>, res: Resp
       name,
       hashtags,
       category,
-      createdBy: (req as any).userId || undefined,
+      createdBy: (req as any).scope?.dbUserId || undefined,
     });
 
     res.json(group);

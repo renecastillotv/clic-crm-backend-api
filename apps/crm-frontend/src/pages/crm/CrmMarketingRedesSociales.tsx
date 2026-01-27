@@ -395,13 +395,15 @@ const CrmMarketingRedesSociales: React.FC = () => {
       setMessage(plainText);
     }
 
-    // Auto-select main image
+    // Auto-select main image and populate imageUrls with it
     if (property.imagen_principal) {
       setSelectedPropertyImage(property.imagen_principal);
       setImageUrl(property.imagen_principal);
+      setImageUrls([property.imagen_principal]);
     } else if (property.imagenes && property.imagenes.length > 0) {
       setSelectedPropertyImage(property.imagenes[0]);
       setImageUrl(property.imagenes[0]);
+      setImageUrls([property.imagenes[0]]);
     }
   };
 
@@ -412,8 +414,23 @@ const CrmMarketingRedesSociales: React.FC = () => {
   };
 
   const handleSelectPropertyImage = (url: string) => {
-    setSelectedPropertyImage(url);
-    setImageUrl(url);
+    // Toggle image in/out of imageUrls for carousel
+    setImageUrls(prev => {
+      const exists = prev.includes(url);
+      if (exists) {
+        const next = prev.filter(u => u !== url);
+        // Update imageUrl to first remaining or empty
+        setImageUrl(next.length > 0 ? next[0] : '');
+        setSelectedPropertyImage(next.length > 0 ? next[0] : '');
+        return next;
+      } else {
+        if (prev.length >= 10) return prev; // max 10
+        const next = [...prev, url];
+        if (!imageUrl) setImageUrl(url);
+        setSelectedPropertyImage(url);
+        return next;
+      }
+    });
     // Clear any file upload state
     if (imagePreview) URL.revokeObjectURL(imagePreview);
     setImageFile(null);
@@ -661,7 +678,7 @@ const CrmMarketingRedesSociales: React.FC = () => {
   // Publish handler
   const handlePublish = async () => {
     if (!tenantActual?.id) return;
-    if (!message && !imageUrl) return;
+    if (!message && !imageUrl && imageUrls.length === 0) return;
     if (!targetFacebook && !targetInstagram) return;
 
     setPublishing(true);
@@ -1020,23 +1037,71 @@ const CrmMarketingRedesSociales: React.FC = () => {
                         )}
                       </div>
 
-                      {/* Property image thumbnails */}
+                      {/* Property image thumbnails - multi-select for carousel */}
                       {selectedProperty.imagenes && selectedProperty.imagenes.length > 1 && (
-                        <div style={{ display: 'flex', gap: '6px', marginTop: '10px', flexWrap: 'wrap' }}>
-                          {selectedProperty.imagenes.slice(0, 6).map((imgUrl, idx) => (
-                            <img
-                              key={idx}
-                              src={imgUrl}
-                              alt=""
-                              onClick={() => handleSelectPropertyImage(imgUrl)}
-                              style={{
-                                width: '48px', height: '48px', borderRadius: '6px', objectFit: 'cover',
-                                cursor: 'pointer', border: selectedPropertyImage === imgUrl ? '2px solid #3b82f6' : '2px solid transparent',
-                                opacity: selectedPropertyImage === imgUrl ? 1 : 0.7,
-                                transition: 'all 0.15s',
+                        <div style={{ marginTop: '10px' }}>
+                          <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '6px' }}>
+                            <span style={{ fontSize: '11px', fontWeight: 600, color: '#64748b' }}>
+                              Selecciona imagenes ({imageUrls.filter(u => selectedProperty.imagenes?.includes(u)).length}/{selectedProperty.imagenes.length})
+                            </span>
+                            <button
+                              onClick={() => {
+                                const allImgs = selectedProperty.imagenes || [];
+                                const allSelected = allImgs.every(img => imageUrls.includes(img));
+                                if (allSelected) {
+                                  // Deselect all property images
+                                  setImageUrls(prev => prev.filter(u => !allImgs.includes(u)));
+                                  setImageUrl('');
+                                  setSelectedPropertyImage('');
+                                } else {
+                                  // Select all (up to 10 total)
+                                  setImageUrls(prev => {
+                                    const nonPropertyUrls = prev.filter(u => !allImgs.includes(u));
+                                    const toAdd = allImgs.slice(0, 10 - nonPropertyUrls.length);
+                                    const next = [...nonPropertyUrls, ...toAdd];
+                                    setImageUrl(next[0] || '');
+                                    setSelectedPropertyImage(toAdd[0] || '');
+                                    return next;
+                                  });
+                                }
                               }}
-                            />
-                          ))}
+                              style={{
+                                fontSize: '11px', fontWeight: 500, color: '#3b82f6', background: 'none',
+                                border: 'none', cursor: 'pointer', padding: '2px 4px', textDecoration: 'underline',
+                              }}
+                            >
+                              {selectedProperty.imagenes.every(img => imageUrls.includes(img)) ? 'Deseleccionar todas' : 'Seleccionar todas'}
+                            </button>
+                          </div>
+                          <div style={{ display: 'flex', gap: '6px', flexWrap: 'wrap' }}>
+                            {selectedProperty.imagenes.slice(0, 20).map((imgUrl, idx) => {
+                              const isSelected = imageUrls.includes(imgUrl);
+                              return (
+                                <div key={idx} style={{ position: 'relative', cursor: 'pointer' }} onClick={() => handleSelectPropertyImage(imgUrl)}>
+                                  <img
+                                    src={imgUrl}
+                                    alt=""
+                                    style={{
+                                      width: '52px', height: '52px', borderRadius: '6px', objectFit: 'cover',
+                                      border: isSelected ? '2px solid #3b82f6' : '2px solid transparent',
+                                      opacity: isSelected ? 1 : 0.5,
+                                      transition: 'all 0.15s',
+                                    }}
+                                  />
+                                  {isSelected && (
+                                    <div style={{
+                                      position: 'absolute', top: '-4px', right: '-4px',
+                                      width: '18px', height: '18px', borderRadius: '50%',
+                                      background: '#3b82f6', display: 'flex', alignItems: 'center', justifyContent: 'center',
+                                      fontSize: '10px', color: 'white', fontWeight: 700,
+                                    }}>
+                                      {imageUrls.indexOf(imgUrl) + 1}
+                                    </div>
+                                  )}
+                                </div>
+                              );
+                            })}
+                          </div>
                         </div>
                       )}
 
@@ -1730,8 +1795,8 @@ const CrmMarketingRedesSociales: React.FC = () => {
                         type="date"
                         value={scheduleDate}
                         onChange={(e) => setScheduleDate(e.target.value)}
-                        min={new Date(Date.now() + 24 * 60 * 60 * 1000).toISOString().split('T')[0]}
-                        max={new Date(Date.now() + 75 * 24 * 60 * 60 * 1000).toISOString().split('T')[0]}
+                        min={new Date().toLocaleDateString('en-CA')}
+                        max={new Date(Date.now() + 75 * 24 * 60 * 60 * 1000).toLocaleDateString('en-CA')}
                         style={{
                           padding: '8px 12px', border: '1px solid #d1d5db', borderRadius: '8px',
                           fontSize: '13px', outline: 'none', color: '#1e293b',
@@ -1761,7 +1826,7 @@ const CrmMarketingRedesSociales: React.FC = () => {
               <div style={{ marginTop: '20px', display: 'flex', alignItems: 'center', gap: '12px' }}>
                 <button
                   onClick={handlePublish}
-                  disabled={publishing || uploadingImage || (!message && !imageUrl) || (!targetFacebook && !targetInstagram) || (scheduleEnabled && (!scheduleDate || !scheduleTime))}
+                  disabled={publishing || uploadingImage || (!message && !imageUrl && imageUrls.length === 0) || (!targetFacebook && !targetInstagram) || (scheduleEnabled && (!scheduleDate || !scheduleTime))}
                   style={{
                     display: 'flex',
                     alignItems: 'center',
@@ -2730,7 +2795,7 @@ const CrmMarketingRedesSociales: React.FC = () => {
                   type="date"
                   value={editDate}
                   onChange={(e) => setEditDate(e.target.value)}
-                  min={new Date(Date.now() + 24 * 60 * 60 * 1000).toISOString().split('T')[0]}
+                  min={new Date().toLocaleDateString('en-CA')}
                   style={{ padding: '8px 12px', border: '1px solid #d1d5db', borderRadius: '8px', fontSize: '13px', outline: 'none', color: '#1e293b' }}
                 />
               </div>
