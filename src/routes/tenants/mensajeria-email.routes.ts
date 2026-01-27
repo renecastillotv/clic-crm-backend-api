@@ -221,7 +221,7 @@ router.get('/inbox', async (req: Request<TenantParams>, res: Response, next: Nex
       page: page ? parseInt(page as string) : undefined,
       limit: limit ? parseInt(limit as string) : undefined,
       busqueda: busqueda as string,
-      carpeta: carpeta as 'bandeja' | 'enviados' | undefined,
+      carpeta: carpeta as 'bandeja' | 'enviados' | 'spam' | 'eliminados' | undefined,
     });
 
     res.json(result);
@@ -490,4 +490,53 @@ router.put('/conversacion/:conversacionId/read', async (req: any, res: Response,
   }
 });
 
+
+/**
+ * PUT /api/tenants/:tenantId/mensajeria-email/conversacion/:conversacionId/estado
+ * Change conversation state (archive, spam, delete, restore).
+ */
+router.put('/conversacion/:conversacionId/estado', async (req: any, res: Response, next: NextFunction) => {
+  try {
+    const { tenantId, conversacionId } = req.params;
+    const { estado } = req.body;
+
+    if (!estado || !['abierta', 'cerrada', 'archivada', 'spam', 'eliminada'].includes(estado)) {
+      return res.status(400).json({ error: 'Estado inválido' });
+    }
+
+    const { updateConversacion } = await import('../../services/mensajeriaService.js');
+    const result = await updateConversacion(tenantId, conversacionId, { estado });
+    res.json(result);
+  } catch (error) {
+    next(error);
+  }
+});
+
+/**
+ * GET /api/tenants/:tenantId/mensajeria-email/unread-count
+ * Get total unread count for a user (for sidebar badge).
+ */
+router.get('/unread-count', async (req: Request<TenantParams>, res: Response, next: NextFunction) => {
+  try {
+    const { tenantId } = req.params;
+    const { usuario_id } = req.query;
+
+    if (!usuario_id) {
+      return res.status(400).json({ error: 'usuario_id query param es requerido' });
+    }
+
+    const sql = `
+      SELECT COALESCE(SUM(no_leidos), 0) as total
+      FROM conversaciones
+      WHERE tenant_id = $1
+        AND usuario_asignado_id = $2
+        AND canal = 'email'
+        AND estado NOT IN ('eliminada', 'spam')
+    `;
+    const result = await query(sql, [tenantId, usuario_id]);
+    res.json({ unread: parseInt(result.rows[0].total) || 0 });
+  } catch (error) {
+    next(error);
+  }
+});
 export default router;
