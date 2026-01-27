@@ -1,48 +1,42 @@
 /**
  * CrmMensajeriaConfiguracion - Configuración de mensajería
  *
- * Gestión de integraciones, etiquetas, firmas y notificaciones.
- * Datos mock por ahora; se conectará al backend en Fase 1+.
+ * Gestión de integraciones (estado real), etiquetas, firmas y notificaciones.
+ * Conecta a: /mensajeria/etiquetas, /mensajeria/firmas, /mensajeria-email/credentials,
+ *            /mensajeria-whatsapp/credentials, /mensajeria-webchat/config, /api-credentials
  */
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { usePageHeader } from '../../layouts/CrmLayout';
+import { useAuth } from '../../contexts/AuthContext';
+import { apiFetch } from '../../services/api';
+
+// ==================== TYPES ====================
 
 interface Etiqueta {
   id: string;
   codigo: string;
   nombre: string;
   color: string;
-  esDefault: boolean;
+  es_default: boolean;
 }
 
-interface IntegracionRed {
-  id: string;
+interface IntegracionStatus {
   tipo: 'whatsapp' | 'instagram' | 'facebook' | 'web_chat' | 'email';
   nombre: string;
   conectado: boolean;
   cuenta?: string;
-  ultimaSync?: Date;
 }
 
-const etiquetasDefault: Etiqueta[] = [
-  { id: 'e1', codigo: 'caliente', nombre: 'Caliente', color: '#ef4444', esDefault: true },
-  { id: 'e2', codigo: 'tibio', nombre: 'Tibio', color: '#f97316', esDefault: true },
-  { id: 'e3', codigo: 'medio', nombre: 'Medio', color: '#eab308', esDefault: true },
-  { id: 'e4', codigo: 'frio', nombre: 'Frío', color: '#3b82f6', esDefault: true },
-  { id: 'e5', codigo: 'descartado', nombre: 'Descartado', color: '#6b7280', esDefault: true },
-  { id: 'e6', codigo: 'sin_calificar', nombre: 'Sin calificar', color: '#94a3b8', esDefault: true },
-];
+interface Firma {
+  id: string;
+  nombre: string;
+  contenido_html: string;
+  es_default: boolean;
+}
 
-const integracionesEjemplo: IntegracionRed[] = [
-  { id: '1', tipo: 'whatsapp', nombre: 'WhatsApp Business', conectado: true, cuenta: '+52 55 1234 5678', ultimaSync: new Date() },
-  { id: '2', tipo: 'instagram', nombre: 'Instagram', conectado: true, cuenta: '@inmobiliaria_cdmx', ultimaSync: new Date() },
-  { id: '3', tipo: 'facebook', nombre: 'Facebook Page', conectado: false },
-  { id: '4', tipo: 'web_chat', nombre: 'Chat Web (Sitio)', conectado: true, cuenta: 'Widget activo', ultimaSync: new Date() },
-  { id: '5', tipo: 'email', nombre: 'Correo Electrónico', conectado: true, cuenta: 'agente@inmobiliaria.com', ultimaSync: new Date() },
-];
+// ==================== ICONS ====================
 
-// Iconos
 const Icons = {
   link: (
     <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
@@ -54,14 +48,6 @@ const Icons = {
     <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
       <path d="M12 2H2v10l9.29 9.29c.94.94 2.48.94 3.42 0l6.58-6.58c.94-.94.94-2.48 0-3.42L12 2Z"/>
       <path d="M7 7h.01"/>
-    </svg>
-  ),
-  users: (
-    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-      <path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2"/>
-      <circle cx="9" cy="7" r="4"/>
-      <path d="M22 21v-2a4 4 0 0 0-3-3.87"/>
-      <path d="M16 3.13a4 4 0 0 1 0 7.75"/>
     </svg>
   ),
   signature: (
@@ -122,25 +108,200 @@ const Icons = {
   ),
 };
 
+// ==================== COMPONENT ====================
+
 export default function CrmMensajeriaConfiguracion() {
   const { setPageHeader } = usePageHeader();
+  const { user, tenantActual } = useAuth();
 
-  const [integraciones] = useState<IntegracionRed[]>(integracionesEjemplo);
-  const [etiquetas, setEtiquetas] = useState<Etiqueta[]>(etiquetasDefault);
-  const [firmaEmail, setFirmaEmail] = useState('');
-  const [notifChats, setNotifChats] = useState(true);
-  const [notifEmails, setNotifEmails] = useState(true);
-  const [notifSonido, setNotifSonido] = useState(true);
-  const [autoRegistrarContactos, setAutoRegistrarContactos] = useState(false);
+  const tenantId = tenantActual?.id;
+  const userId = user?.id;
+
+  // Integration statuses
+  const [integraciones, setIntegraciones] = useState<IntegracionStatus[]>([]);
+  const [loadingInteg, setLoadingInteg] = useState(true);
+
+  // Etiquetas
+  const [etiquetas, setEtiquetas] = useState<Etiqueta[]>([]);
   const [nuevaEtiquetaNombre, setNuevaEtiquetaNombre] = useState('');
   const [nuevaEtiquetaColor, setNuevaEtiquetaColor] = useState('#8b5cf6');
 
+  // Firma
+  const [firmas, setFirmas] = useState<Firma[]>([]);
+  const [firmaTexto, setFirmaTexto] = useState('');
+  const [firmaSaving, setFirmaSaving] = useState(false);
+
+  // Notifications (local preferences)
+  const [notifChats, setNotifChats] = useState(true);
+  const [notifEmails, setNotifEmails] = useState(true);
+  const [notifSonido, setNotifSonido] = useState(true);
+
   useEffect(() => {
-    setPageHeader({
-      title: 'Configuración',
-      subtitle: 'Ajustes de mensajería',
-    });
+    setPageHeader({ title: 'Configuración', subtitle: 'Ajustes de mensajería' });
   }, [setPageHeader]);
+
+  // ==================== FETCH INTEGRATION STATUS ====================
+
+  const fetchIntegrationStatus = useCallback(async () => {
+    if (!tenantId || !userId) return;
+    setLoadingInteg(true);
+
+    const results: IntegracionStatus[] = [];
+
+    // WhatsApp - check tenant credentials
+    try {
+      const waRes = await apiFetch(`/tenants/${tenantId}/mensajeria-whatsapp/credentials`);
+      const waData = await waRes.json();
+      results.push({
+        tipo: 'whatsapp', nombre: 'WhatsApp Business',
+        conectado: !!waData?.whatsapp_connected,
+        cuenta: waData?.whatsapp_phone_number_id ? `ID: ${waData.whatsapp_phone_number_id}` : undefined,
+      });
+    } catch {
+      results.push({ tipo: 'whatsapp', nombre: 'WhatsApp Business', conectado: false });
+    }
+
+    // Instagram & Facebook - check api-credentials for Meta connection
+    try {
+      const metaRes = await apiFetch(`/tenants/${tenantId}/api-credentials`);
+      const metaData = await metaRes.json();
+      const metaCreds = metaData?.meta || metaData;
+      const hasMeta = !!metaCreds?.meta_page_access_token || !!metaCreds?.meta_connected;
+      const hasIG = !!metaCreds?.meta_instagram_business_account_id;
+
+      results.push({
+        tipo: 'instagram', nombre: 'Instagram',
+        conectado: hasIG,
+        cuenta: metaCreds?.meta_instagram_username ? `@${metaCreds.meta_instagram_username}` : undefined,
+      });
+      results.push({
+        tipo: 'facebook', nombre: 'Facebook Page',
+        conectado: hasMeta,
+        cuenta: metaCreds?.meta_page_name || undefined,
+      });
+    } catch {
+      results.push({ tipo: 'instagram', nombre: 'Instagram', conectado: false });
+      results.push({ tipo: 'facebook', nombre: 'Facebook Page', conectado: false });
+    }
+
+    // Web Chat - check webchat config
+    try {
+      const wcRes = await apiFetch(`/tenants/${tenantId}/mensajeria-webchat/config`);
+      const wcData = await wcRes.json();
+      results.push({
+        tipo: 'web_chat', nombre: 'Chat Web (Sitio)',
+        conectado: !!wcData?.enabled,
+        cuenta: wcData?.enabled ? 'Widget activo' : undefined,
+      });
+    } catch {
+      results.push({ tipo: 'web_chat', nombre: 'Chat Web (Sitio)', conectado: false });
+    }
+
+    // Email - check user email credentials
+    try {
+      const emailRes = await apiFetch(`/tenants/${tenantId}/mensajeria-email/credentials?usuario_id=${userId}`);
+      const emailData = await emailRes.json();
+      results.push({
+        tipo: 'email', nombre: 'Correo Electrónico',
+        conectado: !!emailData?.is_connected,
+        cuenta: emailData?.email_address || undefined,
+      });
+    } catch {
+      results.push({ tipo: 'email', nombre: 'Correo Electrónico', conectado: false });
+    }
+
+    setIntegraciones(results);
+    setLoadingInteg(false);
+  }, [tenantId, userId]);
+
+  // ==================== FETCH ETIQUETAS ====================
+
+  const fetchEtiquetas = useCallback(async () => {
+    if (!tenantId) return;
+    try {
+      const res = await apiFetch(`/tenants/${tenantId}/mensajeria/etiquetas`);
+      const data = await res.json();
+      setEtiquetas(Array.isArray(data) ? data : []);
+    } catch {
+      setEtiquetas([]);
+    }
+  }, [tenantId]);
+
+  // ==================== FETCH FIRMAS ====================
+
+  const fetchFirmas = useCallback(async () => {
+    if (!tenantId || !userId) return;
+    try {
+      const res = await apiFetch(`/tenants/${tenantId}/mensajeria/firmas?usuario_id=${userId}`);
+      const data = await res.json();
+      const arr = Array.isArray(data) ? data : [];
+      setFirmas(arr);
+      if (arr.length > 0) {
+        setFirmaTexto(arr[0].contenido_html || '');
+      }
+    } catch {
+      setFirmas([]);
+    }
+  }, [tenantId, userId]);
+
+  useEffect(() => { fetchIntegrationStatus(); }, [fetchIntegrationStatus]);
+  useEffect(() => { fetchEtiquetas(); }, [fetchEtiquetas]);
+  useEffect(() => { fetchFirmas(); }, [fetchFirmas]);
+
+  // ==================== ETIQUETA ACTIONS ====================
+
+  const agregarEtiqueta = async () => {
+    if (!tenantId || !nuevaEtiquetaNombre.trim()) return;
+    const codigo = nuevaEtiquetaNombre.toLowerCase().replace(/\s+/g, '_').replace(/[^a-z0-9_]/g, '');
+    try {
+      await apiFetch(`/tenants/${tenantId}/mensajeria/etiquetas`, {
+        method: 'POST',
+        body: JSON.stringify({ codigo, nombre: nuevaEtiquetaNombre, color: nuevaEtiquetaColor }),
+      });
+      setNuevaEtiquetaNombre('');
+      setNuevaEtiquetaColor('#8b5cf6');
+      await fetchEtiquetas();
+    } catch (err: any) {
+      console.error('Error creating etiqueta:', err.message);
+    }
+  };
+
+  const eliminarEtiqueta = async (id: string) => {
+    if (!tenantId) return;
+    try {
+      await apiFetch(`/tenants/${tenantId}/mensajeria/etiquetas/${id}`, { method: 'DELETE' });
+      await fetchEtiquetas();
+    } catch (err: any) {
+      console.error('Error deleting etiqueta:', err.message);
+    }
+  };
+
+  // ==================== FIRMA ACTIONS ====================
+
+  const guardarFirma = async () => {
+    if (!tenantId || !userId) return;
+    setFirmaSaving(true);
+    try {
+      if (firmas.length > 0) {
+        await apiFetch(`/tenants/${tenantId}/mensajeria/firmas/${firmas[0].id}`, {
+          method: 'PUT',
+          body: JSON.stringify({ contenido_html: firmaTexto }),
+        });
+      } else {
+        await apiFetch(`/tenants/${tenantId}/mensajeria/firmas`, {
+          method: 'POST',
+          body: JSON.stringify({ usuario_id: userId, nombre: 'Principal', contenido_html: firmaTexto, es_default: true }),
+        });
+      }
+      await fetchFirmas();
+    } catch (err: any) {
+      console.error('Error saving firma:', err.message);
+    } finally {
+      setFirmaSaving(false);
+    }
+  };
+
+  // ==================== HELPERS ====================
 
   const getOrigenIcon = (tipo: string) => {
     switch (tipo) {
@@ -164,51 +325,39 @@ export default function CrmMensajeriaConfiguracion() {
     }
   };
 
-  const agregarEtiqueta = () => {
-    if (!nuevaEtiquetaNombre.trim()) return;
-    const codigo = nuevaEtiquetaNombre.toLowerCase().replace(/\s+/g, '_');
-    const nueva: Etiqueta = {
-      id: `e${etiquetas.length + 1}`,
-      codigo,
-      nombre: nuevaEtiquetaNombre,
-      color: nuevaEtiquetaColor,
-      esDefault: false,
-    };
-    setEtiquetas([...etiquetas, nueva]);
-    setNuevaEtiquetaNombre('');
-    setNuevaEtiquetaColor('#8b5cf6');
-  };
-
-  const eliminarEtiqueta = (id: string) => {
-    setEtiquetas(etiquetas.filter(e => e.id !== id || e.esDefault));
-  };
+  // ==================== RENDER ====================
 
   return (
     <div className="msg-config-container">
       {/* Integraciones */}
       <div className="config-section">
         <h3>{Icons.link} Integraciones</h3>
-        <p className="config-description">Conecta tus cuentas para recibir mensajes desde un solo lugar.</p>
-        <div className="integrations-grid">
-          {integraciones.map(integ => (
-            <div key={integ.id} className={`integration-card ${integ.conectado ? 'connected' : ''}`}>
-              <div className="integration-header">
-                <span className="integration-icon" style={{ color: getOrigenColor(integ.tipo) }}>{getOrigenIcon(integ.tipo)}</span>
-                <span className="integration-name">{integ.nombre}</span>
+        <p className="config-description">Estado actual de tus canales de mensajería.</p>
+        {loadingInteg ? (
+          <p style={{ color: '#94a3b8', fontSize: '0.8125rem' }}>Cargando integraciones...</p>
+        ) : (
+          <div className="integrations-grid">
+            {integraciones.map(integ => (
+              <div key={integ.tipo} className={`integration-card ${integ.conectado ? 'connected' : ''}`}>
+                <div className="integration-header">
+                  <span className="integration-icon" style={{ color: getOrigenColor(integ.tipo) }}>{getOrigenIcon(integ.tipo)}</span>
+                  <span className="integration-name">{integ.nombre}</span>
+                </div>
+                <div className="integration-status">
+                  {integ.conectado ? (
+                    <><span className="status-connected">{Icons.check} Conectado</span>{integ.cuenta && <span className="integration-account">{integ.cuenta}</span>}</>
+                  ) : (
+                    <span className="status-disconnected">No configurado</span>
+                  )}
+                </div>
               </div>
-              <div className="integration-status">
-                {integ.conectado ? (
-                  <><span className="status-connected">{Icons.check} Conectado</span><span className="integration-account">{integ.cuenta}</span></>
-                ) : (
-                  <span className="status-disconnected">Desconectado</span>
-                )}
-              </div>
-              <button className={`btn-integration ${integ.conectado ? 'disconnect' : 'connect'}`}>
-                {integ.conectado ? 'Desconectar' : 'Conectar'}
-              </button>
-            </div>
-          ))}
-        </div>
+            ))}
+          </div>
+        )}
+        <p className="config-hint">
+          Para conectar WhatsApp, Facebook o Instagram ve a Configuración &gt; Integraciones.
+          Para Email ve a Correo &gt; Configurar cuenta. Web Chat se activa abajo.
+        </p>
       </div>
 
       {/* Etiquetas */}
@@ -216,35 +365,22 @@ export default function CrmMensajeriaConfiguracion() {
         <h3>{Icons.tag} Etiquetas de Chats</h3>
         <p className="config-description">Clasifica tus conversaciones con etiquetas personalizadas.</p>
         <div className="etiquetas-list">
+          {etiquetas.length === 0 && <p style={{ color: '#94a3b8', fontSize: '0.8125rem', margin: 0 }}>No hay etiquetas. Crea la primera.</p>}
           {etiquetas.map(et => (
             <div key={et.id} className="etiqueta-item">
               <span className="etiqueta-dot" style={{ backgroundColor: et.color }}></span>
               <span className="etiqueta-nombre">{et.nombre}</span>
-              {et.esDefault && <span className="etiqueta-default">Sistema</span>}
-              {!et.esDefault && (
+              {et.es_default && <span className="etiqueta-default">Sistema</span>}
+              {!et.es_default && (
                 <button className="btn-delete-etiqueta" onClick={() => eliminarEtiqueta(et.id)}>{Icons.trash}</button>
               )}
             </div>
           ))}
         </div>
         <div className="nueva-etiqueta-form">
-          <input type="text" placeholder="Nueva etiqueta..." value={nuevaEtiquetaNombre} onChange={(e) => setNuevaEtiquetaNombre(e.target.value)} />
+          <input type="text" placeholder="Nueva etiqueta..." value={nuevaEtiquetaNombre} onChange={(e) => setNuevaEtiquetaNombre(e.target.value)} onKeyDown={(e) => { if (e.key === 'Enter') agregarEtiqueta(); }} />
           <input type="color" value={nuevaEtiquetaColor} onChange={(e) => setNuevaEtiquetaColor(e.target.value)} className="color-picker" />
           <button className="btn-add-etiqueta" onClick={agregarEtiqueta} disabled={!nuevaEtiquetaNombre.trim()}>{Icons.plus}</button>
-        </div>
-      </div>
-
-      {/* Contactos automáticos */}
-      <div className="config-section">
-        <h3>{Icons.users} Registro de Contactos</h3>
-        <p className="config-description">Decide cómo manejar los nuevos contactos que te escriben.</p>
-        <div className="config-options">
-          <label className="config-toggle">
-            <input type="checkbox" checked={autoRegistrarContactos} onChange={(e) => setAutoRegistrarContactos(e.target.checked)} />
-            <span className="toggle-slider"></span>
-            <span className="toggle-label">Registrar automáticamente cada cliente que me escriba en Contactos</span>
-          </label>
-          <p className="config-hint">Si está desactivado, puedes agregar contactos manualmente con el botón + junto al nombre en cada conversación.</p>
         </div>
       </div>
 
@@ -253,8 +389,8 @@ export default function CrmMensajeriaConfiguracion() {
         <h3>{Icons.signature} Firma de Correo</h3>
         <p className="config-description">Se agregará automáticamente a todos tus correos enviados.</p>
         <div className="config-form">
-          <textarea className="signature-input" placeholder="Escribe tu firma..." value={firmaEmail} onChange={(e) => setFirmaEmail(e.target.value)} rows={5} />
-          <button className="btn-primary">Guardar firma</button>
+          <textarea className="signature-input" placeholder="Escribe tu firma..." value={firmaTexto} onChange={(e) => setFirmaTexto(e.target.value)} rows={5} />
+          <button className="btn-primary" onClick={guardarFirma} disabled={firmaSaving}>{firmaSaving ? 'Guardando...' : 'Guardar firma'}</button>
         </div>
       </div>
 
@@ -286,7 +422,7 @@ export default function CrmMensajeriaConfiguracion() {
         .config-section { background: white; border: 1px solid #e2e8f0; border-radius: 10px; padding: 20px; margin-bottom: 20px; }
         .config-section h3 { display: flex; align-items: center; gap: 8px; margin: 0 0 6px 0; font-size: 1rem; font-weight: 600; color: #0f172a; }
         .config-description { margin: 0 0 16px 0; color: #64748b; font-size: 0.8125rem; }
-        .config-hint { margin: 8px 0 0 0; color: #94a3b8; font-size: 0.75rem; font-style: italic; }
+        .config-hint { margin: 12px 0 0 0; color: #94a3b8; font-size: 0.75rem; font-style: italic; }
 
         .integrations-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(180px, 1fr)); gap: 16px; }
         .integration-card { padding: 16px; background: #f8fafc; border: 1px solid #e2e8f0; border-radius: 8px; text-align: center; }
@@ -294,15 +430,10 @@ export default function CrmMensajeriaConfiguracion() {
         .integration-header { display: flex; flex-direction: column; align-items: center; gap: 6px; margin-bottom: 10px; }
         .integration-icon svg { width: 24px; height: 24px; }
         .integration-name { font-weight: 600; color: #0f172a; font-size: 0.8125rem; }
-        .integration-status { display: flex; flex-direction: column; gap: 2px; margin-bottom: 12px; min-height: 32px; }
+        .integration-status { display: flex; flex-direction: column; gap: 2px; min-height: 32px; }
         .status-connected { display: flex; align-items: center; justify-content: center; gap: 3px; color: #16a34a; font-size: 0.75rem; font-weight: 500; }
         .status-disconnected { color: #94a3b8; font-size: 0.75rem; }
         .integration-account { font-size: 0.6875rem; color: #64748b; }
-        .btn-integration { width: 100%; padding: 6px 12px; border-radius: 5px; font-size: 0.75rem; font-weight: 500; cursor: pointer; transition: all 0.15s; }
-        .btn-integration.connect { background: #3b82f6; border: none; color: white; }
-        .btn-integration.connect:hover { background: #2563eb; }
-        .btn-integration.disconnect { background: white; border: 1px solid #e2e8f0; color: #64748b; }
-        .btn-integration.disconnect:hover { background: #fef2f2; border-color: #fecaca; color: #dc2626; }
 
         .etiquetas-list { display: flex; flex-direction: column; gap: 6px; margin-bottom: 16px; }
         .etiqueta-item { display: flex; align-items: center; gap: 10px; padding: 8px 12px; background: #f8fafc; border-radius: 6px; }
@@ -320,10 +451,11 @@ export default function CrmMensajeriaConfiguracion() {
         .btn-add-etiqueta:disabled { background: #cbd5e1; cursor: not-allowed; }
 
         .config-form { display: flex; flex-direction: column; gap: 12px; }
-        .signature-input { width: 100%; padding: 12px; border: 1px solid #e2e8f0; border-radius: 6px; font-size: 0.8125rem; font-family: inherit; resize: vertical; min-height: 100px; }
+        .signature-input { width: 100%; padding: 12px; border: 1px solid #e2e8f0; border-radius: 6px; font-size: 0.8125rem; font-family: inherit; resize: vertical; min-height: 100px; box-sizing: border-box; }
         .signature-input:focus { outline: none; border-color: #3b82f6; }
         .btn-primary { align-self: flex-start; padding: 8px 16px; background: #3b82f6; border: none; border-radius: 5px; color: white; font-size: 0.8125rem; font-weight: 500; cursor: pointer; transition: background 0.15s; }
         .btn-primary:hover { background: #2563eb; }
+        .btn-primary:disabled { opacity: 0.5; cursor: default; }
 
         .config-options { display: flex; flex-direction: column; gap: 12px; }
         .config-toggle { display: flex; align-items: center; gap: 10px; cursor: pointer; }

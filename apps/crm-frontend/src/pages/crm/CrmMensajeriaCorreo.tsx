@@ -339,7 +339,32 @@ export default function CrmMensajeriaCorreo() {
           <button className="btn-primary" onClick={() => setShowSetup(true)} style={{ marginTop: 16 }}>{Icons.settings} Configurar cuenta</button>
           {credentials?.last_error && <p style={{ color: '#ef4444', fontSize: '0.8125rem', marginTop: 8 }}>Error: {credentials.last_error}</p>}
         </div>
-        {showSetup && <SetupModal />}
+        {showSetup && (
+          <div className="modal-overlay" onClick={() => setShowSetup(false)}>
+            <div className="modal-content" onClick={e => e.stopPropagation()}>
+              <div className="modal-header"><h3>Configurar cuenta de correo</h3><button className="btn-icon" onClick={() => setShowSetup(false)}>{Icons.close}</button></div>
+              <div className="setup-fields">
+                <div className="setup-field"><label>Correo electrónico:</label><input type="email" value={setupEmail} onChange={e => setSetupEmail(e.target.value)} placeholder="tu@dominio.com" /></div>
+                <div className="setup-field"><label>Nombre visible:</label><input type="text" value={setupDisplayName} onChange={e => setSetupDisplayName(e.target.value)} placeholder="Tu Nombre" /></div>
+                <div className="setup-field"><label>Contraseña:</label><input type="password" value={setupPassword} onChange={e => setSetupPassword(e.target.value)} placeholder="Contraseña del email" /></div>
+                <div className="setup-row">
+                  <div className="setup-field"><label>IMAP Host:</label><input type="text" value={setupImapHost} onChange={e => setSetupImapHost(e.target.value)} /></div>
+                  <div className="setup-field"><label>Puerto:</label><input type="text" value={setupImapPort} onChange={e => setSetupImapPort(e.target.value)} /></div>
+                </div>
+                <div className="setup-row">
+                  <div className="setup-field"><label>SMTP Host:</label><input type="text" value={setupSmtpHost} onChange={e => setSetupSmtpHost(e.target.value)} /></div>
+                  <div className="setup-field"><label>Puerto:</label><input type="text" value={setupSmtpPort} onChange={e => setSetupSmtpPort(e.target.value)} /></div>
+                </div>
+                {setupError && <p className="setup-error">{setupError}</p>}
+                {setupSuccess && <p className="setup-success">{setupSuccess}</p>}
+              </div>
+              <div className="modal-actions">
+                <button className="btn-primary" onClick={handleSaveCredentials} disabled={setupTesting || !setupEmail || !setupPassword}>{setupTesting ? 'Verificando...' : 'Guardar y verificar'}</button>
+                <button className="btn-secondary" onClick={() => setShowSetup(false)}>Cancelar</button>
+              </div>
+            </div>
+          </div>
+        )}
         <style>{styles}</style>
       </div>
     );
@@ -435,62 +460,55 @@ export default function CrmMensajeriaCorreo() {
         </div>
       </div>
 
-      {showCompose && <ComposeModal />}
-      {showSetup && <SetupModal />}
+      {/* Compose Modal - inlined to avoid remount on state change */}
+      {showCompose && (
+        <div className="modal-overlay" onClick={() => setShowCompose(false)}>
+          <div className="modal-content" onClick={e => e.stopPropagation()}>
+            <div className="modal-header"><h3>Nuevo correo</h3><button className="btn-icon" onClick={() => setShowCompose(false)}>{Icons.close}</button></div>
+            <div className="compose-fields">
+              <div className="compose-field"><label>Para:</label><input type="text" value={composeTo} onChange={e => setComposeTo(e.target.value)} placeholder="destinatario@email.com" /></div>
+              <div className="compose-field"><label>CC:</label><input type="text" value={composeCc} onChange={e => setComposeCc(e.target.value)} placeholder="(opcional)" /></div>
+              <div className="compose-field"><label>Asunto:</label><input type="text" value={composeSubject} onChange={e => setComposeSubject(e.target.value)} placeholder="Asunto del correo" /></div>
+              <textarea className="compose-body" value={composeBody} onChange={e => setComposeBody(e.target.value)} placeholder="Escribe tu mensaje..." rows={10} />
+            </div>
+            <div className="modal-actions">
+              <button className="btn-primary" onClick={handleSendEmail} disabled={sending || !composeTo || !composeSubject}>{Icons.send} {sending ? 'Enviando...' : 'Enviar'}</button>
+              <button className="btn-secondary" onClick={() => setShowCompose(false)}>Cancelar</button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Setup Modal - inlined to avoid remount on state change */}
+      {showSetup && (
+        <div className="modal-overlay" onClick={() => setShowSetup(false)}>
+          <div className="modal-content" onClick={e => e.stopPropagation()}>
+            <div className="modal-header"><h3>Configurar cuenta de correo</h3><button className="btn-icon" onClick={() => setShowSetup(false)}>{Icons.close}</button></div>
+            <div className="setup-fields">
+              <div className="setup-field"><label>Correo electrónico:</label><input type="email" value={setupEmail} onChange={e => setSetupEmail(e.target.value)} placeholder="tu@dominio.com" /></div>
+              <div className="setup-field"><label>Nombre visible:</label><input type="text" value={setupDisplayName} onChange={e => setSetupDisplayName(e.target.value)} placeholder="Tu Nombre" /></div>
+              <div className="setup-field"><label>Contraseña:</label><input type="password" value={setupPassword} onChange={e => setSetupPassword(e.target.value)} placeholder="Contraseña del email" /></div>
+              <div className="setup-row">
+                <div className="setup-field"><label>IMAP Host:</label><input type="text" value={setupImapHost} onChange={e => setSetupImapHost(e.target.value)} /></div>
+                <div className="setup-field"><label>Puerto:</label><input type="text" value={setupImapPort} onChange={e => setSetupImapPort(e.target.value)} /></div>
+              </div>
+              <div className="setup-row">
+                <div className="setup-field"><label>SMTP Host:</label><input type="text" value={setupSmtpHost} onChange={e => setSetupSmtpHost(e.target.value)} /></div>
+                <div className="setup-field"><label>Puerto:</label><input type="text" value={setupSmtpPort} onChange={e => setSetupSmtpPort(e.target.value)} /></div>
+              </div>
+              {setupError && <p className="setup-error">{setupError}</p>}
+              {setupSuccess && <p className="setup-success">{setupSuccess}</p>}
+            </div>
+            <div className="modal-actions">
+              <button className="btn-primary" onClick={handleSaveCredentials} disabled={setupTesting || !setupEmail || !setupPassword}>{setupTesting ? 'Verificando...' : 'Guardar y verificar'}</button>
+              <button className="btn-secondary" onClick={() => setShowSetup(false)}>Cancelar</button>
+            </div>
+          </div>
+        </div>
+      )}
       <style>{styles}</style>
     </div>
   );
-
-  // ==================== MODALS ====================
-
-  function ComposeModal() {
-    return (
-      <div className="modal-overlay" onClick={() => setShowCompose(false)}>
-        <div className="modal-content" onClick={e => e.stopPropagation()}>
-          <div className="modal-header"><h3>Nuevo correo</h3><button className="btn-icon" onClick={() => setShowCompose(false)}>{Icons.close}</button></div>
-          <div className="compose-fields">
-            <div className="compose-field"><label>Para:</label><input type="text" value={composeTo} onChange={e => setComposeTo(e.target.value)} placeholder="destinatario@email.com" /></div>
-            <div className="compose-field"><label>CC:</label><input type="text" value={composeCc} onChange={e => setComposeCc(e.target.value)} placeholder="(opcional)" /></div>
-            <div className="compose-field"><label>Asunto:</label><input type="text" value={composeSubject} onChange={e => setComposeSubject(e.target.value)} placeholder="Asunto del correo" /></div>
-            <textarea className="compose-body" value={composeBody} onChange={e => setComposeBody(e.target.value)} placeholder="Escribe tu mensaje..." rows={10} />
-          </div>
-          <div className="modal-actions">
-            <button className="btn-primary" onClick={handleSendEmail} disabled={sending || !composeTo || !composeSubject}>{Icons.send} {sending ? 'Enviando...' : 'Enviar'}</button>
-            <button className="btn-secondary" onClick={() => setShowCompose(false)}>Cancelar</button>
-          </div>
-        </div>
-      </div>
-    );
-  }
-
-  function SetupModal() {
-    return (
-      <div className="modal-overlay" onClick={() => setShowSetup(false)}>
-        <div className="modal-content" onClick={e => e.stopPropagation()}>
-          <div className="modal-header"><h3>Configurar cuenta de correo</h3><button className="btn-icon" onClick={() => setShowSetup(false)}>{Icons.close}</button></div>
-          <div className="setup-fields">
-            <div className="setup-field"><label>Email:</label><input type="email" value={setupEmail} onChange={e => setSetupEmail(e.target.value)} placeholder="tu@dominio.com" /></div>
-            <div className="setup-field"><label>Nombre visible:</label><input type="text" value={setupDisplayName} onChange={e => setSetupDisplayName(e.target.value)} placeholder="Tu Nombre" /></div>
-            <div className="setup-field"><label>Contraseña:</label><input type="password" value={setupPassword} onChange={e => setSetupPassword(e.target.value)} placeholder="Contraseña del email" /></div>
-            <div className="setup-row">
-              <div className="setup-field"><label>IMAP Host:</label><input type="text" value={setupImapHost} onChange={e => setSetupImapHost(e.target.value)} /></div>
-              <div className="setup-field"><label>Puerto:</label><input type="text" value={setupImapPort} onChange={e => setSetupImapPort(e.target.value)} /></div>
-            </div>
-            <div className="setup-row">
-              <div className="setup-field"><label>SMTP Host:</label><input type="text" value={setupSmtpHost} onChange={e => setSetupSmtpHost(e.target.value)} /></div>
-              <div className="setup-field"><label>Puerto:</label><input type="text" value={setupSmtpPort} onChange={e => setSetupSmtpPort(e.target.value)} /></div>
-            </div>
-            {setupError && <p className="setup-error">{setupError}</p>}
-            {setupSuccess && <p className="setup-success">{setupSuccess}</p>}
-          </div>
-          <div className="modal-actions">
-            <button className="btn-primary" onClick={handleSaveCredentials} disabled={setupTesting || !setupEmail || !setupPassword}>{setupTesting ? 'Verificando...' : 'Guardar y verificar'}</button>
-            <button className="btn-secondary" onClick={() => setShowSetup(false)}>Cancelar</button>
-          </div>
-        </div>
-      </div>
-    );
-  }
 }
 
 // ==================== STYLES ====================
