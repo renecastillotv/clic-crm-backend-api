@@ -11,7 +11,7 @@ import { query } from '../utils/db.js';
 // ========== TYPES ==========
 
 export type CanalType = 'whatsapp' | 'instagram_dm' | 'facebook_dm' | 'web_chat' | 'email';
-export type EstadoConversacion = 'abierta' | 'cerrada' | 'archivada' | 'spam';
+export type EstadoConversacion = 'abierta' | 'cerrada' | 'archivada' | 'spam' | 'eliminada';
 export type TipoMensaje = 'text' | 'image' | 'video' | 'audio' | 'document' | 'email';
 export type EstadoMensaje = 'enviado' | 'entregado' | 'leido' | 'fallido';
 
@@ -68,7 +68,7 @@ export interface ConversacionFiltros {
   estado?: EstadoConversacion;
   etiqueta_id?: string;
   busqueda?: string;
-  carpeta?: 'bandeja' | 'enviados';
+  carpeta?: 'bandeja' | 'enviados' | 'spam' | 'eliminados';
   page?: number;
   limit?: number;
 }
@@ -128,10 +128,18 @@ export async function getConversaciones(
     paramIndex++;
   }
 
-  if (carpeta === 'bandeja') {
-    whereClause += ` AND EXISTS (SELECT 1 FROM mensajes m WHERE m.conversacion_id = c.id AND m.es_entrante = true)`;
-  } else if (carpeta === 'enviados') {
-    whereClause += ` AND EXISTS (SELECT 1 FROM mensajes m WHERE m.conversacion_id = c.id AND m.es_entrante = false)`;
+  if (carpeta === 'spam') {
+    whereClause += ` AND c.estado = 'spam'`;
+  } else if (carpeta === 'eliminados') {
+    whereClause += ` AND c.estado = 'eliminada'`;
+  } else {
+    // Normal folders exclude spam and deleted
+    whereClause += ` AND c.estado NOT IN ('eliminada', 'spam')`;
+    if (carpeta === 'bandeja') {
+      whereClause += ` AND EXISTS (SELECT 1 FROM mensajes m WHERE m.conversacion_id = c.id AND m.es_entrante = true)`;
+    } else if (carpeta === 'enviados') {
+      whereClause += ` AND EXISTS (SELECT 1 FROM mensajes m WHERE m.conversacion_id = c.id AND m.es_entrante = false)`;
+    }
   }
 
   const countResult = await query(

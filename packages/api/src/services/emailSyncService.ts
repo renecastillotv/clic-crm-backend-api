@@ -23,6 +23,7 @@ import {
   createMensaje,
 } from './mensajeriaService.js';
 import { query } from '../utils/db.js';
+import { uploadDocument } from './r2Service.js';
 
 /**
  * Sync inbox for a single user.
@@ -144,11 +145,27 @@ async function processIncomingEmail(
     email_message_id: email.messageId || undefined,
     email_in_reply_to: email.inReplyTo || undefined,
     email_references: email.references || undefined,
-    adjuntos: email.attachments.map(a => ({
-      name: a.filename,
-      type: a.contentType,
-      size: a.size,
-      // Note: In production, upload to R2 and store URL instead of content
+    adjuntos: await Promise.all(email.attachments.map(async (a) => {
+      try {
+        const uploaded = await uploadDocument(a.content, a.filename, {
+          tenantId,
+          folder: 'email-attachments',
+        });
+        return {
+          name: a.filename,
+          type: a.contentType,
+          size: a.size,
+          url: uploaded.url,
+          key: uploaded.key,
+        };
+      } catch (uploadErr: any) {
+        console.error(`Failed to upload attachment ${a.filename}:`, uploadErr.message);
+        return {
+          name: a.filename,
+          type: a.contentType,
+          size: a.size,
+        };
+      }
     })),
     external_message_id: email.messageId || undefined,
     estado: 'entregado',

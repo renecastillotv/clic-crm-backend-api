@@ -8,7 +8,7 @@ import { useClerk, useAuth as useClerkAuth } from '@clerk/clerk-react';
 import { useAuth } from '../contexts/AuthContext';
 import { CatalogosProvider } from '../contexts/CatalogosContext';
 import MiPerfil from '../components/MiPerfil';
-import { getInfoNegocio } from '../services/api';
+import { getInfoNegocio, apiFetch } from '../services/api';
 
 // ========== PAGE HEADER CONTEXT ==========
 interface PageHeaderStat {
@@ -458,6 +458,8 @@ export default function CrmLayout() {
   const [userMenuOpen, setUserMenuOpen] = useState(false);
   const [perfilModalOpen, setPerfilModalOpen] = useState(false);
   const [isotipoUrl, setIsotipoUrl] = useState<string | null>(null);
+  const [unreadCorreo, setUnreadCorreo] = useState(0);
+  const [unreadChats, setUnreadChats] = useState(0);
 
   // Sincronizar tenantActual con la URL cuando cambia el slug
   useEffect(() => {
@@ -484,6 +486,46 @@ export default function CrmLayout() {
     };
     cargarIsotipo();
   }, [tenantActual?.id, getToken]);
+
+  // Polling de unread counts para sidebar badges
+  useEffect(() => {
+    if (!tenantActual?.id || !user?.id) return;
+    let cancelled = false;
+
+    const fetchUnreadCounts = async () => {
+      try {
+        const token = await getToken();
+        // Fetch email unread count
+        const emailRes = await apiFetch(
+          `/tenants/${tenantActual.id}/mensajeria-email/unread-count?usuario_id=${user.id}`,
+          {},
+          token
+        );
+        const emailData = await emailRes.json();
+        if (!cancelled) setUnreadCorreo(emailData.unread || 0);
+      } catch {
+        // Silently fail - sidebar badges are non-critical
+      }
+      try {
+        const token = await getToken();
+        // Fetch chats unread count (conversations with canal != 'email')
+        const chatsRes = await apiFetch(
+          `/tenants/${tenantActual.id}/mensajeria/conversaciones?usuario_id=${user.id}&canal=whatsapp&estado=abierta&limit=1`,
+          {},
+          token
+        );
+        const chatsData = await chatsRes.json();
+        // For now, use total from the paginated response as a proxy
+        if (!cancelled) setUnreadChats(chatsData.total || 0);
+      } catch {
+        // Silently fail
+      }
+    };
+
+    fetchUnreadCounts();
+    const interval = setInterval(fetchUnreadCounts, 60000); // Poll every 60s
+    return () => { cancelled = true; clearInterval(interval); };
+  }, [tenantActual?.id, user?.id, getToken]);
 
   // Mapeo de rutas a módulo requerido para acceso
   const routeModuleMap: Record<string, string> = {
@@ -831,22 +873,31 @@ export default function CrmLayout() {
               >
                 <span className="nav-icon">{Icons.mensajeria}</span>
                 <span className="nav-label">Mensajería</span>
+                {(unreadCorreo + unreadChats) > 0 && !mensajeriaOpen && (
+                  <span className="nav-badge">{unreadCorreo + unreadChats}</span>
+                )}
                 <span className={`nav-chevron ${mensajeriaOpen ? 'open' : ''}`}>
                   {Icons.chevronDown}
                 </span>
               </button>
 
               <div className={`nav-submenu ${mensajeriaOpen ? 'open' : ''}`}>
-                {mensajeriaSubItems.map((item) => (
-                  <NavLink
-                    key={item.id}
-                    to={`${basePath}/${item.path}`}
-                    className={({ isActive }) => `nav-subitem ${isActive ? 'active' : ''}`}
-                  >
-                    <span className="nav-icon">{item.icon}</span>
-                    <span className="nav-label">{item.label}</span>
-                  </NavLink>
-                ))}
+                {mensajeriaSubItems.map((item) => {
+                  const badge = item.id === 'mensajeria-correo' ? unreadCorreo
+                    : item.id === 'mensajeria-chats' ? unreadChats
+                    : 0;
+                  return (
+                    <NavLink
+                      key={item.id}
+                      to={`${basePath}/${item.path}`}
+                      className={({ isActive }) => `nav-subitem ${isActive ? 'active' : ''}`}
+                    >
+                      <span className="nav-icon">{item.icon}</span>
+                      <span className="nav-label">{item.label}</span>
+                      {badge > 0 && <span className="nav-badge">{badge}</span>}
+                    </NavLink>
+                  );
+                })}
               </div>
               </>
               )}
@@ -1392,6 +1443,30 @@ export default function CrmLayout() {
 
           .nav-expandable {
             justify-content: flex-start;
+          }
+
+          .nav-badge {
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            min-width: 18px;
+            height: 18px;
+            padding: 0 5px;
+            border-radius: 9px;
+            background: #ef4444;
+            color: #fff;
+            font-size: 0.65rem;
+            font-weight: 700;
+            line-height: 1;
+            margin-left: auto;
+          }
+
+          .nav-subitem .nav-badge {
+            min-width: 16px;
+            height: 16px;
+            font-size: 0.6rem;
+            padding: 0 4px;
+            border-radius: 8px;
           }
 
           .nav-chevron {

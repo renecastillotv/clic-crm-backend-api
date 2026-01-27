@@ -30,6 +30,7 @@ export interface SendEmailOptions {
     filename: string;
     content: Buffer | string;
     contentType?: string;
+    encoding?: string;
   }>;
 }
 
@@ -105,6 +106,7 @@ export async function sendEmail(
         filename: a.filename,
         content: a.content,
         contentType: a.contentType,
+        ...(a.encoding ? { encoding: a.encoding } : {}),
       })),
     });
 
