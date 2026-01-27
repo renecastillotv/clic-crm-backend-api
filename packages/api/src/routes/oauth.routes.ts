@@ -332,7 +332,7 @@ router.get('/meta-social/callback', async (req: Request, res: Response) => {
       null,
       null,
       new Date(Date.now() + 60 * 24 * 60 * 60 * 1000), // 60 days
-      ['pages_show_list', 'pages_manage_posts', 'pages_read_engagement', 'instagram_basic', 'instagram_content_publish', 'instagram_manage_comments']
+      ['pages_show_list', 'pages_manage_posts', 'pages_read_engagement', 'pages_messaging', 'instagram_basic', 'instagram_content_publish', 'instagram_manage_comments', 'instagram_manage_messages']
     );
 
     return res.send(buildPopupHTML(true, 'Meta conectado exitosamente', 'META_SOCIAL_OAUTH_RESULT'));

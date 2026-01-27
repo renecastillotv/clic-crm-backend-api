@@ -65,6 +65,12 @@ import documentosRequeridosRouter from './documentos-requeridos.routes.js';
 import comisionesRouter from './comisiones.routes.js';
 import apiCredentialsRouter from './api-credentials.routes.js';
 
+// Importar sub-routers modulares - Mensajería
+import mensajeriaRouter from './mensajeria.routes.js';
+import mensajeriaEmailRouter from './mensajeria-email.routes.js';
+import mensajeriaWhatsappRouter from './mensajeria-whatsapp.routes.js';
+import mensajeriaWebchatRouter from './mensajeria-webchat.routes.js';
+
 const router = express.Router();
 
 // ============================================================================
@@ -148,6 +154,18 @@ router.use('/:tenantId/comisiones', comisionesRouter);
 
 // API Credentials Module (integraciones externas: Google, Meta, Email)
 router.use('/:tenantId/api-credentials', apiCredentialsRouter);
+
+// Mensajería Module (conversaciones, mensajes, etiquetas, firmas)
+router.use('/:tenantId/mensajeria', mensajeriaRouter);
+
+// Mensajería Email Module (credentials, IMAP/SMTP, inbox, send/reply)
+router.use('/:tenantId/mensajeria-email', mensajeriaEmailRouter);
+
+// Mensajería WhatsApp Module (credentials, templates, business profile)
+router.use('/:tenantId/mensajeria-whatsapp', mensajeriaWhatsappRouter);
+
+// Mensajería Web Chat Module (config, agents, availability, visitor messages)
+router.use('/:tenantId/mensajeria-webchat', mensajeriaWebchatRouter);
 
 // ============================================================================
 // RUTAS DIRECTAS (sin sub-router)

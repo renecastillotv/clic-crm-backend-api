@@ -70,8 +70,10 @@ import CrmFinanzasComisiones from './pages/crm/CrmFinanzasComisiones';
 import CrmFinanzasFacturas from './pages/crm/CrmFinanzasFacturas';
 import CrmFinanzasConfiguracion from './pages/crm/CrmFinanzasConfiguracion';
 
-// Páginas de Mensajería (con tabs integrados)
-import CrmMensajeria from './pages/crm/CrmMensajeria';
+// Páginas de Mensajería (sub-rutas en sidebar)
+import CrmMensajeriaChats from './pages/crm/CrmMensajeriaChats';
+import CrmMensajeriaCorreo from './pages/crm/CrmMensajeriaCorreo';
+import CrmMensajeriaConfiguracion from './pages/crm/CrmMensajeriaConfiguracion';
 
 // Páginas de Contenido y CLIC Connect
 import CrmContenido from './pages/crm/CrmContenido';
@@ -359,8 +361,11 @@ function AppRoutes() {
         <Route path="finanzas/facturas" element={<CrmFinanzasFacturas />} />
         <Route path="finanzas/configuracion" element={<CrmFinanzasConfiguracion />} />
 
-        {/* Mensajería (una sola página con tabs) */}
-        <Route path="mensajeria" element={<CrmMensajeria />} />
+        {/* Mensajería (sub-rutas en sidebar) */}
+        <Route path="mensajeria" element={<Navigate to="mensajeria/chats" replace />} />
+        <Route path="mensajeria/chats" element={<CrmMensajeriaChats />} />
+        <Route path="mensajeria/correo" element={<CrmMensajeriaCorreo />} />
+        <Route path="mensajeria/configuracion" element={<CrmMensajeriaConfiguracion />} />
 
         {/* Marketing Centro */}
         <Route path="marketing" element={<CrmMarketing />} />

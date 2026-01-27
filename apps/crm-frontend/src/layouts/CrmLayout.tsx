@@ -450,6 +450,7 @@ export default function CrmLayout() {
 
   const [crmOpen, setCrmOpen] = useState(false);
   const [finanzasOpen, setFinanzasOpen] = useState(false);
+  const [mensajeriaOpen, setMensajeriaOpen] = useState(false);
   const [sistemaFasesOpen, setSistemaFasesOpen] = useState(false);
   const [marketingOpen, setMarketingOpen] = useState(false);
   const [configOpen, setConfigOpen] = useState(false);
@@ -502,6 +503,9 @@ export default function CrmLayout() {
     'productividad': 'productividad',
     'contenido': 'contenido',
     'mensajeria': 'mensajeria',
+    'mensajeria/chats': 'mensajeria',
+    'mensajeria/correo': 'mensajeria',
+    'mensajeria/configuracion': 'mensajeria',
     'marketing': 'marketing',
     'marketing/creativos': 'marketing-branding',
     'marketing/creativos/artes': 'marketing-branding',
@@ -561,21 +565,24 @@ export default function CrmLayout() {
                        location.pathname.includes('/actividades') ||
                        location.pathname.includes('/metas');
     const isFinanzasRoute = location.pathname.includes('/finanzas');
+    const isMensajeriaRoute = location.pathname.includes('/mensajeria');
     const isSistemaFasesRoute = location.pathname.includes('/sistema-fases') || location.pathname.includes('/productividad');
     const isMarketingRoute = location.pathname.includes('/marketing');
 
     // Abrir solo el menú correspondiente a la ruta actual, cerrar los demás
     setCrmOpen(isCrmRoute);
     setFinanzasOpen(isFinanzasRoute);
+    setMensajeriaOpen(isMensajeriaRoute);
     setSistemaFasesOpen(isSistemaFasesRoute);
     setMarketingOpen(isMarketingRoute);
     setConfigOpen(isConfigRoute);
   }, [location.pathname]);
 
   // Función para manejar el toggle de submenús (cierra los demás al abrir uno)
-  const toggleSubmenu = (menu: 'crm' | 'finanzas' | 'sistemaFases' | 'marketing' | 'config') => {
+  const toggleSubmenu = (menu: 'crm' | 'finanzas' | 'mensajeria' | 'sistemaFases' | 'marketing' | 'config') => {
     setCrmOpen(menu === 'crm' ? !crmOpen : false);
     setFinanzasOpen(menu === 'finanzas' ? !finanzasOpen : false);
+    setMensajeriaOpen(menu === 'mensajeria' ? !mensajeriaOpen : false);
     setSistemaFasesOpen(menu === 'sistemaFases' ? !sistemaFasesOpen : false);
     setMarketingOpen(menu === 'marketing' ? !marketingOpen : false);
     setConfigOpen(menu === 'config' ? !configOpen : false);
@@ -630,6 +637,13 @@ export default function CrmLayout() {
     { id: 'configuracion', path: 'configuracion', label: 'General', icon: Icons.general },
   ];
 
+  // Sub-items de Mensajería
+  const mensajeriaSubItems = [
+    { id: 'mensajeria-chats', path: 'mensajeria/chats', label: 'Chats', icon: Icons.mensajeria },
+    { id: 'mensajeria-correo', path: 'mensajeria/correo', label: 'Correo', icon: Icons.email },
+    { id: 'mensajeria-config', path: 'mensajeria/configuracion', label: 'Configuración', icon: Icons.configuracion },
+  ];
+
   // Sub-items de Marketing
   const marketingSubItems = [
     { id: 'marketing', path: 'marketing', label: 'Centro', icon: Icons.centro },
@@ -676,6 +690,8 @@ export default function CrmLayout() {
                       location.pathname.includes('/metas');
 
   const isFinanzasActive = location.pathname.includes('/finanzas');
+
+  const isMensajeriaActive = location.pathname.includes('/mensajeria');
 
   const isSistemaFasesActive = location.pathname.includes('/sistema-fases') || location.pathname.includes('/productividad');
 
@@ -806,15 +822,33 @@ export default function CrmLayout() {
               </>
               )}
 
-              {/* Mensajería */}
+              {/* Mensajería con submenú */}
               {tieneAcceso('mensajeria') && (
-              <NavLink
-                to={`${basePath}/mensajeria`}
-                className={({ isActive }) => `nav-item ${isActive ? 'active' : ''}`}
+              <>
+              <button
+                className={`nav-item nav-expandable ${isMensajeriaActive ? 'active' : ''}`}
+                onClick={() => toggleSubmenu('mensajeria')}
               >
                 <span className="nav-icon">{Icons.mensajeria}</span>
                 <span className="nav-label">Mensajería</span>
-              </NavLink>
+                <span className={`nav-chevron ${mensajeriaOpen ? 'open' : ''}`}>
+                  {Icons.chevronDown}
+                </span>
+              </button>
+
+              <div className={`nav-submenu ${mensajeriaOpen ? 'open' : ''}`}>
+                {mensajeriaSubItems.map((item) => (
+                  <NavLink
+                    key={item.id}
+                    to={`${basePath}/${item.path}`}
+                    className={({ isActive }) => `nav-subitem ${isActive ? 'active' : ''}`}
+                  >
+                    <span className="nav-icon">{item.icon}</span>
+                    <span className="nav-label">{item.label}</span>
+                  </NavLink>
+                ))}
+              </div>
+              </>
               )}
 
               {/* Marketing con submenú */}

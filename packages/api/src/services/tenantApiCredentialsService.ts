@@ -61,6 +61,7 @@ export interface TenantApiCredentials {
   // WhatsApp
   whatsappConnected: boolean;
   whatsappPhoneNumberId?: string;
+  whatsappBusinessAccountId?: string;
 
   // Auditoría
   connectedBy?: string;
@@ -192,6 +193,7 @@ export async function getTenantApiCredentials(tenantId: string): Promise<TenantA
       -- WhatsApp
       whatsapp_connected as "whatsappConnected",
       whatsapp_phone_number_id as "whatsappPhoneNumberId",
+      whatsapp_business_account_id as "whatsappBusinessAccountId",
       -- Auditoría
       connected_by as "connectedBy",
       last_sync_at as "lastSyncAt",
@@ -1155,4 +1157,82 @@ export async function getApiUsageStats(
     totalCredits: parseInt(row.totalCredits),
     avgResponseTime: parseFloat(row.avgResponseTime) || 0
   }));
+}
+
+// ==================== WHATSAPP CREDENTIALS ====================
+
+export interface WhatsAppCredentials {
+  accessToken: string;
+  phoneNumberId: string;
+  wabaId: string;
+  connected: boolean;
+}
+
+/**
+ * Get WhatsApp Cloud API credentials for a tenant.
+ */
+export async function getWhatsAppCredentials(tenantId: string): Promise<WhatsAppCredentials | null> {
+  const sql = `
+    SELECT
+      whatsapp_access_token_encrypted,
+      whatsapp_phone_number_id,
+      whatsapp_business_account_id,
+      whatsapp_connected
+    FROM tenant_api_credentials
+    WHERE tenant_id = $1 AND whatsapp_connected = true
+  `;
+  const result = await query(sql, [tenantId]);
+  if (!result.rows[0]) return null;
+
+  const row = result.rows[0];
+  if (!row.whatsapp_access_token_encrypted || !row.whatsapp_phone_number_id) return null;
+
+  const accessToken = await decryptValue(row.whatsapp_access_token_encrypted);
+  return {
+    accessToken,
+    phoneNumberId: row.whatsapp_phone_number_id,
+    wabaId: row.whatsapp_business_account_id || '',
+    connected: row.whatsapp_connected,
+  };
+}
+
+/**
+ * Save WhatsApp Cloud API credentials for a tenant.
+ */
+export async function saveWhatsAppCredentials(
+  tenantId: string,
+  data: {
+    accessToken: string;
+    phoneNumberId: string;
+    wabaId: string;
+  }
+): Promise<void> {
+  const encryptedToken = encryptValue(data.accessToken);
+
+  const sql = `
+    UPDATE tenant_api_credentials SET
+      whatsapp_access_token_encrypted = $1,
+      whatsapp_phone_number_id = $2,
+      whatsapp_business_account_id = $3,
+      whatsapp_connected = true,
+      updated_at = NOW()
+    WHERE tenant_id = $4
+  `;
+  await query(sql, [encryptedToken, data.phoneNumberId, data.wabaId, tenantId]);
+}
+
+/**
+ * Disconnect WhatsApp for a tenant.
+ */
+export async function disconnectWhatsApp(tenantId: string): Promise<void> {
+  const sql = `
+    UPDATE tenant_api_credentials SET
+      whatsapp_connected = false,
+      whatsapp_access_token_encrypted = NULL,
+      whatsapp_phone_number_id = NULL,
+      whatsapp_business_account_id = NULL,
+      updated_at = NOW()
+    WHERE tenant_id = $1
+  `;
+  await query(sql, [tenantId]);
 }

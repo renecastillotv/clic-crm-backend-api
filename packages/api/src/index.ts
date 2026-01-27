@@ -16,6 +16,7 @@ import geocodingRouter from './routes/geocoding.js';
 import importRouter from './routes/import.js';
 import oauthRouter from './routes/oauth.routes.js';
 import cronRouter from './routes/cron.routes.js';
+import metaWebhooksRouter from './routes/meta-webhooks.routes.js';
 
 // Cargar variables de entorno
 dotenv.config();
@@ -87,6 +88,10 @@ console.log('🔧 DATABASE_URL configurada:', process.env.DATABASE_URL ? 'Sí' :
 app.use(cors({
   exposedHeaders: ['X-Scope-Status'],
 }));
+
+// Meta Webhooks: mount BEFORE express.json() to preserve raw body for HMAC signature verification
+app.use('/api/webhooks/meta', express.raw({ type: 'application/json' }), metaWebhooksRouter);
+
 app.use(express.json());
 
 // Health check
