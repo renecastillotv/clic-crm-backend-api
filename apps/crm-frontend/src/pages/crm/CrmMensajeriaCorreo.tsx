@@ -213,6 +213,7 @@ export default function CrmMensajeriaCorreo() {
   const userId = user?.id;
   const syncIntervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
   const pollIntervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
+  const mouseDownTargetRef = useRef<EventTarget | null>(null);
 
   // ==================== FETCH CREDENTIALS ====================
 
@@ -640,7 +641,10 @@ export default function CrmMensajeriaCorreo() {
 
       {/* Compose Modal */}
       {showCompose && (
-        <div className="correo-modal-overlay" onClick={() => setShowCompose(false)}>
+        <div className="correo-modal-overlay"
+          onMouseDown={e => { mouseDownTargetRef.current = e.target; }}
+          onClick={e => { if (e.target === e.currentTarget && mouseDownTargetRef.current === e.currentTarget) setShowCompose(false); }}
+        >
           <div className="correo-modal" onClick={e => e.stopPropagation()}>
             <div className="correo-modal-header">
               <h3>Nuevo correo</h3>
@@ -673,7 +677,10 @@ export default function CrmMensajeriaCorreo() {
   function renderSetupModal() {
     if (!showSetup) return null;
     return (
-      <div className="correo-modal-overlay" onClick={() => setShowSetup(false)}>
+      <div className="correo-modal-overlay"
+        onMouseDown={e => { mouseDownTargetRef.current = e.target; }}
+        onClick={e => { if (e.target === e.currentTarget && mouseDownTargetRef.current === e.currentTarget) setShowSetup(false); }}
+      >
         <div className="correo-modal" onClick={e => e.stopPropagation()}>
           <div className="correo-modal-header">
             <h3>Configurar cuenta de correo</h3>

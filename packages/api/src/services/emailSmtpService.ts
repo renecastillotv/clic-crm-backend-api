@@ -77,20 +77,30 @@ export async function sendEmail(
   const transport = createTransport(creds);
 
   try {
+    const cleanFrom = options.from.trim();
+    const cleanTo = options.to.split(',').map(e => e.trim()).filter(Boolean).join(', ');
+    const cleanCc = options.cc ? options.cc.split(',').map(e => e.trim()).filter(Boolean).join(', ') : undefined;
+    const cleanBcc = options.bcc ? options.bcc.split(',').map(e => e.trim()).filter(Boolean).join(', ') : undefined;
+
     const fromField = options.fromName
-      ? `"${options.fromName}" <${options.from}>`
-      : options.from;
+      ? `"${options.fromName}" <${cleanFrom}>`
+      : cleanFrom;
 
     const result = await transport.sendMail({
       from: fromField,
-      to: options.to,
-      cc: options.cc || undefined,
-      bcc: options.bcc || undefined,
+      to: cleanTo,
+      cc: cleanCc,
+      bcc: cleanBcc,
       subject: options.subject,
       html: options.html,
       text: options.text || undefined,
       inReplyTo: options.inReplyTo || undefined,
       references: options.references || undefined,
+      envelope: {
+        from: cleanFrom,
+        to: cleanTo.split(',').map(e => e.trim()),
+        cc: cleanCc ? cleanCc.split(',').map(e => e.trim()) : undefined,
+      },
       attachments: options.attachments?.map(a => ({
         filename: a.filename,
         content: a.content,
