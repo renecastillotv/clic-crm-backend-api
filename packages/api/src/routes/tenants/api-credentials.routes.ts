@@ -869,9 +869,11 @@ router.get('/meta/posts/:postId/comments', async (req: Request<TenantParams & { 
       return res.status(400).json({ error: 'Meta no está conectado' });
     }
 
+    const platform = (req.query.platform as string) === 'instagram' ? 'instagram' : 'facebook';
     const comments = await metaSocialService.getComments(
       tokenData.pageAccessToken,
-      postId
+      postId,
+      platform
     );
 
     res.json(comments);

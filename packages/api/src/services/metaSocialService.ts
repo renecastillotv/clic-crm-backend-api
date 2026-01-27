@@ -321,9 +321,13 @@ export async function getInstagramMedia(
  */
 export async function getComments(
   pageAccessToken: string,
-  objectId: string
+  objectId: string,
+  platform: 'facebook' | 'instagram' = 'facebook'
 ): Promise<MetaComment[]> {
-  const fields = 'id,message,from,created_time,like_count,comments{id,message,from,created_time,like_count}';
+  // Instagram and Facebook use different field names
+  const fields = platform === 'instagram'
+    ? 'id,text,username,timestamp,like_count,replies{id,text,username,timestamp,like_count}'
+    : 'id,message,from,created_time,like_count,comments{id,message,from,created_time,like_count}';
 
   const response = await fetch(
     `${GRAPH_API_BASE}/${objectId}/comments?fields=${encodeURIComponent(fields)}&limit=50`,
@@ -334,6 +338,23 @@ export async function getComments(
 
   if (!response.ok || data.error) {
     throw new Error(`Failed to get comments: ${data.error?.message || response.statusText}`);
+  }
+
+  if (platform === 'instagram') {
+    return (data.data || []).map((comment: any) => ({
+      id: comment.id,
+      message: comment.text || '',
+      from: comment.username ? { id: comment.username, name: comment.username } : undefined,
+      createdTime: comment.timestamp,
+      likeCount: comment.like_count || 0,
+      replies: (comment.replies?.data || []).map((reply: any) => ({
+        id: reply.id,
+        message: reply.text || '',
+        from: reply.username ? { id: reply.username, name: reply.username } : undefined,
+        createdTime: reply.timestamp,
+        likeCount: reply.like_count || 0,
+      })),
+    }));
   }
 
   return (data.data || []).map((comment: any) => ({

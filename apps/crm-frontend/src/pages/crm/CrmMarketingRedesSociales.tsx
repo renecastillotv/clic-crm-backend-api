@@ -927,13 +927,13 @@ const CrmMarketingRedesSociales: React.FC = () => {
   };
 
   // Comments handler
-  const loadComments = async (postId: string) => {
+  const loadComments = async (postId: string, platform: 'facebook' | 'instagram' = 'facebook') => {
     if (!tenantActual?.id) return;
     setSelectedPostId(postId);
     setCommentsLoading(true);
     setComments([]);
     try {
-      const response = await apiFetch(`/tenants/${tenantActual.id}/api-credentials/meta/posts/${postId}/comments`);
+      const response = await apiFetch(`/tenants/${tenantActual.id}/api-credentials/meta/posts/${postId}/comments?platform=${platform}`);
       const data = await response.json();
       setComments(Array.isArray(data) ? data : []);
     } catch (error) {
@@ -964,8 +964,10 @@ const CrmMarketingRedesSociales: React.FC = () => {
   };
 
   const formatDate = (dateStr: string) => {
+    if (!dateStr) return '';
     try {
       const date = new Date(dateStr);
+      if (isNaN(date.getTime())) return dateStr;
       return date.toLocaleDateString('es-MX', { day: 'numeric', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit' });
     } catch {
       return dateStr;
@@ -2508,7 +2510,7 @@ const CrmMarketingRedesSociales: React.FC = () => {
                     <div style={{ marginTop: '10px', display: 'flex', gap: '8px' }}>
                       {media.commentsCount > 0 && (
                         <button
-                          onClick={() => loadComments(media.id)}
+                          onClick={() => loadComments(media.id, 'instagram')}
                           style={{
                             display: 'flex',
                             alignItems: 'center',
