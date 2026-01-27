@@ -521,7 +521,7 @@ router.get('/meta/auth-url', async (req: Request<TenantParams>, res: Response, n
       client_id: appId,
       redirect_uri: redirectUri,
       response_type: 'code',
-      scope: 'pages_show_list,pages_manage_posts,pages_read_engagement,instagram_basic,instagram_content_publish,instagram_manage_comments',
+      scope: 'pages_show_list,pages_manage_posts,pages_read_engagement,pages_messaging,instagram_basic,instagram_content_publish,instagram_manage_comments,instagram_manage_messages',
       state,
     });
 
@@ -698,7 +698,7 @@ router.put('/meta/page', async (req: Request<TenantParams>, res: Response, next:
       selectedPage.instagramBusinessAccount?.id || null,
       selectedPage.instagramBusinessAccount?.username || null,
       new Date(Date.now() + 60 * 24 * 60 * 60 * 1000),
-      ['pages_manage_posts', 'pages_read_engagement', 'instagram_basic', 'instagram_content_publish', 'instagram_manage_comments']
+      ['pages_manage_posts', 'pages_read_engagement', 'instagram_basic', 'instagram_content_publish', 'instagram_manage_comments', 'instagram_manage_messages']
     );
 
     res.json({

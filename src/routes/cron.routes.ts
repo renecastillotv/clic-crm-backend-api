@@ -104,4 +104,27 @@ router.get('/process-scheduled-posts', async (req: Request, res: Response) => {
   }
 });
 
+/**
+ * GET /api/cron/sync-emails
+ *
+ * Called every 2-3 minutes by Hetzner VPS crontab.
+ * Syncs IMAP inbox for all users with is_connected=true.
+ */
+router.get('/sync-emails', async (req: Request, res: Response) => {
+  const secret = req.headers['x-cron-secret'] as string;
+  if (!CRON_SECRET || secret !== CRON_SECRET) {
+    return res.status(401).json({ error: 'Unauthorized' });
+  }
+
+  try {
+    const { syncAllConnectedUsers } = await import('../services/emailSyncService.js');
+    const result = await syncAllConnectedUsers();
+
+    res.json(result);
+  } catch (error: any) {
+    console.error('[Cron] Error syncing emails:', error.message);
+    res.status(500).json({ error: 'Internal error', message: error.message });
+  }
+});
+
 export default router;
