@@ -64,15 +64,22 @@ interface PropertyItem {
   id: string;
   titulo: string;
   codigo?: string;
+  codigo_publico?: string;
   tipo: string;
   operacion: string;
   precio?: number;
+  precio_venta?: number;
   moneda: string;
   ciudad?: string;
+  slug?: string;
+  categoria_slug?: string;
+  sector_slug?: string;
+  ciudad_slug?: string;
   imagen_principal?: string;
   habitaciones?: number;
   banos?: number;
   m2_construccion?: number;
+  m2_terreno?: number;
 }
 
 interface Firma {
@@ -112,6 +119,12 @@ const Icons = {
   restore: <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><polyline points="1 4 1 10 7 10"/><path d="M3.51 15a9 9 0 1 0 2.13-9.36L1 10"/></svg>,
   filePdf: <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/></svg>,
   arrowLeft: <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><line x1="19" y1="12" x2="5" y2="12"/><polyline points="12 19 5 12 12 5"/></svg>,
+  bold: <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><path d="M6 4h8a4 4 0 0 1 4 4 4 4 0 0 1-4 4H6z"/><path d="M6 12h9a4 4 0 0 1 4 4 4 4 0 0 1-4 4H6z"/></svg>,
+  italic: <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><line x1="19" y1="4" x2="10" y2="4"/><line x1="14" y1="20" x2="5" y2="20"/><line x1="15" y1="4" x2="9" y2="20"/></svg>,
+  underline: <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M6 3v7a6 6 0 0 0 6 6 6 6 0 0 0 6-6V3"/><line x1="4" y1="21" x2="20" y2="21"/></svg>,
+  listUl: <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><line x1="8" y1="6" x2="21" y2="6"/><line x1="8" y1="12" x2="21" y2="12"/><line x1="8" y1="18" x2="21" y2="18"/><line x1="3" y1="6" x2="3.01" y2="6"/><line x1="3" y1="12" x2="3.01" y2="12"/><line x1="3" y1="18" x2="3.01" y2="18"/></svg>,
+  listOl: <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><line x1="10" y1="6" x2="21" y2="6"/><line x1="10" y1="12" x2="21" y2="12"/><line x1="10" y1="18" x2="21" y2="18"/><path d="M4 6h1v4"/><path d="M4 10h2"/><path d="M6 18H4c0-1 2-2 2-3s-1-1.5-2-1"/></svg>,
+  linkIcon: <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M10 13a5 5 0 0 0 7.54.54l3-3a5 5 0 0 0-7.07-7.07l-1.72 1.71"/><path d="M14 11a5 5 0 0 0-7.54-.54l-3 3a5 5 0 0 0 7.07 7.07l1.71-1.71"/></svg>,
 };
 
 // ==================== HELPERS ====================
@@ -180,10 +193,36 @@ function fileToBase64(file: File): Promise<string> {
   });
 }
 
-function buildPropertyHtml(prop: PropertyItem): string {
-  const details = [prop.ciudad, prop.habitaciones ? `${prop.habitaciones} hab` : '', prop.banos ? `${prop.banos} ban` : '', prop.m2_construccion ? `${prop.m2_construccion} m2` : ''].filter(Boolean).join(' | ');
+function buildPropertyUrl(prop: PropertyItem, domain?: string): string {
+  const hasVenta = prop.precio_venta && prop.precio_venta > 0;
+  const operation = hasVenta ? 'comprar' : (prop.operacion === 'alquiler' ? 'alquilar' : 'comprar');
+  const catSlug = prop.categoria_slug || 'propiedad';
+  const locSlug = prop.sector_slug || prop.ciudad_slug || '';
+  let path = `/${operation}`;
+  if (catSlug) path += `/${catSlug}`;
+  if (locSlug) path += `/${locSlug}`;
+  if (prop.slug) path += `/${prop.slug}`;
+  const base = domain ? `https://${domain}` : '';
+  return `${base}${path}`;
+}
+
+function buildPropertyHtml(prop: PropertyItem, domain?: string): string {
+  const details = [
+    prop.codigo_publico ? `#${prop.codigo_publico}` : '',
+    prop.ciudad,
+    prop.habitaciones ? `${prop.habitaciones} hab` : '',
+    prop.banos ? `${prop.banos} ban` : '',
+    prop.m2_construccion ? `${prop.m2_construccion} m\u00B2` : '',
+    prop.m2_terreno ? `${prop.m2_terreno} m\u00B2 terreno` : '',
+  ].filter(Boolean).join(' &middot; ');
   const price = prop.precio ? `${prop.moneda || '$'} ${prop.precio.toLocaleString()}` : '';
-  return `<table width="100%" cellpadding="0" cellspacing="0" style="margin:12px 0;border:1px solid #e2e8f0;border-radius:8px;overflow:hidden;font-family:sans-serif;"><tr>${prop.imagen_principal ? `<td style="padding:0;"><img src="${prop.imagen_principal}" alt="" style="width:100%;max-height:180px;object-fit:cover;display:block;"/></td>` : ''}</tr><tr><td style="padding:16px;"><div style="font-size:16px;font-weight:600;color:#0f172a;margin:0 0 4px;">${prop.titulo}</div><div style="font-size:13px;color:#64748b;margin:0 0 6px;">${details}</div>${price ? `<div style="font-size:18px;font-weight:700;color:#2563eb;">${price}</div>` : ''}</td></tr></table>`;
+  const url = buildPropertyUrl(prop, domain);
+  return `<table width="100%" cellpadding="0" cellspacing="0" style="margin:12px 0;border:1px solid #e2e8f0;border-radius:8px;overflow:hidden;font-family:sans-serif;"><tr>${prop.imagen_principal ? `<td style="padding:0;"><a href="${url}" target="_blank" rel="noopener" style="display:block;"><img src="${prop.imagen_principal}" alt="" style="width:100%;max-height:180px;object-fit:cover;display:block;"/></a></td>` : ''}</tr><tr><td style="padding:16px;"><a href="${url}" target="_blank" rel="noopener" style="text-decoration:none;color:inherit;"><div style="font-size:16px;font-weight:600;color:#0f172a;margin:0 0 4px;">${prop.titulo}</div></a><div style="font-size:13px;color:#64748b;margin:0 0 6px;">${details}</div>${price ? `<div style="font-size:18px;font-weight:700;color:#2563eb;margin:0 0 8px;">${price}</div>` : ''}<a href="${url}" target="_blank" rel="noopener" style="display:inline-block;padding:8px 20px;background:#3b82f6;color:white;text-decoration:none;border-radius:6px;font-size:14px;font-weight:600;">Ver propiedad</a></td></tr></table>`;
+}
+
+function stripHtml(html: string): string {
+  const doc = new DOMParser().parseFromString(html, 'text/html');
+  return doc.body.textContent || '';
 }
 
 // ==================== COMPONENT ====================
@@ -227,7 +266,11 @@ export default function CrmMensajeriaCorreo() {
   const [showPropertyPicker, setShowPropertyPicker] = useState(false);
   const [propertyResults, setPropertyResults] = useState<PropertyItem[]>([]);
   const [propertyQuery, setPropertyQuery] = useState('');
-  const [selectedProperties, setSelectedProperties] = useState<PropertyItem[]>([]);
+
+  // Contact picker modal
+  const [showContactModal, setShowContactModal] = useState(false);
+  const [contactModalQuery, setContactModalQuery] = useState('');
+  const [contactModalResults, setContactModalResults] = useState<ContactSuggestion[]>([]);
 
   // Signature
   const [firma, setFirma] = useState<Firma | null>(null);
@@ -254,6 +297,9 @@ export default function CrmMensajeriaCorreo() {
   const mouseDownTargetRef = useRef<EventTarget | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const toInputRef = useRef<HTMLInputElement>(null);
+  const editorRef = useRef<HTMLDivElement>(null);
+  const fetchConversacionesRef = useRef<() => Promise<void>>();
+  const handleSyncRef = useRef<(silent?: boolean) => Promise<void>>();
 
   // ==================== DATA FETCHING ====================
 
@@ -324,12 +370,12 @@ export default function CrmMensajeriaCorreo() {
   useEffect(() => { fetchFirma(); }, [fetchFirma]);
   useEffect(() => { if (conversacionActiva) fetchMensajes(conversacionActiva); }, [conversacionActiva, fetchMensajes]);
 
-  // Auto-sync
+  // Auto-sync (uses refs so folder changes are picked up without recreating intervals)
   useEffect(() => {
     if (!credentials?.is_connected) return;
-    handleSync(true);
-    syncIntervalRef.current = setInterval(() => handleSync(true), 60000);
-    pollIntervalRef.current = setInterval(fetchConversaciones, 15000);
+    handleSyncRef.current?.(true);
+    syncIntervalRef.current = setInterval(() => handleSyncRef.current?.(true), 60000);
+    pollIntervalRef.current = setInterval(() => fetchConversacionesRef.current?.(), 15000);
     return () => {
       if (syncIntervalRef.current) clearInterval(syncIntervalRef.current);
       if (pollIntervalRef.current) clearInterval(pollIntervalRef.current);
@@ -364,6 +410,27 @@ export default function CrmMensajeriaCorreo() {
     });
   }, [view, composeMode, credentials, syncing]); // eslint-disable-line
 
+  // Editor init: set content when compose view opens
+  useEffect(() => {
+    if (view === 'compose' && editorRef.current) {
+      editorRef.current.innerHTML = composeBody;
+    }
+  }, [view, composeMode]); // eslint-disable-line
+
+  // Rich text formatting
+  const execFormat = (command: string, value?: string) => {
+    editorRef.current?.focus();
+    document.execCommand(command, false, value);
+  };
+
+  const insertLink = () => {
+    const url = prompt('URL del enlace:');
+    if (url) {
+      editorRef.current?.focus();
+      document.execCommand('createLink', false, url);
+    }
+  };
+
   // ==================== ACTIONS ====================
 
   const handleSync = useCallback(async (silent = false) => {
@@ -375,6 +442,10 @@ export default function CrmMensajeriaCorreo() {
     } catch {}
     if (!silent) setSyncing(false);
   }, [tenantId, userId, fetchConversaciones]);
+
+  // Keep refs updated for polling (must be after function definitions)
+  fetchConversacionesRef.current = fetchConversaciones;
+  handleSyncRef.current = handleSync;
 
   const handleSaveCredentials = async () => {
     if (!tenantId || !userId || !setupEmail) return;
@@ -412,7 +483,7 @@ export default function CrmMensajeriaCorreo() {
 
   function openNewCompose() {
     setComposeMode('new'); setComposeTo(''); setComposeCc(''); setComposeBcc('');
-    setComposeSubject(''); setComposeBody(''); setComposeFiles([]); setSelectedProperties([]);
+    setComposeSubject(''); setComposeBody(''); setComposeFiles([]);
     setShowCcBcc(false); setComposeReplyConvId(null); setView('compose');
   }
 
@@ -423,7 +494,7 @@ export default function CrmMensajeriaCorreo() {
     setComposeCc(''); setComposeBcc('');
     setComposeSubject(lastIncoming?.email_asunto ? `Re: ${lastIncoming.email_asunto.replace(/^Re:\s*/i, '')}` : 'Re:');
     setComposeBody('');
-    setComposeFiles([]); setSelectedProperties([]); setShowCcBcc(false);
+    setComposeFiles([]); setShowCcBcc(false);
     setComposeReplyConvId(conv.id); setView('compose');
   }
 
@@ -432,7 +503,7 @@ export default function CrmMensajeriaCorreo() {
     setComposeTo(''); setComposeCc(''); setComposeBcc('');
     setComposeSubject(`Fwd: ${(msg.email_asunto || '').replace(/^Fwd:\s*/i, '')}`);
     setComposeBody(msg.contenido_plain || '');
-    setComposeFiles([]); setSelectedProperties([]); setShowCcBcc(false);
+    setComposeFiles([]); setShowCcBcc(false);
     setComposeReplyConvId(null); setView('compose');
   }
 
@@ -440,12 +511,10 @@ export default function CrmMensajeriaCorreo() {
     if (!tenantId || !userId || !composeTo || !composeSubject) return;
     setSending(true);
     try {
-      // Build HTML body - replace property placeholders with rich HTML
-      let bodyHtml = composeBody;
-      for (const prop of selectedProperties) {
-        bodyHtml = bodyHtml.replace(`[Propiedad: ${prop.titulo}]`, buildPropertyHtml(prop));
-      }
-      let htmlBody = `<div>${bodyHtml.replace(/\n/g, '<br/>')}</div>`;
+      // Read HTML from rich text editor
+      const editorHtml = editorRef.current?.innerHTML || '';
+      const plainText = stripHtml(editorHtml);
+      let htmlBody = `<div>${editorHtml}</div>`;
       if (firma && showFirma) {
         htmlBody += `<br/><div style="border-top:1px solid #e2e8f0;padding-top:12px;margin-top:12px;color:#64748b;font-size:13px;">${firma.contenido_html}</div>`;
       }
@@ -461,7 +530,7 @@ export default function CrmMensajeriaCorreo() {
           body: JSON.stringify({
             usuario_id: userId, conversacion_id: composeReplyConvId, to: composeTo,
             cc: composeCc || undefined, bcc: composeBcc || undefined,
-            subject: composeSubject, html: htmlBody, text: composeBody, attachments,
+            subject: composeSubject, html: htmlBody, text: plainText, attachments,
           }),
         });
       } else {
@@ -469,7 +538,7 @@ export default function CrmMensajeriaCorreo() {
           method: 'POST',
           body: JSON.stringify({
             usuario_id: userId, to: composeTo, cc: composeCc || undefined, bcc: composeBcc || undefined,
-            subject: composeSubject, html: htmlBody, text: composeBody, attachments,
+            subject: composeSubject, html: htmlBody, text: plainText, attachments,
           }),
         });
       }
@@ -519,9 +588,49 @@ export default function CrmMensajeriaCorreo() {
 
   // Property picker
   const handleInsertProperty = (prop: PropertyItem) => {
-    setComposeBody(prev => prev + '\n[Propiedad: ' + prop.titulo + ']\n');
-    setSelectedProperties(prev => [...prev, prop]);
+    const domain = (tenantActual as any)?.dominio_web || (tenantActual as any)?.dominio || '';
+    const html = buildPropertyHtml(prop, domain || undefined);
+    if (editorRef.current) {
+      editorRef.current.focus();
+      document.execCommand('insertHTML', false, html);
+    }
     setShowPropertyPicker(false);
+  };
+
+  // Contact modal
+  const openContactModal = () => {
+    setContactModalQuery('');
+    setContactModalResults([]);
+    setShowContactModal(true);
+    // Fetch initial contacts
+    if (tenantId) {
+      apiFetch(`/tenants/${tenantId}/contactos?limit=20`)
+        .then(res => res.json())
+        .then(data => setContactModalResults((data.data || []).filter((c: any) => c.email)))
+        .catch(() => {});
+    }
+  };
+
+  const searchContactsModal = async (query: string) => {
+    if (!tenantId) return;
+    try {
+      const res = await apiFetch(`/tenants/${tenantId}/contactos?busqueda=${encodeURIComponent(query)}&limit=20`);
+      const data = await res.json();
+      setContactModalResults((data.data || []).filter((c: any) => c.email));
+    } catch { setContactModalResults([]); }
+  };
+
+  const selectContactFromModal = (contact: ContactSuggestion) => {
+    const currentTo = composeTo.trim();
+    const email = contact.email!;
+    if (currentTo && !currentTo.endsWith(',')) {
+      setComposeTo(currentTo + ', ' + email);
+    } else if (currentTo) {
+      setComposeTo(currentTo + ' ' + email);
+    } else {
+      setComposeTo(email);
+    }
+    setShowContactModal(false);
   };
 
   // ==================== COMPUTED ====================
@@ -579,7 +688,7 @@ export default function CrmMensajeriaCorreo() {
                   placeholder="destinatario@email.com"
                   autoFocus
                 />
-                <button className="ce-compose-field-btn" onClick={() => { searchContacts(''); setShowContactDropdown(true); }} title="Buscar contactos">{Icons.user}</button>
+                <button className="ce-compose-field-btn" onClick={openContactModal} title="Buscar contactos">{Icons.user}</button>
                 {!showCcBcc && <button className="ce-compose-field-btn text" onClick={() => setShowCcBcc(true)}>CC/BCC</button>}
               </div>
               {showContactDropdown && contactSuggestions.length > 0 && (
@@ -611,12 +720,30 @@ export default function CrmMensajeriaCorreo() {
             </div>
           </div>
 
-          {/* Body */}
+          {/* Rich text toolbar */}
+          <div className="ce-editor-toolbar">
+            <button type="button" className="ce-editor-btn" onClick={() => execFormat('bold')} title="Negrita (Ctrl+B)">{Icons.bold}</button>
+            <button type="button" className="ce-editor-btn" onClick={() => execFormat('italic')} title="Cursiva (Ctrl+I)">{Icons.italic}</button>
+            <button type="button" className="ce-editor-btn" onClick={() => execFormat('underline')} title="Subrayado (Ctrl+U)">{Icons.underline}</button>
+            <span className="ce-editor-sep" />
+            <button type="button" className="ce-editor-btn" onClick={() => execFormat('insertUnorderedList')} title="Lista">{Icons.listUl}</button>
+            <button type="button" className="ce-editor-btn" onClick={() => execFormat('insertOrderedList')} title="Lista numerada">{Icons.listOl}</button>
+            <span className="ce-editor-sep" />
+            <button type="button" className="ce-editor-btn" onClick={insertLink} title="Insertar enlace">{Icons.linkIcon}</button>
+          </div>
+
+          {/* Body - rich text editor */}
           <div className="ce-compose-body-area">
-            <textarea
-              value={composeBody}
-              onChange={e => setComposeBody(e.target.value)}
-              placeholder="Escribe tu mensaje..."
+            <div
+              ref={editorRef}
+              className="ce-rich-editor"
+              contentEditable
+              data-placeholder="Escribe tu mensaje..."
+              onKeyDown={e => {
+                if (e.key === 'Enter' && !e.shiftKey) {
+                  // Allow default Enter behavior (new line)
+                }
+              }}
             />
           </div>
 
@@ -682,6 +809,7 @@ export default function CrmMensajeriaCorreo() {
             <button className="ce-btn ghost" onClick={() => setView('inbox')}>Descartar</button>
           </div>
         </div>
+        {renderContactModal()}
         <style>{styles}</style>
       </div>
     );
@@ -698,7 +826,7 @@ export default function CrmMensajeriaCorreo() {
             <button
               key={f.id}
               className={`ce-folder-btn ${carpeta === f.id ? 'active' : ''}`}
-              onClick={() => { setCarpeta(f.id); setConversacionActiva(null); setMensajes([]); }}
+              onClick={() => { setCarpeta(f.id); setConversacionActiva(null); setMensajes([]); setConversaciones([]); }}
               style={{ '--folder-color': f.color } as React.CSSProperties}
             >
               <span className="ce-folder-icon">{f.icon}</span>
@@ -845,9 +973,61 @@ export default function CrmMensajeriaCorreo() {
 
       {/* Setup Modal */}
       {renderSetupModal()}
+      {renderContactModal()}
       <style>{styles}</style>
     </div>
   );
+
+  // ==================== CONTACT MODAL ====================
+
+  function renderContactModal() {
+    if (!showContactModal) return null;
+    return (
+      <div className="ce-modal-overlay"
+        onMouseDown={e => { mouseDownTargetRef.current = e.target; }}
+        onClick={e => { if (e.target === e.currentTarget && mouseDownTargetRef.current === e.currentTarget) setShowContactModal(false); }}
+      >
+        <div className="ce-modal" onClick={e => e.stopPropagation()}>
+          <div className="ce-modal-header">
+            <h3>Seleccionar contacto</h3>
+            <button className="ce-btn-icon" onClick={() => setShowContactModal(false)}>{Icons.close}</button>
+          </div>
+          <div style={{ padding: '16px 24px 8px' }}>
+            <div className="ce-list-search" style={{ borderRadius: 8, border: '1px solid #e2e8f0' }}>
+              {Icons.search}
+              <input
+                type="text"
+                placeholder="Buscar por nombre o email..."
+                value={contactModalQuery}
+                onChange={e => { setContactModalQuery(e.target.value); searchContactsModal(e.target.value); }}
+                autoFocus
+              />
+            </div>
+          </div>
+          <div style={{ maxHeight: 360, overflowY: 'auto', padding: '0 12px 12px' }}>
+            {contactModalResults.length === 0 && (
+              <p style={{ textAlign: 'center', color: '#94a3b8', fontSize: '0.8125rem', padding: 20 }}>
+                {contactModalQuery ? 'Sin resultados' : 'Cargando contactos...'}
+              </p>
+            )}
+            {contactModalResults.map(c => (
+              <button
+                key={c.id}
+                className="ce-contact-modal-item"
+                onClick={() => selectContactFromModal(c)}
+              >
+                <div className="ce-contact-avatar" style={{ background: getAvatarColor(c.nombre) }}>{getInitials(c.nombre)}</div>
+                <div style={{ flex: 1, minWidth: 0 }}>
+                  <div className="ce-contact-name">{c.nombre} {c.apellido || ''}</div>
+                  <div className="ce-contact-email">{c.email}</div>
+                </div>
+              </button>
+            ))}
+          </div>
+        </div>
+      </div>
+    );
+  }
 
   // ==================== SETUP MODAL ====================
 
@@ -899,6 +1079,9 @@ const styles = `
     display: flex;
     flex-direction: column;
     height: calc(100vh - 64px);
+    margin-top: -16px;
+    margin-left: -24px;
+    margin-right: -24px;
     background: #f0f2f5;
     overflow: hidden;
   }
@@ -924,11 +1107,12 @@ const styles = `
     width: 180px;
     min-width: 160px;
     background: linear-gradient(180deg, #1e293b 0%, #0f172a 100%);
-    padding: 16px 10px;
+    padding: 8px 10px;
     display: flex;
     flex-direction: column;
     gap: 4px;
     flex-shrink: 0;
+    overflow-y: auto;
   }
   .ce-folder-btn {
     display: flex;
@@ -988,6 +1172,7 @@ const styles = `
     border-right: 1px solid #e2e8f0;
     display: flex;
     flex-direction: column;
+    overflow: hidden;
   }
   .ce-list-search {
     display: flex;
@@ -1497,25 +1682,73 @@ const styles = `
   .ce-contact-name { font-size: 0.8125rem; font-weight: 500; color: #0f172a; }
   .ce-contact-email { font-size: 0.75rem; color: #64748b; }
 
+  /* ===== RICH TEXT EDITOR TOOLBAR ===== */
+  .ce-editor-toolbar {
+    display: flex;
+    align-items: center;
+    gap: 2px;
+    padding: 6px 24px;
+    background: #fafbfc;
+    border-bottom: 1px solid #e2e8f0;
+    flex-shrink: 0;
+  }
+  .ce-editor-btn {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 32px;
+    height: 32px;
+    background: none;
+    border: 1px solid transparent;
+    border-radius: 6px;
+    color: #64748b;
+    cursor: pointer;
+    transition: all 0.15s;
+  }
+  .ce-editor-btn:hover {
+    background: #e2e8f0;
+    color: #0f172a;
+    border-color: #cbd5e1;
+  }
+  .ce-editor-btn:active {
+    background: #dbeafe;
+    color: #2563eb;
+  }
+  .ce-editor-sep {
+    width: 1px;
+    height: 20px;
+    background: #e2e8f0;
+    margin: 0 4px;
+    flex-shrink: 0;
+  }
+
   /* ===== COMPOSE BODY ===== */
   .ce-compose-body-area {
     flex: 1;
     overflow: hidden;
     display: flex;
   }
-  .ce-compose-body-area textarea {
+  .ce-rich-editor {
     flex: 1;
-    border: none;
     padding: 20px 24px;
     font-size: 0.9375rem;
     font-family: inherit;
     line-height: 1.7;
     color: #0f172a;
-    resize: none;
     outline: none;
     background: white;
+    overflow-y: auto;
+    min-height: 200px;
+    word-break: break-word;
   }
-  .ce-compose-body-area textarea::placeholder { color: #94a3b8; }
+  .ce-rich-editor:empty::before {
+    content: attr(data-placeholder);
+    color: #94a3b8;
+    pointer-events: none;
+  }
+  .ce-rich-editor a { color: #3b82f6; text-decoration: underline; }
+  .ce-rich-editor ul, .ce-rich-editor ol { margin: 4px 0; padding-left: 24px; }
+  .ce-rich-editor li { margin-bottom: 2px; }
 
   /* ===== COMPOSE SIGNATURE ===== */
   .ce-compose-signature {
@@ -1778,6 +2011,24 @@ const styles = `
     border-radius: 8px;
     border: 1px solid #e2e8f0;
     line-height: 1.5;
+  }
+
+  /* ===== CONTACT MODAL ITEM ===== */
+  .ce-contact-modal-item {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    padding: 10px 12px;
+    width: 100%;
+    border: none;
+    background: none;
+    cursor: pointer;
+    text-align: left;
+    border-radius: 8px;
+    transition: background 0.15s;
+  }
+  .ce-contact-modal-item:hover {
+    background: #f1f5f9;
   }
 
   /* ===== RESPONSIVE ===== */
