@@ -251,6 +251,18 @@ const CrmMarketingRedesSociales: React.FC = () => {
   const isFullyConnected = credentials?.metaConnected && credentials?.metaPageId && credentials.metaPageId !== 'PENDING';
   const hasInstagram = !!credentials?.metaInstagramBusinessAccountId;
 
+  // Disconnect Meta (must be before header useEffect that references it)
+  const handleDisconnectMeta = useCallback(async () => {
+    if (!tenantActual?.id) return;
+    if (!confirm('¿Desconectar tu cuenta de Meta? Tus publicaciones programadas podrian fallar.')) return;
+    try {
+      await apiFetch(`/tenants/${tenantActual.id}/api-credentials/meta/my-connection`, { method: 'DELETE' });
+      setCredentials({ metaConnected: false, source: null });
+    } catch (error) {
+      console.error('Error disconnecting:', error);
+    }
+  }, [tenantActual?.id]);
+
   // Build header with connection status in actions slot
   useEffect(() => {
     if (!isFullyConnected) {
@@ -424,17 +436,6 @@ const CrmMarketingRedesSociales: React.FC = () => {
     }
   }, [tenantActual?.id]);
 
-  // Disconnect Meta
-  const handleDisconnectMeta = useCallback(async () => {
-    if (!tenantActual?.id) return;
-    if (!confirm('¿Desconectar tu cuenta de Meta? Tus publicaciones programadas podrian fallar.')) return;
-    try {
-      await apiFetch(`/tenants/${tenantActual.id}/api-credentials/meta/my-connection`, { method: 'DELETE' });
-      setCredentials({ metaConnected: false, source: null });
-    } catch (error) {
-      console.error('Error disconnecting:', error);
-    }
-  }, [tenantActual?.id]);
 
   // Load FB posts when tab changes
   const loadFbPosts = useCallback(async () => {
