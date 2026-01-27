@@ -266,6 +266,10 @@ export default function CrmMensajeriaCorreo() {
   const [showPropertyPicker, setShowPropertyPicker] = useState(false);
   const [propertyResults, setPropertyResults] = useState<PropertyItem[]>([]);
   const [propertyQuery, setPropertyQuery] = useState('');
+  const savedSelectionRef = useRef<Range | null>(null);
+
+  // Tenant domain for property URLs
+  const [tenantDomain, setTenantDomain] = useState('');
 
   // Contact picker modal
   const [showContactModal, setShowContactModal] = useState(false);
@@ -369,6 +373,30 @@ export default function CrmMensajeriaCorreo() {
   useEffect(() => { fetchConversaciones(); }, [fetchConversaciones]);
   useEffect(() => { fetchFirma(); }, [fetchFirma]);
   useEffect(() => { if (conversacionActiva) fetchMensajes(conversacionActiva); }, [conversacionActiva, fetchMensajes]);
+
+  // Fetch tenant domain for property URLs
+  useEffect(() => {
+    if (!tenantId) return;
+    apiFetch(`/tenants/${tenantId}/configuracion`)
+      .then(res => res.json())
+      .then(data => { if (data?.dominio_personalizado) setTenantDomain(data.dominio_personalizado); })
+      .catch(() => {});
+  }, [tenantId]);
+
+  // Override parent .crm-content overflow so each column scrolls independently
+  useEffect(() => {
+    const contentEl = document.querySelector('.crm-content') as HTMLElement;
+    if (contentEl) {
+      contentEl.style.overflow = 'hidden';
+      contentEl.style.padding = '0';
+    }
+    return () => {
+      if (contentEl) {
+        contentEl.style.overflow = '';
+        contentEl.style.padding = '';
+      }
+    };
+  }, []);
 
   // Auto-sync (uses refs so folder changes are picked up without recreating intervals)
   useEffect(() => {
@@ -586,12 +614,29 @@ export default function CrmMensajeriaCorreo() {
     toInputRef.current?.focus();
   };
 
-  // Property picker
-  const handleInsertProperty = (prop: PropertyItem) => {
-    const domain = (tenantActual as any)?.dominio_web || (tenantActual as any)?.dominio || '';
-    const html = buildPropertyHtml(prop, domain || undefined);
-    if (editorRef.current) {
+  // Property picker - save selection before opening picker
+  const saveEditorSelection = () => {
+    const sel = window.getSelection();
+    if (sel && sel.rangeCount > 0 && editorRef.current?.contains(sel.anchorNode)) {
+      savedSelectionRef.current = sel.getRangeAt(0).cloneRange();
+    }
+  };
+
+  const restoreEditorSelection = () => {
+    if (savedSelectionRef.current && editorRef.current) {
       editorRef.current.focus();
+      const sel = window.getSelection();
+      if (sel) {
+        sel.removeAllRanges();
+        sel.addRange(savedSelectionRef.current);
+      }
+    }
+  };
+
+  const handleInsertProperty = (prop: PropertyItem) => {
+    const html = buildPropertyHtml(prop, tenantDomain || undefined);
+    if (editorRef.current) {
+      restoreEditorSelection();
       document.execCommand('insertHTML', false, html);
     }
     setShowPropertyPicker(false);
@@ -803,7 +848,7 @@ export default function CrmMensajeriaCorreo() {
               <div className="ce-toolbar-divider" />
               <input ref={fileInputRef} type="file" multiple hidden onChange={e => { if (e.target.files) setComposeFiles(prev => [...prev, ...Array.from(e.target.files!)]); }} />
               <button className="ce-toolbar-btn" onClick={() => fileInputRef.current?.click()} title="Adjuntar archivo">{Icons.attachment}</button>
-              <button className="ce-toolbar-btn" onClick={() => { setShowPropertyPicker(!showPropertyPicker); if (!showPropertyPicker) searchProperties(''); }} title="Adjuntar propiedad">{Icons.home}</button>
+              <button className="ce-toolbar-btn" onClick={() => { if (!showPropertyPicker) saveEditorSelection(); setShowPropertyPicker(!showPropertyPicker); if (!showPropertyPicker) searchProperties(''); }} title="Adjuntar propiedad">{Icons.home}</button>
               <button className={`ce-toolbar-btn ${showFirma ? 'active' : ''}`} onClick={() => setShowFirma(!showFirma)} title={firma ? `Firma: ${firma.nombre}` : 'Sin firma'}>{Icons.signature}</button>
             </div>
             <button className="ce-btn ghost" onClick={() => setView('inbox')}>Descartar</button>
@@ -1079,12 +1124,14 @@ const styles = `
     display: flex;
     flex-direction: column;
     height: calc(100vh - 64px);
-    margin-top: -16px;
-    margin-left: -24px;
-    margin-right: -24px;
     background: #f0f2f5;
     overflow: hidden;
   }
+
+  /* ===== PROPERTY IMAGE SIZE IN EDITOR ===== */
+  .ce-rich-editor table { max-width: 420px; font-size: 14px; }
+  .ce-rich-editor table img { max-height: 160px; width: 100%; object-fit: cover; }
+  .ce-rich-editor table td { padding: 8px 12px; }
 
   /* ===== SPINNER ===== */
   .ce-spinner {

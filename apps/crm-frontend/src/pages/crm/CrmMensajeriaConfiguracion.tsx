@@ -6,7 +6,7 @@
  *            /mensajeria-whatsapp/credentials, /mensajeria-webchat/config, /api-credentials
  */
 
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { usePageHeader } from '../../layouts/CrmLayout';
 import { useAuth } from '../../contexts/AuthContext';
@@ -34,6 +34,14 @@ interface Firma {
   nombre: string;
   contenido_html: string;
   es_default: boolean;
+}
+
+interface InfoNegocio {
+  nombre_negocio?: string;
+  isotipo?: string;
+  isotipo_url?: string;
+  ciudad?: string;
+  pais?: string;
 }
 
 // ==================== ICONS ====================
@@ -77,6 +85,36 @@ const Icons = {
       <path d="M3 6h18"/>
       <path d="M19 6v14c0 1-1 2-2 2H7c-1 0-2-1-2-2V6"/>
       <path d="M8 6V4c0-1 1-2 2-2h4c1 0 2 1 2 2v2"/>
+    </svg>
+  ),
+  bold: (
+    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+      <path d="M6 4h8a4 4 0 0 1 4 4 4 4 0 0 1-4 4H6z"/><path d="M6 12h9a4 4 0 0 1 4 4 4 4 0 0 1-4 4H6z"/>
+    </svg>
+  ),
+  italic: (
+    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+      <line x1="19" y1="4" x2="10" y2="4"/><line x1="14" y1="20" x2="5" y2="20"/><line x1="15" y1="4" x2="9" y2="20"/>
+    </svg>
+  ),
+  underline: (
+    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+      <path d="M6 3v7a6 6 0 0 0 6 6 6 6 0 0 0 6-6V3"/><line x1="4" y1="21" x2="20" y2="21"/>
+    </svg>
+  ),
+  image: (
+    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+      <rect x="3" y="3" width="18" height="18" rx="2" ry="2"/><circle cx="8.5" cy="8.5" r="1.5"/><polyline points="21 15 16 10 5 21"/>
+    </svg>
+  ),
+  linkIcon: (
+    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+      <path d="M10 13a5 5 0 0 0 7.54.54l3-3a5 5 0 0 0-7.07-7.07l-1.72 1.71"/><path d="M14 11a5 5 0 0 0-7.54-.54l-3 3a5 5 0 0 0 7.07 7.07l1.71-1.71"/>
+    </svg>
+  ),
+  building: (
+    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+      <rect x="4" y="2" width="16" height="20" rx="2" ry="2"/><path d="M9 22v-4h6v4"/><line x1="8" y1="6" x2="8" y2="6.01"/><line x1="12" y1="6" x2="12" y2="6.01"/><line x1="16" y1="6" x2="16" y2="6.01"/><line x1="8" y1="10" x2="8" y2="10.01"/><line x1="12" y1="10" x2="12" y2="10.01"/><line x1="16" y1="10" x2="16" y2="10.01"/><line x1="8" y1="14" x2="8" y2="14.01"/><line x1="12" y1="14" x2="12" y2="14.01"/><line x1="16" y1="14" x2="16" y2="14.01"/>
     </svg>
   ),
   whatsapp: (
@@ -130,8 +168,12 @@ export default function CrmMensajeriaConfiguracion() {
 
   // Firma
   const [firmas, setFirmas] = useState<Firma[]>([]);
-  const [firmaTexto, setFirmaTexto] = useState('');
   const [firmaSaving, setFirmaSaving] = useState(false);
+  const firmaEditorRef = useRef<HTMLDivElement>(null);
+  const firmaImageInputRef = useRef<HTMLInputElement>(null);
+
+  // Info negocio (for timbrado)
+  const [infoNegocio, setInfoNegocio] = useState<InfoNegocio | null>(null);
 
   // Notifications (local preferences)
   const [notifChats, setNotifChats] = useState(true);
@@ -238,17 +280,34 @@ export default function CrmMensajeriaConfiguracion() {
       const data = await res.json();
       const arr = Array.isArray(data) ? data : [];
       setFirmas(arr);
-      if (arr.length > 0) {
-        setFirmaTexto(arr[0].contenido_html || '');
-      }
+      // Set editor content after mount
+      setTimeout(() => {
+        if (firmaEditorRef.current && arr.length > 0) {
+          firmaEditorRef.current.innerHTML = arr[0].contenido_html || '';
+        }
+      }, 100);
     } catch {
       setFirmas([]);
     }
   }, [tenantId, userId]);
 
+  // ==================== FETCH INFO NEGOCIO ====================
+
+  const fetchInfoNegocio = useCallback(async () => {
+    if (!tenantId) return;
+    try {
+      const res = await apiFetch(`/tenants/${tenantId}/info-negocio`);
+      const data = await res.json();
+      setInfoNegocio(data);
+    } catch {
+      setInfoNegocio(null);
+    }
+  }, [tenantId]);
+
   useEffect(() => { fetchIntegrationStatus(); }, [fetchIntegrationStatus]);
   useEffect(() => { fetchEtiquetas(); }, [fetchEtiquetas]);
   useEffect(() => { fetchFirmas(); }, [fetchFirmas]);
+  useEffect(() => { fetchInfoNegocio(); }, [fetchInfoNegocio]);
 
   // ==================== ETIQUETA ACTIONS ====================
 
@@ -283,16 +342,17 @@ export default function CrmMensajeriaConfiguracion() {
   const guardarFirma = async () => {
     if (!tenantId || !userId) return;
     setFirmaSaving(true);
+    const contenidoHtml = firmaEditorRef.current?.innerHTML || '';
     try {
       if (firmas.length > 0) {
         await apiFetch(`/tenants/${tenantId}/mensajeria/firmas/${firmas[0].id}`, {
           method: 'PUT',
-          body: JSON.stringify({ contenido_html: firmaTexto }),
+          body: JSON.stringify({ contenido_html: contenidoHtml }),
         });
       } else {
         await apiFetch(`/tenants/${tenantId}/mensajeria/firmas`, {
           method: 'POST',
-          body: JSON.stringify({ usuario_id: userId, nombre: 'Principal', contenido_html: firmaTexto, es_default: true }),
+          body: JSON.stringify({ usuario_id: userId, nombre: 'Principal', contenido_html: contenidoHtml, es_default: true }),
         });
       }
       await fetchFirmas();
@@ -300,6 +360,57 @@ export default function CrmMensajeriaConfiguracion() {
       console.error('Error saving firma:', err.message);
     } finally {
       setFirmaSaving(false);
+    }
+  };
+
+  // Rich text helpers for firma
+  const firmaExecFormat = (command: string, value?: string) => {
+    firmaEditorRef.current?.focus();
+    document.execCommand(command, false, value);
+  };
+
+  const firmaInsertLink = () => {
+    const url = prompt('URL del enlace:');
+    if (url) {
+      firmaEditorRef.current?.focus();
+      document.execCommand('createLink', false, url);
+    }
+  };
+
+  const firmaInsertImage = () => {
+    firmaImageInputRef.current?.click();
+  };
+
+  const handleFirmaImageUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    const reader = new FileReader();
+    reader.onload = () => {
+      const dataUrl = reader.result as string;
+      firmaEditorRef.current?.focus();
+      document.execCommand('insertHTML', false, `<img src="${dataUrl}" alt="" style="max-width:200px;max-height:80px;border-radius:4px;" />`);
+    };
+    reader.readAsDataURL(file);
+    e.target.value = '';
+  };
+
+  // Timbrado inmobiliaria
+  const insertTimbrado = () => {
+    const nombreNegocio = infoNegocio?.nombre_negocio || 'Tu Inmobiliaria';
+    const logoUrl = infoNegocio?.isotipo || infoNegocio?.isotipo_url || '';
+    const ubicacion = [infoNegocio?.ciudad, infoNegocio?.pais].filter(Boolean).join(', ');
+    const nombreUsuario = user?.nombre
+      ? `${user.nombre}${user.apellido ? ' ' + user.apellido : ''}`
+      : 'Asesor';
+
+    const logoHtml = logoUrl
+      ? `<img src="${logoUrl}" alt="${nombreNegocio}" style="max-width:120px;max-height:50px;object-fit:contain;display:block;margin-bottom:8px;" />`
+      : '';
+
+    const timbradoHtml = `<table cellpadding="0" cellspacing="0" style="border-collapse:collapse;font-family:sans-serif;"><tr><td style="padding-right:16px;vertical-align:top;">${logoHtml}</td><td style="vertical-align:top;"><div style="font-size:15px;font-weight:700;color:#0f172a;margin:0 0 2px;">${nombreUsuario}</div><div style="font-size:13px;color:#3b82f6;font-weight:600;margin:0 0 6px;">Asesor Inmobiliario</div><div style="font-size:13px;font-weight:600;color:#334155;margin:0 0 2px;">${nombreNegocio}</div>${ubicacion ? `<div style="font-size:12px;color:#64748b;">${ubicacion}</div>` : ''}</td></tr></table>`;
+
+    if (firmaEditorRef.current) {
+      firmaEditorRef.current.innerHTML = timbradoHtml;
     }
   };
 
@@ -401,13 +512,38 @@ export default function CrmMensajeriaConfiguracion() {
         </div>
       </div>
 
-      {/* Firma de correo */}
+      {/* Firma de correo - Rich text editor */}
       <div className="config-section">
         <h3>{Icons.signature} Firma de Correo</h3>
         <p className="config-description">Se agregará automáticamente a todos tus correos enviados.</p>
         <div className="config-form">
-          <textarea className="signature-input" placeholder="Escribe tu firma..." value={firmaTexto} onChange={(e) => setFirmaTexto(e.target.value)} rows={5} />
-          <button className="btn-primary" onClick={guardarFirma} disabled={firmaSaving}>{firmaSaving ? 'Guardando...' : 'Guardar firma'}</button>
+          {/* Timbrado button */}
+          <button className="btn-timbrado" onClick={insertTimbrado}>
+            {Icons.building} Incluir timbrado de la inmobiliaria
+          </button>
+
+          {/* Toolbar */}
+          <div className="firma-toolbar">
+            <button type="button" className="firma-toolbar-btn" onClick={() => firmaExecFormat('bold')} title="Negrita">{Icons.bold}</button>
+            <button type="button" className="firma-toolbar-btn" onClick={() => firmaExecFormat('italic')} title="Cursiva">{Icons.italic}</button>
+            <button type="button" className="firma-toolbar-btn" onClick={() => firmaExecFormat('underline')} title="Subrayado">{Icons.underline}</button>
+            <span className="firma-toolbar-sep" />
+            <button type="button" className="firma-toolbar-btn" onClick={firmaInsertLink} title="Insertar enlace">{Icons.linkIcon}</button>
+            <button type="button" className="firma-toolbar-btn" onClick={firmaInsertImage} title="Insertar imagen">{Icons.image}</button>
+            <input ref={firmaImageInputRef} type="file" accept="image/*" hidden onChange={handleFirmaImageUpload} />
+          </div>
+
+          {/* Rich editor */}
+          <div
+            ref={firmaEditorRef}
+            className="firma-rich-editor"
+            contentEditable
+            data-placeholder="Escribe tu firma con formato..."
+          />
+
+          <div className="firma-actions">
+            <button className="btn-primary" onClick={guardarFirma} disabled={firmaSaving}>{firmaSaving ? 'Guardando...' : 'Guardar firma'}</button>
+          </div>
         </div>
       </div>
 
@@ -418,17 +554,23 @@ export default function CrmMensajeriaConfiguracion() {
         <div className="config-options">
           <label className="config-toggle">
             <input type="checkbox" checked={notifChats} onChange={(e) => setNotifChats(e.target.checked)} />
-            <span className="toggle-slider"></span>
+            <span className="toggle-track">
+              <span className="toggle-thumb" />
+            </span>
             <span className="toggle-label">Notificar nuevos chats</span>
           </label>
           <label className="config-toggle">
             <input type="checkbox" checked={notifEmails} onChange={(e) => setNotifEmails(e.target.checked)} />
-            <span className="toggle-slider"></span>
+            <span className="toggle-track">
+              <span className="toggle-thumb" />
+            </span>
             <span className="toggle-label">Notificar nuevos correos</span>
           </label>
           <label className="config-toggle">
             <input type="checkbox" checked={notifSonido} onChange={(e) => setNotifSonido(e.target.checked)} />
-            <span className="toggle-slider"></span>
+            <span className="toggle-track">
+              <span className="toggle-thumb" />
+            </span>
             <span className="toggle-label">Sonido de notificación</span>
           </label>
         </div>
@@ -471,21 +613,155 @@ export default function CrmMensajeriaConfiguracion() {
         .btn-add-etiqueta:hover:not(:disabled) { background: #2563eb; }
         .btn-add-etiqueta:disabled { background: #cbd5e1; cursor: not-allowed; }
 
-        .config-form { display: flex; flex-direction: column; gap: 12px; }
-        .signature-input { width: 100%; padding: 12px; border: 1px solid #e2e8f0; border-radius: 6px; font-size: 0.8125rem; font-family: inherit; resize: vertical; min-height: 100px; box-sizing: border-box; }
-        .signature-input:focus { outline: none; border-color: #3b82f6; }
-        .btn-primary { align-self: flex-start; padding: 8px 16px; background: #3b82f6; border: none; border-radius: 5px; color: white; font-size: 0.8125rem; font-weight: 500; cursor: pointer; transition: background 0.15s; }
+        .config-form { display: flex; flex-direction: column; gap: 0; }
+
+        /* Timbrado button */
+        .btn-timbrado {
+          display: inline-flex;
+          align-items: center;
+          gap: 8px;
+          padding: 10px 18px;
+          background: linear-gradient(135deg, #eff6ff, #dbeafe);
+          border: 1px solid #bfdbfe;
+          border-radius: 8px;
+          color: #1d4ed8;
+          font-size: 0.8125rem;
+          font-weight: 600;
+          cursor: pointer;
+          transition: all 0.2s;
+          margin-bottom: 12px;
+          align-self: flex-start;
+        }
+        .btn-timbrado:hover {
+          background: linear-gradient(135deg, #dbeafe, #bfdbfe);
+          border-color: #93c5fd;
+          transform: translateY(-1px);
+          box-shadow: 0 2px 8px rgba(59, 130, 246, 0.15);
+        }
+
+        /* Firma toolbar */
+        .firma-toolbar {
+          display: flex;
+          align-items: center;
+          gap: 2px;
+          padding: 6px 10px;
+          background: #f8fafc;
+          border: 1px solid #e2e8f0;
+          border-bottom: none;
+          border-radius: 8px 8px 0 0;
+        }
+        .firma-toolbar-btn {
+          display: flex;
+          align-items: center;
+          justify-content: center;
+          width: 30px;
+          height: 30px;
+          background: none;
+          border: 1px solid transparent;
+          border-radius: 5px;
+          color: #64748b;
+          cursor: pointer;
+          transition: all 0.15s;
+        }
+        .firma-toolbar-btn:hover {
+          background: #e2e8f0;
+          color: #0f172a;
+          border-color: #cbd5e1;
+        }
+        .firma-toolbar-sep {
+          width: 1px;
+          height: 18px;
+          background: #e2e8f0;
+          margin: 0 4px;
+          flex-shrink: 0;
+        }
+
+        /* Firma rich editor */
+        .firma-rich-editor {
+          width: 100%;
+          min-height: 140px;
+          max-height: 300px;
+          overflow-y: auto;
+          padding: 14px 16px;
+          border: 1px solid #e2e8f0;
+          border-radius: 0 0 8px 8px;
+          font-size: 0.875rem;
+          font-family: inherit;
+          color: #334155;
+          line-height: 1.6;
+          outline: none;
+          background: white;
+          box-sizing: border-box;
+          word-break: break-word;
+        }
+        .firma-rich-editor:focus {
+          border-color: #3b82f6;
+          box-shadow: 0 0 0 3px rgba(59,130,246,0.08);
+        }
+        .firma-rich-editor:empty::before {
+          content: attr(data-placeholder);
+          color: #94a3b8;
+          pointer-events: none;
+        }
+        .firma-rich-editor a { color: #3b82f6; text-decoration: underline; }
+        .firma-rich-editor img { max-width: 200px; max-height: 80px; border-radius: 4px; display: block; margin: 6px 0; }
+
+        .firma-actions {
+          margin-top: 12px;
+        }
+
+        .btn-primary { align-self: flex-start; padding: 8px 16px; background: #3b82f6; border: none; border-radius: 6px; color: white; font-size: 0.8125rem; font-weight: 600; cursor: pointer; transition: all 0.15s; }
         .btn-primary:hover { background: #2563eb; }
         .btn-primary:disabled { opacity: 0.5; cursor: default; }
 
-        .config-options { display: flex; flex-direction: column; gap: 12px; }
-        .config-toggle { display: flex; align-items: center; gap: 10px; cursor: pointer; }
+        /* Toggle switches - modern style */
+        .config-options { display: flex; flex-direction: column; gap: 16px; }
+        .config-toggle {
+          display: flex;
+          align-items: center;
+          gap: 12px;
+          cursor: pointer;
+          padding: 10px 14px;
+          border-radius: 10px;
+          transition: background 0.15s;
+        }
+        .config-toggle:hover { background: #f8fafc; }
         .config-toggle input { display: none; }
-        .toggle-slider { position: relative; width: 40px; height: 22px; background: #cbd5e1; border-radius: 11px; transition: background 0.2s; flex-shrink: 0; }
-        .toggle-slider::before { content: ''; position: absolute; top: 2px; left: 2px; width: 18px; height: 18px; background: white; border-radius: 50%; transition: transform 0.2s; }
-        .config-toggle input:checked + .toggle-slider { background: #3b82f6; }
-        .config-toggle input:checked + .toggle-slider::before { transform: translateX(18px); }
-        .toggle-label { font-size: 0.8125rem; color: #334155; }
+
+        .toggle-track {
+          position: relative;
+          width: 44px;
+          height: 24px;
+          background: #cbd5e1;
+          border-radius: 12px;
+          transition: all 0.25s cubic-bezier(0.4, 0, 0.2, 1);
+          flex-shrink: 0;
+          box-shadow: inset 0 1px 3px rgba(0,0,0,0.1);
+        }
+        .toggle-thumb {
+          position: absolute;
+          top: 2px;
+          left: 2px;
+          width: 20px;
+          height: 20px;
+          background: white;
+          border-radius: 50%;
+          transition: all 0.25s cubic-bezier(0.4, 0, 0.2, 1);
+          box-shadow: 0 1px 3px rgba(0,0,0,0.15), 0 1px 2px rgba(0,0,0,0.1);
+        }
+        .config-toggle input:checked + .toggle-track {
+          background: #3b82f6;
+          box-shadow: inset 0 1px 3px rgba(0,0,0,0.05);
+        }
+        .config-toggle input:checked + .toggle-track .toggle-thumb {
+          transform: translateX(20px);
+          box-shadow: 0 1px 3px rgba(59,130,246,0.3), 0 1px 2px rgba(0,0,0,0.1);
+        }
+        .toggle-label {
+          font-size: 0.875rem;
+          color: #334155;
+          font-weight: 500;
+        }
       `}</style>
     </div>
   );
