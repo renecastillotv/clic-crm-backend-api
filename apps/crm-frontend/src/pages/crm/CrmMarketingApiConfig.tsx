@@ -30,6 +30,7 @@ import {
   User,
   Building,
   X,
+  MessageCircle,
 } from 'lucide-react';
 
 // Interfaz para las credenciales del tenant
@@ -47,6 +48,9 @@ interface TenantApiCredentials {
   metaInstagramUsername?: string;
   metaAdsConnected: boolean;
   metaAdAccountId?: string;
+  whatsappConnected: boolean;
+  whatsappPhoneNumberId?: string;
+  whatsappBusinessAccountId?: string;
   emailProvider: 'mailchimp' | 'sendgrid' | 'mailjet' | 'ses' | 'smtp' | 'none';
   emailConnected: boolean;
   emailSenderName?: string;
@@ -323,10 +327,17 @@ const CrmMarketingApiConfig: React.FC = () => {
   const [availablePages, setAvailablePages] = useState<{ id: string; name: string; category?: string; instagramBusinessAccount?: { id: string; username: string } }[]>([]);
   const [pagesLoading, setPagesLoading] = useState(false);
 
+  // WhatsApp Cloud API config modal state
+  const [showWhatsAppModal, setShowWhatsAppModal] = useState(false);
+  const [waAccessToken, setWaAccessToken] = useState('');
+  const [waPhoneNumberId, setWaPhoneNumberId] = useState('');
+  const [waBusinessAccountId, setWaBusinessAccountId] = useState('');
+  const [waSaving, setWaSaving] = useState(false);
+
   useEffect(() => {
     setPageHeader({
       title: 'Configuración de APIs',
-      subtitle: 'Conecta tus cuentas de Google, Meta y email marketing',
+      subtitle: 'Conecta tus cuentas de Google, Meta, WhatsApp y email marketing',
     });
   }, [setPageHeader]);
 
@@ -851,6 +862,73 @@ const CrmMarketingApiConfig: React.FC = () => {
     }
   };
 
+  // ==================== WhatsApp ====================
+
+  const handleConnectWhatsApp = () => {
+    setWaAccessToken('');
+    setWaPhoneNumberId(credentials?.whatsappPhoneNumberId || '');
+    setWaBusinessAccountId(credentials?.whatsappBusinessAccountId || '');
+    setShowWhatsAppModal(true);
+  };
+
+  const handleSaveWhatsApp = async () => {
+    if (!tenantActual?.id) return;
+    if (!waAccessToken.trim() || !waPhoneNumberId.trim() || !waBusinessAccountId.trim()) {
+      alert('Todos los campos son requeridos');
+      return;
+    }
+
+    setWaSaving(true);
+    try {
+      const res = await apiFetch(`/tenants/${tenantActual.id}/mensajeria-whatsapp/credentials`, {
+        method: 'POST',
+        body: JSON.stringify({
+          accessToken: waAccessToken.trim(),
+          phoneNumberId: waPhoneNumberId.trim(),
+          wabaId: waBusinessAccountId.trim(),
+        }),
+      });
+
+      if (!res.ok) {
+        const err = await res.json().catch(() => ({}));
+        throw new Error(err.error || 'Error al conectar WhatsApp');
+      }
+
+      setCredentials(prev => prev ? {
+        ...prev,
+        whatsappConnected: true,
+        whatsappPhoneNumberId: waPhoneNumberId.trim(),
+        whatsappBusinessAccountId: waBusinessAccountId.trim(),
+      } : null);
+      setShowWhatsAppModal(false);
+    } catch (error: any) {
+      alert(error.message || 'Error al guardar credenciales de WhatsApp');
+    } finally {
+      setWaSaving(false);
+    }
+  };
+
+  const handleDisconnectWhatsApp = async () => {
+    if (!tenantActual?.id) return;
+    if (!confirm('¿Estás seguro de desconectar WhatsApp Business?')) return;
+
+    setActionLoading('whatsapp');
+    try {
+      await apiFetch(`/tenants/${tenantActual.id}/mensajeria-whatsapp/credentials`, { method: 'DELETE' });
+      setCredentials(prev => prev ? {
+        ...prev,
+        whatsappConnected: false,
+        whatsappPhoneNumberId: undefined,
+        whatsappBusinessAccountId: undefined,
+      } : null);
+    } catch (error) {
+      console.error('Error disconnecting WhatsApp:', error);
+      alert('Error al desconectar WhatsApp');
+    } finally {
+      setActionLoading(null);
+    }
+  };
+
   const handleConnectEmail = () => {
     setActionLoading('email');
     alert('La configuración de email se implementará próximamente.\n\nProveedores soportados:\n- Mailchimp\n- SendGrid\n- Mailjet\n- Amazon SES\n- SMTP personalizado');
@@ -1036,6 +1114,34 @@ const CrmMarketingApiConfig: React.FC = () => {
           onConnect={handleConnectMetaAds}
           onDisconnect={handleDisconnectMetaAds}
           loading={actionLoading === 'meta-ads'}
+        />
+      </Section>
+
+      {/* WhatsApp Section */}
+      <Section
+        title="WhatsApp Business"
+        subtitle="Mensajería con clientes vía WhatsApp Cloud API"
+        icon={
+          <svg width="22" height="22" viewBox="0 0 24 24" fill="currentColor">
+            <path d="M17.472 14.382c-.297-.149-1.758-.867-2.03-.967-.273-.099-.471-.148-.67.15-.197.297-.767.966-.94 1.164-.173.199-.347.223-.644.075-.297-.15-1.255-.463-2.39-1.475-.883-.788-1.48-1.761-1.653-2.059-.173-.297-.018-.458.13-.606.134-.133.298-.347.446-.52.149-.174.198-.298.298-.497.099-.198.05-.371-.025-.52-.075-.149-.669-1.612-.916-2.207-.242-.579-.487-.5-.669-.51-.173-.008-.371-.01-.57-.01-.198 0-.52.074-.792.372-.272.297-1.04 1.016-1.04 2.479 0 1.462 1.065 2.875 1.213 3.074.149.198 2.096 3.2 5.077 4.487.709.306 1.262.489 1.694.625.712.227 1.36.195 1.871.118.571-.085 1.758-.719 2.006-1.413.248-.694.248-1.289.173-1.413-.074-.124-.272-.198-.57-.347m-5.421 7.403h-.004a9.87 9.87 0 01-5.031-1.378l-.361-.214-3.741.982.998-3.648-.235-.374a9.86 9.86 0 01-1.51-5.26c.001-5.45 4.436-9.884 9.888-9.884 2.64 0 5.122 1.03 6.988 2.898a9.825 9.825 0 012.893 6.994c-.003 5.45-4.437 9.884-9.885 9.884m8.413-18.297A11.815 11.815 0 0012.05 0C5.495 0 .16 5.335.157 11.892c0 2.096.547 4.142 1.588 5.945L.057 24l6.305-1.654a11.882 11.882 0 005.683 1.448h.005c6.554 0 11.89-5.335 11.893-11.893a11.821 11.821 0 00-3.48-8.413z"/>
+          </svg>
+        }
+        color="#25D366"
+      >
+        <IntegrationCard
+          icon={<MessageCircle size={24} />}
+          name="WhatsApp Cloud API"
+          description="Envía y recibe mensajes de WhatsApp Business a través de la Cloud API de Meta"
+          connected={credentials?.whatsappConnected || false}
+          connectionInfo={
+            credentials?.whatsappPhoneNumberId
+              ? `Phone ID: ${credentials.whatsappPhoneNumberId}${credentials.whatsappBusinessAccountId ? ` | WABA: ${credentials.whatsappBusinessAccountId}` : ''}`
+              : undefined
+          }
+          color="#25D366"
+          onConnect={handleConnectWhatsApp}
+          onDisconnect={handleDisconnectWhatsApp}
+          loading={actionLoading === 'whatsapp'}
         />
       </Section>
 
@@ -1768,6 +1874,137 @@ const CrmMarketingApiConfig: React.FC = () => {
             <span style={{ fontSize: '14px', fontWeight: 500, color: '#1e293b' }}>
               Obteniendo páginas de Facebook...
             </span>
+          </div>
+        </div>
+      )}
+
+      {/* WhatsApp Cloud API Credentials Modal */}
+      {showWhatsAppModal && (
+        <div
+          style={{
+            position: 'fixed',
+            inset: 0,
+            background: 'rgba(0,0,0,0.5)',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            zIndex: 999,
+          }}
+          onClick={(e) => { if (e.target === e.currentTarget) setShowWhatsAppModal(false); }}
+        >
+          <div
+            style={{
+              background: 'white',
+              borderRadius: '16px',
+              width: '480px',
+              maxWidth: '95vw',
+              boxShadow: '0 12px 40px rgba(0,0,0,0.15)',
+              overflow: 'hidden',
+            }}
+          >
+            {/* Header */}
+            <div style={{ padding: '20px 24px', borderBottom: '1px solid #e2e8f0', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+                <div style={{ width: '40px', height: '40px', borderRadius: '10px', background: '#25D36615', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#25D366' }}>
+                  <MessageCircle size={20} />
+                </div>
+                <div>
+                  <h3 style={{ margin: 0, fontSize: '16px', fontWeight: 600, color: '#1e293b' }}>WhatsApp Cloud API</h3>
+                  <p style={{ margin: 0, fontSize: '12px', color: '#64748b' }}>Credenciales de Meta Business Platform</p>
+                </div>
+              </div>
+              <button onClick={() => setShowWhatsAppModal(false)} style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#94a3b8', padding: '4px' }}>
+                <X size={20} />
+              </button>
+            </div>
+
+            {/* Body */}
+            <div style={{ padding: '24px' }}>
+              <p style={{ fontSize: '13px', color: '#64748b', margin: '0 0 20px 0', lineHeight: 1.5 }}>
+                Obtén estas credenciales desde{' '}
+                <a href="https://developers.facebook.com" target="_blank" rel="noopener noreferrer" style={{ color: '#3b82f6' }}>
+                  Meta for Developers
+                </a>
+                {' '}→ Tu App → WhatsApp → API Setup.
+              </p>
+
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
+                <div>
+                  <label style={{ display: 'block', fontSize: '13px', fontWeight: 600, color: '#334155', marginBottom: '6px' }}>
+                    Access Token (permanente)
+                  </label>
+                  <input
+                    type="password"
+                    value={waAccessToken}
+                    onChange={(e) => setWaAccessToken(e.target.value)}
+                    placeholder="EAAxxxxxxx..."
+                    style={{ width: '100%', padding: '10px 14px', border: '1px solid #e2e8f0', borderRadius: '8px', fontSize: '14px', boxSizing: 'border-box' }}
+                  />
+                  <p style={{ fontSize: '11px', color: '#94a3b8', margin: '4px 0 0 0' }}>
+                    System User Token con permisos whatsapp_business_messaging y whatsapp_business_management
+                  </p>
+                </div>
+
+                <div>
+                  <label style={{ display: 'block', fontSize: '13px', fontWeight: 600, color: '#334155', marginBottom: '6px' }}>
+                    Phone Number ID
+                  </label>
+                  <input
+                    type="text"
+                    value={waPhoneNumberId}
+                    onChange={(e) => setWaPhoneNumberId(e.target.value)}
+                    placeholder="1234567890"
+                    style={{ width: '100%', padding: '10px 14px', border: '1px solid #e2e8f0', borderRadius: '8px', fontSize: '14px', boxSizing: 'border-box' }}
+                  />
+                  <p style={{ fontSize: '11px', color: '#94a3b8', margin: '4px 0 0 0' }}>
+                    ID del número de teléfono de WhatsApp Business
+                  </p>
+                </div>
+
+                <div>
+                  <label style={{ display: 'block', fontSize: '13px', fontWeight: 600, color: '#334155', marginBottom: '6px' }}>
+                    WhatsApp Business Account ID (WABA)
+                  </label>
+                  <input
+                    type="text"
+                    value={waBusinessAccountId}
+                    onChange={(e) => setWaBusinessAccountId(e.target.value)}
+                    placeholder="1234567890"
+                    style={{ width: '100%', padding: '10px 14px', border: '1px solid #e2e8f0', borderRadius: '8px', fontSize: '14px', boxSizing: 'border-box' }}
+                  />
+                  <p style={{ fontSize: '11px', color: '#94a3b8', margin: '4px 0 0 0' }}>
+                    ID de la cuenta de WhatsApp Business
+                  </p>
+                </div>
+              </div>
+            </div>
+
+            {/* Footer */}
+            <div style={{ padding: '16px 24px', borderTop: '1px solid #e2e8f0', display: 'flex', justifyContent: 'flex-end', gap: '10px' }}>
+              <button
+                onClick={() => setShowWhatsAppModal(false)}
+                style={{ padding: '10px 20px', background: '#f1f5f9', color: '#64748b', border: 'none', borderRadius: '8px', fontSize: '14px', fontWeight: 500, cursor: 'pointer' }}
+              >
+                Cancelar
+              </button>
+              <button
+                onClick={handleSaveWhatsApp}
+                disabled={waSaving || !waAccessToken.trim() || !waPhoneNumberId.trim() || !waBusinessAccountId.trim()}
+                style={{
+                  padding: '10px 20px',
+                  background: waSaving ? '#94a3b8' : '#25D366',
+                  color: 'white',
+                  border: 'none',
+                  borderRadius: '8px',
+                  fontSize: '14px',
+                  fontWeight: 600,
+                  cursor: waSaving ? 'default' : 'pointer',
+                  opacity: (!waAccessToken.trim() || !waPhoneNumberId.trim() || !waBusinessAccountId.trim()) ? 0.5 : 1,
+                }}
+              >
+                {waSaving ? 'Verificando...' : 'Conectar WhatsApp'}
+              </button>
+            </div>
           </div>
         </div>
       )}
