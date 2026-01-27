@@ -15,6 +15,7 @@ import ubicacionesRouter from './routes/ubicaciones.js';
 import geocodingRouter from './routes/geocoding.js';
 import importRouter from './routes/import.js';
 import oauthRouter from './routes/oauth.routes.js';
+import cronRouter from './routes/cron.routes.js';
 
 // Cargar variables de entorno
 dotenv.config();
@@ -235,6 +236,9 @@ app.use('/api/import', importRouter);
 
 // Rutas OAuth (callbacks sin autenticación - Google, Meta)
 app.use('/api/oauth', oauthRouter);
+
+// Rutas Cron (protegidas por X-Cron-Secret header)
+app.use('/api/cron', cronRouter);
 
 // Nota: Las rutas de datos dinámicos están anidadas en /api/tenants/:tenantId/dynamic-data
 

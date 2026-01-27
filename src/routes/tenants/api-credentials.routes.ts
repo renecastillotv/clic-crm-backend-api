@@ -19,6 +19,7 @@ import * as metaAdsService from '../../services/metaAdsService.js';
 import * as metaSocialService from '../../services/metaSocialService.js';
 import * as socialCopyService from '../../services/socialCopyService.js';
 import * as scheduledPostsService from '../../services/scheduledPostsService.js';
+import * as hashtagGroupsService from '../../services/hashtagGroupsService.js';
 import { getPropiedadById } from '../../services/propiedadesCrmService.js';
 
 const router = express.Router({ mergeParams: true });
@@ -611,9 +612,9 @@ router.put('/meta/page', async (req: Request<TenantParams>, res: Response, next:
 router.post('/meta/publish', async (req: Request<TenantParams>, res: Response, next: NextFunction) => {
   try {
     const { tenantId } = req.params;
-    const { message, imageUrl, link, targets } = req.body;
+    const { message, imageUrl, imageUrls, link, targets } = req.body;
 
-    if (!message && !imageUrl) {
+    if (!message && !imageUrl && (!imageUrls || imageUrls.length === 0)) {
       return res.status(400).json({ error: 'Se requiere mensaje o imagen' });
     }
 
@@ -622,16 +623,25 @@ router.post('/meta/publish', async (req: Request<TenantParams>, res: Response, n
       return res.status(400).json({ error: 'Meta no está configurado completamente. Selecciona una página primero.' });
     }
 
+    const allImages: string[] = imageUrls && imageUrls.length > 0 ? imageUrls : imageUrl ? [imageUrl] : [];
     const results: Record<string, { success: boolean; postId?: string; mediaId?: string; error?: string }> = {};
 
     // Publish to Facebook
     if (targets?.facebook !== false) {
       try {
-        if (imageUrl) {
+        if (allImages.length > 1) {
+          // Multi-photo album
+          const fbResult = await metaSocialService.publishMultiPhotoToPage(
+            tokenData.pageAccessToken,
+            tokenData.pageId,
+            { imageUrls: allImages, caption: message }
+          );
+          results.facebook = { success: true, postId: fbResult.id };
+        } else if (allImages.length === 1) {
           const fbResult = await metaSocialService.publishPhotoToPage(
             tokenData.pageAccessToken,
             tokenData.pageId,
-            { imageUrl, caption: message }
+            { imageUrl: allImages[0], caption: message }
           );
           results.facebook = { success: true, postId: fbResult.postId };
         } else {
@@ -649,15 +659,24 @@ router.post('/meta/publish', async (req: Request<TenantParams>, res: Response, n
 
     // Publish to Instagram (requires image)
     if (targets?.instagram && tokenData.instagramAccountId) {
-      if (!imageUrl) {
-        results.instagram = { success: false, error: 'Instagram requiere una imagen' };
+      if (allImages.length === 0) {
+        results.instagram = { success: false, error: 'Instagram requiere al menos una imagen' };
       } else {
         try {
-          const igResult = await metaSocialService.publishToInstagram(
-            tokenData.pageAccessToken,
-            tokenData.instagramAccountId,
-            { imageUrl, caption: message }
-          );
+          let igResult: { id: string };
+          if (allImages.length > 1) {
+            igResult = await metaSocialService.publishCarouselToInstagram(
+              tokenData.pageAccessToken,
+              tokenData.instagramAccountId,
+              { imageUrls: allImages, caption: message }
+            );
+          } else {
+            igResult = await metaSocialService.publishToInstagram(
+              tokenData.pageAccessToken,
+              tokenData.instagramAccountId,
+              { imageUrl: allImages[0], caption: message }
+            );
+          }
           results.instagram = { success: true, mediaId: igResult.id };
         } catch (error: any) {
           results.instagram = { success: false, error: error.message };
@@ -825,15 +844,19 @@ router.post('/meta/generate-copy', async (req: Request<TenantParams>, res: Respo
 
 /**
  * POST /api/tenants/:tenantId/api-credentials/meta/schedule
- * Schedules a Facebook Page post for future publishing.
+ * Schedules a post for future publishing.
+ * Facebook: uses native scheduling via Meta API.
+ * Instagram: saves to DB for cron-based publishing.
  */
 router.post('/meta/schedule', async (req: Request<TenantParams>, res: Response, next: NextFunction) => {
   try {
     const { tenantId } = req.params;
-    const { message, imageUrl, linkUrl, scheduledFor, propiedadId } = req.body;
+    const { message, imageUrl, imageUrls, linkUrl, scheduledFor, propiedadId, platform } = req.body;
 
-    if (!message && !imageUrl) {
-      return res.status(400).json({ error: 'Se requiere message o imageUrl' });
+    const allImages: string[] = imageUrls && imageUrls.length > 0 ? imageUrls : imageUrl ? [imageUrl] : [];
+
+    if (!message && allImages.length === 0) {
+      return res.status(400).json({ error: 'Se requiere message o imagen(es)' });
     }
     if (!scheduledFor) {
       return res.status(400).json({ error: 'Se requiere scheduledFor (unix timestamp en segundos)' });
@@ -845,24 +868,57 @@ router.post('/meta/schedule', async (req: Request<TenantParams>, res: Response, 
     const maxTime = nowSec + 75 * 24 * 60 * 60; // 75 days from now
 
     if (scheduledTimestamp < minTime) {
-      return res.status(400).json({ error: 'La publicación debe programarse al menos 10 minutos en el futuro' });
+      return res.status(400).json({ error: 'La publicacion debe programarse al menos 10 minutos en el futuro' });
     }
     if (scheduledTimestamp > maxTime) {
-      return res.status(400).json({ error: 'La publicación no puede programarse más de 75 días en el futuro' });
+      return res.status(400).json({ error: 'La publicacion no puede programarse mas de 75 dias en el futuro' });
     }
 
     const tokenData = await credentialsService.getMetaPageToken(tenantId);
     if (!tokenData) {
-      return res.status(400).json({ error: 'Meta no está conectado' });
+      return res.status(400).json({ error: 'Meta no esta conectado' });
     }
 
+    const targetPlatform = platform || 'facebook';
+    const scheduledForISO = new Date(scheduledTimestamp * 1000).toISOString();
+
+    if (targetPlatform === 'instagram') {
+      // Instagram: save to DB only. Cron will publish when due.
+      if (allImages.length === 0) {
+        return res.status(400).json({ error: 'Instagram requiere al menos una imagen' });
+      }
+      if (!tokenData.instagramAccountId) {
+        return res.status(400).json({ error: 'Instagram no esta conectado' });
+      }
+
+      const scheduledPost = await scheduledPostsService.createScheduledPost(tenantId, {
+        platform: 'instagram',
+        message: message || undefined,
+        imageUrl: allImages[0],
+        imageUrls: allImages,
+        linkUrl: linkUrl || undefined,
+        propiedadId: propiedadId || undefined,
+        scheduledFor: scheduledForISO,
+        createdBy: (req as any).userId || undefined,
+      });
+
+      return res.json({ scheduledPost });
+    }
+
+    // Facebook: use native scheduling via Meta API
     let metaResult: { id: string };
 
-    if (imageUrl) {
+    if (allImages.length > 1) {
+      metaResult = await metaSocialService.publishMultiPhotoToPage(
+        tokenData.pageAccessToken,
+        tokenData.pageId,
+        { imageUrls: allImages, caption: message, scheduledPublishTime: scheduledTimestamp }
+      );
+    } else if (allImages.length === 1) {
       const photoResult = await metaSocialService.publishPhotoToPage(
         tokenData.pageAccessToken,
         tokenData.pageId,
-        { imageUrl, caption: message, scheduledPublishTime: scheduledTimestamp }
+        { imageUrl: allImages[0], caption: message, scheduledPublishTime: scheduledTimestamp }
       );
       metaResult = { id: photoResult.postId || photoResult.id };
     } else {
@@ -877,10 +933,11 @@ router.post('/meta/schedule', async (req: Request<TenantParams>, res: Response, 
       platform: 'facebook',
       metaPostId: metaResult.id,
       message: message || undefined,
-      imageUrl: imageUrl || undefined,
+      imageUrl: allImages[0] || undefined,
+      imageUrls: allImages,
       linkUrl: linkUrl || undefined,
       propiedadId: propiedadId || undefined,
-      scheduledFor: new Date(scheduledTimestamp * 1000).toISOString(),
+      scheduledFor: scheduledForISO,
       createdBy: (req as any).userId || undefined,
       metaResponse: metaResult,
     });
@@ -941,6 +998,190 @@ router.delete('/meta/scheduled-posts/:postId', async (req: Request<TenantParams 
     res.json({ success: true });
   } catch (error: any) {
     console.error('[Meta Social] Error cancelling scheduled post:', error.message);
+    next(error);
+  }
+});
+
+/**
+ * PUT /api/tenants/:tenantId/api-credentials/meta/scheduled-posts/:postId
+ * Edits a scheduled post.
+ * Facebook: deletes old post from Meta, creates new one with updated content.
+ * Instagram (cron): updates DB record directly (not sent to Meta yet).
+ */
+router.put('/meta/scheduled-posts/:postId', async (req: Request<TenantParams & { postId: string }>, res: Response, next: NextFunction) => {
+  try {
+    const { tenantId, postId } = req.params;
+    const { message, imageUrl, imageUrls, linkUrl, scheduledFor } = req.body;
+
+    const existing = await scheduledPostsService.getScheduledPostById(tenantId, postId);
+    if (!existing) {
+      return res.status(404).json({ error: 'Post programado no encontrado' });
+    }
+    if (existing.status !== 'scheduled') {
+      return res.status(400).json({ error: 'Solo se pueden editar posts con status "scheduled"' });
+    }
+
+    const allImages: string[] = imageUrls && imageUrls.length > 0 ? imageUrls : imageUrl ? [imageUrl] : [];
+    const newScheduledFor = scheduledFor ? Number(scheduledFor) : undefined;
+
+    if (newScheduledFor) {
+      const nowSec = Math.floor(Date.now() / 1000);
+      if (newScheduledFor < nowSec + 10 * 60) {
+        return res.status(400).json({ error: 'La publicacion debe programarse al menos 10 minutos en el futuro' });
+      }
+    }
+
+    if (existing.platform === 'instagram') {
+      // Instagram: just update DB
+      const updated = await scheduledPostsService.updateScheduledPost(tenantId, postId, {
+        message,
+        imageUrl: allImages[0] || undefined,
+        imageUrls: allImages.length > 0 ? allImages : undefined,
+        linkUrl,
+        scheduledFor: newScheduledFor ? new Date(newScheduledFor * 1000).toISOString() : undefined,
+      });
+      return res.json({ scheduledPost: updated });
+    }
+
+    // Facebook: delete old post from Meta, create new one
+    const tokenData = await credentialsService.getMetaPageToken(tenantId);
+    if (!tokenData) {
+      return res.status(400).json({ error: 'Meta no esta conectado' });
+    }
+
+    // Delete old from Meta
+    if (existing.metaPostId) {
+      await metaSocialService.deleteScheduledPost(tokenData.pageAccessToken, existing.metaPostId);
+    }
+
+    // Create new scheduled post on Meta
+    const scheduledTimestamp = newScheduledFor || Math.floor(new Date(existing.scheduledFor).getTime() / 1000);
+    const finalMessage = message !== undefined ? message : existing.message;
+    const finalImages = allImages.length > 0 ? allImages : existing.imageUrls.length > 0 ? existing.imageUrls : existing.imageUrl ? [existing.imageUrl] : [];
+    const finalLinkUrl = linkUrl !== undefined ? linkUrl : existing.linkUrl;
+
+    let metaResult: { id: string };
+
+    if (finalImages.length > 1) {
+      metaResult = await metaSocialService.publishMultiPhotoToPage(
+        tokenData.pageAccessToken,
+        tokenData.pageId,
+        { imageUrls: finalImages, caption: finalMessage || undefined, scheduledPublishTime: scheduledTimestamp }
+      );
+    } else if (finalImages.length === 1) {
+      const photoResult = await metaSocialService.publishPhotoToPage(
+        tokenData.pageAccessToken,
+        tokenData.pageId,
+        { imageUrl: finalImages[0], caption: finalMessage || undefined, scheduledPublishTime: scheduledTimestamp }
+      );
+      metaResult = { id: photoResult.postId || photoResult.id };
+    } else {
+      metaResult = await metaSocialService.publishToPage(
+        tokenData.pageAccessToken,
+        tokenData.pageId,
+        { message: finalMessage || undefined, link: finalLinkUrl || undefined, scheduledPublishTime: scheduledTimestamp }
+      );
+    }
+
+    const updated = await scheduledPostsService.updateScheduledPost(tenantId, postId, {
+      message: finalMessage || undefined,
+      imageUrl: finalImages[0] || undefined,
+      imageUrls: finalImages,
+      linkUrl: finalLinkUrl || undefined,
+      scheduledFor: new Date(scheduledTimestamp * 1000).toISOString(),
+      metaPostId: metaResult.id,
+      metaResponse: metaResult,
+    });
+
+    res.json({ scheduledPost: updated });
+  } catch (error: any) {
+    console.error('[Meta Social] Error editing scheduled post:', error.message);
+    next(error);
+  }
+});
+
+// ==================== HASHTAG GROUPS ====================
+
+/**
+ * GET /api/tenants/:tenantId/api-credentials/meta/hashtag-groups
+ * Lists all hashtag groups for the tenant.
+ */
+router.get('/meta/hashtag-groups', async (req: Request<TenantParams>, res: Response, next: NextFunction) => {
+  try {
+    const { tenantId } = req.params;
+    const groups = await hashtagGroupsService.listHashtagGroups(tenantId);
+    res.json(groups);
+  } catch (error) {
+    next(error);
+  }
+});
+
+/**
+ * POST /api/tenants/:tenantId/api-credentials/meta/hashtag-groups
+ * Creates a new hashtag group.
+ */
+router.post('/meta/hashtag-groups', async (req: Request<TenantParams>, res: Response, next: NextFunction) => {
+  try {
+    const { tenantId } = req.params;
+    const { name, hashtags, category } = req.body;
+
+    if (!name || !hashtags || !Array.isArray(hashtags) || hashtags.length === 0) {
+      return res.status(400).json({ error: 'Se requiere name y hashtags (array no vacio)' });
+    }
+
+    const group = await hashtagGroupsService.createHashtagGroup(tenantId, {
+      name,
+      hashtags,
+      category,
+      createdBy: (req as any).userId || undefined,
+    });
+
+    res.json(group);
+  } catch (error) {
+    next(error);
+  }
+});
+
+/**
+ * PUT /api/tenants/:tenantId/api-credentials/meta/hashtag-groups/:groupId
+ * Updates a hashtag group.
+ */
+router.put('/meta/hashtag-groups/:groupId', async (req: Request<TenantParams & { groupId: string }>, res: Response, next: NextFunction) => {
+  try {
+    const { tenantId, groupId } = req.params;
+    const { name, hashtags, category } = req.body;
+
+    const updated = await hashtagGroupsService.updateHashtagGroup(tenantId, groupId, {
+      name,
+      hashtags,
+      category,
+    });
+
+    if (!updated) {
+      return res.status(404).json({ error: 'Grupo no encontrado' });
+    }
+
+    res.json(updated);
+  } catch (error) {
+    next(error);
+  }
+});
+
+/**
+ * DELETE /api/tenants/:tenantId/api-credentials/meta/hashtag-groups/:groupId
+ * Deletes a hashtag group.
+ */
+router.delete('/meta/hashtag-groups/:groupId', async (req: Request<TenantParams & { groupId: string }>, res: Response, next: NextFunction) => {
+  try {
+    const { tenantId, groupId } = req.params;
+    const deleted = await hashtagGroupsService.deleteHashtagGroup(tenantId, groupId);
+
+    if (!deleted) {
+      return res.status(404).json({ error: 'Grupo no encontrado' });
+    }
+
+    res.json({ success: true });
+  } catch (error) {
     next(error);
   }
 });
