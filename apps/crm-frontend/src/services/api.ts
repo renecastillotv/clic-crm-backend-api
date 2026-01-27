@@ -90,7 +90,7 @@ export async function apiFetch(url: string, options: RequestInit = {}, token?: s
         });
       }
       
-      throw new Error(errorData.message || `Error ${response.status}: ${response.statusText}`);
+      throw new Error(errorData.message || errorData.error || `Error ${response.status}: ${response.statusText}`);
     }
 
     return response;

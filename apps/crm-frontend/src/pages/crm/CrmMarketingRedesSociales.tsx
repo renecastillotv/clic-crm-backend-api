@@ -645,8 +645,8 @@ const CrmMarketingRedesSociales: React.FC = () => {
     setEditingPost(post);
     setEditMessage(post.message || '');
     const d = new Date(post.scheduledFor);
-    setEditDate(d.toISOString().split('T')[0]);
-    setEditTime(d.toTimeString().slice(0, 5));
+    setEditDate(d.toLocaleDateString('en-CA')); // local date YYYY-MM-DD
+    setEditTime(d.toTimeString().slice(0, 5));   // local time HH:MM
   };
 
   const handleSaveEdit = async () => {
