@@ -196,38 +196,30 @@ export default function CrmMensajeriaConfiguracion() {
 
     const results: IntegracionStatus[] = [];
 
-    // WhatsApp - check tenant credentials
-    try {
-      const waRes = await apiFetch(`/tenants/${tenantId}/mensajeria-whatsapp/credentials`);
-      const waData = await waRes.json();
-      results.push({
-        tipo: 'whatsapp', nombre: 'WhatsApp Business',
-        conectado: !!waData?.whatsapp_connected,
-        cuenta: waData?.whatsapp_phone_number_id ? `ID: ${waData.whatsapp_phone_number_id}` : undefined,
-      });
-    } catch {
-      results.push({ tipo: 'whatsapp', nombre: 'WhatsApp Business', conectado: false });
-    }
-
-    // Instagram & Facebook - check api-credentials for Meta connection
+    // WhatsApp, Instagram & Facebook - check api-credentials for Meta/WA connection
     try {
       const metaRes = await apiFetch(`/tenants/${tenantId}/api-credentials`);
       const metaData = await metaRes.json();
-      const metaCreds = metaData?.meta || metaData;
-      const hasMeta = !!metaCreds?.meta_page_access_token || !!metaCreds?.meta_connected;
-      const hasIG = !!metaCreds?.meta_instagram_business_account_id;
+      const hasMeta = !!metaData?.metaConnected;
+      const hasIG = !!metaData?.metaInstagramBusinessAccountId;
 
+      results.push({
+        tipo: 'whatsapp', nombre: 'WhatsApp Business',
+        conectado: !!metaData?.whatsappConnected,
+        cuenta: metaData?.whatsappPhoneNumberId ? `ID: ${metaData.whatsappPhoneNumberId}` : undefined,
+      });
       results.push({
         tipo: 'instagram', nombre: 'Instagram',
         conectado: hasIG,
-        cuenta: metaCreds?.meta_instagram_username ? `@${metaCreds.meta_instagram_username}` : undefined,
+        cuenta: metaData?.metaInstagramUsername ? `@${metaData.metaInstagramUsername}` : undefined,
       });
       results.push({
         tipo: 'facebook', nombre: 'Facebook Page',
         conectado: hasMeta,
-        cuenta: metaCreds?.meta_page_name || undefined,
+        cuenta: metaData?.metaPageName || undefined,
       });
     } catch {
+      results.push({ tipo: 'whatsapp', nombre: 'WhatsApp Business', conectado: false });
       results.push({ tipo: 'instagram', nombre: 'Instagram', conectado: false });
       results.push({ tipo: 'facebook', nombre: 'Facebook Page', conectado: false });
     }
@@ -472,23 +464,23 @@ export default function CrmMensajeriaConfiguracion() {
                   <button
                     className="btn-config-integ"
                     onClick={() => {
-                      if (integ.tipo === 'email') navigate('../correo');
-                      else if (integ.tipo === 'whatsapp' || integ.tipo === 'instagram' || integ.tipo === 'facebook') navigate('../../marketing/configuracion');
-                      else if (integ.tipo === 'web_chat') navigate('../../marketing/configuracion');
+                      if (integ.tipo === 'email') navigate('../correo', { relative: 'path' });
+                      else if (integ.tipo === 'whatsapp' || integ.tipo === 'instagram' || integ.tipo === 'facebook') navigate('../../marketing/configuracion', { relative: 'path' });
+                      else if (integ.tipo === 'web_chat') navigate('../../marketing/configuracion', { relative: 'path' });
                     }}
                   >
                     Configurar
                   </button>
                 )}
                 {integ.conectado && integ.tipo === 'email' && (
-                  <button className="btn-config-integ btn-config-ver" onClick={() => navigate('../correo')}>Ir a Correo</button>
+                  <button className="btn-config-integ btn-config-ver" onClick={() => navigate('../correo', { relative: 'path' })}>Ir a Correo</button>
                 )}
               </div>
             ))}
           </div>
         )}
         <p className="config-hint">
-          Para conectar WhatsApp, Facebook o Instagram ve a Configuración &gt; Integraciones.
+          Para conectar WhatsApp, Facebook o Instagram ve a Marketing &gt; Configuración.
           Para Email ve a Correo &gt; Configurar cuenta. Web Chat se activa abajo.
         </p>
       </div>
