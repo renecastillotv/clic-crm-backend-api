@@ -5,7 +5,7 @@
  * Conecta al backend: mensajeria-email routes (Phase 2).
  */
 
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useRef } from 'react';
 import { usePageHeader } from '../../layouts/CrmLayout';
 import { useAuth } from '../../contexts/AuthContext';
 import { apiFetch } from '../../services/api';
@@ -17,6 +17,7 @@ interface EmailConversacion {
   contacto_nombre: string | null;
   ultimo_mensaje_texto: string | null;
   ultimo_mensaje_at: string | null;
+  ultimo_mensaje_es_entrante: boolean | null;
   no_leidos: number;
   estado: string;
   metadata: Record<string, any>;
@@ -47,6 +48,8 @@ interface EmailCredentialsInfo {
   has_smtp_password: boolean;
 }
 
+type Carpeta = 'bandeja' | 'enviados';
+
 // ==================== ICONS ====================
 
 const Icons = {
@@ -68,19 +71,19 @@ const Icons = {
     </svg>
   ),
   inbox: (
-    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
       <polyline points="22 12 16 12 14 15 10 15 8 12 2 12"/>
       <path d="M5.45 5.11L2 12v6a2 2 0 0 0 2 2h16a2 2 0 0 0 2-2v-6l-3.45-6.89A2 2 0 0 0 16.76 4H7.24a2 2 0 0 0-1.79 1.11z"/>
     </svg>
   ),
   sent: (
-    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
       <line x1="22" y1="2" x2="11" y2="13"/>
       <polygon points="22 2 15 22 11 13 2 9 22 2"/>
     </svg>
   ),
   attachment: (
-    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
       <path d="M21.44 11.05l-9.19 9.19a6 6 0 0 1-8.49-8.49l9.19-9.19a4 4 0 0 1 5.66 5.66l-9.2 9.19a2 2 0 0 1-2.83-2.83l8.49-8.48"/>
     </svg>
   ),
@@ -108,7 +111,63 @@ const Icons = {
       <polygon points="22 2 15 22 11 13 2 9 22 2"/>
     </svg>
   ),
+  disconnect: (
+    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+      <path d="M18.36 6.64a9 9 0 1 1-12.73 0"/>
+      <line x1="12" y1="2" x2="12" y2="12"/>
+    </svg>
+  ),
 };
+
+// ==================== HELPERS ====================
+
+function translateEmailError(error: string): string {
+  const lower = error.toLowerCase();
+  if (lower.includes('invalid login') || lower.includes('535') || lower.includes('incorrect authentication') || lower.includes('authentication failed')) {
+    return 'Contraseña incorrecta. Verifica tu correo y contraseña.';
+  }
+  if (lower.includes('enotfound') || lower.includes('getaddrinfo')) {
+    return 'Servidor no encontrado. Verifica el hostname (ej: witcher.mxrouting.net).';
+  }
+  if (lower.includes('econnrefused')) {
+    return 'Conexión rechazada. Verifica el host y puerto.';
+  }
+  if (lower.includes('etimeout') || lower.includes('timeout') || lower.includes('ebusy')) {
+    return 'Tiempo de espera agotado. Verifica el host y puerto.';
+  }
+  if (lower.includes('certificate') || lower.includes('ssl') || lower.includes('tls')) {
+    return 'Error de certificado SSL/TLS. Verifica la configuración de seguridad.';
+  }
+  if (lower.includes('command failed')) {
+    return 'Error del servidor de correo. Verifica tus credenciales.';
+  }
+  return error;
+}
+
+function formatTimeAgo(dateStr: string | null): string {
+  if (!dateStr) return '';
+  const date = new Date(dateStr);
+  const diff = Date.now() - date.getTime();
+  const minutes = Math.floor(diff / 60000);
+  const hours = Math.floor(diff / 3600000);
+  const days = Math.floor(diff / 86400000);
+  if (minutes < 1) return 'Ahora';
+  if (minutes < 60) return `${minutes}m`;
+  if (hours < 24) return `${hours}h`;
+  if (days < 7) return `${days}d`;
+  return date.toLocaleDateString('es-MX', { day: 'numeric', month: 'short' });
+}
+
+function formatFullDate(dateStr: string): string {
+  return new Date(dateStr).toLocaleDateString('es-MX', {
+    weekday: 'short',
+    day: 'numeric',
+    month: 'short',
+    year: 'numeric',
+    hour: '2-digit',
+    minute: '2-digit',
+  });
+}
 
 export default function CrmMensajeriaCorreo() {
   const { setPageHeader } = usePageHeader();
@@ -120,6 +179,7 @@ export default function CrmMensajeriaCorreo() {
   const [conversaciones, setConversaciones] = useState<EmailConversacion[]>([]);
   const [mensajes, setMensajes] = useState<EmailMensaje[]>([]);
   const [conversacionActiva, setConversacionActiva] = useState<string | null>(null);
+  const [carpeta, setCarpeta] = useState<Carpeta>('bandeja');
   const [busqueda, setBusqueda] = useState('');
   const [syncing, setSyncing] = useState(false);
   const [loading, setLoading] = useState(false);
@@ -151,10 +211,8 @@ export default function CrmMensajeriaCorreo() {
 
   const tenantId = tenantActual?.id;
   const userId = user?.id;
-
-  useEffect(() => {
-    setPageHeader({ title: 'Correo', subtitle: 'Bandeja de correo electrónico' });
-  }, [setPageHeader]);
+  const syncIntervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
+  const pollIntervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
 
   // ==================== FETCH CREDENTIALS ====================
 
@@ -180,7 +238,7 @@ export default function CrmMensajeriaCorreo() {
     if (!tenantId || !userId || !credentials?.is_connected) return;
     setLoading(true);
     try {
-      const params = new URLSearchParams({ usuario_id: userId });
+      const params = new URLSearchParams({ usuario_id: userId, carpeta });
       if (busqueda) params.set('busqueda', busqueda);
       const res = await apiFetch(`/tenants/${tenantId}/mensajeria-email/inbox?${params}`);
       const data = await res.json();
@@ -190,16 +248,9 @@ export default function CrmMensajeriaCorreo() {
     } finally {
       setLoading(false);
     }
-  }, [tenantId, userId, credentials?.is_connected, busqueda]);
+  }, [tenantId, userId, credentials?.is_connected, busqueda, carpeta]);
 
   useEffect(() => { fetchConversaciones(); }, [fetchConversaciones]);
-
-  // Poll every 30s
-  useEffect(() => {
-    if (!credentials?.is_connected) return;
-    const interval = setInterval(fetchConversaciones, 30000);
-    return () => clearInterval(interval);
-  }, [credentials?.is_connected, fetchConversaciones]);
 
   // ==================== FETCH MESSAGES ====================
 
@@ -220,17 +271,41 @@ export default function CrmMensajeriaCorreo() {
     if (conversacionActiva) fetchMensajes(conversacionActiva);
   }, [conversacionActiva, fetchMensajes]);
 
-  // ==================== ACTIONS ====================
+  // ==================== AUTO-SYNC + POLLING ====================
 
-  const handleSync = async () => {
+  const handleSync = useCallback(async (silent = false) => {
     if (!tenantId || !userId) return;
-    setSyncing(true);
+    if (!silent) setSyncing(true);
     try {
-      await apiFetch(`/tenants/${tenantId}/mensajeria-email/sync`, { method: 'POST', body: JSON.stringify({ usuario_id: userId }) });
+      await apiFetch(`/tenants/${tenantId}/mensajeria-email/sync`, {
+        method: 'POST',
+        body: JSON.stringify({ usuario_id: userId }),
+      });
       await fetchConversaciones();
     } catch {}
-    setSyncing(false);
-  };
+    if (!silent) setSyncing(false);
+  }, [tenantId, userId, fetchConversaciones]);
+
+  // Auto-sync on mount + every 60s; poll conversations every 15s
+  useEffect(() => {
+    if (!credentials?.is_connected) return;
+
+    // Initial sync
+    handleSync(true);
+
+    // Sync IMAP every 60s
+    syncIntervalRef.current = setInterval(() => handleSync(true), 60000);
+
+    // Poll conversations every 15s (fast DB read)
+    pollIntervalRef.current = setInterval(fetchConversaciones, 15000);
+
+    return () => {
+      if (syncIntervalRef.current) clearInterval(syncIntervalRef.current);
+      if (pollIntervalRef.current) clearInterval(pollIntervalRef.current);
+    };
+  }, [credentials?.is_connected, handleSync, fetchConversaciones]);
+
+  // ==================== ACTIONS ====================
 
   const handleSaveCredentials = async () => {
     if (!tenantId || !userId || !setupEmail) return;
@@ -246,16 +321,25 @@ export default function CrmMensajeriaCorreo() {
           smtp_host: setupSmtpHost, smtp_port: parseInt(setupSmtpPort), smtp_username: setupEmail, smtp_password: setupPassword || undefined,
         }),
       });
-      const testResponse = await apiFetch(`/tenants/${tenantId}/mensajeria-email/test-connection`, { method: 'POST', body: JSON.stringify({ usuario_id: userId }) });
+      const testResponse = await apiFetch(`/tenants/${tenantId}/mensajeria-email/test-connection`, {
+        method: 'POST',
+        body: JSON.stringify({ usuario_id: userId }),
+      });
       const testRes = await testResponse.json();
       if (testRes.is_connected) {
-        setSetupSuccess('Conexión exitosa. Sincronizando...');
+        setSetupSuccess('Conexión exitosa. Sincronizando correos...');
         await apiFetch(`/tenants/${tenantId}/mensajeria-email/sync`, { method: 'POST', body: JSON.stringify({ usuario_id: userId }) });
         await fetchCredentials();
         await fetchConversaciones();
         setShowSetup(false);
       } else {
-        setSetupError(`IMAP: ${testRes.imap?.error || 'OK'} | SMTP: ${testRes.smtp?.error || 'OK'}`);
+        // Translate each error to user-friendly message
+        const imapErr = testRes.imap?.error ? translateEmailError(testRes.imap.error) : null;
+        const smtpErr = testRes.smtp?.error ? translateEmailError(testRes.smtp.error) : null;
+        const parts: string[] = [];
+        if (imapErr) parts.push(`IMAP: ${imapErr}`);
+        if (smtpErr) parts.push(`SMTP: ${smtpErr}`);
+        setSetupError(parts.join(' — ') || 'No se pudo conectar. Verifica tus datos.');
       }
     } catch (err: any) {
       setSetupError(err.message || 'Error al guardar');
@@ -278,10 +362,19 @@ export default function CrmMensajeriaCorreo() {
     try {
       await apiFetch(`/tenants/${tenantId}/mensajeria-email/send`, {
         method: 'POST',
-        body: JSON.stringify({ usuario_id: userId, to: composeTo, cc: composeCc || undefined, subject: composeSubject, html: `<p>${composeBody.replace(/\n/g, '<br/>')}</p>`, text: composeBody }),
+        body: JSON.stringify({
+          usuario_id: userId,
+          to: composeTo,
+          cc: composeCc || undefined,
+          subject: composeSubject,
+          html: `<p>${composeBody.replace(/\n/g, '<br/>')}</p>`,
+          text: composeBody,
+        }),
       });
-      setShowCompose(false); setComposeTo(''); setComposeSubject(''); setComposeBody(''); setComposeCc('');
-      await fetchConversaciones();
+      setShowCompose(false);
+      setComposeTo(''); setComposeSubject(''); setComposeBody(''); setComposeCc('');
+      // Switch to Enviados to show the sent email
+      setCarpeta('enviados');
     } catch {}
     setSending(false);
   };
@@ -294,7 +387,14 @@ export default function CrmMensajeriaCorreo() {
       const lastIncoming = mensajes.filter(m => m.es_entrante).pop();
       await apiFetch(`/tenants/${tenantId}/mensajeria-email/reply`, {
         method: 'POST',
-        body: JSON.stringify({ usuario_id: userId, conversacion_id: conversacionActiva, to: lastIncoming?.email_de || conv?.contacto_nombre || '', subject: lastIncoming?.email_asunto || '', html: `<p>${replyBody.replace(/\n/g, '<br/>')}</p>`, text: replyBody }),
+        body: JSON.stringify({
+          usuario_id: userId,
+          conversacion_id: conversacionActiva,
+          to: lastIncoming?.email_de || conv?.contacto_nombre || '',
+          subject: lastIncoming?.email_asunto || '',
+          html: `<p>${replyBody.replace(/\n/g, '<br/>')}</p>`,
+          text: replyBody,
+        }),
       });
       setReplyMode(false); setReplyBody('');
       await fetchMensajes(conversacionActiva);
@@ -303,28 +403,52 @@ export default function CrmMensajeriaCorreo() {
     setSending(false);
   };
 
-  // ==================== HELPERS ====================
-
-  const formatTimeAgo = (dateStr: string | null) => {
-    if (!dateStr) return '';
-    const date = new Date(dateStr);
-    const diff = Date.now() - date.getTime();
-    const minutes = Math.floor(diff / 60000);
-    const hours = Math.floor(diff / 3600000);
-    const days = Math.floor(diff / 86400000);
-    if (minutes < 1) return 'Ahora';
-    if (minutes < 60) return `${minutes}m`;
-    if (hours < 24) return `${hours}h`;
-    if (days < 7) return `${days}d`;
-    return date.toLocaleDateString('es-MX', { day: 'numeric', month: 'short' });
-  };
+  // ==================== COMPUTED ====================
 
   const totalNoLeidos = conversaciones.reduce((sum, c) => sum + (c.no_leidos || 0), 0);
+  const convActual = conversaciones.find(c => c.id === conversacionActiva);
+
+  // ==================== HEADER ====================
+
+  useEffect(() => {
+    if (!credentials?.is_connected) {
+      setPageHeader({ title: 'Correo', subtitle: 'Configura tu cuenta de email' });
+      return;
+    }
+
+    setPageHeader({
+      title: 'Correo',
+      subtitle: credentials.email_address,
+      actions: (
+        <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+          <button className="correo-header-btn primary" onClick={() => setShowCompose(true)}>
+            {Icons.plus} <span>Redactar</span>
+          </button>
+          <button className="correo-header-btn" onClick={() => handleSync(false)} disabled={syncing}>
+            {Icons.refresh} <span>{syncing ? 'Sincronizando...' : 'Sincronizar'}</span>
+          </button>
+          <button className="correo-header-btn" onClick={() => setShowSetup(true)} title="Configuración">
+            {Icons.settings}
+          </button>
+          <button className="correo-header-btn danger" onClick={handleDisconnect} title="Desconectar cuenta">
+            {Icons.disconnect}
+          </button>
+        </div>
+      ),
+    });
+  }, [setPageHeader, credentials, syncing, handleSync]);
 
   // ==================== RENDER: LOADING ====================
 
   if (credentialsLoading) {
-    return <div className="crm-correo"><div className="conv-empty"><p>Cargando...</p></div><style>{styles}</style></div>;
+    return (
+      <div className="crm-correo">
+        <div className="correo-empty-state">
+          <p>Cargando...</p>
+        </div>
+        <style>{styles}</style>
+      </div>
+    );
   }
 
   // ==================== RENDER: SETUP REQUIRED ====================
@@ -332,40 +456,20 @@ export default function CrmMensajeriaCorreo() {
   if (!credentials || !credentials.is_connected) {
     return (
       <div className="crm-correo">
-        <div className="conv-empty">
-          <div className="empty-icon">{Icons.email}</div>
+        <div className="correo-empty-state">
+          <div className="correo-empty-icon">{Icons.email}</div>
           <h3>Configura tu correo</h3>
           <p>Conecta tu cuenta de email para recibir y enviar correos desde el CRM.</p>
-          <button className="btn-primary" onClick={() => setShowSetup(true)} style={{ marginTop: 16 }}>{Icons.settings} Configurar cuenta</button>
-          {credentials?.last_error && <p style={{ color: '#ef4444', fontSize: '0.8125rem', marginTop: 8 }}>Error: {credentials.last_error}</p>}
-        </div>
-        {showSetup && (
-          <div className="modal-overlay" onClick={() => setShowSetup(false)}>
-            <div className="modal-content" onClick={e => e.stopPropagation()}>
-              <div className="modal-header"><h3>Configurar cuenta de correo</h3><button className="btn-icon" onClick={() => setShowSetup(false)}>{Icons.close}</button></div>
-              <div className="setup-fields">
-                <div className="setup-field"><label>Correo electrónico:</label><input type="email" value={setupEmail} onChange={e => setSetupEmail(e.target.value)} placeholder="tu@dominio.com" /></div>
-                <div className="setup-field"><label>Nombre visible:</label><input type="text" value={setupDisplayName} onChange={e => setSetupDisplayName(e.target.value)} placeholder="Tu Nombre" /></div>
-                <div className="setup-field"><label>Contraseña:</label><input type="password" value={setupPassword} onChange={e => setSetupPassword(e.target.value)} placeholder="Contraseña del email" /></div>
-                <p className="setup-hint">Los datos de IMAP y SMTP los encuentras en el panel de tu proveedor de correo (cPanel, MXRoute, etc). NO uses "mail.mxroute.com" — usa el hostname real de tu servidor.</p>
-                <div className="setup-row">
-                  <div className="setup-field"><label>IMAP Host:</label><input type="text" value={setupImapHost} onChange={e => setSetupImapHost(e.target.value)} placeholder="ej: echo.mxrouting.net" /></div>
-                  <div className="setup-field"><label>Puerto:</label><input type="text" value={setupImapPort} onChange={e => setSetupImapPort(e.target.value)} /></div>
-                </div>
-                <div className="setup-row">
-                  <div className="setup-field"><label>SMTP Host:</label><input type="text" value={setupSmtpHost} onChange={e => setSetupSmtpHost(e.target.value)} placeholder="ej: echo.mxrouting.net" /></div>
-                  <div className="setup-field"><label>Puerto:</label><input type="text" value={setupSmtpPort} onChange={e => setSetupSmtpPort(e.target.value)} /></div>
-                </div>
-                {setupError && <p className="setup-error">{setupError}</p>}
-                {setupSuccess && <p className="setup-success">{setupSuccess}</p>}
-              </div>
-              <div className="modal-actions">
-                <button className="btn-primary" onClick={handleSaveCredentials} disabled={setupTesting || !setupEmail || !setupPassword || !setupImapHost || !setupSmtpHost}>{setupTesting ? 'Verificando...' : 'Guardar y verificar'}</button>
-                <button className="btn-secondary" onClick={() => setShowSetup(false)}>Cancelar</button>
-              </div>
+          <button className="correo-btn primary" onClick={() => setShowSetup(true)} style={{ marginTop: 16 }}>
+            {Icons.settings} Configurar cuenta
+          </button>
+          {credentials?.last_error && (
+            <div className="correo-alert error" style={{ marginTop: 12 }}>
+              {translateEmailError(credentials.last_error)}
             </div>
-          </div>
-        )}
+          )}
+        </div>
+        {renderSetupModal()}
         <style>{styles}</style>
       </div>
     );
@@ -375,242 +479,752 @@ export default function CrmMensajeriaCorreo() {
 
   return (
     <div className="crm-correo">
-      <div className="msg-email-container">
-        {/* Sidebar */}
-        <div className="email-sidebar">
-          <button className="btn-compose" onClick={() => setShowCompose(true)}>{Icons.plus} Redactar</button>
-          <div className="email-folders">
-            <button className="folder-btn active">{Icons.inbox}<span>Bandeja</span>{totalNoLeidos > 0 && <span className="folder-badge">{totalNoLeidos}</span>}</button>
-            <button className="folder-btn">{Icons.sent}<span>Enviados</span></button>
-          </div>
-          <div className="email-sidebar-actions">
-            <button className="folder-btn" onClick={handleSync} disabled={syncing}>{Icons.refresh}<span>{syncing ? 'Sync...' : 'Sincronizar'}</span></button>
-            <button className="folder-btn" onClick={() => setShowSetup(true)}>{Icons.settings}<span>Config</span></button>
-            <button className="folder-btn" onClick={handleDisconnect}><span style={{ fontSize: '0.75rem', color: '#94a3b8' }}>{credentials.email_address}</span></button>
-          </div>
+      {/* Toolbar: folder tabs + search */}
+      <div className="correo-toolbar">
+        <div className="correo-tabs">
+          <button
+            className={`correo-tab ${carpeta === 'bandeja' ? 'active' : ''}`}
+            onClick={() => { setCarpeta('bandeja'); setConversacionActiva(null); }}
+          >
+            {Icons.inbox}
+            <span>Bandeja</span>
+            {carpeta === 'bandeja' && totalNoLeidos > 0 && <span className="correo-tab-badge">{totalNoLeidos}</span>}
+          </button>
+          <button
+            className={`correo-tab ${carpeta === 'enviados' ? 'active' : ''}`}
+            onClick={() => { setCarpeta('enviados'); setConversacionActiva(null); }}
+          >
+            {Icons.sent}
+            <span>Enviados</span>
+          </button>
         </div>
+        <div className="correo-search">
+          {Icons.search}
+          <input
+            type="text"
+            placeholder="Buscar correos..."
+            value={busqueda}
+            onChange={(e) => setBusqueda(e.target.value)}
+          />
+        </div>
+      </div>
 
-        {/* List */}
-        <div className="email-list-panel">
-          <div className="email-list-header">
-            <div className="msg-search">{Icons.search}<input type="text" placeholder="Buscar..." value={busqueda} onChange={(e) => setBusqueda(e.target.value)} /></div>
-          </div>
-          <div className="email-list">
-            {loading && conversaciones.length === 0 && <div className="msg-empty"><p>Cargando...</p></div>}
+      {/* Two-panel layout */}
+      <div className="correo-panels">
+        {/* Email list */}
+        <div className="correo-list-panel">
+          <div className="correo-list">
+            {loading && conversaciones.length === 0 && (
+              <div className="correo-list-empty"><p>Cargando...</p></div>
+            )}
             {conversaciones.map(conv => (
-              <div key={conv.id} className={`email-item ${conversacionActiva === conv.id ? 'active' : ''} ${conv.no_leidos > 0 ? 'unread' : ''}`} onClick={() => { setConversacionActiva(conv.id); setReplyMode(false); }}>
-                <div className="email-item-content">
-                  <div className="email-item-header">
-                    <span className="email-from">{conv.contacto_nombre || 'Desconocido'}</span>
-                    <span className="email-time">{formatTimeAgo(conv.ultimo_mensaje_at)}</span>
-                  </div>
-                  <div className="email-subject">{conv.metadata?.email_subject || conv.ultimo_mensaje_texto || '(Sin asunto)'}</div>
-                  <div className="email-preview">{conv.ultimo_mensaje_texto || ''}</div>
+              <div
+                key={conv.id}
+                className={`correo-item ${conversacionActiva === conv.id ? 'active' : ''} ${conv.no_leidos > 0 ? 'unread' : ''}`}
+                onClick={() => { setConversacionActiva(conv.id); setReplyMode(false); }}
+              >
+                <div className="correo-item-avatar">
+                  {(conv.contacto_nombre || 'D')[0].toUpperCase()}
                 </div>
-                {conv.no_leidos > 0 && <span className="unread-badge">{conv.no_leidos}</span>}
+                <div className="correo-item-content">
+                  <div className="correo-item-top">
+                    <span className="correo-item-from">{conv.contacto_nombre || 'Desconocido'}</span>
+                    <span className="correo-item-time">{formatTimeAgo(conv.ultimo_mensaje_at)}</span>
+                  </div>
+                  <div className="correo-item-subject">{conv.metadata?.email_subject || '(Sin asunto)'}</div>
+                  <div className="correo-item-preview">{conv.ultimo_mensaje_texto || ''}</div>
+                </div>
+                {conv.no_leidos > 0 && <span className="correo-item-badge">{conv.no_leidos}</span>}
               </div>
             ))}
-            {!loading && conversaciones.length === 0 && <div className="msg-empty"><p>No hay correos. Pulsa Sincronizar.</p></div>}
+            {!loading && conversaciones.length === 0 && (
+              <div className="correo-list-empty">
+                <div className="correo-empty-icon" style={{ width: 48, height: 48 }}>
+                  {carpeta === 'bandeja' ? Icons.inbox : Icons.sent}
+                </div>
+                <p>{carpeta === 'bandeja' ? 'No hay correos en la bandeja.' : 'No hay correos enviados.'}</p>
+                {carpeta === 'bandeja' && (
+                  <button className="correo-btn secondary" onClick={() => handleSync(false)} disabled={syncing} style={{ marginTop: 8 }}>
+                    {Icons.refresh} {syncing ? 'Sincronizando...' : 'Sincronizar ahora'}
+                  </button>
+                )}
+              </div>
+            )}
           </div>
         </div>
 
         {/* Read panel */}
-        <div className="email-read-panel">
+        <div className="correo-read-panel">
           {conversacionActiva && mensajes.length > 0 ? (
             <>
-              <div className="email-header"><h2>{mensajes[0]?.email_asunto || '(Sin asunto)'}</h2></div>
-              <div className="email-thread">
+              <div className="correo-read-header">
+                <h2>{mensajes[0]?.email_asunto || '(Sin asunto)'}</h2>
+                <div className="correo-read-meta">
+                  <span>{carpeta === 'bandeja' ? 'De' : 'Para'}: {convActual?.contacto_nombre || 'Desconocido'}</span>
+                  <span>{mensajes.length} mensaje{mensajes.length > 1 ? 's' : ''}</span>
+                </div>
+              </div>
+              <div className="correo-thread">
                 {mensajes.map(msg => (
-                  <div key={msg.id} className={`email-msg ${msg.es_entrante ? 'incoming' : 'outgoing'}`}>
-                    <div className="email-msg-header">
-                      <span className="email-from-full">{msg.es_entrante ? `De: ${msg.email_de || msg.remitente_nombre}` : `Enviado a: ${msg.email_para}`}</span>
-                      <span className="email-date">{new Date(msg.created_at).toLocaleDateString('es-MX', { weekday: 'short', day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' })}</span>
+                  <div key={msg.id} className={`correo-msg ${msg.es_entrante ? 'incoming' : 'outgoing'}`}>
+                    <div className="correo-msg-header">
+                      <div className="correo-msg-sender">
+                        <div className="correo-msg-avatar" style={{ background: msg.es_entrante ? '#dbeafe' : '#dcfce7', color: msg.es_entrante ? '#2563eb' : '#16a34a' }}>
+                          {(msg.es_entrante ? (msg.email_de || msg.remitente_nombre || 'D') : 'Yo')[0].toUpperCase()}
+                        </div>
+                        <div>
+                          <span className="correo-msg-from">{msg.es_entrante ? (msg.remitente_nombre || msg.email_de) : 'Yo'}</span>
+                          <span className="correo-msg-email">{msg.es_entrante ? msg.email_de : `Para: ${msg.email_para}`}</span>
+                        </div>
+                      </div>
+                      <span className="correo-msg-date">{formatFullDate(msg.created_at)}</span>
                     </div>
-                    {msg.email_cc && <div className="email-cc">CC: {msg.email_cc}</div>}
-                    <div className="email-body" dangerouslySetInnerHTML={{ __html: msg.contenido || msg.contenido_plain || '' }} />
+                    {msg.email_cc && <div className="correo-msg-cc">CC: {msg.email_cc}</div>}
+                    <div className="correo-msg-body" dangerouslySetInnerHTML={{ __html: msg.contenido || msg.contenido_plain || '' }} />
                     {msg.adjuntos?.length > 0 && (
-                      <div className="email-attachments">{msg.adjuntos.map((adj: any, i: number) => <div key={i} className="attachment-item">{Icons.attachment}<span>{adj.name || adj.nombre}</span></div>)}</div>
+                      <div className="correo-msg-attachments">
+                        {msg.adjuntos.map((adj: any, i: number) => (
+                          <div key={i} className="correo-attachment">{Icons.attachment}<span>{adj.name || adj.nombre || 'Adjunto'}</span></div>
+                        ))}
+                      </div>
                     )}
                   </div>
                 ))}
               </div>
-              <div className="email-actions">
+              <div className="correo-actions-bar">
                 {replyMode ? (
-                  <div className="reply-compose">
-                    <textarea value={replyBody} onChange={(e) => setReplyBody(e.target.value)} placeholder="Escribe tu respuesta..." rows={4} />
-                    <div className="reply-actions">
-                      <button className="btn-primary" onClick={handleReply} disabled={sending || !replyBody}>{Icons.send} {sending ? 'Enviando...' : 'Enviar'}</button>
-                      <button className="btn-secondary" onClick={() => { setReplyMode(false); setReplyBody(''); }}>Cancelar</button>
+                  <div className="correo-reply-box">
+                    <textarea
+                      value={replyBody}
+                      onChange={(e) => setReplyBody(e.target.value)}
+                      placeholder="Escribe tu respuesta..."
+                      rows={4}
+                      autoFocus
+                    />
+                    <div className="correo-reply-actions">
+                      <button className="correo-btn primary" onClick={handleReply} disabled={sending || !replyBody}>
+                        {Icons.send} {sending ? 'Enviando...' : 'Enviar'}
+                      </button>
+                      <button className="correo-btn secondary" onClick={() => { setReplyMode(false); setReplyBody(''); }}>
+                        Cancelar
+                      </button>
                     </div>
                   </div>
                 ) : (
-                  <>
-                    <button className="btn-secondary" onClick={() => setReplyMode(true)}>Responder</button>
-                    <button className="btn-secondary" onClick={() => {
+                  <div className="correo-action-buttons">
+                    <button className="correo-btn primary" onClick={() => setReplyMode(true)}>
+                      Responder
+                    </button>
+                    <button className="correo-btn secondary" onClick={() => {
                       const lastMsg = mensajes[mensajes.length - 1];
-                      setComposeTo(''); setComposeSubject(`Fwd: ${(lastMsg?.email_asunto || '').replace(/^Fwd:\s*/i, '')}`);
-                      setComposeBody(lastMsg?.contenido_plain || ''); setShowCompose(true);
-                    }}>Reenviar</button>
-                  </>
+                      setComposeTo('');
+                      setComposeSubject(`Fwd: ${(lastMsg?.email_asunto || '').replace(/^Fwd:\s*/i, '')}`);
+                      setComposeBody(lastMsg?.contenido_plain || '');
+                      setShowCompose(true);
+                    }}>
+                      Reenviar
+                    </button>
+                  </div>
                 )}
               </div>
             </>
           ) : (
-            <div className="conv-empty"><div className="empty-icon">{Icons.email}</div><h3>Selecciona un correo</h3><p>Elige un correo de la lista</p></div>
+            <div className="correo-empty-state">
+              <div className="correo-empty-icon">{Icons.email}</div>
+              <h3>Selecciona un correo</h3>
+              <p>Elige un correo de la lista para leerlo aquí.</p>
+            </div>
           )}
         </div>
       </div>
 
-      {/* Compose Modal - inlined to avoid remount on state change */}
+      {/* Compose Modal */}
       {showCompose && (
-        <div className="modal-overlay" onClick={() => setShowCompose(false)}>
-          <div className="modal-content" onClick={e => e.stopPropagation()}>
-            <div className="modal-header"><h3>Nuevo correo</h3><button className="btn-icon" onClick={() => setShowCompose(false)}>{Icons.close}</button></div>
-            <div className="compose-fields">
-              <div className="compose-field"><label>Para:</label><input type="text" value={composeTo} onChange={e => setComposeTo(e.target.value)} placeholder="destinatario@email.com" /></div>
-              <div className="compose-field"><label>CC:</label><input type="text" value={composeCc} onChange={e => setComposeCc(e.target.value)} placeholder="(opcional)" /></div>
-              <div className="compose-field"><label>Asunto:</label><input type="text" value={composeSubject} onChange={e => setComposeSubject(e.target.value)} placeholder="Asunto del correo" /></div>
-              <textarea className="compose-body" value={composeBody} onChange={e => setComposeBody(e.target.value)} placeholder="Escribe tu mensaje..." rows={10} />
+        <div className="correo-modal-overlay" onClick={() => setShowCompose(false)}>
+          <div className="correo-modal" onClick={e => e.stopPropagation()}>
+            <div className="correo-modal-header">
+              <h3>Nuevo correo</h3>
+              <button className="correo-btn-icon" onClick={() => setShowCompose(false)}>{Icons.close}</button>
             </div>
-            <div className="modal-actions">
-              <button className="btn-primary" onClick={handleSendEmail} disabled={sending || !composeTo || !composeSubject}>{Icons.send} {sending ? 'Enviando...' : 'Enviar'}</button>
-              <button className="btn-secondary" onClick={() => setShowCompose(false)}>Cancelar</button>
+            <div className="correo-compose-fields">
+              <div className="correo-compose-row"><label>Para:</label><input type="text" value={composeTo} onChange={e => setComposeTo(e.target.value)} placeholder="destinatario@email.com" /></div>
+              <div className="correo-compose-row"><label>CC:</label><input type="text" value={composeCc} onChange={e => setComposeCc(e.target.value)} placeholder="(opcional)" /></div>
+              <div className="correo-compose-row"><label>Asunto:</label><input type="text" value={composeSubject} onChange={e => setComposeSubject(e.target.value)} placeholder="Asunto del correo" /></div>
+              <textarea className="correo-compose-body" value={composeBody} onChange={e => setComposeBody(e.target.value)} placeholder="Escribe tu mensaje..." rows={10} />
+            </div>
+            <div className="correo-modal-footer">
+              <button className="correo-btn primary" onClick={handleSendEmail} disabled={sending || !composeTo || !composeSubject}>
+                {Icons.send} {sending ? 'Enviando...' : 'Enviar'}
+              </button>
+              <button className="correo-btn secondary" onClick={() => setShowCompose(false)}>Cancelar</button>
             </div>
           </div>
         </div>
       )}
 
-      {/* Setup Modal - inlined to avoid remount on state change */}
-      {showSetup && (
-        <div className="modal-overlay" onClick={() => setShowSetup(false)}>
-          <div className="modal-content" onClick={e => e.stopPropagation()}>
-            <div className="modal-header"><h3>Configurar cuenta de correo</h3><button className="btn-icon" onClick={() => setShowSetup(false)}>{Icons.close}</button></div>
-            <div className="setup-fields">
-              <div className="setup-field"><label>Correo electrónico:</label><input type="email" value={setupEmail} onChange={e => setSetupEmail(e.target.value)} placeholder="tu@dominio.com" /></div>
-              <div className="setup-field"><label>Nombre visible:</label><input type="text" value={setupDisplayName} onChange={e => setSetupDisplayName(e.target.value)} placeholder="Tu Nombre" /></div>
-              <div className="setup-field"><label>Contraseña:</label><input type="password" value={setupPassword} onChange={e => setSetupPassword(e.target.value)} placeholder="Contraseña del email" /></div>
-              <p className="setup-hint">Los datos de IMAP y SMTP los encuentras en el panel de tu proveedor de correo (cPanel, MXRoute, etc). NO uses "mail.mxroute.com" — usa el hostname real de tu servidor.</p>
-              <div className="setup-row">
-                <div className="setup-field"><label>IMAP Host:</label><input type="text" value={setupImapHost} onChange={e => setSetupImapHost(e.target.value)} placeholder="ej: echo.mxrouting.net" /></div>
-                <div className="setup-field"><label>Puerto:</label><input type="text" value={setupImapPort} onChange={e => setSetupImapPort(e.target.value)} /></div>
-              </div>
-              <div className="setup-row">
-                <div className="setup-field"><label>SMTP Host:</label><input type="text" value={setupSmtpHost} onChange={e => setSetupSmtpHost(e.target.value)} placeholder="ej: echo.mxrouting.net" /></div>
-                <div className="setup-field"><label>Puerto:</label><input type="text" value={setupSmtpPort} onChange={e => setSetupSmtpPort(e.target.value)} /></div>
-              </div>
-              {setupError && <p className="setup-error">{setupError}</p>}
-              {setupSuccess && <p className="setup-success">{setupSuccess}</p>}
-            </div>
-            <div className="modal-actions">
-              <button className="btn-primary" onClick={handleSaveCredentials} disabled={setupTesting || !setupEmail || !setupPassword || !setupImapHost || !setupSmtpHost}>{setupTesting ? 'Verificando...' : 'Guardar y verificar'}</button>
-              <button className="btn-secondary" onClick={() => setShowSetup(false)}>Cancelar</button>
-            </div>
-          </div>
-        </div>
-      )}
+      {/* Setup Modal */}
+      {renderSetupModal()}
       <style>{styles}</style>
     </div>
   );
+
+  // ==================== SETUP MODAL (reused) ====================
+
+  function renderSetupModal() {
+    if (!showSetup) return null;
+    return (
+      <div className="correo-modal-overlay" onClick={() => setShowSetup(false)}>
+        <div className="correo-modal" onClick={e => e.stopPropagation()}>
+          <div className="correo-modal-header">
+            <h3>Configurar cuenta de correo</h3>
+            <button className="correo-btn-icon" onClick={() => setShowSetup(false)}>{Icons.close}</button>
+          </div>
+          <div className="correo-setup-fields">
+            <div className="correo-setup-field">
+              <label>Correo electrónico:</label>
+              <input type="email" value={setupEmail} onChange={e => setSetupEmail(e.target.value)} placeholder="tu@dominio.com" />
+            </div>
+            <div className="correo-setup-field">
+              <label>Nombre visible:</label>
+              <input type="text" value={setupDisplayName} onChange={e => setSetupDisplayName(e.target.value)} placeholder="Tu Nombre" />
+            </div>
+            <div className="correo-setup-field">
+              <label>Contraseña:</label>
+              <input type="password" value={setupPassword} onChange={e => setSetupPassword(e.target.value)} placeholder="Contraseña del email" />
+            </div>
+            <div className="correo-setup-hint">
+              Los datos de IMAP y SMTP los encuentras en tu panel de MXRoute. Usa el hostname de tu servidor (ej: witcher.mxrouting.net).
+            </div>
+            <div className="correo-setup-row">
+              <div className="correo-setup-field"><label>IMAP Host:</label><input type="text" value={setupImapHost} onChange={e => setSetupImapHost(e.target.value)} placeholder="ej: echo.mxrouting.net" /></div>
+              <div className="correo-setup-field"><label>Puerto:</label><input type="text" value={setupImapPort} onChange={e => setSetupImapPort(e.target.value)} /></div>
+            </div>
+            <div className="correo-setup-row">
+              <div className="correo-setup-field"><label>SMTP Host:</label><input type="text" value={setupSmtpHost} onChange={e => setSetupSmtpHost(e.target.value)} placeholder="ej: echo.mxrouting.net" /></div>
+              <div className="correo-setup-field"><label>Puerto:</label><input type="text" value={setupSmtpPort} onChange={e => setSetupSmtpPort(e.target.value)} /></div>
+            </div>
+            {setupError && <div className="correo-alert error">{setupError}</div>}
+            {setupSuccess && <div className="correo-alert success">{setupSuccess}</div>}
+          </div>
+          <div className="correo-modal-footer">
+            <button className="correo-btn primary" onClick={handleSaveCredentials} disabled={setupTesting || !setupEmail || !setupPassword || !setupImapHost || !setupSmtpHost}>
+              {setupTesting ? 'Verificando conexión...' : 'Guardar y verificar'}
+            </button>
+            <button className="correo-btn secondary" onClick={() => setShowSetup(false)}>Cancelar</button>
+          </div>
+        </div>
+      </div>
+    );
+  }
 }
 
 // ==================== STYLES ====================
 
 const styles = `
-  .crm-correo { display: flex; flex-direction: column; height: calc(100vh - 140px); background: #f8fafc; }
-  .msg-email-container { display: flex; height: 100%; }
-  .email-sidebar { width: 180px; background: white; border-right: 1px solid #e2e8f0; padding: 12px; display: flex; flex-direction: column; }
-  .btn-compose { display: flex; align-items: center; justify-content: center; gap: 6px; width: 100%; padding: 10px 14px; background: #3b82f6; color: white; border: none; border-radius: 6px; font-size: 0.8125rem; font-weight: 500; cursor: pointer; margin-bottom: 16px; transition: background 0.15s; }
-  .btn-compose:hover { background: #2563eb; }
-  .email-folders { display: flex; flex-direction: column; gap: 2px; }
-  .email-sidebar-actions { margin-top: auto; display: flex; flex-direction: column; gap: 2px; border-top: 1px solid #e2e8f0; padding-top: 8px; }
-  .folder-btn { display: flex; align-items: center; gap: 8px; width: 100%; padding: 8px 10px; background: none; border: none; border-radius: 5px; color: #475569; font-size: 0.8125rem; cursor: pointer; transition: all 0.15s; text-align: left; }
-  .folder-btn:hover { background: #f1f5f9; }
-  .folder-btn.active { background: #eff6ff; color: #3b82f6; }
-  .folder-btn:disabled { opacity: 0.5; cursor: default; }
-  .folder-badge { margin-left: auto; min-width: 18px; height: 18px; display: flex; align-items: center; justify-content: center; padding: 0 5px; background: #ef4444; color: white; font-size: 0.6875rem; font-weight: 600; border-radius: 9px; }
+  /* Layout */
+  .crm-correo {
+    display: flex;
+    flex-direction: column;
+    height: calc(100vh - 64px);
+    background: #f1f5f9;
+  }
 
-  .email-list-panel { width: 300px; background: white; border-right: 1px solid #e2e8f0; display: flex; flex-direction: column; }
-  .email-list-header { padding: 12px; border-bottom: 1px solid #e2e8f0; }
-  .msg-search { display: flex; align-items: center; gap: 6px; padding: 8px 10px; background: #f1f5f9; border-radius: 6px; color: #64748b; }
-  .msg-search input { flex: 1; border: none; background: none; font-size: 0.8125rem; color: #0f172a; outline: none; }
-  .msg-search input::placeholder { color: #94a3b8; }
-  .email-list { flex: 1; overflow-y: auto; }
-  .email-item { display: flex; align-items: flex-start; gap: 6px; padding: 12px; border-bottom: 1px solid #f1f5f9; cursor: pointer; transition: background 0.15s; }
-  .email-item:hover { background: #f8fafc; }
-  .email-item.active { background: #eff6ff; }
-  .email-item.unread { background: #fefce8; }
-  .email-item.unread .email-from, .email-item.unread .email-subject { font-weight: 600; }
-  .email-item-content { flex: 1; min-width: 0; }
-  .email-item-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 2px; }
-  .email-from { font-size: 0.8125rem; color: #0f172a; }
-  .email-time { font-size: 0.6875rem; color: #94a3b8; flex-shrink: 0; }
-  .email-subject { font-size: 0.8125rem; color: #0f172a; margin-bottom: 2px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-  .email-preview { font-size: 0.75rem; color: #64748b; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-  .unread-badge { min-width: 18px; height: 18px; display: flex; align-items: center; justify-content: center; padding: 0 5px; background: #3b82f6; color: white; font-size: 0.6875rem; font-weight: 600; border-radius: 9px; flex-shrink: 0; }
+  /* Toolbar */
+  .correo-toolbar {
+    display: flex;
+    align-items: center;
+    gap: 16px;
+    padding: 0 20px;
+    height: 48px;
+    background: white;
+    border-bottom: 1px solid #e2e8f0;
+    flex-shrink: 0;
+  }
+  .correo-tabs {
+    display: flex;
+    gap: 2px;
+    height: 100%;
+  }
+  .correo-tab {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    padding: 0 16px;
+    background: none;
+    border: none;
+    border-bottom: 2px solid transparent;
+    color: #64748b;
+    font-size: 0.8125rem;
+    font-weight: 500;
+    cursor: pointer;
+    transition: all 0.15s;
+    white-space: nowrap;
+  }
+  .correo-tab:hover { color: #334155; background: #f8fafc; }
+  .correo-tab.active {
+    color: #3b82f6;
+    border-bottom-color: #3b82f6;
+  }
+  .correo-tab-badge {
+    min-width: 18px;
+    height: 18px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 0 5px;
+    background: #ef4444;
+    color: white;
+    font-size: 0.6875rem;
+    font-weight: 600;
+    border-radius: 9px;
+  }
+  .correo-search {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    margin-left: auto;
+    padding: 6px 12px;
+    background: #f1f5f9;
+    border-radius: 6px;
+    color: #64748b;
+    min-width: 200px;
+  }
+  .correo-search input {
+    flex: 1;
+    border: none;
+    background: none;
+    font-size: 0.8125rem;
+    color: #0f172a;
+    outline: none;
+  }
+  .correo-search input::placeholder { color: #94a3b8; }
 
-  .email-read-panel { flex: 1; display: flex; flex-direction: column; background: white; overflow-y: auto; }
-  .email-header { padding: 20px; border-bottom: 1px solid #e2e8f0; }
-  .email-header h2 { margin: 0; font-size: 1.125rem; font-weight: 600; color: #0f172a; }
-  .email-thread { flex: 1; overflow-y: auto; }
-  .email-msg { padding: 16px 20px; border-bottom: 1px solid #f1f5f9; }
-  .email-msg.outgoing { background: #f0fdf4; }
-  .email-msg-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px; }
-  .email-from-full { font-size: 0.8125rem; color: #475569; font-weight: 500; }
-  .email-date { font-size: 0.75rem; color: #94a3b8; }
-  .email-cc { font-size: 0.75rem; color: #94a3b8; margin-bottom: 8px; }
-  .email-body { line-height: 1.6; color: #334155; font-size: 0.875rem; }
-  .email-body p { margin: 0 0 8px 0; }
-  .email-attachments { padding-top: 8px; display: flex; flex-wrap: wrap; gap: 6px; }
-  .attachment-item { display: flex; align-items: center; gap: 6px; padding: 6px 10px; background: #f8fafc; border: 1px solid #e2e8f0; border-radius: 5px; color: #475569; font-size: 0.75rem; }
-  .email-actions { display: flex; gap: 6px; padding: 14px 20px; border-top: 1px solid #e2e8f0; flex-wrap: wrap; }
+  /* Two-panel layout */
+  .correo-panels {
+    display: flex;
+    flex: 1;
+    overflow: hidden;
+  }
 
-  .reply-compose { width: 100%; display: flex; flex-direction: column; gap: 8px; }
-  .reply-compose textarea { width: 100%; padding: 10px; border: 1px solid #e2e8f0; border-radius: 6px; font-size: 0.875rem; font-family: inherit; resize: vertical; outline: none; box-sizing: border-box; }
-  .reply-compose textarea:focus { border-color: #3b82f6; }
-  .reply-actions { display: flex; gap: 6px; }
+  /* List panel */
+  .correo-list-panel {
+    width: 360px;
+    min-width: 280px;
+    background: white;
+    border-right: 1px solid #e2e8f0;
+    display: flex;
+    flex-direction: column;
+  }
+  .correo-list {
+    flex: 1;
+    overflow-y: auto;
+  }
+  .correo-item {
+    display: flex;
+    align-items: flex-start;
+    gap: 10px;
+    padding: 12px 16px;
+    border-bottom: 1px solid #f1f5f9;
+    cursor: pointer;
+    transition: background 0.15s;
+  }
+  .correo-item:hover { background: #f8fafc; }
+  .correo-item.active { background: #eff6ff; }
+  .correo-item.unread { background: #fffbeb; }
+  .correo-item.unread .correo-item-from,
+  .correo-item.unread .correo-item-subject { font-weight: 600; }
+  .correo-item-avatar {
+    width: 36px;
+    height: 36px;
+    border-radius: 50%;
+    background: #e2e8f0;
+    color: #475569;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 0.875rem;
+    font-weight: 600;
+    flex-shrink: 0;
+  }
+  .correo-item-content { flex: 1; min-width: 0; }
+  .correo-item-top {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 2px;
+  }
+  .correo-item-from { font-size: 0.8125rem; color: #0f172a; }
+  .correo-item-time { font-size: 0.6875rem; color: #94a3b8; flex-shrink: 0; }
+  .correo-item-subject {
+    font-size: 0.8125rem;
+    color: #334155;
+    margin-bottom: 2px;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+  .correo-item-preview {
+    font-size: 0.75rem;
+    color: #94a3b8;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+  .correo-item-badge {
+    min-width: 18px;
+    height: 18px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 0 5px;
+    background: #3b82f6;
+    color: white;
+    font-size: 0.6875rem;
+    font-weight: 600;
+    border-radius: 9px;
+    flex-shrink: 0;
+    margin-top: 2px;
+  }
+  .correo-list-empty {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    padding: 40px 20px;
+    color: #94a3b8;
+    text-align: center;
+  }
+  .correo-list-empty p { margin: 8px 0 0; font-size: 0.8125rem; }
 
-  .btn-primary { display: flex; align-items: center; gap: 5px; padding: 8px 16px; background: #3b82f6; color: white; border: none; border-radius: 5px; font-size: 0.8125rem; font-weight: 500; cursor: pointer; transition: background 0.15s; }
-  .btn-primary:hover { background: #2563eb; }
-  .btn-primary:disabled { opacity: 0.5; cursor: default; }
-  .btn-secondary { display: flex; align-items: center; gap: 5px; padding: 8px 14px; background: white; border: 1px solid #e2e8f0; border-radius: 5px; color: #475569; font-size: 0.8125rem; font-weight: 500; cursor: pointer; transition: all 0.15s; }
-  .btn-secondary:hover { background: #f8fafc; border-color: #cbd5e1; }
-  .btn-icon { display: flex; align-items: center; justify-content: center; width: 28px; height: 28px; background: none; border: none; color: #64748b; cursor: pointer; border-radius: 4px; }
-  .btn-icon:hover { background: #f1f5f9; }
+  /* Read panel */
+  .correo-read-panel {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    background: #fafbfc;
+    overflow: hidden;
+  }
+  .correo-read-header {
+    padding: 20px 24px 16px;
+    background: white;
+    border-bottom: 1px solid #e2e8f0;
+  }
+  .correo-read-header h2 {
+    margin: 0 0 6px;
+    font-size: 1.125rem;
+    font-weight: 600;
+    color: #0f172a;
+    line-height: 1.3;
+  }
+  .correo-read-meta {
+    display: flex;
+    gap: 16px;
+    font-size: 0.8125rem;
+    color: #64748b;
+  }
+  .correo-thread {
+    flex: 1;
+    overflow-y: auto;
+    padding: 8px 0;
+  }
+  .correo-msg {
+    margin: 8px 16px;
+    padding: 16px 20px;
+    background: white;
+    border-radius: 8px;
+    border: 1px solid #e2e8f0;
+  }
+  .correo-msg.outgoing {
+    background: #f0fdf4;
+    border-color: #bbf7d0;
+  }
+  .correo-msg-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: flex-start;
+    margin-bottom: 12px;
+  }
+  .correo-msg-sender {
+    display: flex;
+    gap: 10px;
+    align-items: center;
+  }
+  .correo-msg-avatar {
+    width: 32px;
+    height: 32px;
+    border-radius: 50%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 0.8125rem;
+    font-weight: 600;
+    flex-shrink: 0;
+  }
+  .correo-msg-from {
+    display: block;
+    font-size: 0.8125rem;
+    font-weight: 600;
+    color: #0f172a;
+  }
+  .correo-msg-email {
+    display: block;
+    font-size: 0.75rem;
+    color: #94a3b8;
+  }
+  .correo-msg-date { font-size: 0.75rem; color: #94a3b8; white-space: nowrap; }
+  .correo-msg-cc { font-size: 0.75rem; color: #94a3b8; margin-bottom: 8px; }
+  .correo-msg-body {
+    line-height: 1.6;
+    color: #334155;
+    font-size: 0.875rem;
+    word-break: break-word;
+  }
+  .correo-msg-body p { margin: 0 0 8px; }
+  .correo-msg-body img { max-width: 100%; height: auto; border-radius: 4px; }
+  .correo-msg-attachments {
+    padding-top: 12px;
+    margin-top: 12px;
+    border-top: 1px solid #f1f5f9;
+    display: flex;
+    flex-wrap: wrap;
+    gap: 6px;
+  }
+  .correo-attachment {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    padding: 6px 10px;
+    background: #f8fafc;
+    border: 1px solid #e2e8f0;
+    border-radius: 5px;
+    color: #475569;
+    font-size: 0.75rem;
+  }
 
-  .conv-empty, .msg-empty { flex: 1; display: flex; flex-direction: column; align-items: center; justify-content: center; padding: 40px; color: #64748b; }
-  .empty-icon { width: 64px; height: 64px; display: flex; align-items: center; justify-content: center; background: #f1f5f9; border-radius: 50%; color: #94a3b8; margin-bottom: 12px; }
-  .empty-icon svg { width: 32px; height: 32px; }
-  .conv-empty h3 { margin: 0 0 4px 0; font-size: 1rem; font-weight: 600; color: #0f172a; }
-  .conv-empty p { margin: 0; font-size: 0.875rem; }
+  /* Actions bar */
+  .correo-actions-bar {
+    padding: 12px 16px;
+    background: white;
+    border-top: 1px solid #e2e8f0;
+  }
+  .correo-action-buttons { display: flex; gap: 8px; }
+  .correo-reply-box {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+  }
+  .correo-reply-box textarea {
+    width: 100%;
+    padding: 10px;
+    border: 1px solid #e2e8f0;
+    border-radius: 6px;
+    font-size: 0.875rem;
+    font-family: inherit;
+    resize: vertical;
+    outline: none;
+    box-sizing: border-box;
+  }
+  .correo-reply-box textarea:focus { border-color: #3b82f6; }
+  .correo-reply-actions { display: flex; gap: 6px; }
 
-  .modal-overlay { position: fixed; top: 0; left: 0; right: 0; bottom: 0; background: rgba(0,0,0,0.4); display: flex; align-items: center; justify-content: center; z-index: 1000; }
-  .modal-content { background: white; border-radius: 10px; width: 500px; max-width: 95vw; max-height: 90vh; overflow-y: auto; box-shadow: 0 20px 60px rgba(0,0,0,0.15); }
-  .modal-header { display: flex; justify-content: space-between; align-items: center; padding: 16px 20px; border-bottom: 1px solid #e2e8f0; }
-  .modal-header h3 { margin: 0; font-size: 1rem; font-weight: 600; color: #0f172a; }
-  .modal-actions { display: flex; gap: 8px; padding: 16px 20px; border-top: 1px solid #e2e8f0; }
+  /* Empty state */
+  .correo-empty-state {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    padding: 40px;
+    color: #64748b;
+    text-align: center;
+  }
+  .correo-empty-icon {
+    width: 64px;
+    height: 64px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    background: #f1f5f9;
+    border-radius: 50%;
+    color: #94a3b8;
+    margin-bottom: 12px;
+  }
+  .correo-empty-icon svg { width: 32px; height: 32px; }
+  .correo-empty-state h3 { margin: 0 0 4px; font-size: 1rem; font-weight: 600; color: #0f172a; }
+  .correo-empty-state p { margin: 0; font-size: 0.875rem; }
 
-  .compose-fields { padding: 16px 20px; display: flex; flex-direction: column; gap: 8px; }
-  .compose-field { display: flex; align-items: center; gap: 8px; }
-  .compose-field label { width: 50px; font-size: 0.8125rem; color: #64748b; flex-shrink: 0; }
-  .compose-field input { flex: 1; padding: 8px 10px; border: 1px solid #e2e8f0; border-radius: 5px; font-size: 0.8125rem; outline: none; }
-  .compose-field input:focus { border-color: #3b82f6; }
-  .compose-body { padding: 10px; border: 1px solid #e2e8f0; border-radius: 5px; font-size: 0.875rem; font-family: inherit; resize: vertical; outline: none; }
-  .compose-body:focus { border-color: #3b82f6; }
+  /* Buttons */
+  .correo-btn {
+    display: inline-flex;
+    align-items: center;
+    gap: 5px;
+    padding: 8px 16px;
+    border: 1px solid #e2e8f0;
+    border-radius: 6px;
+    font-size: 0.8125rem;
+    font-weight: 500;
+    cursor: pointer;
+    transition: all 0.15s;
+    background: white;
+    color: #475569;
+  }
+  .correo-btn:hover { background: #f8fafc; border-color: #cbd5e1; }
+  .correo-btn:disabled { opacity: 0.5; cursor: default; }
+  .correo-btn.primary {
+    background: #3b82f6;
+    color: white;
+    border-color: #3b82f6;
+  }
+  .correo-btn.primary:hover { background: #2563eb; border-color: #2563eb; }
+  .correo-btn.secondary { background: white; color: #475569; }
+  .correo-btn-icon {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 28px;
+    height: 28px;
+    background: none;
+    border: none;
+    color: #64748b;
+    cursor: pointer;
+    border-radius: 4px;
+  }
+  .correo-btn-icon:hover { background: #f1f5f9; }
 
-  .setup-fields { padding: 16px 20px; display: flex; flex-direction: column; gap: 10px; }
-  .setup-field { display: flex; flex-direction: column; gap: 4px; }
-  .setup-field label { font-size: 0.8125rem; color: #475569; font-weight: 500; }
-  .setup-field input { padding: 8px 10px; border: 1px solid #e2e8f0; border-radius: 5px; font-size: 0.8125rem; outline: none; }
-  .setup-field input:focus { border-color: #3b82f6; }
-  .setup-row { display: flex; gap: 10px; }
-  .setup-row .setup-field { flex: 1; }
-  .setup-hint { color: #94a3b8; font-size: 0.75rem; font-style: italic; margin: 0; padding: 4px 0; background: #f8fafc; border-radius: 4px; padding: 6px 8px; }
-  .setup-error { color: #ef4444; font-size: 0.8125rem; margin: 0; }
-  .setup-success { color: #10b981; font-size: 0.8125rem; margin: 0; }
+  /* Header action buttons */
+  .correo-header-btn {
+    display: inline-flex;
+    align-items: center;
+    gap: 5px;
+    padding: 6px 12px;
+    background: white;
+    border: 1px solid #e2e8f0;
+    border-radius: 6px;
+    color: #475569;
+    font-size: 0.8125rem;
+    font-weight: 500;
+    cursor: pointer;
+    transition: all 0.15s;
+  }
+  .correo-header-btn:hover { background: #f1f5f9; border-color: #cbd5e1; }
+  .correo-header-btn:disabled { opacity: 0.5; cursor: default; }
+  .correo-header-btn.primary {
+    background: #3b82f6;
+    color: white;
+    border-color: #3b82f6;
+  }
+  .correo-header-btn.primary:hover { background: #2563eb; }
+  .correo-header-btn.danger { color: #ef4444; }
+  .correo-header-btn.danger:hover { background: #fef2f2; border-color: #fca5a5; }
 
+  /* Alert */
+  .correo-alert {
+    padding: 10px 14px;
+    border-radius: 6px;
+    font-size: 0.8125rem;
+    line-height: 1.4;
+  }
+  .correo-alert.error {
+    background: #fef2f2;
+    color: #dc2626;
+    border: 1px solid #fecaca;
+  }
+  .correo-alert.success {
+    background: #f0fdf4;
+    color: #16a34a;
+    border: 1px solid #bbf7d0;
+  }
+
+  /* Modal */
+  .correo-modal-overlay {
+    position: fixed;
+    top: 0; left: 0; right: 0; bottom: 0;
+    background: rgba(0,0,0,0.4);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    z-index: 1000;
+  }
+  .correo-modal {
+    background: white;
+    border-radius: 10px;
+    width: 520px;
+    max-width: 95vw;
+    max-height: 90vh;
+    overflow-y: auto;
+    box-shadow: 0 20px 60px rgba(0,0,0,0.15);
+  }
+  .correo-modal-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 16px 20px;
+    border-bottom: 1px solid #e2e8f0;
+  }
+  .correo-modal-header h3 { margin: 0; font-size: 1rem; font-weight: 600; color: #0f172a; }
+  .correo-modal-footer {
+    display: flex;
+    gap: 8px;
+    padding: 16px 20px;
+    border-top: 1px solid #e2e8f0;
+  }
+
+  /* Compose fields */
+  .correo-compose-fields { padding: 16px 20px; display: flex; flex-direction: column; gap: 8px; }
+  .correo-compose-row { display: flex; align-items: center; gap: 8px; }
+  .correo-compose-row label { width: 50px; font-size: 0.8125rem; color: #64748b; flex-shrink: 0; }
+  .correo-compose-row input {
+    flex: 1;
+    padding: 8px 10px;
+    border: 1px solid #e2e8f0;
+    border-radius: 5px;
+    font-size: 0.8125rem;
+    outline: none;
+  }
+  .correo-compose-row input:focus { border-color: #3b82f6; }
+  .correo-compose-body {
+    padding: 10px;
+    border: 1px solid #e2e8f0;
+    border-radius: 5px;
+    font-size: 0.875rem;
+    font-family: inherit;
+    resize: vertical;
+    outline: none;
+  }
+  .correo-compose-body:focus { border-color: #3b82f6; }
+
+  /* Setup fields */
+  .correo-setup-fields { padding: 16px 20px; display: flex; flex-direction: column; gap: 10px; }
+  .correo-setup-field { display: flex; flex-direction: column; gap: 4px; }
+  .correo-setup-field label { font-size: 0.8125rem; color: #475569; font-weight: 500; }
+  .correo-setup-field input {
+    padding: 8px 10px;
+    border: 1px solid #e2e8f0;
+    border-radius: 5px;
+    font-size: 0.8125rem;
+    outline: none;
+  }
+  .correo-setup-field input:focus { border-color: #3b82f6; }
+  .correo-setup-row { display: flex; gap: 10px; }
+  .correo-setup-row .correo-setup-field { flex: 1; }
+  .correo-setup-hint {
+    color: #64748b;
+    font-size: 0.75rem;
+    margin: 0;
+    padding: 8px 10px;
+    background: #f8fafc;
+    border-radius: 6px;
+    border: 1px solid #e2e8f0;
+    line-height: 1.4;
+  }
+
+  /* Responsive */
   @media (max-width: 900px) {
-    .msg-email-container { flex-direction: column; }
-    .email-list-panel, .email-sidebar { width: 100%; max-height: 50vh; }
-    .email-read-panel { min-height: 50vh; }
+    .correo-panels { flex-direction: column; }
+    .correo-list-panel { width: 100%; max-height: 50vh; }
+    .correo-read-panel { min-height: 50vh; }
+    .correo-search { min-width: 140px; }
+    .correo-toolbar { padding: 0 12px; gap: 8px; }
   }
 `;

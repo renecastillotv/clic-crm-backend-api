@@ -68,6 +68,7 @@ export interface ConversacionFiltros {
   estado?: EstadoConversacion;
   etiqueta_id?: string;
   busqueda?: string;
+  carpeta?: 'bandeja' | 'enviados';
   page?: number;
   limit?: number;
 }
@@ -90,7 +91,7 @@ export async function getConversaciones(
   tenantId: string,
   filtros: ConversacionFiltros = {}
 ): Promise<PaginatedResult<Conversacion>> {
-  const { usuario_id, canal, estado, etiqueta_id, busqueda, page = 1, limit = 50 } = filtros;
+  const { usuario_id, canal, estado, etiqueta_id, busqueda, carpeta, page = 1, limit = 50 } = filtros;
   const offset = (page - 1) * limit;
 
   let whereClause = 'c.tenant_id = $1';
@@ -125,6 +126,12 @@ export async function getConversaciones(
     whereClause += ` AND (c.contacto_nombre ILIKE $${paramIndex} OR c.ultimo_mensaje_texto ILIKE $${paramIndex})`;
     params.push(`%${busqueda}%`);
     paramIndex++;
+  }
+
+  if (carpeta === 'bandeja') {
+    whereClause += ` AND EXISTS (SELECT 1 FROM mensajes m WHERE m.conversacion_id = c.id AND m.es_entrante = true)`;
+  } else if (carpeta === 'enviados') {
+    whereClause += ` AND EXISTS (SELECT 1 FROM mensajes m WHERE m.conversacion_id = c.id AND m.es_entrante = false)`;
   }
 
   const countResult = await query(

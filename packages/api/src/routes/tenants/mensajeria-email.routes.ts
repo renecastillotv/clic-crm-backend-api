@@ -209,7 +209,7 @@ router.post('/sync', async (req: Request<TenantParams>, res: Response, next: Nex
 router.get('/inbox', async (req: Request<TenantParams>, res: Response, next: NextFunction) => {
   try {
     const { tenantId } = req.params;
-    const { usuario_id, page, limit, busqueda } = req.query;
+    const { usuario_id, page, limit, busqueda, carpeta } = req.query;
 
     if (!usuario_id) {
       return res.status(400).json({ error: 'usuario_id query param es requerido' });
@@ -221,6 +221,7 @@ router.get('/inbox', async (req: Request<TenantParams>, res: Response, next: Nex
       page: page ? parseInt(page as string) : undefined,
       limit: limit ? parseInt(limit as string) : undefined,
       busqueda: busqueda as string,
+      carpeta: carpeta as 'bandeja' | 'enviados' | undefined,
     });
 
     res.json(result);
