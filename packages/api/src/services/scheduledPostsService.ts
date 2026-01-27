@@ -94,7 +94,8 @@ export async function createScheduledPost(
  */
 export async function getScheduledPosts(
   tenantId: string,
-  status?: string
+  status?: string,
+  userId?: string
 ): Promise<ScheduledPost[]> {
   let sql = `
     SELECT sp.*, p.titulo as propiedad_titulo
@@ -105,8 +106,13 @@ export async function getScheduledPosts(
   const params: any[] = [tenantId];
 
   if (status) {
-    sql += ` AND sp.status = $2`;
+    sql += ` AND sp.status = $${params.length + 1}`;
     params.push(status);
+  }
+
+  if (userId) {
+    sql += ` AND sp.created_by = $${params.length + 1}`;
+    params.push(userId);
   }
 
   sql += ` ORDER BY sp.scheduled_for DESC LIMIT 50`;

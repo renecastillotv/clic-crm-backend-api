@@ -533,6 +533,78 @@ router.get('/meta/auth-url', async (req: Request<TenantParams>, res: Response, n
 });
 
 /**
+ * GET /api/tenants/:tenantId/api-credentials/meta/my-connection
+ * Returns the current user's Meta connection status.
+ * Checks per-user credentials first, then tenant fallback.
+ */
+router.get('/meta/my-connection', async (req: Request<TenantParams>, res: Response, next: NextFunction) => {
+  try {
+    const { tenantId } = req.params;
+    const userId = (req as any).scope?.dbUserId;
+    if (!userId) {
+      return res.status(401).json({ error: 'Usuario no autenticado' });
+    }
+
+    // Check per-user credentials
+    const userCreds = await credentialsService.getUserMetaCredentials(tenantId, userId);
+    if (userCreds && userCreds.pageId && userCreds.pageId !== 'PENDING') {
+      return res.json({
+        connected: true,
+        source: 'user',
+        pageId: userCreds.pageId,
+        pageName: userCreds.pageName || null,
+        instagramAccountId: userCreds.instagramAccountId || null,
+        instagramUsername: userCreds.instagramUsername || null,
+      });
+    }
+
+    // Check if user has pending OAuth (PENDING page)
+    if (userCreds && userCreds.pageId === 'PENDING') {
+      return res.json({
+        connected: false,
+        source: null,
+        pendingPageSelection: true,
+      });
+    }
+
+    // Fallback: check tenant-level credentials
+    const tenantCreds = await credentialsService.getMetaPageToken(tenantId);
+    if (tenantCreds && tenantCreds.pageId && tenantCreds.pageId !== 'PENDING') {
+      return res.json({
+        connected: true,
+        source: 'tenant',
+        pageId: tenantCreds.pageId,
+        pageName: undefined,
+        instagramAccountId: tenantCreds.instagramAccountId || null,
+        instagramUsername: undefined,
+      });
+    }
+
+    return res.json({ connected: false, source: null });
+  } catch (error) {
+    next(error);
+  }
+});
+
+/**
+ * DELETE /api/tenants/:tenantId/api-credentials/meta/my-connection
+ * Disconnects the current user's Meta account.
+ */
+router.delete('/meta/my-connection', async (req: Request<TenantParams>, res: Response, next: NextFunction) => {
+  try {
+    const userId = (req as any).scope?.dbUserId;
+    if (!userId) {
+      return res.status(401).json({ error: 'Usuario no autenticado' });
+    }
+
+    await credentialsService.disconnectUserMeta(userId);
+    res.json({ success: true, message: 'Meta desconectado' });
+  } catch (error) {
+    next(error);
+  }
+});
+
+/**
  * GET /api/tenants/:tenantId/api-credentials/meta/pages
  * Lists accessible Facebook Pages after OAuth.
  */
@@ -540,7 +612,8 @@ router.get('/meta/pages', async (req: Request<TenantParams>, res: Response, next
   try {
     const { tenantId } = req.params;
 
-    const tokenData = await credentialsService.getMetaPageToken(tenantId);
+    const userId = (req as any).scope?.dbUserId;
+    const tokenData = await credentialsService.getMetaCredentialsWithFallback(tenantId, userId);
     if (!tokenData) {
       return res.status(400).json({ error: 'Meta no está conectado' });
     }
@@ -568,33 +641,64 @@ router.put('/meta/page', async (req: Request<TenantParams>, res: Response, next:
   try {
     const { tenantId } = req.params;
     const { pageId } = req.body;
+    const userId = (req as any).scope?.dbUserId;
 
     if (!pageId) {
       return res.status(400).json({ error: 'Se requiere pageId' });
     }
-
-    // Get the stored user token
-    const tokenData = await credentialsService.getMetaPageToken(tenantId);
-    if (!tokenData) {
-      return res.status(400).json({ error: 'Meta no está conectado. Realiza el flujo OAuth primero.' });
+    if (!userId) {
+      return res.status(401).json({ error: 'Usuario no autenticado' });
     }
 
-    // Use user token to get page details including page token
-    const pages = await metaSocialService.listUserPages(tokenData.pageAccessToken);
-    const selectedPage = pages.find(p => p.id === pageId);
+    // Get the stored user token (saved during OAuth with PENDING page)
+    const userCreds = await credentialsService.getUserMetaCredentials(tenantId, userId);
+    if (!userCreds) {
+      // Fallback: try tenant credentials (backward compat)
+      const tenantCreds = await credentialsService.getMetaPageToken(tenantId);
+      if (!tenantCreds) {
+        return res.status(400).json({ error: 'Meta no está conectado. Realiza el flujo OAuth primero.' });
+      }
+      // Use tenant flow (old behavior)
+      const pages = await metaSocialService.listUserPages(tenantCreds.pageAccessToken);
+      const selectedPage = pages.find(p => p.id === pageId);
+      if (!selectedPage) {
+        return res.status(400).json({ error: 'Página no encontrada o no tienes permisos' });
+      }
+      await credentialsService.saveMetaCredentials(
+        tenantId,
+        selectedPage.accessToken,
+        selectedPage.id,
+        selectedPage.name,
+        selectedPage.instagramBusinessAccount?.id || null,
+        selectedPage.instagramBusinessAccount?.username || null
+      );
+      return res.json({
+        success: true,
+        pageId: selectedPage.id,
+        pageName: selectedPage.name,
+        instagramAccountId: selectedPage.instagramBusinessAccount?.id || null,
+        instagramUsername: selectedPage.instagramBusinessAccount?.username || null,
+      });
+    }
 
+    // Use user credentials flow (new per-user behavior)
+    const pages = await metaSocialService.listUserPages(userCreds.pageAccessToken);
+    const selectedPage = pages.find(p => p.id === pageId);
     if (!selectedPage) {
       return res.status(400).json({ error: 'Página no encontrada o no tienes permisos' });
     }
 
-    // Save the permanent Page Access Token (connected_by already set during OAuth)
-    await credentialsService.saveMetaCredentials(
+    // Save the Page Access Token to user's asesor_social_accounts
+    await credentialsService.saveUserMetaCredentials(
       tenantId,
+      userId,
       selectedPage.accessToken,
       selectedPage.id,
       selectedPage.name,
       selectedPage.instagramBusinessAccount?.id || null,
-      selectedPage.instagramBusinessAccount?.username || null
+      selectedPage.instagramBusinessAccount?.username || null,
+      new Date(Date.now() + 60 * 24 * 60 * 60 * 1000),
+      ['pages_manage_posts', 'pages_read_engagement', 'instagram_basic', 'instagram_content_publish', 'instagram_manage_comments']
     );
 
     res.json({
@@ -622,7 +726,8 @@ router.post('/meta/publish', async (req: Request<TenantParams>, res: Response, n
       return res.status(400).json({ error: 'Se requiere mensaje o imagen' });
     }
 
-    const tokenData = await credentialsService.getMetaPageToken(tenantId);
+    const userId = (req as any).scope?.dbUserId;
+    const tokenData = await credentialsService.getMetaCredentialsWithFallback(tenantId, userId);
     if (!tokenData || !tokenData.pageId || tokenData.pageId === 'PENDING') {
       return res.status(400).json({ error: 'Meta no está configurado completamente. Selecciona una página primero.' });
     }
@@ -703,7 +808,8 @@ router.get('/meta/posts', async (req: Request<TenantParams>, res: Response, next
     const { tenantId } = req.params;
     const limit = parseInt(req.query.limit as string) || 25;
 
-    const tokenData = await credentialsService.getMetaPageToken(tenantId);
+    const userId = (req as any).scope?.dbUserId;
+    const tokenData = await credentialsService.getMetaCredentialsWithFallback(tenantId, userId);
     if (!tokenData || !tokenData.pageId || tokenData.pageId === 'PENDING') {
       return res.status(400).json({ error: 'Meta no está configurado completamente' });
     }
@@ -730,7 +836,8 @@ router.get('/meta/instagram-media', async (req: Request<TenantParams>, res: Resp
     const { tenantId } = req.params;
     const limit = parseInt(req.query.limit as string) || 25;
 
-    const tokenData = await credentialsService.getMetaPageToken(tenantId);
+    const userId = (req as any).scope?.dbUserId;
+    const tokenData = await credentialsService.getMetaCredentialsWithFallback(tenantId, userId);
     if (!tokenData || !tokenData.instagramAccountId) {
       return res.status(400).json({ error: 'Instagram no está conectado' });
     }
@@ -756,7 +863,8 @@ router.get('/meta/posts/:postId/comments', async (req: Request<TenantParams & { 
   try {
     const { tenantId, postId } = req.params;
 
-    const tokenData = await credentialsService.getMetaPageToken(tenantId);
+    const userId = (req as any).scope?.dbUserId;
+    const tokenData = await credentialsService.getMetaCredentialsWithFallback(tenantId, userId);
     if (!tokenData) {
       return res.status(400).json({ error: 'Meta no está conectado' });
     }
@@ -786,7 +894,8 @@ router.post('/meta/comments/:commentId/reply', async (req: Request<TenantParams 
       return res.status(400).json({ error: 'Se requiere mensaje' });
     }
 
-    const tokenData = await credentialsService.getMetaPageToken(tenantId);
+    const userId = (req as any).scope?.dbUserId;
+    const tokenData = await credentialsService.getMetaCredentialsWithFallback(tenantId, userId);
     if (!tokenData) {
       return res.status(400).json({ error: 'Meta no está conectado' });
     }
@@ -878,7 +987,8 @@ router.post('/meta/schedule', async (req: Request<TenantParams>, res: Response, 
       return res.status(400).json({ error: 'La publicacion no puede programarse mas de 75 dias en el futuro' });
     }
 
-    const tokenData = await credentialsService.getMetaPageToken(tenantId);
+    const userId = (req as any).scope?.dbUserId;
+    const tokenData = await credentialsService.getMetaCredentialsWithFallback(tenantId, userId);
     if (!tokenData) {
       return res.status(400).json({ error: 'Meta no esta conectado' });
     }
@@ -962,7 +1072,9 @@ router.get('/meta/scheduled-posts', async (req: Request<TenantParams>, res: Resp
     const { tenantId } = req.params;
     const status = req.query.status as string | undefined;
 
-    const posts = await scheduledPostsService.getScheduledPosts(tenantId, status);
+    const userId = (req as any).scope?.dbUserId;
+    const isPlatformAdmin = (req as any).scope?.isPlatformAdmin;
+    const posts = await scheduledPostsService.getScheduledPosts(tenantId, status, isPlatformAdmin ? undefined : userId);
     res.json(posts);
   } catch (error: any) {
     console.error('[Meta Social] Error getting scheduled posts:', error.message);
@@ -989,7 +1101,14 @@ router.delete('/meta/scheduled-posts/:postId', async (req: Request<TenantParams 
 
     // Delete from Meta if we have a Meta post ID
     if (scheduledPost.metaPostId) {
-      const tokenData = await credentialsService.getMetaPageToken(tenantId);
+      // Use post creator's credentials to delete from Meta
+      let tokenData = null;
+      if (scheduledPost.createdBy) {
+        tokenData = await credentialsService.getUserMetaCredentialsByUserId(scheduledPost.createdBy);
+      }
+      if (!tokenData) {
+        tokenData = await credentialsService.getMetaPageToken(tenantId);
+      }
       if (tokenData) {
         await metaSocialService.deleteScheduledPost(
           tokenData.pageAccessToken,
@@ -1048,7 +1167,8 @@ router.put('/meta/scheduled-posts/:postId', async (req: Request<TenantParams & {
     }
 
     // Facebook: delete old post from Meta, create new one
-    const tokenData = await credentialsService.getMetaPageToken(tenantId);
+    const userId = (req as any).scope?.dbUserId;
+    const tokenData = await credentialsService.getMetaCredentialsWithFallback(tenantId, userId);
     if (!tokenData) {
       return res.status(400).json({ error: 'Meta no esta conectado' });
     }

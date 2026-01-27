@@ -89,6 +89,15 @@ interface Credentials {
   metaPageName?: string;
   metaInstagramBusinessAccountId?: string;
   metaInstagramUsername?: string;
+  source?: 'user' | 'tenant' | null;
+  pendingPageSelection?: boolean;
+}
+
+interface MetaPage {
+  id: string;
+  name: string;
+  category?: string;
+  instagramBusinessAccount?: { id: string; username: string };
 }
 
 interface CopySuggestion {
@@ -171,6 +180,7 @@ const CrmMarketingRedesSociales: React.FC = () => {
   // Posts state
   const [fbPosts, setFbPosts] = useState<MetaPost[]>([]);
   const [fbPostsLoading, setFbPostsLoading] = useState(false);
+  const [fbPostsError, setFbPostsError] = useState(false);
   const [igMedia, setIgMedia] = useState<MetaIGMedia[]>([]);
   const [igMediaLoading, setIgMediaLoading] = useState(false);
 
@@ -232,6 +242,12 @@ const CrmMarketingRedesSociales: React.FC = () => {
   const [previewPlatform, setPreviewPlatform] = useState<'facebook' | 'instagram'>('facebook');
   const [showPreview, setShowPreview] = useState(false);
 
+  // OAuth & page selection state
+  const [connectLoading, setConnectLoading] = useState(false);
+  const [availablePages, setAvailablePages] = useState<MetaPage[]>([]);
+  const [showPageSelector, setShowPageSelector] = useState(false);
+  const popupRef = useRef<Window | null>(null);
+
   const isFullyConnected = credentials?.metaConnected && credentials?.metaPageId && credentials.metaPageId !== 'PENDING';
   const hasInstagram = !!credentials?.metaInstagramBusinessAccountId;
 
@@ -256,6 +272,11 @@ const CrmMarketingRedesSociales: React.FC = () => {
             </div>
             <span style={{ fontSize: '13px', fontWeight: 600, color: '#1e293b' }}>{credentials?.metaPageName}</span>
             <CheckCircle size={12} color="#16a34a" />
+            {credentials?.source && (
+              <span style={{ fontSize: '10px', color: credentials.source === 'user' ? '#16a34a' : '#f59e0b', fontWeight: 500 }}>
+                ({credentials.source === 'user' ? 'tu cuenta' : 'empresa'})
+              </span>
+            )}
           </div>
           {hasInstagram && (
             <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
@@ -266,31 +287,36 @@ const CrmMarketingRedesSociales: React.FC = () => {
               <CheckCircle size={12} color="#16a34a" />
             </div>
           )}
-          <button
-            onClick={() => navigate(`${basePath}/marketing/configuracion`)}
-            style={{ display: 'flex', alignItems: 'center', gap: '5px', padding: '6px 12px', background: '#f1f5f9', border: 'none', borderRadius: '8px', fontSize: '12px', fontWeight: 500, color: '#64748b', cursor: 'pointer' }}
-          >
-            <Settings size={13} />
-            Config
-          </button>
+          {credentials?.source === 'user' && (
+            <button
+              onClick={handleDisconnectMeta}
+              title="Desconectar Meta"
+              style={{ display: 'flex', alignItems: 'center', gap: '5px', padding: '6px 12px', background: '#fef2f2', border: 'none', borderRadius: '8px', fontSize: '12px', fontWeight: 500, color: '#ef4444', cursor: 'pointer' }}
+            >
+              <XCircle size={13} />
+              Desconectar
+            </button>
+          )}
         </div>
       ),
     });
-  }, [setPageHeader, isFullyConnected, hasInstagram, credentials, navigate, basePath]);
+  }, [setPageHeader, isFullyConnected, hasInstagram, credentials, navigate, basePath, handleDisconnectMeta]);
 
-  // Load credentials
+  // Load credentials (per-user)
   useEffect(() => {
     const fetchCredentials = async () => {
       if (!tenantActual?.id) return;
       try {
-        const response = await apiFetch(`/tenants/${tenantActual.id}/api-credentials`);
+        const response = await apiFetch(`/tenants/${tenantActual.id}/api-credentials/meta/my-connection`);
         const data = await response.json();
         setCredentials({
-          metaConnected: data.metaConnected || false,
-          metaPageId: data.metaPageId,
-          metaPageName: data.metaPageName,
-          metaInstagramBusinessAccountId: data.metaInstagramBusinessAccountId,
-          metaInstagramUsername: data.metaInstagramUsername,
+          metaConnected: data.connected || false,
+          metaPageId: data.pageId || undefined,
+          metaPageName: data.pageName || undefined,
+          metaInstagramBusinessAccountId: data.instagramAccountId || undefined,
+          metaInstagramUsername: data.instagramUsername || undefined,
+          source: data.source || null,
+          pendingPageSelection: data.pendingPageSelection || false,
         });
       } catch (error) {
         console.error('Error fetching credentials:', error);
@@ -301,16 +327,132 @@ const CrmMarketingRedesSociales: React.FC = () => {
     fetchCredentials();
   }, [tenantActual?.id]);
 
+  // Handle OAuth popup connection
+  const handleConnectMeta = useCallback(async () => {
+    if (!tenantActual?.id) return;
+    setConnectLoading(true);
+    try {
+      const response = await apiFetch(`/tenants/${tenantActual.id}/api-credentials/meta/auth-url?connectedBy=${tenantActual.id}`);
+      const { authUrl } = await response.json();
+
+      const width = 600, height = 700;
+      const left = window.screenX + (window.outerWidth - width) / 2;
+      const top = window.screenY + (window.outerHeight - height) / 2;
+      const popup = window.open(authUrl, 'meta-oauth', `width=${width},height=${height},left=${left},top=${top},toolbar=no,menubar=no,scrollbars=yes`);
+      if (!popup) {
+        alert('No se pudo abrir la ventana de autorizacion. Verifica que los popups esten permitidos.');
+        setConnectLoading(false);
+        return;
+      }
+      popupRef.current = popup;
+
+      const pollTimer = setInterval(() => {
+        if (popup.closed) {
+          clearInterval(pollTimer);
+          popupRef.current = null;
+          setConnectLoading(false);
+        }
+      }, 500);
+    } catch (error) {
+      console.error('Error starting Meta OAuth:', error);
+      setConnectLoading(false);
+    }
+  }, [tenantActual?.id]);
+
+  // Listen for OAuth callback message
+  useEffect(() => {
+    const handleOAuthMessage = async (event: MessageEvent) => {
+      if (event.data?.type !== 'META_SOCIAL_OAUTH_RESULT') return;
+
+      popupRef.current = null;
+      setConnectLoading(false);
+
+      if (event.data.success && tenantActual?.id) {
+        try {
+          // Fetch available pages
+          const pagesResponse = await apiFetch(`/tenants/${tenantActual.id}/api-credentials/meta/pages`);
+          const pages = await pagesResponse.json();
+
+          if (pages.length === 1) {
+            // Auto-select single page
+            await handleSelectPage(pages[0].id);
+          } else if (pages.length > 0) {
+            setAvailablePages(pages);
+            setShowPageSelector(true);
+          } else {
+            alert('No se encontraron paginas de Facebook. Asegurate de tener al menos una pagina creada.');
+          }
+        } catch (error) {
+          console.error('Error fetching pages:', error);
+          alert('OAuth exitoso, pero hubo un error al obtener las paginas.');
+        }
+      } else if (!event.data.success) {
+        alert(event.data.message || 'Error en la autorizacion de Meta');
+      }
+    };
+
+    window.addEventListener('message', handleOAuthMessage);
+    return () => window.removeEventListener('message', handleOAuthMessage);
+  }, [tenantActual?.id]);
+
+  // Select a Facebook page after OAuth
+  const handleSelectPage = useCallback(async (pageId: string) => {
+    if (!tenantActual?.id) return;
+    try {
+      await apiFetch(`/tenants/${tenantActual.id}/api-credentials/meta/page`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ pageId }),
+      });
+
+      // Refresh credentials
+      const response = await apiFetch(`/tenants/${tenantActual.id}/api-credentials/meta/my-connection`);
+      const data = await response.json();
+      setCredentials({
+        metaConnected: data.connected || false,
+        metaPageId: data.pageId || undefined,
+        metaPageName: data.pageName || undefined,
+        metaInstagramBusinessAccountId: data.instagramAccountId || undefined,
+        metaInstagramUsername: data.instagramUsername || undefined,
+        source: data.source || null,
+      });
+      setShowPageSelector(false);
+      setAvailablePages([]);
+    } catch (error) {
+      console.error('Error selecting page:', error);
+      alert('Error al seleccionar la pagina');
+    }
+  }, [tenantActual?.id]);
+
+  // Disconnect Meta
+  const handleDisconnectMeta = useCallback(async () => {
+    if (!tenantActual?.id) return;
+    if (!confirm('¿Desconectar tu cuenta de Meta? Tus publicaciones programadas podrian fallar.')) return;
+    try {
+      await apiFetch(`/tenants/${tenantActual.id}/api-credentials/meta/my-connection`, { method: 'DELETE' });
+      setCredentials({ metaConnected: false, source: null });
+    } catch (error) {
+      console.error('Error disconnecting:', error);
+    }
+  }, [tenantActual?.id]);
+
   // Load FB posts when tab changes
   const loadFbPosts = useCallback(async () => {
     if (!tenantActual?.id || !isFullyConnected) return;
     setFbPostsLoading(true);
+    setFbPostsError(false);
     try {
       const response = await apiFetch(`/tenants/${tenantActual.id}/api-credentials/meta/posts?limit=20`);
       const data = await response.json();
-      setFbPosts(Array.isArray(data) ? data : []);
+      if (!response.ok) {
+        setFbPostsError(true);
+        setFbPosts([]);
+      } else {
+        setFbPosts(Array.isArray(data) ? data : []);
+      }
     } catch (error) {
       console.error('Error loading FB posts:', error);
+      setFbPostsError(true);
     } finally {
       setFbPostsLoading(false);
     }
@@ -837,7 +979,7 @@ const CrmMarketingRedesSociales: React.FC = () => {
     );
   }
 
-  // Not connected - show CTA
+  // Not connected - show inline connect flow
   if (!isFullyConnected) {
     return (
       <div style={{ padding: '24px' }}>
@@ -868,31 +1010,41 @@ const CrmMarketingRedesSociales: React.FC = () => {
             Conecta tus redes sociales
           </h2>
           <p style={{ fontSize: '15px', color: '#64748b', margin: '0 0 32px 0', lineHeight: 1.6, maxWidth: '480px', marginLeft: 'auto', marginRight: 'auto' }}>
-            Para publicar en Facebook e Instagram, primero necesitas conectar tu cuenta de Meta
-            y seleccionar la Pagina de Facebook de tu empresa.
+            Para publicar en Facebook e Instagram, conecta tu cuenta de Meta
+            y selecciona la Pagina de Facebook de tu empresa.
           </p>
           <button
-            onClick={() => navigate(`${basePath}/marketing/configuracion`)}
+            onClick={handleConnectMeta}
+            disabled={connectLoading}
             style={{
               display: 'inline-flex',
               alignItems: 'center',
               gap: '8px',
               padding: '14px 28px',
-              background: 'linear-gradient(135deg, #1877f2 0%, #e11d48 100%)',
+              background: connectLoading ? '#94a3b8' : 'linear-gradient(135deg, #1877f2 0%, #e11d48 100%)',
               color: 'white',
               border: 'none',
               borderRadius: '12px',
               fontSize: '15px',
               fontWeight: 600,
-              cursor: 'pointer',
+              cursor: connectLoading ? 'not-allowed' : 'pointer',
             }}
           >
-            <Settings size={18} />
-            Ir a Configuracion
-            <ChevronRight size={18} />
+            {connectLoading ? (
+              <>
+                <Loader2 size={18} style={{ animation: 'spin 1s linear infinite' }} />
+                Conectando...
+              </>
+            ) : (
+              <>
+                <Facebook size={18} />
+                Conectar Meta
+                <ChevronRight size={18} />
+              </>
+            )}
           </button>
 
-          {credentials?.metaConnected && credentials?.metaPageId === 'PENDING' && (
+          {credentials?.pendingPageSelection && (
             <div
               style={{
                 marginTop: '24px',
@@ -907,11 +1059,49 @@ const CrmMarketingRedesSociales: React.FC = () => {
             >
               <AlertCircle size={18} color="#92400e" />
               <span style={{ fontSize: '13px', color: '#92400e', fontWeight: 500 }}>
-                Meta esta conectado pero no has seleccionado una pagina. Ve a Configuracion para elegir tu pagina.
+                Meta esta conectado pero no has seleccionado una pagina. Haz clic en "Conectar Meta" para continuar.
               </span>
             </div>
           )}
         </div>
+
+        {/* Page Selector Modal */}
+        {showPageSelector && availablePages.length > 0 && (
+          <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.5)', zIndex: 1000, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '20px' }}>
+            <div style={{ background: 'white', borderRadius: '16px', padding: '24px', width: '100%', maxWidth: '440px', boxShadow: '0 20px 60px rgba(0,0,0,0.3)' }}>
+              <h3 style={{ fontSize: '16px', fontWeight: 600, color: '#1e293b', margin: '0 0 8px 0' }}>Selecciona una pagina</h3>
+              <p style={{ fontSize: '13px', color: '#64748b', margin: '0 0 16px 0' }}>Elige la pagina de Facebook desde la que publicaras</p>
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+                {availablePages.map((page) => (
+                  <button
+                    key={page.id}
+                    onClick={() => handleSelectPage(page.id)}
+                    style={{
+                      display: 'flex', alignItems: 'center', gap: '12px', padding: '12px 16px',
+                      background: '#f8fafc', border: '1px solid #e2e8f0', borderRadius: '10px',
+                      cursor: 'pointer', textAlign: 'left', width: '100%',
+                    }}
+                  >
+                    <Facebook size={20} color="#1877f2" />
+                    <div>
+                      <div style={{ fontSize: '14px', fontWeight: 600, color: '#1e293b' }}>{page.name}</div>
+                      {page.instagramBusinessAccount && (
+                        <div style={{ fontSize: '12px', color: '#64748b', marginTop: '2px' }}>
+                          <Instagram size={11} style={{ verticalAlign: 'middle', marginRight: '4px' }} />
+                          @{page.instagramBusinessAccount.username}
+                        </div>
+                      )}
+                    </div>
+                    <ChevronRight size={16} color="#94a3b8" style={{ marginLeft: 'auto' }} />
+                  </button>
+                ))}
+              </div>
+              <button onClick={() => { setShowPageSelector(false); setAvailablePages([]); }} style={{ marginTop: '12px', padding: '8px 16px', background: 'none', border: 'none', color: '#64748b', fontSize: '13px', cursor: 'pointer', width: '100%' }}>
+                Cancelar
+              </button>
+            </div>
+          </div>
+        )}
 
         <style>{`
           @keyframes spin {
@@ -2681,6 +2871,13 @@ const CrmMarketingRedesSociales: React.FC = () => {
               </button>
             </div>
           </div>
+
+          {fbPostsError && (
+            <div style={{ display: 'flex', alignItems: 'center', gap: '8px', padding: '10px 14px', background: '#fffbeb', border: '1px solid #fde68a', borderRadius: '10px', marginBottom: '12px', fontSize: '12px', color: '#92400e' }}>
+              <AlertCircle size={14} style={{ flexShrink: 0 }} />
+              <span>No se pudieron cargar las publicaciones de Facebook. Las analiticas muestran solo datos de Instagram. Verifica los permisos de tu aplicacion Meta.</span>
+            </div>
+          )}
 
           {/* KPI Cards */}
           {(() => {
