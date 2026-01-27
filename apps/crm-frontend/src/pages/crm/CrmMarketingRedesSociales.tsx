@@ -39,6 +39,13 @@ import {
   Sparkles,
   Search,
   Building2,
+  Edit3,
+  Hash,
+  BarChart3,
+  TrendingUp,
+  Eye,
+  Plus,
+  Save,
 } from 'lucide-react';
 
 // ==================== TYPES ====================
@@ -101,6 +108,8 @@ interface ScheduledPost {
   scheduledFor: string;
   status: string;
   createdAt: string;
+  imageUrls?: string[];
+  errorMessage?: string | null;
 }
 
 interface PropertyResult {
@@ -117,7 +126,14 @@ interface PropertyResult {
   imagenes?: string[];
 }
 
-type TabId = 'publish' | 'facebook' | 'instagram' | 'scheduled';
+interface HashtagGroup {
+  id: string;
+  name: string;
+  hashtags: string[];
+  category: string | null;
+}
+
+type TabId = 'publish' | 'facebook' | 'instagram' | 'scheduled' | 'analytics';
 
 // ==================== COMPONENT ====================
 
@@ -190,6 +206,29 @@ const CrmMarketingRedesSociales: React.FC = () => {
   const [scheduledPosts, setScheduledPosts] = useState<ScheduledPost[]>([]);
   const [scheduledPostsLoading, setScheduledPostsLoading] = useState(false);
   const [cancellingPostId, setCancellingPostId] = useState<string | null>(null);
+
+  // Multi-image state
+  const [imageUrls, setImageUrls] = useState<string[]>([]);
+  const multiFileInputRef = useRef<HTMLInputElement>(null);
+
+  // Hashtag groups state
+  const [hashtagGroups, setHashtagGroups] = useState<HashtagGroup[]>([]);
+  const [showHashtagPanel, setShowHashtagPanel] = useState(false);
+  const [newGroupName, setNewGroupName] = useState('');
+  const [newGroupHashtags, setNewGroupHashtags] = useState('');
+  const [savingHashtagGroup, setSavingHashtagGroup] = useState(false);
+  const [deletingGroupId, setDeletingGroupId] = useState<string | null>(null);
+
+  // Edit modal state
+  const [editingPost, setEditingPost] = useState<ScheduledPost | null>(null);
+  const [editMessage, setEditMessage] = useState('');
+  const [editDate, setEditDate] = useState('');
+  const [editTime, setEditTime] = useState('');
+  const [savingEdit, setSavingEdit] = useState(false);
+
+  // Preview toggle
+  const [previewPlatform, setPreviewPlatform] = useState<'facebook' | 'instagram'>('facebook');
+  const [showPreview, setShowPreview] = useState(false);
 
   const isFullyConnected = credentials?.metaConnected && credentials?.metaPageId && credentials.metaPageId !== 'PENDING';
   const hasInstagram = !!credentials?.metaInstagramBusinessAccountId;
@@ -479,6 +518,146 @@ const CrmMarketingRedesSociales: React.FC = () => {
     if (fileInputRef.current) fileInputRef.current.value = '';
   };
 
+  // Multi-image upload handler
+  const handleMultiImageSelect = async (files: FileList) => {
+    if (!tenantActual?.id) return;
+    const validFiles = Array.from(files).filter(f => f.type.startsWith('image/') && f.size <= 10 * 1024 * 1024).slice(0, 10 - imageUrls.length);
+    if (validFiles.length === 0) return;
+
+    setUploadingImage(true);
+    try {
+      const token = await getToken();
+      const uploaded: string[] = [];
+      for (const file of validFiles) {
+        const formData = new FormData();
+        formData.append('image', file);
+        formData.append('folder', 'social-posts');
+        const response = await fetch(
+          `${import.meta.env.VITE_API_URL || 'http://localhost:3001/api'}/tenants/${tenantActual.id}/upload/image`,
+          { method: 'POST', headers: { Authorization: `Bearer ${token}` }, body: formData }
+        );
+        if (response.ok) {
+          const data = await response.json();
+          uploaded.push(data.url);
+        }
+      }
+      setImageUrls(prev => [...prev, ...uploaded]);
+      if (uploaded.length > 0 && !imageUrl) {
+        setImageUrl(uploaded[0]);
+      }
+    } catch (err: any) {
+      console.error('Error uploading images:', err);
+      setImageUploadError(err.message || 'Error al subir imagenes');
+    } finally {
+      setUploadingImage(false);
+    }
+  };
+
+  const handleRemoveMultiImage = (idx: number) => {
+    setImageUrls(prev => {
+      const next = prev.filter((_, i) => i !== idx);
+      if (next.length === 0) setImageUrl('');
+      else if (imageUrl === prev[idx]) setImageUrl(next[0]);
+      return next;
+    });
+  };
+
+  // Hashtag functions
+  const loadHashtagGroups = useCallback(async () => {
+    if (!tenantActual?.id) return;
+    try {
+      const response = await apiFetch(`/tenants/${tenantActual.id}/api-credentials/meta/hashtag-groups`);
+      const data = await response.json();
+      setHashtagGroups(Array.isArray(data) ? data : []);
+    } catch (error) {
+      console.error('Error loading hashtag groups:', error);
+    }
+  }, [tenantActual?.id]);
+
+  useEffect(() => {
+    if (isFullyConnected) loadHashtagGroups();
+  }, [isFullyConnected, loadHashtagGroups]);
+
+  const handleSaveHashtagGroup = async () => {
+    if (!tenantActual?.id || !newGroupName.trim() || !newGroupHashtags.trim()) return;
+    setSavingHashtagGroup(true);
+    try {
+      const hashtags = newGroupHashtags.split(/[\s,]+/).filter(h => h.startsWith('#') || h.length > 0).map(h => h.startsWith('#') ? h : '#' + h);
+      await apiFetch(`/tenants/${tenantActual.id}/api-credentials/meta/hashtag-groups`, {
+        method: 'POST',
+        body: JSON.stringify({ name: newGroupName.trim(), hashtags }),
+      });
+      setNewGroupName('');
+      setNewGroupHashtags('');
+      loadHashtagGroups();
+    } catch (error) {
+      console.error('Error saving hashtag group:', error);
+    } finally {
+      setSavingHashtagGroup(false);
+    }
+  };
+
+  const handleDeleteHashtagGroup = async (groupId: string) => {
+    if (!tenantActual?.id) return;
+    setDeletingGroupId(groupId);
+    try {
+      await apiFetch(`/tenants/${tenantActual.id}/api-credentials/meta/hashtag-groups/${groupId}`, { method: 'DELETE' });
+      loadHashtagGroups();
+    } catch (error) {
+      console.error('Error deleting hashtag group:', error);
+    } finally {
+      setDeletingGroupId(null);
+    }
+  };
+
+  const handleInsertHashtags = (hashtags: string[]) => {
+    const hashtagStr = hashtags.join(' ');
+    setMessage(prev => prev + (prev.endsWith('\n') || prev === '' ? '' : '\n\n') + hashtagStr);
+  };
+
+  const handleSaveCurrentHashtags = () => {
+    const currentHashtags = message.match(/#\w+/g);
+    if (currentHashtags && currentHashtags.length > 0) {
+      setNewGroupHashtags(currentHashtags.join(' '));
+      setShowHashtagPanel(true);
+    }
+  };
+
+  // Edit scheduled post functions
+  const handleOpenEdit = (post: ScheduledPost) => {
+    setEditingPost(post);
+    setEditMessage(post.message || '');
+    const d = new Date(post.scheduledFor);
+    setEditDate(d.toISOString().split('T')[0]);
+    setEditTime(d.toTimeString().slice(0, 5));
+  };
+
+  const handleSaveEdit = async () => {
+    if (!tenantActual?.id || !editingPost) return;
+    setSavingEdit(true);
+    try {
+      const scheduledDateTime = new Date(`${editDate}T${editTime}:00`);
+      const scheduledFor = Math.floor(scheduledDateTime.getTime() / 1000);
+
+      const response = await apiFetch(`/tenants/${tenantActual.id}/api-credentials/meta/scheduled-posts/${editingPost.id}`, {
+        method: 'PUT',
+        body: JSON.stringify({ message: editMessage, scheduledFor }),
+      });
+      if (response.ok) {
+        setEditingPost(null);
+        loadScheduledPosts();
+      } else {
+        const err = await response.json();
+        alert(err.error || 'Error al editar');
+      }
+    } catch (error: any) {
+      console.error('Error editing post:', error);
+      alert('Error al editar la publicacion');
+    } finally {
+      setSavingEdit(false);
+    }
+  };
+
   // Publish handler
   const handlePublish = async () => {
     if (!tenantActual?.id) return;
@@ -489,57 +668,52 @@ const CrmMarketingRedesSociales: React.FC = () => {
     setPublishResult(null);
 
     try {
-      // If scheduling is enabled for Facebook
-      const shouldScheduleFB = scheduleEnabled && targetFacebook && scheduleDate && scheduleTime;
-
-      if (shouldScheduleFB) {
-        // Build unix timestamp from date + time
+      if (scheduleEnabled && scheduleDate && scheduleTime) {
         const scheduledDateTime = new Date(`${scheduleDate}T${scheduleTime}:00`);
         const scheduledFor = Math.floor(scheduledDateTime.getTime() / 1000);
-
-        // Schedule Facebook post
-        const fbResponse = await apiFetch(`/tenants/${tenantActual.id}/api-credentials/meta/schedule`, {
-          method: 'POST',
-          body: JSON.stringify({
-            message: message || undefined,
-            imageUrl: imageUrl || undefined,
-            linkUrl: linkUrl || undefined,
-            scheduledFor,
-            propiedadId: selectedProperty?.id || undefined,
-          }),
-        });
-
-        const fbResult = await fbResponse.json();
         const results: Record<string, { success: boolean; error?: string }> = {};
 
-        if (fbResponse.ok) {
-          results.facebook = { success: true };
-        } else {
-          results.facebook = { success: false, error: fbResult.error || 'Error al programar' };
-        }
-
-        // If also targeting Instagram, publish immediately (IG doesn't support scheduling)
-        if (targetInstagram) {
+        if (targetFacebook) {
           try {
-            const igResponse = await apiFetch(`/tenants/${tenantActual.id}/api-credentials/meta/publish`, {
+            const fbResponse = await apiFetch(`/tenants/${tenantActual.id}/api-credentials/meta/schedule`, {
               method: 'POST',
               body: JSON.stringify({
                 message: message || undefined,
                 imageUrl: imageUrl || undefined,
-                targets: { facebook: false, instagram: true },
+                imageUrls: imageUrls.length > 0 ? imageUrls : undefined,
+                linkUrl: linkUrl || undefined,
+                scheduledFor,
+                propiedadId: selectedProperty?.id || undefined,
+                platform: 'facebook',
               }),
             });
-            const igResult = await igResponse.json();
-            results.instagram = igResult.instagram || { success: igResponse.ok };
-          } catch (igErr: any) {
-            results.instagram = { success: false, error: igErr.message };
+            results.facebook = fbResponse.ok ? { success: true } : { success: false, error: (await fbResponse.json()).error || 'Error' };
+          } catch (e: any) {
+            results.facebook = { success: false, error: e.message };
+          }
+        }
+
+        if (targetInstagram) {
+          try {
+            const igResponse = await apiFetch(`/tenants/${tenantActual.id}/api-credentials/meta/schedule`, {
+              method: 'POST',
+              body: JSON.stringify({
+                message: message || undefined,
+                imageUrl: imageUrl || undefined,
+                imageUrls: imageUrls.length > 0 ? imageUrls : undefined,
+                scheduledFor,
+                propiedadId: selectedProperty?.id || undefined,
+                platform: 'instagram',
+              }),
+            });
+            results.instagram = igResponse.ok ? { success: true } : { success: false, error: (await igResponse.json()).error || 'Error' };
+          } catch (e: any) {
+            results.instagram = { success: false, error: e.message };
           }
         }
 
         setPublishResult(results);
-
-        const anySuccess = Object.values(results).some(r => r.success);
-        if (anySuccess) {
+        if (Object.values(results).some(r => r.success)) {
           clearForm();
           loadScheduledPosts();
         }
@@ -550,15 +724,14 @@ const CrmMarketingRedesSociales: React.FC = () => {
           body: JSON.stringify({
             message: message || undefined,
             imageUrl: imageUrl || undefined,
+            imageUrls: imageUrls.length > 0 ? imageUrls : undefined,
             link: linkUrl || undefined,
             targets: { facebook: targetFacebook, instagram: targetInstagram },
           }),
         });
         const result = await response.json();
         setPublishResult(result);
-
-        const anySuccess = Object.values(result).some((r: any) => r.success);
-        if (anySuccess) {
+        if (Object.values(result).some((r: any) => r.success)) {
           clearForm();
           if (targetFacebook) setTimeout(loadFbPosts, 2000);
           if (targetInstagram) setTimeout(loadIgMedia, 2000);
@@ -587,6 +760,8 @@ const CrmMarketingRedesSociales: React.FC = () => {
     setScheduleEnabled(false);
     setScheduleDate('');
     setScheduleTime('10:00');
+    setImageUrls([]);
+    setShowPreview(false);
   };
 
   // Comments handler
@@ -748,6 +923,7 @@ const CrmMarketingRedesSociales: React.FC = () => {
           { id: 'facebook' as TabId, label: 'Facebook', icon: <Facebook size={16} /> },
           ...(hasInstagram ? [{ id: 'instagram' as TabId, label: 'Instagram', icon: <Instagram size={16} /> }] : []),
           { id: 'scheduled' as TabId, label: 'Programados', icon: <Clock size={16} /> },
+          { id: 'analytics' as TabId, label: 'Analiticas', icon: <BarChart3 size={16} /> },
         ].map((tab) => (
           <button
             key={tab.id}
@@ -1063,6 +1239,223 @@ const CrmMarketingRedesSociales: React.FC = () => {
                 onBlur={(e) => { e.currentTarget.style.borderColor = '#e2e8f0'; }}
               />
 
+              {/* Hashtag quick-insert */}
+              <div style={{ marginTop: '8px', display: 'flex', alignItems: 'center', gap: '8px', flexWrap: 'wrap' }}>
+                <button
+                  onClick={() => { setShowHashtagPanel(!showHashtagPanel); if (!showHashtagPanel && hashtagGroups.length === 0) loadHashtagGroups(); }}
+                  style={{
+                    display: 'flex', alignItems: 'center', gap: '5px', padding: '6px 12px',
+                    background: showHashtagPanel ? '#eff6ff' : '#f1f5f9', border: showHashtagPanel ? '1px solid #bfdbfe' : '1px solid transparent',
+                    borderRadius: '8px', fontSize: '12px', fontWeight: 500, color: showHashtagPanel ? '#2563eb' : '#64748b', cursor: 'pointer',
+                  }}
+                >
+                  <Hash size={13} />
+                  Hashtags
+                </button>
+
+                {message.match(/#\w+/g) && (
+                  <button
+                    onClick={handleSaveCurrentHashtags}
+                    style={{
+                      display: 'flex', alignItems: 'center', gap: '4px', padding: '5px 10px',
+                      background: '#f0fdf4', border: '1px solid #bbf7d0', borderRadius: '6px',
+                      fontSize: '11px', fontWeight: 500, color: '#16a34a', cursor: 'pointer',
+                    }}
+                  >
+                    <Save size={11} />
+                    Guardar hashtags
+                  </button>
+                )}
+
+                <button
+                  onClick={() => setShowPreview(!showPreview)}
+                  style={{
+                    display: 'flex', alignItems: 'center', gap: '5px', padding: '6px 12px',
+                    background: showPreview ? '#fdf2f8' : '#f1f5f9', border: showPreview ? '1px solid #fbcfe8' : '1px solid transparent',
+                    borderRadius: '8px', fontSize: '12px', fontWeight: 500, color: showPreview ? '#db2777' : '#64748b', cursor: 'pointer',
+                  }}
+                >
+                  <Eye size={13} />
+                  Preview
+                </button>
+              </div>
+
+              {/* Hashtag panel */}
+              {showHashtagPanel && (
+                <div style={{
+                  marginTop: '10px', border: '1px solid #e2e8f0', borderRadius: '12px',
+                  background: '#f8fafc', overflow: 'hidden',
+                }}>
+                  <div style={{ padding: '14px 16px', borderBottom: '1px solid #e2e8f0' }}>
+                    <h4 style={{ fontSize: '13px', fontWeight: 600, color: '#1e293b', margin: '0 0 10px 0' }}>Grupos de hashtags</h4>
+                    {hashtagGroups.length === 0 ? (
+                      <p style={{ fontSize: '12px', color: '#94a3b8', margin: 0 }}>No hay grupos guardados</p>
+                    ) : (
+                      <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+                        {hashtagGroups.map(group => (
+                          <div key={group.id} style={{
+                            display: 'flex', alignItems: 'center', gap: '8px', padding: '8px 12px',
+                            background: 'white', borderRadius: '8px', border: '1px solid #e2e8f0',
+                          }}>
+                            <div style={{ flex: 1, minWidth: 0 }}>
+                              <div style={{ fontSize: '12px', fontWeight: 600, color: '#1e293b' }}>{group.name}</div>
+                              <div style={{ fontSize: '11px', color: '#64748b', marginTop: '2px', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                                {group.hashtags.join(' ')}
+                              </div>
+                            </div>
+                            <button
+                              onClick={() => handleInsertHashtags(group.hashtags)}
+                              style={{ padding: '5px 10px', background: '#eff6ff', border: 'none', borderRadius: '6px', fontSize: '11px', fontWeight: 500, color: '#2563eb', cursor: 'pointer', flexShrink: 0 }}
+                            >
+                              Insertar
+                            </button>
+                            <button
+                              onClick={() => handleDeleteHashtagGroup(group.id)}
+                              disabled={deletingGroupId === group.id}
+                              style={{ padding: '5px', background: 'none', border: 'none', color: '#94a3b8', cursor: 'pointer', flexShrink: 0 }}
+                            >
+                              {deletingGroupId === group.id ? <Loader2 size={12} style={{ animation: 'spin 1s linear infinite' }} /> : <Trash2 size={12} />}
+                            </button>
+                          </div>
+                        ))}
+                      </div>
+                    )}
+                  </div>
+
+                  <div style={{ padding: '14px 16px' }}>
+                    <h4 style={{ fontSize: '12px', fontWeight: 600, color: '#64748b', margin: '0 0 8px 0' }}>Nuevo grupo</h4>
+                    <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap' }}>
+                      <input
+                        type="text"
+                        value={newGroupName}
+                        onChange={(e) => setNewGroupName(e.target.value)}
+                        placeholder="Nombre del grupo"
+                        style={{ flex: '1 1 120px', padding: '7px 10px', border: '1px solid #d1d5db', borderRadius: '6px', fontSize: '12px', outline: 'none' }}
+                      />
+                      <input
+                        type="text"
+                        value={newGroupHashtags}
+                        onChange={(e) => setNewGroupHashtags(e.target.value)}
+                        placeholder="#hashtag1 #hashtag2 ..."
+                        style={{ flex: '2 1 200px', padding: '7px 10px', border: '1px solid #d1d5db', borderRadius: '6px', fontSize: '12px', outline: 'none' }}
+                      />
+                      <button
+                        onClick={handleSaveHashtagGroup}
+                        disabled={savingHashtagGroup || !newGroupName.trim() || !newGroupHashtags.trim()}
+                        style={{
+                          padding: '7px 14px', background: savingHashtagGroup ? '#94a3b8' : '#2563eb', color: 'white',
+                          border: 'none', borderRadius: '6px', fontSize: '12px', fontWeight: 500,
+                          cursor: savingHashtagGroup ? 'not-allowed' : 'pointer', display: 'flex', alignItems: 'center', gap: '4px',
+                        }}
+                      >
+                        {savingHashtagGroup ? <Loader2 size={12} style={{ animation: 'spin 1s linear infinite' }} /> : <Save size={12} />}
+                        Guardar
+                      </button>
+                    </div>
+                  </div>
+                </div>
+              )}
+
+              {/* Post Preview */}
+              {showPreview && (message || imageUrl) && (
+                <div style={{ marginTop: '12px' }}>
+                  <div style={{ display: 'flex', gap: '8px', marginBottom: '10px' }}>
+                    <button
+                      onClick={() => setPreviewPlatform('facebook')}
+                      style={{
+                        padding: '5px 12px', borderRadius: '6px', fontSize: '12px', fontWeight: 500,
+                        background: previewPlatform === 'facebook' ? '#1877f2' : '#f1f5f9',
+                        color: previewPlatform === 'facebook' ? 'white' : '#64748b',
+                        border: 'none', cursor: 'pointer',
+                      }}
+                    >
+                      Facebook
+                    </button>
+                    <button
+                      onClick={() => setPreviewPlatform('instagram')}
+                      style={{
+                        padding: '5px 12px', borderRadius: '6px', fontSize: '12px', fontWeight: 500,
+                        background: previewPlatform === 'instagram' ? '#e11d48' : '#f1f5f9',
+                        color: previewPlatform === 'instagram' ? 'white' : '#64748b',
+                        border: 'none', cursor: 'pointer',
+                      }}
+                    >
+                      Instagram
+                    </button>
+                  </div>
+
+                  {previewPlatform === 'facebook' ? (
+                    <div style={{
+                      border: '1px solid #e2e8f0', borderRadius: '12px', background: 'white', overflow: 'hidden', maxWidth: '500px',
+                    }}>
+                      <div style={{ padding: '12px 16px', display: 'flex', alignItems: 'center', gap: '10px' }}>
+                        <div style={{ width: '40px', height: '40px', borderRadius: '50%', background: 'linear-gradient(135deg, #1877f2, #4299e1)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                          <Facebook size={20} color="white" />
+                        </div>
+                        <div>
+                          <div style={{ fontSize: '13px', fontWeight: 600, color: '#1e293b' }}>{credentials?.metaPageName || 'Tu Pagina'}</div>
+                          <div style={{ fontSize: '11px', color: '#94a3b8' }}>Ahora</div>
+                        </div>
+                      </div>
+                      {message && <div style={{ padding: '0 16px 12px', fontSize: '14px', color: '#1e293b', lineHeight: 1.5, whiteSpace: 'pre-wrap' }}>{message}</div>}
+                      {(imageUrls.length > 1 ? imageUrls : imageUrl ? [imageUrl] : []).length > 0 && (
+                        <div style={{ display: 'grid', gridTemplateColumns: (imageUrls.length > 1 ? imageUrls : [imageUrl]).length > 1 ? '1fr 1fr' : '1fr', gap: '2px' }}>
+                          {(imageUrls.length > 1 ? imageUrls : imageUrl ? [imageUrl] : []).slice(0, 4).map((url, i) => (
+                            <div key={i} style={{ position: 'relative' }}>
+                              <img src={url} alt="" style={{ width: '100%', height: (imageUrls.length > 1 ? imageUrls : [imageUrl]).length > 1 ? '160px' : '280px', objectFit: 'cover', display: 'block' }} />
+                              {i === 3 && (imageUrls.length > 1 ? imageUrls : [imageUrl]).length > 4 && (
+                                <div style={{ position: 'absolute', inset: 0, background: 'rgba(0,0,0,0.5)', display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'white', fontSize: '24px', fontWeight: 700 }}>
+                                  +{(imageUrls.length > 1 ? imageUrls : [imageUrl]).length - 4}
+                                </div>
+                              )}
+                            </div>
+                          ))}
+                        </div>
+                      )}
+                      <div style={{ padding: '10px 16px', borderTop: '1px solid #f1f5f9', display: 'flex', justifyContent: 'space-around', fontSize: '13px', color: '#64748b' }}>
+                        <span style={{ display: 'flex', alignItems: 'center', gap: '6px' }}><ThumbsUp size={15} /> Me gusta</span>
+                        <span style={{ display: 'flex', alignItems: 'center', gap: '6px' }}><MessageSquare size={15} /> Comentar</span>
+                        <span style={{ display: 'flex', alignItems: 'center', gap: '6px' }}><Share2 size={15} /> Compartir</span>
+                      </div>
+                    </div>
+                  ) : (
+                    <div style={{
+                      border: '1px solid #e2e8f0', borderRadius: '12px', background: 'white', overflow: 'hidden', maxWidth: '400px',
+                    }}>
+                      <div style={{ padding: '10px 14px', display: 'flex', alignItems: 'center', gap: '10px' }}>
+                        <div style={{ width: '32px', height: '32px', borderRadius: '50%', background: 'linear-gradient(135deg, #f58529, #dd2a7b, #8134af)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                          <Instagram size={16} color="white" />
+                        </div>
+                        <div style={{ fontSize: '13px', fontWeight: 600, color: '#1e293b' }}>{credentials?.metaInstagramUsername || 'tu_cuenta'}</div>
+                      </div>
+                      {(imageUrls.length > 0 ? imageUrls[0] : imageUrl) && (
+                        <div style={{ position: 'relative' }}>
+                          <img src={imageUrls.length > 0 ? imageUrls[0] : imageUrl} alt="" style={{ width: '100%', aspectRatio: '1', objectFit: 'cover', display: 'block' }} />
+                          {(imageUrls.length > 1) && (
+                            <div style={{ position: 'absolute', top: '10px', right: '10px', background: 'rgba(0,0,0,0.6)', borderRadius: '12px', padding: '3px 8px', fontSize: '11px', color: 'white', fontWeight: 600 }}>
+                              1/{imageUrls.length}
+                            </div>
+                          )}
+                        </div>
+                      )}
+                      <div style={{ padding: '10px 14px' }}>
+                        <div style={{ display: 'flex', gap: '14px', marginBottom: '8px' }}>
+                          <ThumbsUp size={20} color="#1e293b" />
+                          <MessageSquare size={20} color="#1e293b" />
+                          <Send size={20} color="#1e293b" />
+                        </div>
+                        {message && (
+                          <div style={{ fontSize: '13px', color: '#1e293b', lineHeight: 1.5 }}>
+                            <span style={{ fontWeight: 600 }}>{credentials?.metaInstagramUsername || 'tu_cuenta'}</span>{' '}
+                            {message.length > 150 ? message.substring(0, 150) + '...' : message}
+                          </div>
+                        )}
+                      </div>
+                    </div>
+                  )}
+                </div>
+              )}
+
               {/* Image upload */}
               <div style={{ marginTop: '16px' }}>
                 <label style={{ fontSize: '12px', fontWeight: 600, color: '#64748b', display: 'flex', alignItems: 'center', gap: '6px', marginBottom: '6px' }}>
@@ -1161,6 +1554,72 @@ const CrmMarketingRedesSociales: React.FC = () => {
                   <div style={{ marginTop: '8px', display: 'flex', alignItems: 'center', gap: '6px' }}>
                     <AlertCircle size={13} color="#ef4444" />
                     <span style={{ fontSize: '12px', color: '#ef4444' }}>{imageUploadError}</span>
+                  </div>
+                )}
+
+                {/* Multi-image carousel */}
+                {imageUrls.length > 0 && (
+                  <div style={{ marginTop: '12px' }}>
+                    <label style={{ fontSize: '12px', fontWeight: 600, color: '#64748b', display: 'flex', alignItems: 'center', gap: '6px', marginBottom: '8px' }}>
+                      <Image size={14} />
+                      Imagenes del carrusel ({imageUrls.length}/10)
+                    </label>
+                    <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap' }}>
+                      {imageUrls.map((url, idx) => (
+                        <div key={idx} style={{ position: 'relative', width: '72px', height: '72px' }}>
+                          <img src={url} alt="" style={{ width: '72px', height: '72px', borderRadius: '8px', objectFit: 'cover', border: '1px solid #e2e8f0' }} />
+                          <button
+                            onClick={() => handleRemoveMultiImage(idx)}
+                            style={{
+                              position: 'absolute', top: '-6px', right: '-6px',
+                              width: '20px', height: '20px', borderRadius: '50%',
+                              background: '#ef4444', border: 'none', color: 'white',
+                              display: 'flex', alignItems: 'center', justifyContent: 'center',
+                              cursor: 'pointer', fontSize: '10px',
+                            }}
+                          >
+                            <X size={10} />
+                          </button>
+                        </div>
+                      ))}
+                      {imageUrls.length < 10 && (
+                        <div
+                          onClick={() => multiFileInputRef.current?.click()}
+                          style={{
+                            width: '72px', height: '72px', borderRadius: '8px', border: '2px dashed #d1d5db',
+                            display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer',
+                            background: '#f8fafc',
+                          }}
+                        >
+                          <Plus size={20} color="#94a3b8" />
+                        </div>
+                      )}
+                    </div>
+                    <input
+                      ref={multiFileInputRef}
+                      type="file"
+                      accept="image/jpeg,image/png,image/webp"
+                      multiple
+                      onChange={(e) => { if (e.target.files) handleMultiImageSelect(e.target.files); e.target.value = ''; }}
+                      style={{ display: 'none' }}
+                    />
+                  </div>
+                )}
+
+                {/* Add more images button (when no multi-images yet but has single image) */}
+                {imageUrl && imageUrls.length === 0 && (
+                  <div style={{ marginTop: '8px' }}>
+                    <button
+                      onClick={() => { setImageUrls([imageUrl]); }}
+                      style={{
+                        display: 'flex', alignItems: 'center', gap: '6px', padding: '6px 12px',
+                        background: '#f1f5f9', border: 'none', borderRadius: '8px',
+                        fontSize: '12px', fontWeight: 500, color: '#64748b', cursor: 'pointer',
+                      }}
+                    >
+                      <Plus size={13} />
+                      Agregar mas imagenes (carrusel)
+                    </button>
                   </div>
                 )}
               </div>
@@ -1294,17 +1753,6 @@ const CrmMarketingRedesSociales: React.FC = () => {
                       />
                     </div>
 
-                    {scheduleEnabled && targetInstagram && (
-                      <div style={{
-                        padding: '8px 12px', background: '#fef3c7', borderRadius: '8px',
-                        display: 'flex', alignItems: 'center', gap: '6px', flex: '1 1 100%',
-                      }}>
-                        <AlertCircle size={13} color="#92400e" />
-                        <span style={{ fontSize: '11px', color: '#92400e' }}>
-                          Instagram se publicara de inmediato. La programacion solo aplica para Facebook.
-                        </span>
-                      </div>
-                    )}
                   </div>
                 )}
               </div>
@@ -2013,7 +2461,7 @@ const CrmMarketingRedesSociales: React.FC = () => {
                         width: '64px', height: '64px', borderRadius: '10px', background: '#f1f5f9',
                         display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0,
                       }}>
-                        <Facebook size={24} color="#94a3b8" />
+                        {post.platform === 'instagram' ? <Instagram size={24} color="#e11d48" /> : <Facebook size={24} color="#94a3b8" />}
                       </div>
                     )}
 
@@ -2052,38 +2500,272 @@ const CrmMarketingRedesSociales: React.FC = () => {
 
                         <span style={{
                           fontSize: '11px', padding: '1px 6px', borderRadius: '4px',
-                          background: '#eff6ff', color: '#3b82f6', fontWeight: 500, textTransform: 'capitalize',
+                          background: post.platform === 'instagram' ? '#fdf2f8' : '#eff6ff',
+                          color: post.platform === 'instagram' ? '#e11d48' : '#3b82f6',
+                          fontWeight: 500, textTransform: 'capitalize',
                         }}>
                           {post.platform}
                         </span>
+
+                        {post.status === 'failed' && post.errorMessage && (
+                          <span style={{ fontSize: '11px', color: '#dc2626', display: 'flex', alignItems: 'center', gap: '4px' }}>
+                            <AlertCircle size={11} />
+                            {post.errorMessage.length > 60 ? post.errorMessage.substring(0, 60) + '...' : post.errorMessage}
+                          </span>
+                        )}
                       </div>
                     </div>
 
                     {post.status === 'scheduled' && (
-                      <button
-                        onClick={() => handleCancelScheduledPost(post.id)}
-                        disabled={cancellingPostId === post.id}
-                        style={{
-                          display: 'flex', alignItems: 'center', gap: '6px', padding: '8px 14px',
-                          background: '#fef2f2', border: 'none', borderRadius: '8px',
-                          fontSize: '12px', fontWeight: 500, color: '#dc2626',
-                          cursor: cancellingPostId === post.id ? 'not-allowed' : 'pointer',
-                          opacity: cancellingPostId === post.id ? 0.5 : 1, flexShrink: 0,
-                        }}
-                      >
-                        {cancellingPostId === post.id ? (
-                          <Loader2 size={13} style={{ animation: 'spin 1s linear infinite' }} />
-                        ) : (
-                          <Trash2 size={13} />
-                        )}
-                        Cancelar
-                      </button>
+                      <div style={{ display: 'flex', gap: '8px', flexShrink: 0 }}>
+                        <button
+                          onClick={() => handleOpenEdit(post)}
+                          style={{
+                            display: 'flex', alignItems: 'center', gap: '6px', padding: '8px 14px',
+                            background: '#eff6ff', border: 'none', borderRadius: '8px',
+                            fontSize: '12px', fontWeight: 500, color: '#2563eb',
+                            cursor: 'pointer', flexShrink: 0,
+                          }}
+                        >
+                          <Edit3 size={13} />
+                          Editar
+                        </button>
+                        <button
+                          onClick={() => handleCancelScheduledPost(post.id)}
+                          disabled={cancellingPostId === post.id}
+                          style={{
+                            display: 'flex', alignItems: 'center', gap: '6px', padding: '8px 14px',
+                            background: '#fef2f2', border: 'none', borderRadius: '8px',
+                            fontSize: '12px', fontWeight: 500, color: '#dc2626',
+                            cursor: cancellingPostId === post.id ? 'not-allowed' : 'pointer',
+                            opacity: cancellingPostId === post.id ? 0.5 : 1, flexShrink: 0,
+                          }}
+                        >
+                          {cancellingPostId === post.id ? (
+                            <Loader2 size={13} style={{ animation: 'spin 1s linear infinite' }} />
+                          ) : (
+                            <Trash2 size={13} />
+                          )}
+                          Cancelar
+                        </button>
+                      </div>
                     )}
                   </div>
                 );
               })}
             </div>
           )}
+        </div>
+      )}
+
+      {/* ==================== ANALYTICS TAB ==================== */}
+      {activeTab === 'analytics' && (
+        <div>
+          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '16px' }}>
+            <h3 style={{ fontSize: '16px', fontWeight: 600, color: '#1e293b', margin: 0 }}>Analiticas de publicaciones</h3>
+            <div style={{ display: 'flex', gap: '8px' }}>
+              <button onClick={loadFbPosts} disabled={fbPostsLoading} style={{ display: 'flex', alignItems: 'center', gap: '6px', padding: '8px 14px', background: '#f1f5f9', border: 'none', borderRadius: '8px', fontSize: '12px', fontWeight: 500, color: '#64748b', cursor: 'pointer' }}>
+                <RefreshCw size={14} style={fbPostsLoading ? { animation: 'spin 1s linear infinite' } : {}} />
+                Actualizar
+              </button>
+            </div>
+          </div>
+
+          {/* KPI Cards */}
+          {(() => {
+            const totalFb = fbPosts.length;
+            const totalIg = igMedia.length;
+            const totalPosts = totalFb + totalIg;
+            const avgLikes = totalPosts > 0 ? Math.round((fbPosts.reduce((s, p) => s + p.likes, 0) + igMedia.reduce((s, m) => s + m.likeCount, 0)) / totalPosts) : 0;
+            const avgComments = totalPosts > 0 ? Math.round((fbPosts.reduce((s, p) => s + p.comments, 0) + igMedia.reduce((s, m) => s + m.commentsCount, 0)) / totalPosts) : 0;
+            const totalShares = fbPosts.reduce((s, p) => s + p.shares, 0);
+
+            const kpis = [
+              { label: 'Total publicaciones', value: totalPosts, color: '#3b82f6' },
+              { label: 'Promedio likes', value: avgLikes, color: '#e11d48' },
+              { label: 'Promedio comentarios', value: avgComments, color: '#8b5cf6' },
+              { label: 'Total compartidos', value: totalShares, color: '#16a34a' },
+            ];
+
+            return (
+              <>
+                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(180px, 1fr))', gap: '12px', marginBottom: '24px' }}>
+                  {kpis.map((kpi, idx) => (
+                    <div key={idx} style={{ background: 'white', borderRadius: '14px', border: '1px solid #e2e8f0', padding: '18px 20px' }}>
+                      <div style={{ fontSize: '11px', fontWeight: 600, color: '#94a3b8', textTransform: 'uppercase', letterSpacing: '0.5px' }}>{kpi.label}</div>
+                      <div style={{ fontSize: '28px', fontWeight: 700, color: kpi.color, marginTop: '6px' }}>{kpi.value.toLocaleString()}</div>
+                    </div>
+                  ))}
+                </div>
+
+                {/* Top Posts by engagement */}
+                <div style={{ background: 'white', borderRadius: '14px', border: '1px solid #e2e8f0', overflow: 'hidden' }}>
+                  <div style={{ padding: '16px 20px', borderBottom: '1px solid #f1f5f9' }}>
+                    <h4 style={{ fontSize: '14px', fontWeight: 600, color: '#1e293b', margin: 0, display: 'flex', alignItems: 'center', gap: '8px' }}>
+                      <TrendingUp size={16} color="#e11d48" />
+                      Top 5 publicaciones por engagement
+                    </h4>
+                  </div>
+
+                  <div style={{ padding: '16px 20px' }}>
+                    {(() => {
+                      const allPostsScored = [
+                        ...fbPosts.map(p => ({
+                          id: p.id, platform: 'facebook' as const, message: p.message || '', image: p.fullPicture,
+                          score: p.likes + (p.comments * 2) + (p.shares * 3),
+                          likes: p.likes, comments: p.comments, shares: p.shares,
+                        })),
+                        ...igMedia.map(m => ({
+                          id: m.id, platform: 'instagram' as const, message: m.caption || '', image: m.mediaUrl || m.thumbnailUrl,
+                          score: m.likeCount + (m.commentsCount * 2),
+                          likes: m.likeCount, comments: m.commentsCount, shares: 0,
+                        })),
+                      ].sort((a, b) => b.score - a.score).slice(0, 5);
+
+                      const maxScore = allPostsScored[0]?.score || 1;
+
+                      if (allPostsScored.length === 0) {
+                        return <p style={{ fontSize: '13px', color: '#94a3b8', textAlign: 'center', margin: '20px 0' }}>No hay datos disponibles. Carga las publicaciones en los tabs de Facebook e Instagram.</p>;
+                      }
+
+                      return (
+                        <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
+                          {allPostsScored.map((post, idx) => (
+                            <div key={post.id} style={{ display: 'flex', gap: '12px', alignItems: 'center' }}>
+                              <span style={{ fontSize: '14px', fontWeight: 700, color: '#94a3b8', width: '24px', textAlign: 'center' }}>#{idx + 1}</span>
+                              {post.image ? (
+                                <img src={post.image} alt="" style={{ width: '48px', height: '48px', borderRadius: '8px', objectFit: 'cover', flexShrink: 0 }} />
+                              ) : (
+                                <div style={{ width: '48px', height: '48px', borderRadius: '8px', background: '#f1f5f9', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
+                                  {post.platform === 'instagram' ? <Instagram size={18} color="#e11d48" /> : <Facebook size={18} color="#1877f2" />}
+                                </div>
+                              )}
+                              <div style={{ flex: 1, minWidth: 0 }}>
+                                <div style={{ fontSize: '12px', color: '#1e293b', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                                  {post.message || '(Sin texto)'}
+                                </div>
+                                <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginTop: '4px' }}>
+                                  <span style={{ fontSize: '11px', color: '#94a3b8' }}><ThumbsUp size={10} /> {post.likes}</span>
+                                  <span style={{ fontSize: '11px', color: '#94a3b8' }}><MessageSquare size={10} /> {post.comments}</span>
+                                  {post.shares > 0 && <span style={{ fontSize: '11px', color: '#94a3b8' }}><Share2 size={10} /> {post.shares}</span>}
+                                  <span style={{
+                                    fontSize: '10px', padding: '1px 5px', borderRadius: '3px',
+                                    background: post.platform === 'instagram' ? '#fdf2f8' : '#eff6ff',
+                                    color: post.platform === 'instagram' ? '#e11d48' : '#3b82f6', fontWeight: 500,
+                                  }}>
+                                    {post.platform === 'instagram' ? 'IG' : 'FB'}
+                                  </span>
+                                </div>
+                                {/* Engagement bar */}
+                                <div style={{ marginTop: '6px', height: '4px', background: '#f1f5f9', borderRadius: '2px', overflow: 'hidden' }}>
+                                  <div style={{
+                                    height: '100%', borderRadius: '2px',
+                                    width: `${(post.score / maxScore) * 100}%`,
+                                    background: post.platform === 'instagram' ? 'linear-gradient(90deg, #f58529, #dd2a7b)' : 'linear-gradient(90deg, #1877f2, #4299e1)',
+                                  }} />
+                                </div>
+                              </div>
+                              <div style={{ fontSize: '14px', fontWeight: 700, color: '#1e293b', flexShrink: 0 }}>
+                                {post.score}
+                              </div>
+                            </div>
+                          ))}
+                        </div>
+                      );
+                    })()}
+                  </div>
+                </div>
+              </>
+            );
+          })()}
+        </div>
+      )}
+
+      {/* Edit Modal */}
+      {editingPost && (
+        <div style={{
+          position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.5)', zIndex: 1000,
+          display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '20px',
+        }} onClick={() => setEditingPost(null)}>
+          <div
+            onClick={(e) => e.stopPropagation()}
+            style={{
+              background: 'white', borderRadius: '16px', padding: '24px', width: '100%', maxWidth: '500px',
+              boxShadow: '0 20px 60px rgba(0,0,0,0.3)',
+            }}
+          >
+            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '20px' }}>
+              <h3 style={{ fontSize: '16px', fontWeight: 600, color: '#1e293b', margin: 0 }}>Editar publicacion programada</h3>
+              <button onClick={() => setEditingPost(null)} style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#94a3b8' }}>
+                <X size={20} />
+              </button>
+            </div>
+
+            <div style={{ display: 'flex', gap: '8px', marginBottom: '16px' }}>
+              <span style={{
+                padding: '3px 10px', borderRadius: '6px', fontSize: '11px', fontWeight: 600, textTransform: 'capitalize',
+                background: editingPost.platform === 'instagram' ? '#fdf2f8' : '#eff6ff',
+                color: editingPost.platform === 'instagram' ? '#e11d48' : '#3b82f6',
+              }}>
+                {editingPost.platform}
+              </span>
+            </div>
+
+            <textarea
+              value={editMessage}
+              onChange={(e) => setEditMessage(e.target.value)}
+              style={{
+                width: '100%', minHeight: '120px', padding: '12px', border: '1px solid #e2e8f0',
+                borderRadius: '10px', fontSize: '14px', color: '#1e293b', resize: 'vertical',
+                fontFamily: 'inherit', outline: 'none', boxSizing: 'border-box',
+              }}
+              onFocus={(e) => { e.currentTarget.style.borderColor = '#3b82f6'; }}
+              onBlur={(e) => { e.currentTarget.style.borderColor = '#e2e8f0'; }}
+            />
+
+            <div style={{ marginTop: '16px', display: 'flex', gap: '12px' }}>
+              <div>
+                <label style={{ fontSize: '11px', fontWeight: 600, color: '#64748b', display: 'block', marginBottom: '4px' }}>Fecha</label>
+                <input
+                  type="date"
+                  value={editDate}
+                  onChange={(e) => setEditDate(e.target.value)}
+                  min={new Date(Date.now() + 24 * 60 * 60 * 1000).toISOString().split('T')[0]}
+                  style={{ padding: '8px 12px', border: '1px solid #d1d5db', borderRadius: '8px', fontSize: '13px', outline: 'none', color: '#1e293b' }}
+                />
+              </div>
+              <div>
+                <label style={{ fontSize: '11px', fontWeight: 600, color: '#64748b', display: 'block', marginBottom: '4px' }}>Hora</label>
+                <input
+                  type="time"
+                  value={editTime}
+                  onChange={(e) => setEditTime(e.target.value)}
+                  style={{ padding: '8px 12px', border: '1px solid #d1d5db', borderRadius: '8px', fontSize: '13px', outline: 'none', color: '#1e293b' }}
+                />
+              </div>
+            </div>
+
+            <div style={{ marginTop: '24px', display: 'flex', gap: '12px', justifyContent: 'flex-end' }}>
+              <button
+                onClick={() => setEditingPost(null)}
+                style={{ padding: '10px 20px', background: '#f1f5f9', border: 'none', borderRadius: '8px', fontSize: '13px', fontWeight: 500, color: '#64748b', cursor: 'pointer' }}
+              >
+                Cancelar
+              </button>
+              <button
+                onClick={handleSaveEdit}
+                disabled={savingEdit}
+                style={{
+                  padding: '10px 20px', background: savingEdit ? '#94a3b8' : '#2563eb', color: 'white',
+                  border: 'none', borderRadius: '8px', fontSize: '13px', fontWeight: 600,
+                  cursor: savingEdit ? 'not-allowed' : 'pointer', display: 'flex', alignItems: 'center', gap: '6px',
+                }}
+              >
+                {savingEdit ? <Loader2 size={14} style={{ animation: 'spin 1s linear infinite' }} /> : <Save size={14} />}
+                Guardar cambios
+              </button>
+            </div>
+          </div>
         </div>
       )}
 

@@ -378,6 +378,182 @@ export async function replyToComment(
   return { id: data.id };
 }
 
+// ==================== INSTAGRAM CAROUSEL ====================
+
+/**
+ * Publishes a carousel (multi-image) post to Instagram.
+ * Instagram carousel requires:
+ * 1. Create child containers for each image (is_carousel_item: true)
+ * 2. Create carousel container with children IDs
+ * 3. Poll until ready
+ * 4. Publish
+ */
+export async function publishCarouselToInstagram(
+  pageAccessToken: string,
+  igAccountId: string,
+  options: { imageUrls: string[]; caption?: string }
+): Promise<{ id: string }> {
+  if (options.imageUrls.length < 2) {
+    throw new Error('Carousel requires at least 2 images');
+  }
+  if (options.imageUrls.length > 10) {
+    throw new Error('Carousel supports max 10 images');
+  }
+
+  // Step 1: Create child containers in parallel
+  const childPromises = options.imageUrls.map(async (imageUrl) => {
+    const response = await fetch(`${GRAPH_API_BASE}/${igAccountId}/media`, {
+      method: 'POST',
+      headers: {
+        Authorization: `Bearer ${pageAccessToken}`,
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({
+        image_url: imageUrl,
+        is_carousel_item: true,
+      }),
+    });
+
+    const data: any = await response.json();
+    if (!response.ok || data.error) {
+      throw new Error(`Failed to create carousel item: ${data.error?.message || response.statusText}`);
+    }
+    return data.id as string;
+  });
+
+  const childIds = await Promise.all(childPromises);
+
+  // Step 2: Create carousel container
+  const carouselBody: Record<string, any> = {
+    media_type: 'CAROUSEL',
+    children: childIds.join(','),
+  };
+  if (options.caption) carouselBody.caption = options.caption;
+
+  const carouselResponse = await fetch(`${GRAPH_API_BASE}/${igAccountId}/media`, {
+    method: 'POST',
+    headers: {
+      Authorization: `Bearer ${pageAccessToken}`,
+      'Content-Type': 'application/json',
+    },
+    body: JSON.stringify(carouselBody),
+  });
+
+  const carouselData: any = await carouselResponse.json();
+  if (!carouselResponse.ok || carouselData.error) {
+    throw new Error(`Failed to create carousel container: ${carouselData.error?.message || carouselResponse.statusText}`);
+  }
+
+  const containerId = carouselData.id;
+
+  // Step 3: Poll until ready
+  let attempts = 0;
+  const maxAttempts = 15;
+
+  while (attempts < maxAttempts) {
+    const statusResponse = await fetch(
+      `${GRAPH_API_BASE}/${containerId}?fields=status_code`,
+      { headers: { Authorization: `Bearer ${pageAccessToken}` } }
+    );
+    const statusData: any = await statusResponse.json();
+
+    if (statusData.status_code === 'FINISHED') break;
+    if (statusData.status_code === 'ERROR') {
+      throw new Error('Instagram carousel processing failed');
+    }
+
+    await new Promise(resolve => setTimeout(resolve, 2000));
+    attempts++;
+  }
+
+  if (attempts >= maxAttempts) {
+    throw new Error('Instagram carousel processing timed out');
+  }
+
+  // Step 4: Publish
+  const publishResponse = await fetch(`${GRAPH_API_BASE}/${igAccountId}/media_publish`, {
+    method: 'POST',
+    headers: {
+      Authorization: `Bearer ${pageAccessToken}`,
+      'Content-Type': 'application/json',
+    },
+    body: JSON.stringify({ creation_id: containerId }),
+  });
+
+  const publishData: any = await publishResponse.json();
+  if (!publishResponse.ok || publishData.error) {
+    throw new Error(`Failed to publish carousel: ${publishData.error?.message || publishResponse.statusText}`);
+  }
+
+  return { id: publishData.id };
+}
+
+// ==================== FACEBOOK MULTI-PHOTO ====================
+
+/**
+ * Publishes a multi-photo post to a Facebook Page.
+ * 1. Upload each photo as unpublished
+ * 2. Create feed post with attached_media referencing each photo
+ */
+export async function publishMultiPhotoToPage(
+  pageAccessToken: string,
+  pageId: string,
+  options: { imageUrls: string[]; caption?: string; scheduledPublishTime?: number }
+): Promise<{ id: string }> {
+  if (options.imageUrls.length < 2) {
+    throw new Error('Multi-photo requires at least 2 images');
+  }
+
+  // Step 1: Upload each photo as unpublished
+  const photoPromises = options.imageUrls.map(async (imageUrl) => {
+    const response = await fetch(`${GRAPH_API_BASE}/${pageId}/photos`, {
+      method: 'POST',
+      headers: {
+        Authorization: `Bearer ${pageAccessToken}`,
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({
+        url: imageUrl,
+        published: false,
+      }),
+    });
+
+    const data: any = await response.json();
+    if (!response.ok || data.error) {
+      throw new Error(`Failed to upload photo: ${data.error?.message || response.statusText}`);
+    }
+    return data.id as string;
+  });
+
+  const photoIds = await Promise.all(photoPromises);
+
+  // Step 2: Create feed post with attached media
+  const feedBody: Record<string, any> = {
+    attached_media: photoIds.map(id => ({ media_fbid: id })),
+  };
+  if (options.caption) feedBody.message = options.caption;
+  if (options.scheduledPublishTime) {
+    feedBody.scheduled_publish_time = options.scheduledPublishTime;
+    feedBody.published = false;
+  }
+
+  const feedResponse = await fetch(`${GRAPH_API_BASE}/${pageId}/feed`, {
+    method: 'POST',
+    headers: {
+      Authorization: `Bearer ${pageAccessToken}`,
+      'Content-Type': 'application/json',
+    },
+    body: JSON.stringify(feedBody),
+  });
+
+  const feedData: any = await feedResponse.json();
+  if (!feedResponse.ok || feedData.error) {
+    throw new Error(`Failed to create multi-photo post: ${feedData.error?.message || feedResponse.statusText}`);
+  }
+
+  return { id: feedData.id };
+}
+
 // ==================== SCHEDULED POST MANAGEMENT ====================
 
 /**
