@@ -21,8 +21,12 @@ import * as socialCopyService from '../../services/socialCopyService.js';
 import * as scheduledPostsService from '../../services/scheduledPostsService.js';
 import * as hashtagGroupsService from '../../services/hashtagGroupsService.js';
 import { getPropiedadById } from '../../services/propiedadesCrmService.js';
+import { resolveUserScope } from '../../middleware/scopeResolver.js';
 
 const router = express.Router({ mergeParams: true });
+
+// Resolve user scope (dbUserId, alcances) for all api-credentials routes
+router.use(resolveUserScope);
 
 interface TenantParams { tenantId: string }
 interface UserParams extends TenantParams { usuarioId: string }

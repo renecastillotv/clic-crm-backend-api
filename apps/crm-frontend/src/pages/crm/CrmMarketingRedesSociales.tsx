@@ -206,6 +206,8 @@ const CrmMarketingRedesSociales: React.FC = () => {
   const [scheduledPosts, setScheduledPosts] = useState<ScheduledPost[]>([]);
   const [scheduledPostsLoading, setScheduledPostsLoading] = useState(false);
   const [cancellingPostId, setCancellingPostId] = useState<string | null>(null);
+  const [scheduledSortAsc, setScheduledSortAsc] = useState(true);
+  const [scheduledPlatformFilter, setScheduledPlatformFilter] = useState<'all' | 'facebook' | 'instagram'>('all');
 
   // Multi-image state
   const [imageUrls, setImageUrls] = useState<string[]>([]);
@@ -2461,22 +2463,54 @@ const CrmMarketingRedesSociales: React.FC = () => {
       {/* ==================== SCHEDULED POSTS TAB ==================== */}
       {activeTab === 'scheduled' && (
         <div>
-          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '16px' }}>
+          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '16px', flexWrap: 'wrap', gap: '10px' }}>
             <h3 style={{ fontSize: '16px', fontWeight: 600, color: '#1e293b', margin: 0 }}>
               Publicaciones programadas
             </h3>
-            <button
-              onClick={loadScheduledPosts}
-              disabled={scheduledPostsLoading}
-              style={{
-                display: 'flex', alignItems: 'center', gap: '6px', padding: '8px 14px',
-                background: '#f1f5f9', border: 'none', borderRadius: '8px',
-                fontSize: '12px', fontWeight: 500, color: '#64748b', cursor: 'pointer',
-              }}
-            >
-              <RefreshCw size={14} style={scheduledPostsLoading ? { animation: 'spin 1s linear infinite' } : {}} />
-              Actualizar
-            </button>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+              {(['all', 'facebook', 'instagram'] as const).map((p) => (
+                <button
+                  key={p}
+                  onClick={() => setScheduledPlatformFilter(p)}
+                  style={{
+                    padding: '6px 12px', border: 'none', borderRadius: '8px',
+                    fontSize: '12px', fontWeight: 500, cursor: 'pointer',
+                    background: scheduledPlatformFilter === p
+                      ? (p === 'instagram' ? '#fdf2f8' : p === 'facebook' ? '#eff6ff' : '#f0fdf4')
+                      : '#f1f5f9',
+                    color: scheduledPlatformFilter === p
+                      ? (p === 'instagram' ? '#e11d48' : p === 'facebook' ? '#3b82f6' : '#16a34a')
+                      : '#94a3b8',
+                  }}
+                >
+                  {p === 'all' ? 'Todos' : p === 'facebook' ? 'Facebook' : 'Instagram'}
+                </button>
+              ))}
+              <button
+                onClick={() => setScheduledSortAsc(!scheduledSortAsc)}
+                style={{
+                  display: 'flex', alignItems: 'center', gap: '4px', padding: '6px 10px',
+                  background: '#f1f5f9', border: 'none', borderRadius: '8px',
+                  fontSize: '12px', fontWeight: 500, color: '#64748b', cursor: 'pointer',
+                }}
+                title={scheduledSortAsc ? 'Mas proximo primero' : 'Mas lejano primero'}
+              >
+                <Calendar size={12} />
+                {scheduledSortAsc ? '\u2191' : '\u2193'}
+              </button>
+              <button
+                onClick={loadScheduledPosts}
+                disabled={scheduledPostsLoading}
+                style={{
+                  display: 'flex', alignItems: 'center', gap: '6px', padding: '6px 12px',
+                  background: '#f1f5f9', border: 'none', borderRadius: '8px',
+                  fontSize: '12px', fontWeight: 500, color: '#64748b', cursor: 'pointer',
+                }}
+              >
+                <RefreshCw size={14} style={scheduledPostsLoading ? { animation: 'spin 1s linear infinite' } : {}} />
+                Actualizar
+              </button>
+            </div>
           </div>
 
           {scheduledPostsLoading && scheduledPosts.length === 0 ? (
@@ -2498,7 +2532,14 @@ const CrmMarketingRedesSociales: React.FC = () => {
             </div>
           ) : (
             <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
-              {scheduledPosts.map((post) => {
+              {scheduledPosts
+                .filter((p) => scheduledPlatformFilter === 'all' || p.platform === scheduledPlatformFilter)
+                .sort((a, b) => {
+                  const da = new Date(a.scheduledFor).getTime();
+                  const db = new Date(b.scheduledFor).getTime();
+                  return scheduledSortAsc ? da - db : db - da;
+                })
+                .map((post) => {
                 const statusConfig: Record<string, { bg: string; text: string; label: string }> = {
                   scheduled: { bg: '#f0fdf4', text: '#16a34a', label: 'Programado' },
                   published: { bg: '#eff6ff', text: '#2563eb', label: 'Publicado' },
@@ -2618,6 +2659,11 @@ const CrmMarketingRedesSociales: React.FC = () => {
                   </div>
                 );
               })}
+              {scheduledPosts.length > 0 && scheduledPosts.filter((p) => scheduledPlatformFilter === 'all' || p.platform === scheduledPlatformFilter).length === 0 && (
+                <div style={{ textAlign: 'center', padding: '32px', color: '#94a3b8', fontSize: '13px' }}>
+                  No hay publicaciones para {scheduledPlatformFilter === 'facebook' ? 'Facebook' : 'Instagram'}
+                </div>
+              )}
             </div>
           )}
         </div>
