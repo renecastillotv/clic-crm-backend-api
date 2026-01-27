@@ -2001,6 +2001,7 @@ export async function getPerfilAsesor(
       destacado,
       visible_en_web as "visibleEnWeb",
       orden,
+      ref,
       traducciones,
       metadata,
       created_at as "createdAt",
