@@ -14,7 +14,7 @@ import { useParams, useNavigate, useSearchParams } from 'react-router-dom';
 import { useAuth as useClerkAuth } from '@clerk/clerk-react';
 import { useAuth } from '../../contexts/AuthContext';
 import { usePageHeader } from '../../layouts/CrmLayout';
-import { apiFetch } from '../../utils/api';
+import { apiFetch } from '../../services/api';
 import {
   FileText,
   ChevronRight,

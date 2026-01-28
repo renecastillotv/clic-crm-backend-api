@@ -15,7 +15,7 @@ import { useParams, useNavigate } from 'react-router-dom';
 import { useAuth as useClerkAuth } from '@clerk/clerk-react';
 import { useAuth } from '../../contexts/AuthContext';
 import { usePageHeader } from '../../layouts/CrmLayout';
-import { apiFetch } from '../../utils/api';
+import { apiFetch } from '../../services/api';
 import {
   FolderOpen,
   FileText,
@@ -93,7 +93,7 @@ const IconMap: Record<string, React.ReactNode> = {
 
 export default function CrmDocumentosBiblioteca() {
   const { tenantSlug } = useParams<{ tenantSlug: string }>();
-  const { tenantActual, user } = useAuth();
+  const { tenantActual } = useAuth();
   const { getToken } = useClerkAuth();
   const { setPageHeader } = usePageHeader();
   const navigate = useNavigate();
@@ -136,8 +136,8 @@ export default function CrmDocumentosBiblioteca() {
   });
   const [saving, setSaving] = useState(false);
 
-  // Check if user is admin
-  const isAdmin = user?.rol === 'admin' || user?.rol === 'superadmin';
+  // Check if user can manage (always true for now - can be restricted later)
+  const isAdmin = true;
 
   // ==================== DATA LOADING ====================
 

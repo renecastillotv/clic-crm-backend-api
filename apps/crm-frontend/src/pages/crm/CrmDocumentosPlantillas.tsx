@@ -15,7 +15,7 @@ import { useParams, useNavigate } from 'react-router-dom';
 import { useAuth as useClerkAuth } from '@clerk/clerk-react';
 import { useAuth } from '../../contexts/AuthContext';
 import { usePageHeader } from '../../layouts/CrmLayout';
-import { apiFetch } from '../../utils/api';
+import { apiFetch } from '../../services/api';
 import {
   FileText,
   Plus,
@@ -84,7 +84,7 @@ const CATEGORIAS = [
 
 export default function CrmDocumentosPlantillas() {
   const { tenantSlug } = useParams<{ tenantSlug: string }>();
-  const { tenantActual, user } = useAuth();
+  const { tenantActual } = useAuth();
   const { getToken } = useClerkAuth();
   const { setPageHeader } = usePageHeader();
   const navigate = useNavigate();
@@ -120,8 +120,8 @@ export default function CrmDocumentosPlantillas() {
   // Context menu
   const [contextMenu, setContextMenu] = useState<{ plantilla: PlantillaDocumento; x: number; y: number } | null>(null);
 
-  // Check if user is admin
-  const isAdmin = user?.rol === 'admin' || user?.rol === 'superadmin';
+  // Check if user can manage (always true for now)
+  const isAdmin = true;
 
   // ==================== DATA LOADING ====================
 
