@@ -200,9 +200,8 @@ async function getPropiedadData(propiedadId: string): Promise<Partial<DatosMerge
   if (!propiedadId) return {};
 
   const result = await query(
-    `SELECT p.*, u.ciudad, u.sector
+    `SELECT p.*
      FROM propiedades p
-     LEFT JOIN ubicaciones u ON u.id = p.ubicacion_id
      WHERE p.id = $1`,
     [propiedadId]
   );
