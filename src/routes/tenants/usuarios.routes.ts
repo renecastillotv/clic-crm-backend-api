@@ -12,6 +12,9 @@ import {
   agregarUsuarioATenant,
   actualizarUsuarioTenant,
   eliminarUsuarioDeTenant,
+  reactivarUsuarioEnTenant,
+  toggleUsuarioVisibilidadWeb,
+  resetUsuarioPassword,
   getRolesByTenant,
   getRolTenantById,
   createRolTenant,
@@ -124,6 +127,87 @@ router.delete('/:usuarioTenantId', async (req, res, next) => {
     }
 
     res.json({ success: true, message: 'Usuario eliminado del tenant' });
+  } catch (error) {
+    next(error);
+  }
+});
+
+/**
+ * PATCH /api/tenants/:tenantId/usuarios/:usuarioTenantId/toggle-status
+ * Activa o desactiva un usuario del tenant
+ */
+router.patch('/:usuarioTenantId/toggle-status', async (req, res, next) => {
+  try {
+    const { tenantId, usuarioTenantId } = req.params as RouteParams;
+    const { activo } = req.body;
+
+    if (typeof activo !== 'boolean') {
+      return res.status(400).json({ error: 'El campo "activo" es requerido y debe ser booleano' });
+    }
+
+    let resultado: boolean;
+    if (activo) {
+      resultado = await reactivarUsuarioEnTenant(tenantId, usuarioTenantId!);
+    } else {
+      resultado = await eliminarUsuarioDeTenant(tenantId, usuarioTenantId!);
+    }
+
+    res.json({
+      success: resultado,
+      activo,
+      message: activo ? 'Usuario activado' : 'Usuario desactivado'
+    });
+  } catch (error) {
+    next(error);
+  }
+});
+
+/**
+ * PATCH /api/tenants/:tenantId/usuarios/:usuarioTenantId/toggle-visibility
+ * Muestra u oculta un usuario (asesor) en la página web
+ */
+router.patch('/:usuarioTenantId/toggle-visibility', async (req, res, next) => {
+  try {
+    const { tenantId, usuarioTenantId } = req.params as RouteParams;
+    const { visible } = req.body;
+
+    if (typeof visible !== 'boolean') {
+      return res.status(400).json({ error: 'El campo "visible" es requerido y debe ser booleano' });
+    }
+
+    const resultado = await toggleUsuarioVisibilidadWeb(tenantId, usuarioTenantId!, visible);
+
+    res.json({
+      success: true,
+      visibleEnWeb: visible,
+      message: visible ? 'Usuario visible en web' : 'Usuario oculto de la web'
+    });
+  } catch (error) {
+    next(error);
+  }
+});
+
+/**
+ * POST /api/tenants/:tenantId/usuarios/:usuarioTenantId/reset-password
+ * Cambia la contraseña de un usuario (admin del tenant)
+ */
+router.post('/:usuarioTenantId/reset-password', async (req, res, next) => {
+  try {
+    const { tenantId, usuarioTenantId } = req.params as RouteParams;
+    const { newPassword } = req.body;
+
+    if (!newPassword || newPassword.length < 8) {
+      return res.status(400).json({
+        error: 'La contraseña es requerida y debe tener al menos 8 caracteres'
+      });
+    }
+
+    await resetUsuarioPassword(tenantId, usuarioTenantId!, newPassword);
+
+    res.json({
+      success: true,
+      message: 'Contraseña actualizada correctamente'
+    });
   } catch (error) {
     next(error);
   }

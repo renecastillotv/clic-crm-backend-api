@@ -596,9 +596,11 @@ export async function getUsuariosByTenant(tenantId: string): Promise<UsuarioTena
       ut.es_owner as "esOwner",
       ut.activo,
       u.ultimo_acceso as "ultimoAcceso",
-      ut.created_at as "createdAt"
+      ut.created_at as "createdAt",
+      COALESCE(pa.visible_en_web, false) as "visibleEnWeb"
     FROM usuarios_tenants ut
     JOIN usuarios u ON ut.usuario_id = u.id
+    LEFT JOIN perfiles_asesor pa ON pa.usuario_id = u.id AND pa.tenant_id = ut.tenant_id
     WHERE ut.tenant_id = $1
       AND ut.activo = true
       AND u.activo = true
@@ -2212,5 +2214,96 @@ export async function upsertPerfilAsesor(
     ]);
 
     return await getPerfilAsesor(usuarioId, tenantId);
+  }
+}
+
+// ==================== FUNCIONES DE ADMINISTRACIÓN ====================
+
+/**
+ * Toggle visibilidad del usuario (asesor) en la página web
+ */
+export async function toggleUsuarioVisibilidadWeb(
+  tenantId: string,
+  usuarioId: string,
+  visible: boolean
+): Promise<boolean> {
+  // Actualizar perfil de asesor si existe
+  const result = await query(
+    `UPDATE perfiles_asesor
+     SET visible_en_web = $1, updated_at = NOW()
+     WHERE tenant_id = $2 AND usuario_id = $3`,
+    [visible, tenantId, usuarioId]
+  );
+
+  if ((result.rowCount ?? 0) === 0) {
+    // Si no existe perfil de asesor, intentar crearlo
+    console.log(`⚠️ No existe perfil de asesor para usuario ${usuarioId}, creando uno básico...`);
+
+    // Obtener datos del usuario para crear el perfil
+    const usuarioResult = await query(
+      `SELECT u.nombre, u.apellido
+       FROM usuarios u
+       WHERE u.id = $1`,
+      [usuarioId]
+    );
+
+    if (usuarioResult.rows.length > 0) {
+      const usuario = usuarioResult.rows[0];
+      const nombreCompleto = [usuario.nombre, usuario.apellido].filter(Boolean).join(' ') || 'Usuario';
+      const baseSlug = nombreCompleto.toLowerCase()
+        .normalize('NFD').replace(/[\u0300-\u036f]/g, '')
+        .replace(/[^a-z0-9]+/g, '-')
+        .replace(/(^-|-$)/g, '');
+
+      await query(
+        `INSERT INTO perfiles_asesor (tenant_id, usuario_id, slug, activo, visible_en_web)
+         VALUES ($1, $2, $3, true, $4)
+         ON CONFLICT (tenant_id, usuario_id) DO UPDATE SET visible_en_web = $4, updated_at = NOW()`,
+        [tenantId, usuarioId, baseSlug, visible]
+      );
+    }
+  }
+
+  console.log(`✅ Visibilidad web del usuario ${usuarioId} cambiada a: ${visible}`);
+  return true;
+}
+
+/**
+ * Cambiar contraseña de un usuario (admin del tenant)
+ */
+export async function resetUsuarioPassword(
+  tenantId: string,
+  usuarioId: string,
+  newPassword: string
+): Promise<boolean> {
+  // Verificar que el usuario pertenece al tenant
+  const usuarioResult = await query(
+    `SELECT u.clerk_id, u.email
+     FROM usuarios u
+     INNER JOIN usuarios_tenants ut ON u.id = ut.usuario_id
+     WHERE u.id = $1 AND ut.tenant_id = $2`,
+    [usuarioId, tenantId]
+  );
+
+  if (usuarioResult.rows.length === 0) {
+    throw new Error('Usuario no encontrado en el tenant');
+  }
+
+  const usuario = usuarioResult.rows[0];
+
+  if (!usuario.clerk_id) {
+    throw new Error('El usuario no tiene cuenta de Clerk asociada');
+  }
+
+  // Usar Clerk para cambiar la contraseña
+  const { updateClerkUser } = await import('../middleware/clerkAuth.js');
+
+  try {
+    await updateClerkUser(usuario.clerk_id, { password: newPassword });
+    console.log(`✅ Contraseña actualizada para usuario ${usuario.email}`);
+    return true;
+  } catch (error: any) {
+    console.error(`❌ Error al cambiar contraseña en Clerk:`, error);
+    throw new Error(`Error al cambiar contraseña: ${error.message}`);
   }
 }
