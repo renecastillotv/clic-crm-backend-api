@@ -97,7 +97,7 @@ export default function CrmDocumentosGenerados() {
         { headers: { Authorization: `Bearer ${token}` } }
       );
       const data = await response.json();
-      setDocumentos(data.documentos || data || []);
+      setDocumentos(data.data || data.documentos || []);
     } catch (err: any) {
       console.error('Error cargando documentos:', err);
       setError(err.message || 'Error al cargar documentos');
