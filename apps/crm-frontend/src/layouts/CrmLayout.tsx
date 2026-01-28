@@ -1049,6 +1049,7 @@ export default function CrmLayout() {
                   <NavLink
                     key={item.id}
                     to={`${basePath}/${item.path}`}
+                    end={item.path === 'documentos'}
                     className={({ isActive }) => `nav-subitem ${isActive ? 'active' : ''}`}
                   >
                     <span className="nav-icon">{item.icon}</span>

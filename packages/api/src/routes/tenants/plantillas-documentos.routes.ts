@@ -279,6 +279,19 @@ router.get('/unificados', async (req: any, res: Response, next: NextFunction) =>
     const { tenantId } = req.params;
     const usuarioId = req.scope?.dbUserId;
 
+    // Si no hay usuario autenticado, retornar lista vacía
+    if (!usuarioId) {
+      return res.json({
+        data: [],
+        total: 0,
+        totalGenerados: 0,
+        totalEmpresa: 0,
+        page: 1,
+        limit: 50,
+        totalPages: 0
+      });
+    }
+
     const tipo = req.query.tipo as string; // 'generado' | 'empresa' | undefined
     const estado = req.query.estado as string;
     const pendientes = req.query.pendientes === 'true';
