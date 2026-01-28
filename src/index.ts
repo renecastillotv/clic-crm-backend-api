@@ -87,7 +87,7 @@ console.log('🔧 DATABASE_URL configurada:', process.env.DATABASE_URL ? 'Sí' :
 // Middlewares - CORS configuration for Vercel
 const allowedOrigins = [
   'https://clic-crm-frontend.vercel.app',
-  'https://crm.clicinmobiliario.com',
+  'https://crm.clicinmobiliaria.com',
   'http://localhost:5173',
   'http://localhost:3000',
 ];
