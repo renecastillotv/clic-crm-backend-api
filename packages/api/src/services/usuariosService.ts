@@ -1181,138 +1181,148 @@ export async function eliminarUsuarioDeTenant(
   usuarioId: string,
   reasignarA?: string // ID del usuario al que reasignar propiedades/contactos (opcional)
 ): Promise<boolean> {
-  // Obtener información del usuario
-  const usuarioResult = await query(
-    `SELECT clerk_id, email FROM usuarios WHERE id = $1`,
-    [usuarioId]
-  );
-  const usuario = usuarioResult.rows[0];
-
-  if (!usuario) {
-    throw new Error('Usuario no encontrado');
-  }
-
-  console.log(`🔄 Desactivando usuario ${usuario.email} del tenant ${tenantId}...`);
-
-  // 1. Marcar como inactivo en usuarios_tenants (soft delete)
-  const updateResult = await query(
-    `UPDATE usuarios_tenants
-     SET activo = false, updated_at = NOW()
-     WHERE usuario_id = $1 AND tenant_id = $2`,
-    [usuarioId, tenantId]
-  );
-
-  // 2. Desactivar perfil de asesor si existe
-  await query(
-    `UPDATE perfiles_asesor
-     SET activo = false, visible_en_web = false, updated_at = NOW()
-     WHERE usuario_id = $1 AND tenant_id = $2`,
-    [usuarioId, tenantId]
-  );
-
-  // 3. Determinar usuario para reasignación (el especificado o el owner del tenant)
-  let usuarioReasignacion = reasignarA;
-  if (!usuarioReasignacion) {
-    // Buscar el owner del tenant o el primer admin activo
-    const ownerResult = await query(
-      `SELECT ut.usuario_id
-       FROM usuarios_tenants ut
-       WHERE ut.tenant_id = $1
-         AND ut.activo = true
-         AND ut.es_owner = true
-         AND ut.usuario_id != $2
-       LIMIT 1`,
-      [tenantId, usuarioId]
-    );
-
-    if (ownerResult.rows.length > 0) {
-      usuarioReasignacion = ownerResult.rows[0].usuario_id;
-    }
-  }
-
-  // 4. Reasignar propiedades asignadas al usuario
-  if (usuarioReasignacion) {
-    // Reasignar propiedades donde el usuario es asesor asignado
-    const propiedadesActualizadas = await query(
-      `UPDATE propiedades
-       SET asesor_asignado_id = $1, updated_at = NOW()
-       WHERE tenant_id = $2 AND asesor_asignado_id = $3
-       RETURNING id`,
-      [usuarioReasignacion, tenantId, usuarioId]
-    );
-
-    if (propiedadesActualizadas.rows.length > 0) {
-      console.log(`   ✅ ${propiedadesActualizadas.rows.length} propiedades reasignadas`);
+  try {
+    // Validar parámetros
+    if (!tenantId || !usuarioId) {
+      throw new Error('Se requieren tenantId y usuarioId');
     }
 
-    // Reasignar contactos/leads asignados al usuario
-    const contactosActualizados = await query(
-      `UPDATE contactos
-       SET asesor_asignado_id = $1, updated_at = NOW()
-       WHERE tenant_id = $2 AND asesor_asignado_id = $3
-       RETURNING id`,
-      [usuarioReasignacion, tenantId, usuarioId]
+    // Obtener información del usuario
+    const usuarioResult = await query(
+      `SELECT clerk_id, email FROM usuarios WHERE id = $1`,
+      [usuarioId]
+    );
+    const usuario = usuarioResult.rows[0];
+
+    if (!usuario) {
+      throw new Error('Usuario no encontrado');
+    }
+
+    console.log(`🔄 Desactivando usuario ${usuario.email} del tenant ${tenantId}...`);
+
+    // 1. Marcar como inactivo en usuarios_tenants (soft delete)
+    const updateResult = await query(
+      `UPDATE usuarios_tenants
+       SET activo = false, updated_at = NOW()
+       WHERE usuario_id = $1 AND tenant_id = $2`,
+      [usuarioId, tenantId]
     );
 
-    if (contactosActualizados.rows.length > 0) {
-      console.log(`   ✅ ${contactosActualizados.rows.length} contactos reasignados`);
-    }
-  } else {
-    console.log(`   ⚠️ No se encontró usuario para reasignación, propiedades y contactos quedan sin asesor asignado`);
-
-    // Quitar asignación (null) en lugar de dejar huérfanos
+    // 2. Desactivar perfil de asesor si existe
     await query(
-      `UPDATE propiedades
-       SET asesor_asignado_id = NULL, updated_at = NOW()
-       WHERE tenant_id = $1 AND asesor_asignado_id = $2`,
-      [tenantId, usuarioId]
+      `UPDATE perfiles_asesor
+       SET activo = false, visible_en_web = false, updated_at = NOW()
+       WHERE usuario_id = $1 AND tenant_id = $2`,
+      [usuarioId, tenantId]
     );
 
-    await query(
-      `UPDATE contactos
-       SET asesor_asignado_id = NULL, updated_at = NOW()
-       WHERE tenant_id = $1 AND asesor_asignado_id = $2`,
-      [tenantId, usuarioId]
-    );
-  }
+    // 3. Determinar usuario para reasignación (el especificado o el owner del tenant)
+    let usuarioReasignacion = reasignarA;
+    if (!usuarioReasignacion) {
+      // Buscar el owner del tenant o el primer admin activo
+      const ownerResult = await query(
+        `SELECT ut.usuario_id
+         FROM usuarios_tenants ut
+         WHERE ut.tenant_id = $1
+           AND ut.activo = true
+           AND ut.es_owner = true
+           AND ut.usuario_id != $2
+         LIMIT 1`,
+        [tenantId, usuarioId]
+      );
 
-  // 5. Verificar si el usuario tiene otros tenants ACTIVOS
-  const otrosTenants = await query(
-    `SELECT COUNT(*) as count
-     FROM usuarios_tenants
-     WHERE usuario_id = $1 AND activo = true`,
-    [usuarioId]
-  );
-  const tieneOtrosTenants = parseInt(otrosTenants.rows[0].count) > 0;
-
-  // 6. Si no tiene otros tenants activos, desactivar en Clerk y en usuarios
-  if (!tieneOtrosTenants) {
-    console.log(`   🔒 Usuario ${usuario.email} no tiene otros tenants activos, desactivando completamente...`);
-
-    // Desactivar (ban) en Clerk si tiene clerk_id
-    if (usuario.clerk_id) {
-      try {
-        await deactivateClerkUser(usuario.clerk_id);
-        console.log(`   ✅ Usuario baneado en Clerk: ${usuario.email}`);
-      } catch (clerkError: any) {
-        console.error(`   ⚠️ Error desactivando en Clerk: ${clerkError.message}`);
+      if (ownerResult.rows.length > 0) {
+        usuarioReasignacion = ownerResult.rows[0].usuario_id;
       }
     }
 
-    // Marcar como inactivo en la tabla usuarios
-    await query(
-      `UPDATE usuarios SET activo = false, updated_at = NOW() WHERE id = $1`,
+    // 4. Reasignar propiedades asignadas al usuario
+    if (usuarioReasignacion) {
+      // Reasignar propiedades donde el usuario es asesor asignado
+      const propiedadesActualizadas = await query(
+        `UPDATE propiedades
+         SET asesor_asignado_id = $1, updated_at = NOW()
+         WHERE tenant_id = $2 AND asesor_asignado_id = $3
+         RETURNING id`,
+        [usuarioReasignacion, tenantId, usuarioId]
+      );
+
+      if (propiedadesActualizadas.rows.length > 0) {
+        console.log(`   ✅ ${propiedadesActualizadas.rows.length} propiedades reasignadas`);
+      }
+
+      // Reasignar contactos/leads asignados al usuario
+      const contactosActualizados = await query(
+        `UPDATE contactos
+         SET asesor_asignado_id = $1, updated_at = NOW()
+         WHERE tenant_id = $2 AND asesor_asignado_id = $3
+         RETURNING id`,
+        [usuarioReasignacion, tenantId, usuarioId]
+      );
+
+      if (contactosActualizados.rows.length > 0) {
+        console.log(`   ✅ ${contactosActualizados.rows.length} contactos reasignados`);
+      }
+    } else {
+      console.log(`   ⚠️ No se encontró usuario para reasignación, propiedades y contactos quedan sin asesor asignado`);
+
+      // Quitar asignación (null) en lugar de dejar huérfanos
+      await query(
+        `UPDATE propiedades
+         SET asesor_asignado_id = NULL, updated_at = NOW()
+         WHERE tenant_id = $1 AND asesor_asignado_id = $2`,
+        [tenantId, usuarioId]
+      );
+
+      await query(
+        `UPDATE contactos
+         SET asesor_asignado_id = NULL, updated_at = NOW()
+         WHERE tenant_id = $1 AND asesor_asignado_id = $2`,
+        [tenantId, usuarioId]
+      );
+    }
+
+    // 5. Verificar si el usuario tiene otros tenants ACTIVOS
+    const otrosTenants = await query(
+      `SELECT COUNT(*) as count
+       FROM usuarios_tenants
+       WHERE usuario_id = $1 AND activo = true`,
       [usuarioId]
     );
+    const tieneOtrosTenants = parseInt(otrosTenants.rows[0].count) > 0;
 
-    console.log(`   ✅ Usuario marcado como inactivo en BD: ${usuario.email}`);
-  } else {
-    console.log(`   ℹ️ Usuario ${usuario.email} tiene otros tenants activos, solo se desactivó de este tenant`);
+    // 6. Si no tiene otros tenants activos, desactivar en Clerk y en usuarios
+    if (!tieneOtrosTenants) {
+      console.log(`   🔒 Usuario ${usuario.email} no tiene otros tenants activos, desactivando completamente...`);
+
+      // Desactivar (ban) en Clerk si tiene clerk_id
+      if (usuario.clerk_id) {
+        try {
+          await deactivateClerkUser(usuario.clerk_id);
+          console.log(`   ✅ Usuario baneado en Clerk: ${usuario.email}`);
+        } catch (clerkError: any) {
+          console.error(`   ⚠️ Error desactivando en Clerk: ${clerkError.message}`);
+        }
+      }
+
+      // Marcar como inactivo en la tabla usuarios
+      await query(
+        `UPDATE usuarios SET activo = false, updated_at = NOW() WHERE id = $1`,
+        [usuarioId]
+      );
+
+      console.log(`   ✅ Usuario marcado como inactivo en BD: ${usuario.email}`);
+    } else {
+      console.log(`   ℹ️ Usuario ${usuario.email} tiene otros tenants activos, solo se desactivó de este tenant`);
+    }
+
+    console.log(`✅ Usuario ${usuario.email} desactivado correctamente del tenant`);
+
+    return (updateResult.rowCount ?? 0) > 0;
+  } catch (error: any) {
+    console.error(`❌ Error al eliminar usuario ${usuarioId} del tenant ${tenantId}:`, error);
+    throw new Error(`Error al desactivar usuario: ${error.message || 'Error desconocido'}`);
   }
-
-  console.log(`✅ Usuario ${usuario.email} desactivado correctamente del tenant`);
-
-  return (updateResult.rowCount ?? 0) > 0;
 }
 
 /**
