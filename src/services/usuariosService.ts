@@ -1238,11 +1238,11 @@ export async function eliminarUsuarioDeTenant(
 
     // 4. Reasignar propiedades asignadas al usuario
     if (usuarioReasignacion) {
-      // Reasignar propiedades donde el usuario es asesor asignado
+      // Reasignar propiedades donde el usuario es agente asignado
       const propiedadesActualizadas = await query(
         `UPDATE propiedades
-         SET asesor_asignado_id = $1, updated_at = NOW()
-         WHERE tenant_id = $2 AND asesor_asignado_id = $3
+         SET agente_id = $1, updated_at = NOW()
+         WHERE tenant_id = $2 AND agente_id = $3
          RETURNING id`,
         [usuarioReasignacion, tenantId, usuarioId]
       );
@@ -1254,8 +1254,8 @@ export async function eliminarUsuarioDeTenant(
       // Reasignar contactos/leads asignados al usuario
       const contactosActualizados = await query(
         `UPDATE contactos
-         SET asesor_asignado_id = $1, updated_at = NOW()
-         WHERE tenant_id = $2 AND asesor_asignado_id = $3
+         SET usuario_asignado_id = $1, updated_at = NOW()
+         WHERE tenant_id = $2 AND usuario_asignado_id = $3
          RETURNING id`,
         [usuarioReasignacion, tenantId, usuarioId]
       );
@@ -1269,15 +1269,15 @@ export async function eliminarUsuarioDeTenant(
       // Quitar asignación (null) en lugar de dejar huérfanos
       await query(
         `UPDATE propiedades
-         SET asesor_asignado_id = NULL, updated_at = NOW()
-         WHERE tenant_id = $1 AND asesor_asignado_id = $2`,
+         SET agente_id = NULL, updated_at = NOW()
+         WHERE tenant_id = $1 AND agente_id = $2`,
         [tenantId, usuarioId]
       );
 
       await query(
         `UPDATE contactos
-         SET asesor_asignado_id = NULL, updated_at = NOW()
-         WHERE tenant_id = $1 AND asesor_asignado_id = $2`,
+         SET usuario_asignado_id = NULL, updated_at = NOW()
+         WHERE tenant_id = $1 AND usuario_asignado_id = $2`,
         [tenantId, usuarioId]
       );
     }
