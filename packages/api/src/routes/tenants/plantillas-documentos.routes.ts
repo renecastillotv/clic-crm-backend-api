@@ -387,7 +387,7 @@ router.get('/unificados', async (req: any, res: Response, next: NextFunction) =>
         LEFT JOIN biblioteca_categorias bc ON bd.categoria_id = bc.id
         WHERE ${whereEmpresa}
         ORDER BY bd.es_obligatorio DESC, bd.created_at DESC
-      `, [...paramsEmpresa, usuarioId, usuarioId]);
+      `, [...paramsEmpresa, usuarioId]);
 
       documentos.push(...empRes.rows.map(r => ({
         ...r,
