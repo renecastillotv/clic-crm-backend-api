@@ -1,14 +1,15 @@
 /**
- * Webhooks de Clerk
+ * Webhooks de Clerk y DocuSeal
  *
- * Recibe eventos de Clerk para sincronizar usuarios automáticamente.
- * Los webhooks se configuran en el dashboard de Clerk.
+ * - Clerk: Sincroniza usuarios automáticamente
+ * - DocuSeal: Notificaciones de firma de documentos
  */
 
 import express from 'express';
 import { Webhook } from 'svix';
 import { syncUsuarioFromClerk } from '../services/usuariosService.js';
 import { query } from '../utils/db.js';
+import * as docusealService from '../services/docusealService.js';
 
 const router = express.Router();
 
@@ -104,6 +105,30 @@ router.post('/clerk', async (req, res) => {
     res.status(200).json({ received: true });
   } catch (error: any) {
     console.error('❌ Error procesando webhook:', error);
+    res.status(500).json({ error: 'Error processing webhook' });
+  }
+});
+
+/**
+ * POST /api/webhooks/docuseal
+ *
+ * Endpoint para recibir webhooks de DocuSeal.
+ * Eventos soportados:
+ * - form.viewed: Un firmante abrió el documento
+ * - form.completed: Un firmante completó su firma
+ * - form.declined: Un firmante rechazó firmar
+ * - submission.completed: Todos los firmantes completaron
+ * - submission.expired: La submission expiró
+ */
+router.post('/docuseal', express.json(), async (req, res) => {
+  try {
+    console.log('📩 DocuSeal webhook recibido:', req.body.event_type);
+
+    await docusealService.procesarWebhook(req.body);
+
+    res.status(200).json({ received: true });
+  } catch (error: any) {
+    console.error('❌ Error procesando webhook DocuSeal:', error);
     res.status(500).json({ error: 'Error processing webhook' });
   }
 });

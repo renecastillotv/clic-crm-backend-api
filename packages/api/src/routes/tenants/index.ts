@@ -71,6 +71,10 @@ import mensajeriaEmailRouter from './mensajeria-email.routes.js';
 import mensajeriaWhatsappRouter from './mensajeria-whatsapp.routes.js';
 import mensajeriaWebchatRouter from './mensajeria-webchat.routes.js';
 
+// Importar sub-routers modulares - Documentos
+import bibliotecaRouter from './biblioteca.routes.js';
+import plantillasDocumentosRouter from './plantillas-documentos.routes.js';
+
 const router = express.Router();
 
 // ============================================================================
@@ -166,6 +170,12 @@ router.use('/:tenantId/mensajeria-whatsapp', mensajeriaWhatsappRouter);
 
 // Mensajería Web Chat Module (config, agents, availability, visitor messages)
 router.use('/:tenantId/mensajeria-webchat', mensajeriaWebchatRouter);
+
+// Biblioteca Module (documentos compartidos, categorías, versiones, confirmaciones)
+router.use('/:tenantId/biblioteca', bibliotecaRouter);
+
+// Plantillas de Documentos Module (plantillas, documentos generados)
+router.use('/:tenantId/documentos', plantillasDocumentosRouter);
 
 // ============================================================================
 // RUTAS DIRECTAS (sin sub-router)

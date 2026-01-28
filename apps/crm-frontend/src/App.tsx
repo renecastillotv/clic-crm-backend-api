@@ -74,6 +74,10 @@ import CrmFinanzasConfiguracion from './pages/crm/CrmFinanzasConfiguracion';
 import CrmMensajeriaChats from './pages/crm/CrmMensajeriaChats';
 import CrmMensajeriaCorreo from './pages/crm/CrmMensajeriaCorreo';
 import CrmMensajeriaConfiguracion from './pages/crm/CrmMensajeriaConfiguracion';
+import CrmDocumentosBiblioteca from './pages/crm/CrmDocumentosBiblioteca';
+import CrmDocumentosPlantillas from './pages/crm/CrmDocumentosPlantillas';
+import CrmDocumentosGenerar from './pages/crm/CrmDocumentosGenerar';
+import CrmDocumentosGenerados from './pages/crm/CrmDocumentosGenerados';
 
 // Páginas de Contenido y CLIC Connect
 import CrmContenido from './pages/crm/CrmContenido';
@@ -366,6 +370,13 @@ function AppRoutes() {
         <Route path="mensajeria/chats" element={<CrmMensajeriaChats />} />
         <Route path="mensajeria/correo" element={<CrmMensajeriaCorreo />} />
         <Route path="mensajeria/configuracion" element={<CrmMensajeriaConfiguracion />} />
+
+        {/* Documentos */}
+        <Route path="documentos" element={<Navigate to="documentos/biblioteca" replace />} />
+        <Route path="documentos/biblioteca" element={<CrmDocumentosBiblioteca />} />
+        <Route path="documentos/plantillas" element={<CrmDocumentosPlantillas />} />
+        <Route path="documentos/generar" element={<CrmDocumentosGenerar />} />
+        <Route path="documentos/generados" element={<CrmDocumentosGenerados />} />
 
         {/* Marketing Centro */}
         <Route path="marketing" element={<CrmMarketing />} />
