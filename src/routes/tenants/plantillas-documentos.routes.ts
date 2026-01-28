@@ -27,6 +27,7 @@ import { resolveUserScope } from '../../middleware/scopeResolver.js';
 import * as plantillasService from '../../services/plantillasDocumentosService.js';
 import * as renderService from '../../services/documentoRenderService.js';
 import * as docusealService from '../../services/docusealService.js';
+import pool from '../../database/connection.js';
 
 const router = express.Router({ mergeParams: true });
 
@@ -261,6 +262,154 @@ router.get('/plantillas/:id/variables', async (req: Request<PlantillaParams>, re
     res.json({
       variables,
       campos_requeridos: plantilla.campos_requeridos,
+    });
+  } catch (error) {
+    next(error);
+  }
+});
+
+// ==================== DOCUMENTOS UNIFICADOS ====================
+
+/**
+ * GET /unificados
+ * Lista unificada de documentos del usuario (generados + biblioteca empresa)
+ */
+router.get('/unificados', async (req: any, res: Response, next: NextFunction) => {
+  try {
+    const { tenantId } = req.params;
+    const usuarioId = req.scope?.dbUserId;
+
+    const tipo = req.query.tipo as string; // 'generado' | 'empresa' | undefined
+    const estado = req.query.estado as string;
+    const pendientes = req.query.pendientes === 'true';
+    const page = parseInt(req.query.page as string) || 1;
+    const limit = parseInt(req.query.limit as string) || 50;
+    const offset = (page - 1) * limit;
+
+    const documentos: any[] = [];
+    let totalGenerados = 0;
+    let totalEmpresa = 0;
+
+    // Obtener documentos generados del usuario
+    if (!tipo || tipo === 'generado') {
+      let whereGenerados = 'dg.tenant_id = $1 AND dg.usuario_id = $2';
+      const paramsGenerados: any[] = [tenantId, usuarioId];
+      let paramIdx = 3;
+
+      if (estado) {
+        whereGenerados += ` AND dg.estado = $${paramIdx}`;
+        paramsGenerados.push(estado);
+        paramIdx++;
+      }
+
+      const countGenRes = await pool.query(
+        `SELECT COUNT(*) FROM documentos_generados dg WHERE ${whereGenerados}`,
+        paramsGenerados
+      );
+      totalGenerados = parseInt(countGenRes.rows[0].count);
+
+      const genRes = await pool.query(`
+        SELECT
+          dg.id,
+          'generado' as tipo,
+          dg.nombre,
+          dg.estado,
+          dg.url_documento,
+          dg.fecha_generacion as fecha,
+          dg.created_at,
+          pd.nombre as plantilla_nombre,
+          pd.categoria as plantilla_categoria,
+          c.nombre as contacto_nombre,
+          p.titulo as propiedad_titulo
+        FROM documentos_generados dg
+        LEFT JOIN plantillas_documentos pd ON dg.plantilla_id = pd.id
+        LEFT JOIN contactos c ON dg.contacto_id = c.id
+        LEFT JOIN propiedades p ON dg.propiedad_id = p.id
+        WHERE ${whereGenerados}
+        ORDER BY dg.created_at DESC
+      `, paramsGenerados);
+
+      documentos.push(...genRes.rows.map(r => ({
+        ...r,
+        tipo: 'generado'
+      })));
+    }
+
+    // Obtener documentos de empresa (biblioteca)
+    if (!tipo || tipo === 'empresa') {
+      let whereEmpresa = 'bd.tenant_id = $1 AND bd.activo = true';
+      const paramsEmpresa: any[] = [tenantId];
+      let paramIdx = 2;
+
+      if (pendientes) {
+        // Solo documentos obligatorios sin confirmar
+        whereEmpresa += ` AND bd.es_obligatorio = true
+          AND NOT EXISTS (
+            SELECT 1 FROM biblioteca_confirmaciones bc
+            WHERE bc.documento_id = bd.id
+            AND bc.usuario_id = $${paramIdx}
+            AND bc.version_confirmada = bd.version
+          )`;
+        paramsEmpresa.push(usuarioId);
+        paramIdx++;
+      }
+
+      const countEmpRes = await pool.query(
+        `SELECT COUNT(*) FROM biblioteca_documentos bd WHERE ${whereEmpresa}`,
+        paramsEmpresa
+      );
+      totalEmpresa = parseInt(countEmpRes.rows[0].count);
+
+      const empRes = await pool.query(`
+        SELECT
+          bd.id,
+          'empresa' as tipo,
+          bd.titulo as nombre,
+          CASE WHEN bd.es_obligatorio THEN 'obligatorio' ELSE 'disponible' END as estado,
+          bd.url_documento,
+          bd.created_at as fecha,
+          bd.es_obligatorio,
+          bd.tipo_archivo,
+          bc.nombre as categoria_nombre,
+          bc.color as categoria_color,
+          EXISTS (
+            SELECT 1 FROM biblioteca_confirmaciones conf
+            WHERE conf.documento_id = bd.id
+            AND conf.usuario_id = $${paramIdx}
+            AND conf.version_confirmada = bd.version
+          ) as confirmado,
+          EXISTS (
+            SELECT 1 FROM biblioteca_favoritos bf
+            WHERE bf.documento_id = bd.id
+            AND bf.usuario_id = $${paramIdx}
+          ) as es_favorito
+        FROM biblioteca_documentos bd
+        LEFT JOIN biblioteca_categorias bc ON bd.categoria_id = bc.id
+        WHERE ${whereEmpresa}
+        ORDER BY bd.es_obligatorio DESC, bd.created_at DESC
+      `, [...paramsEmpresa, usuarioId, usuarioId]);
+
+      documentos.push(...empRes.rows.map(r => ({
+        ...r,
+        tipo: 'empresa'
+      })));
+    }
+
+    // Ordenar combinados por fecha
+    documentos.sort((a, b) => new Date(b.fecha).getTime() - new Date(a.fecha).getTime());
+
+    // Paginar resultado combinado
+    const paginatedDocs = documentos.slice(offset, offset + limit);
+    const total = totalGenerados + totalEmpresa;
+
+    res.json({
+      data: paginatedDocs,
+      total,
+      totalGenerados,
+      totalEmpresa,
+      page,
+      limit,
+      totalPages: Math.ceil(total / limit)
     });
   } catch (error) {
     next(error);
