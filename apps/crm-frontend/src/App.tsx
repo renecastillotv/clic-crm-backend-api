@@ -74,6 +74,10 @@ import CrmFinanzasConfiguracion from './pages/crm/CrmFinanzasConfiguracion';
 import CrmMensajeriaChats from './pages/crm/CrmMensajeriaChats';
 import CrmMensajeriaCorreo from './pages/crm/CrmMensajeriaCorreo';
 import CrmMensajeriaConfiguracion from './pages/crm/CrmMensajeriaConfiguracion';
+// Documentos - Nuevo sistema simplificado
+import CrmMisDocumentos from './pages/crm/CrmMisDocumentos';
+import CrmDocumentosConfiguracion from './pages/crm/CrmDocumentosConfiguracion';
+// Legacy imports para redirects de compatibilidad
 import CrmDocumentosBiblioteca from './pages/crm/CrmDocumentosBiblioteca';
 import CrmDocumentosPlantillas from './pages/crm/CrmDocumentosPlantillas';
 import CrmDocumentosGenerar from './pages/crm/CrmDocumentosGenerar';
@@ -371,12 +375,14 @@ function AppRoutes() {
         <Route path="mensajeria/correo" element={<CrmMensajeriaCorreo />} />
         <Route path="mensajeria/configuracion" element={<CrmMensajeriaConfiguracion />} />
 
-        {/* Documentos */}
-        <Route path="documentos" element={<Navigate to="documentos/biblioteca" replace />} />
-        <Route path="documentos/biblioteca" element={<CrmDocumentosBiblioteca />} />
-        <Route path="documentos/plantillas" element={<CrmDocumentosPlantillas />} />
-        <Route path="documentos/generar" element={<CrmDocumentosGenerar />} />
-        <Route path="documentos/generados" element={<CrmDocumentosGenerados />} />
+        {/* Documentos - Nueva estructura simplificada */}
+        <Route path="documentos" element={<CrmMisDocumentos />} />
+        <Route path="documentos/configuracion" element={<CrmDocumentosConfiguracion />} />
+        {/* Redirects de compatibilidad para URLs antiguas */}
+        <Route path="documentos/biblioteca" element={<Navigate to="../documentos" replace />} />
+        <Route path="documentos/plantillas" element={<Navigate to="../documentos/configuracion" replace />} />
+        <Route path="documentos/generar" element={<Navigate to="../documentos" replace />} />
+        <Route path="documentos/generados" element={<Navigate to="../documentos" replace />} />
 
         {/* Marketing Centro */}
         <Route path="marketing" element={<CrmMarketing />} />

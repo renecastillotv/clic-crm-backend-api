@@ -717,12 +717,10 @@ export default function CrmLayout() {
     { id: 'mensajeria-config', path: 'mensajeria/configuracion', label: 'Configuración', icon: Icons.configuracion },
   ];
 
-  // Sub-items de Documentos
+  // Sub-items de Documentos (simplificado a 2 secciones)
   const documentosSubItems = [
-    { id: 'documentos-biblioteca', path: 'documentos/biblioteca', label: 'Biblioteca', icon: Icons.documentos },
-    { id: 'documentos-plantillas', path: 'documentos/plantillas', label: 'Plantillas', icon: Icons.plantillas },
-    { id: 'documentos-generar', path: 'documentos/generar', label: 'Generar', icon: Icons.generar },
-    { id: 'documentos-generados', path: 'documentos/generados', label: 'Mis Documentos', icon: Icons.misDocumentos },
+    { id: 'mis-documentos', path: 'documentos', label: 'Mis Documentos', icon: Icons.misDocumentos },
+    { id: 'documentos-config', path: 'documentos/configuracion', label: 'Configuracion', icon: Icons.configuracion },
   ];
 
   // Sub-items de Marketing
