@@ -17,6 +17,9 @@ import {
   getUsuariosTenant,
   getRolesTenant,
   deleteUsuarioTenant,
+  toggleUsuarioStatus,
+  toggleUsuarioVisibility,
+  resetUsuarioPassword,
   UsuarioTenant,
   RolTenant,
 } from '../../services/api';
@@ -94,6 +97,34 @@ const Icons = {
       <line x1="3" y1="18" x2="3.01" y2="18"/>
     </svg>
   ),
+  key: (props?: any) => (
+    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" {...props}>
+      <path d="m21 2-2 2m-7.61 7.61a5.5 5.5 0 1 1-7.778 7.778 5.5 5.5 0 0 1 7.777-7.777zm0 0L15.5 7.5m0 0 3 3L22 7l-3-3m-3.5 3.5L19 4"/>
+    </svg>
+  ),
+  eye: (props?: any) => (
+    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" {...props}>
+      <path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/>
+      <circle cx="12" cy="12" r="3"/>
+    </svg>
+  ),
+  eyeOff: (props?: any) => (
+    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" {...props}>
+      <path d="M17.94 17.94A10.07 10.07 0 0 1 12 20c-7 0-11-8-11-8a18.45 18.45 0 0 1 5.06-5.94M9.9 4.24A9.12 9.12 0 0 1 12 4c7 0 11 8 11 8a18.5 18.5 0 0 1-2.16 3.19m-6.72-1.07a3 3 0 1 1-4.24-4.24"/>
+      <line x1="1" y1="1" x2="23" y2="23"/>
+    </svg>
+  ),
+  power: (props?: any) => (
+    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" {...props}>
+      <path d="M18.36 6.64a9 9 0 1 1-12.73 0"/>
+      <line x1="12" y1="2" x2="12" y2="12"/>
+    </svg>
+  ),
+  check: (props?: any) => (
+    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" {...props}>
+      <polyline points="20 6 9 17 4 12"/>
+    </svg>
+  ),
 };
 
 export default function CrmUsuarios() {
@@ -114,6 +145,14 @@ export default function CrmUsuarios() {
   const [deleteConfirm, setDeleteConfirm] = useState<string | null>(null);
   const [deleting, setDeleting] = useState(false);
   const [vista, setVista] = useState<'tarjeta' | 'lista'>('tarjeta');
+
+  // Estados para nuevas acciones
+  const [passwordModal, setPasswordModal] = useState<{ userId: string; userName: string } | null>(null);
+  const [newPassword, setNewPassword] = useState('');
+  const [savingPassword, setSavingPassword] = useState(false);
+  const [togglingStatus, setTogglingStatus] = useState<string | null>(null);
+  const [togglingVisibility, setTogglingVisibility] = useState<string | null>(null);
+  const [successMessage, setSuccessMessage] = useState<string | null>(null);
 
   // Configurar header de la página
   useEffect(() => {
@@ -236,6 +275,72 @@ export default function CrmUsuarios() {
       setError(err.message);
     } finally {
       setDeleting(false);
+    }
+  };
+
+  // Toggle estado activo/inactivo
+  const handleToggleStatus = async (usuario: UsuarioTenant) => {
+    if (!tenantActual?.id) return;
+
+    try {
+      setTogglingStatus(usuario.id);
+      const nuevoEstado = !usuario.activo;
+      await toggleUsuarioStatus(tenantActual.id, usuario.id, nuevoEstado);
+      setUsuarios(prev => prev.map(u =>
+        u.id === usuario.id ? { ...u, activo: nuevoEstado } : u
+      ));
+      setSuccessMessage(nuevoEstado ? 'Usuario activado' : 'Usuario desactivado');
+      setTimeout(() => setSuccessMessage(null), 3000);
+    } catch (err: any) {
+      console.error('Error al cambiar estado:', err);
+      setError(err.message);
+    } finally {
+      setTogglingStatus(null);
+    }
+  };
+
+  // Toggle visibilidad en web
+  const handleToggleVisibility = async (usuario: UsuarioTenant) => {
+    if (!tenantActual?.id) return;
+
+    try {
+      setTogglingVisibility(usuario.id);
+      const nuevaVisibilidad = !usuario.visibleEnWeb;
+      await toggleUsuarioVisibility(tenantActual.id, usuario.id, nuevaVisibilidad);
+      setUsuarios(prev => prev.map(u =>
+        u.id === usuario.id ? { ...u, visibleEnWeb: nuevaVisibilidad } : u
+      ));
+      setSuccessMessage(nuevaVisibilidad ? 'Usuario visible en web' : 'Usuario oculto de la web');
+      setTimeout(() => setSuccessMessage(null), 3000);
+    } catch (err: any) {
+      console.error('Error al cambiar visibilidad:', err);
+      setError(err.message);
+    } finally {
+      setTogglingVisibility(null);
+    }
+  };
+
+  // Cambiar contraseña
+  const handleResetPassword = async () => {
+    if (!tenantActual?.id || !passwordModal) return;
+
+    if (newPassword.length < 8) {
+      setError('La contraseña debe tener al menos 8 caracteres');
+      return;
+    }
+
+    try {
+      setSavingPassword(true);
+      await resetUsuarioPassword(tenantActual.id, passwordModal.userId, newPassword);
+      setPasswordModal(null);
+      setNewPassword('');
+      setSuccessMessage('Contraseña actualizada correctamente');
+      setTimeout(() => setSuccessMessage(null), 3000);
+    } catch (err: any) {
+      console.error('Error al cambiar contraseña:', err);
+      setError(err.message);
+    } finally {
+      setSavingPassword(false);
     }
   };
 
@@ -440,14 +545,49 @@ export default function CrmUsuarios() {
                       >
                         <Icons.edit />
                       </button>
+                      <button
+                        className="action-btn"
+                        onClick={() => setPasswordModal({ userId: usuario.id, userName: getNombreCompleto(usuario) })}
+                        title="Cambiar contraseña"
+                      >
+                        <Icons.key />
+                      </button>
+                      <button
+                        className={`action-btn ${usuario.visibleEnWeb ? 'active' : ''}`}
+                        onClick={() => handleToggleVisibility(usuario)}
+                        disabled={togglingVisibility === usuario.id}
+                        title={usuario.visibleEnWeb ? 'Ocultar de la web' : 'Mostrar en la web'}
+                      >
+                        {togglingVisibility === usuario.id ? (
+                          <Icons.loader className="spinner" />
+                        ) : usuario.visibleEnWeb ? (
+                          <Icons.eye />
+                        ) : (
+                          <Icons.eyeOff />
+                        )}
+                      </button>
                       {!usuario.esOwner && (
-                        <button
-                          className="action-btn danger"
-                          onClick={() => setDeleteConfirm(usuario.id)}
-                          title="Eliminar usuario"
-                        >
-                          <Icons.trash />
-                        </button>
+                        <>
+                          <button
+                            className={`action-btn ${usuario.activo ? '' : 'success'}`}
+                            onClick={() => handleToggleStatus(usuario)}
+                            disabled={togglingStatus === usuario.id}
+                            title={usuario.activo ? 'Desactivar usuario' : 'Activar usuario'}
+                          >
+                            {togglingStatus === usuario.id ? (
+                              <Icons.loader className="spinner" />
+                            ) : (
+                              <Icons.power />
+                            )}
+                          </button>
+                          <button
+                            className="action-btn danger"
+                            onClick={() => setDeleteConfirm(usuario.id)}
+                            title="Eliminar usuario"
+                          >
+                            <Icons.trash />
+                          </button>
+                        </>
                       )}
                     </div>
                   </td>
@@ -509,6 +649,11 @@ export default function CrmUsuarios() {
                 <span className={`status-badge ${usuario.activo ? 'activo' : 'inactivo'}`}>
                   {usuario.activo ? 'Activo' : 'Inactivo'}
                 </span>
+                {usuario.visibleEnWeb && (
+                  <span className="status-badge visible">
+                    <Icons.eye /> Web
+                  </span>
+                )}
               </div>
 
               <div className="usuario-actions">
@@ -519,14 +664,49 @@ export default function CrmUsuarios() {
                 >
                   <Icons.edit />
                 </button>
+                <button
+                  className="action-btn"
+                  onClick={() => setPasswordModal({ userId: usuario.id, userName: getNombreCompleto(usuario) })}
+                  title="Cambiar contraseña"
+                >
+                  <Icons.key />
+                </button>
+                <button
+                  className={`action-btn ${usuario.visibleEnWeb ? 'active' : ''}`}
+                  onClick={() => handleToggleVisibility(usuario)}
+                  disabled={togglingVisibility === usuario.id}
+                  title={usuario.visibleEnWeb ? 'Ocultar de la web' : 'Mostrar en la web'}
+                >
+                  {togglingVisibility === usuario.id ? (
+                    <Icons.loader className="spinner" />
+                  ) : usuario.visibleEnWeb ? (
+                    <Icons.eye />
+                  ) : (
+                    <Icons.eyeOff />
+                  )}
+                </button>
                 {!usuario.esOwner && (
-                  <button
-                    className="action-btn danger"
-                    onClick={() => setDeleteConfirm(usuario.id)}
-                    title="Eliminar usuario"
-                  >
-                    <Icons.trash />
-                  </button>
+                  <>
+                    <button
+                      className={`action-btn ${usuario.activo ? '' : 'success'}`}
+                      onClick={() => handleToggleStatus(usuario)}
+                      disabled={togglingStatus === usuario.id}
+                      title={usuario.activo ? 'Desactivar usuario' : 'Activar usuario'}
+                    >
+                      {togglingStatus === usuario.id ? (
+                        <Icons.loader className="spinner" />
+                      ) : (
+                        <Icons.power />
+                      )}
+                    </button>
+                    <button
+                      className="action-btn danger"
+                      onClick={() => setDeleteConfirm(usuario.id)}
+                      title="Eliminar usuario"
+                    >
+                      <Icons.trash />
+                    </button>
+                  </>
                 )}
               </div>
             </div>
@@ -556,6 +736,47 @@ export default function CrmUsuarios() {
               </button>
             </div>
           </div>
+        </div>
+      )}
+
+      {/* Modal de cambio de contraseña */}
+      {passwordModal && (
+        <div className="modal-overlay" onClick={() => { setPasswordModal(null); setNewPassword(''); }}>
+          <div className="modal-content modal-small" onClick={(e) => e.stopPropagation()}>
+            <div className="modal-icon info">
+              <Icons.key />
+            </div>
+            <h3>Cambiar Contraseña</h3>
+            <p>Nueva contraseña para <strong>{passwordModal.userName}</strong></p>
+            <input
+              type="password"
+              className="modal-input"
+              placeholder="Nueva contraseña (mín. 8 caracteres)"
+              value={newPassword}
+              onChange={(e) => setNewPassword(e.target.value)}
+              minLength={8}
+            />
+            <div className="modal-actions">
+              <button className="btn-cancel" onClick={() => { setPasswordModal(null); setNewPassword(''); }}>
+                Cancelar
+              </button>
+              <button
+                className="btn-primary"
+                onClick={handleResetPassword}
+                disabled={savingPassword || newPassword.length < 8}
+              >
+                {savingPassword ? <Icons.loader className="spinner" /> : 'Guardar'}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Mensaje de éxito */}
+      {successMessage && (
+        <div className="success-toast">
+          <Icons.check />
+          <span>{successMessage}</span>
         </div>
       )}
 
@@ -930,10 +1151,6 @@ const styles = `
     color: #94a3b8;
   }
 
-  .usuario-status {
-    margin-bottom: 16px;
-  }
-
   .status-badge {
     display: inline-block;
     padding: 4px 10px;
@@ -950,6 +1167,21 @@ const styles = `
   .status-badge.inactivo {
     background: #fef2f2;
     color: #dc2626;
+  }
+
+  .status-badge.visible {
+    background: #eff6ff;
+    color: #2563eb;
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+  }
+
+  .usuario-status {
+    margin-bottom: 16px;
+    display: flex;
+    gap: 8px;
+    flex-wrap: wrap;
   }
 
   .usuario-actions {
@@ -983,6 +1215,21 @@ const styles = `
   .action-btn.danger:hover {
     background: #fef2f2;
     color: #dc2626;
+  }
+
+  .action-btn.active {
+    background: #dcfce7;
+    color: #16a34a;
+  }
+
+  .action-btn.success:hover {
+    background: #dcfce7;
+    color: #16a34a;
+  }
+
+  .action-btn:disabled {
+    opacity: 0.6;
+    cursor: not-allowed;
   }
 
   .modal-overlay {
@@ -1091,6 +1338,49 @@ const styles = `
   .btn-danger:disabled {
     opacity: 0.6;
     cursor: not-allowed;
+  }
+
+  .modal-icon.info {
+    background: #eff6ff;
+    color: #2563eb;
+  }
+
+  .modal-input {
+    width: 100%;
+    padding: 12px 16px;
+    border: 1px solid #e2e8f0;
+    border-radius: 10px;
+    font-size: 0.95rem;
+    margin-bottom: 20px;
+    transition: all 0.2s;
+  }
+
+  .modal-input:focus {
+    outline: none;
+    border-color: #2563eb;
+    box-shadow: 0 0 0 3px rgba(37, 99, 235, 0.1);
+  }
+
+  .success-toast {
+    position: fixed;
+    bottom: 24px;
+    right: 24px;
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    padding: 14px 20px;
+    background: #16a34a;
+    color: white;
+    border-radius: 10px;
+    font-weight: 500;
+    box-shadow: 0 4px 20px rgba(0, 0, 0, 0.15);
+    animation: slideInRight 0.3s ease-out;
+    z-index: 1001;
+  }
+
+  @keyframes slideInRight {
+    from { transform: translateX(100px); opacity: 0; }
+    to { transform: translateX(0); opacity: 1; }
   }
 
   .view-toggle {

@@ -3682,6 +3682,7 @@ export interface UsuarioTenant {
   email: string;
   nombre: string | null;
   apellido: string | null;
+  telefono?: string | null;
   avatarUrl: string | null;
   roles: {
     id: string;
@@ -3691,6 +3692,7 @@ export interface UsuarioTenant {
   }[];
   esOwner: boolean;
   activo: boolean;
+  visibleEnWeb?: boolean;
 }
 
 /**
@@ -5553,6 +5555,57 @@ export async function deleteUsuarioTenant(
   await apiFetch(`/tenants/${tenantId}/usuarios/${userId}`, {
     method: 'DELETE',
   }, token);
+}
+
+/**
+ * Activa o desactiva un usuario del tenant
+ */
+export async function toggleUsuarioStatus(
+  tenantId: string,
+  userId: string,
+  activo: boolean,
+  token?: string | null
+): Promise<{ success: boolean; activo: boolean; message: string }> {
+  const response = await apiFetch(`/tenants/${tenantId}/usuarios/${userId}/toggle-status`, {
+    method: 'PATCH',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ activo }),
+  }, token);
+  return response.json();
+}
+
+/**
+ * Muestra u oculta un usuario (asesor) en la página web
+ */
+export async function toggleUsuarioVisibility(
+  tenantId: string,
+  userId: string,
+  visible: boolean,
+  token?: string | null
+): Promise<{ success: boolean; visibleEnWeb: boolean; message: string }> {
+  const response = await apiFetch(`/tenants/${tenantId}/usuarios/${userId}/toggle-visibility`, {
+    method: 'PATCH',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ visible }),
+  }, token);
+  return response.json();
+}
+
+/**
+ * Cambia la contraseña de un usuario (admin del tenant)
+ */
+export async function resetUsuarioPassword(
+  tenantId: string,
+  userId: string,
+  newPassword: string,
+  token?: string | null
+): Promise<{ success: boolean; message: string }> {
+  const response = await apiFetch(`/tenants/${tenantId}/usuarios/${userId}/reset-password`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ newPassword }),
+  }, token);
+  return response.json();
 }
 
 // ==========================================
