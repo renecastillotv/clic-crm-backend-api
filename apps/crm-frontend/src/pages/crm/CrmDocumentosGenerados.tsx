@@ -93,7 +93,7 @@ export default function CrmDocumentosGenerados() {
     try {
       const token = await getToken();
       const response = await apiFetch(
-        `/api/tenants/${tenantActual.id}/documentos/generados?mis_documentos=true`,
+        `/tenants/${tenantActual.id}/documentos/generados?mis_documentos=true`,
         { headers: { Authorization: `Bearer ${token}` } }
       );
       const data = await response.json();
@@ -165,7 +165,7 @@ export default function CrmDocumentosGenerados() {
     try {
       const token = await getToken();
       await apiFetch(
-        `/api/tenants/${tenantActual.id}/documentos/generados/${documentoSeleccionado.id}/enviar-firma`,
+        `/tenants/${tenantActual.id}/documentos/generados/${documentoSeleccionado.id}/enviar-firma`,
         {
           method: 'POST',
           headers: {
@@ -201,7 +201,7 @@ export default function CrmDocumentosGenerados() {
     try {
       const token = await getToken();
       const response = await apiFetch(
-        `/api/tenants/${tenantActual.id}/documentos/generados/${doc.id}/estado-firma`,
+        `/tenants/${tenantActual.id}/documentos/generados/${doc.id}/estado-firma`,
         { headers: { Authorization: `Bearer ${token}` } }
       );
       const estado = await response.json();
