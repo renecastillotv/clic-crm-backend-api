@@ -81,6 +81,25 @@ export async function initComponentesWebTenant(
     ? (sql: string, params: any[]) => clientOrNull.query(sql, params)
     : (sql: string, params: any[]) => query(sql, params);
 
+  // Verificar si las tablas requeridas existen
+  try {
+    const tableCheck = await executeQuery(
+      `SELECT EXISTS (
+        SELECT FROM information_schema.tables
+        WHERE table_schema = 'public' AND table_name = 'componentes_web'
+      ) as exists`,
+      []
+    );
+
+    if (!tableCheck.rows[0]?.exists) {
+      console.log(`⚠️ Tabla componentes_web no existe, saltando inicialización para tenant ${tenantId}`);
+      return { created: 0, skipped: 0 };
+    }
+  } catch (checkError: any) {
+    console.warn(`⚠️ No se pudo verificar tabla componentes_web: ${checkError.message}`);
+    return { created: 0, skipped: 0 };
+  }
+
   // Verificar si el tenant ya tiene componentes_web
   const existingComponents = await executeQuery(
     `SELECT COUNT(*) as count FROM componentes_web WHERE tenant_id = $1`,

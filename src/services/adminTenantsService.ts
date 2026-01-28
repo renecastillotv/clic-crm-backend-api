@@ -113,6 +113,9 @@ const PAGINAS_BASE = [
 /**
  * Inserta las páginas base para un tenant nuevo
  * Usa las plantillas por defecto del catálogo
+ *
+ * NOTA: Esta función verifica primero si la tabla paginas_web existe.
+ * Si no existe, simplemente salta este paso (permite crear tenants sin sitio web).
  */
 export async function insertPaginasBaseTenant(
   tenantId: string,
@@ -122,33 +125,57 @@ export async function insertPaginasBaseTenant(
     ? (sql: string, params: any[]) => clientOrNull.query(sql, params)
     : (sql: string, params: any[]) => query(sql, params);
 
-  for (const pagina of PAGINAS_BASE) {
-    // Verificar si ya existe esta página para el tenant
-    const existing = await executeQuery(
-      `SELECT id FROM paginas_web WHERE tenant_id = $1 AND slug = $2`,
-      [tenantId, pagina.slug]
+  // Verificar si la tabla paginas_web existe
+  try {
+    const tableCheck = await executeQuery(
+      `SELECT EXISTS (
+        SELECT FROM information_schema.tables
+        WHERE table_schema = 'public' AND table_name = 'paginas_web'
+      ) as exists`,
+      []
     );
 
-    if (existing.rows.length === 0) {
-      // Buscar la plantilla
-      const plantillaResult = await executeQuery(
-        `SELECT id, componentes, estilos FROM plantillas_pagina WHERE codigo = $1`,
-        [pagina.plantilla_codigo]
+    if (!tableCheck.rows[0]?.exists) {
+      console.log(`⚠️ Tabla paginas_web no existe, saltando inserción de páginas base para tenant ${tenantId}`);
+      return;
+    }
+  } catch (checkError: any) {
+    console.warn(`⚠️ No se pudo verificar tabla paginas_web: ${checkError.message}`);
+    return;
+  }
+
+  for (const pagina of PAGINAS_BASE) {
+    try {
+      // Verificar si ya existe esta página para el tenant
+      const existing = await executeQuery(
+        `SELECT id FROM paginas_web WHERE tenant_id = $1 AND slug = $2`,
+        [tenantId, pagina.slug]
       );
 
-      const plantillaId = plantillaResult.rows.length > 0 ? plantillaResult.rows[0].id : null;
+      if (existing.rows.length === 0) {
+        // Buscar la plantilla
+        const plantillaResult = await executeQuery(
+          `SELECT id, componentes, estilos FROM plantillas_pagina WHERE codigo = $1`,
+          [pagina.plantilla_codigo]
+        );
 
-      // Insertar la página
-      await executeQuery(
-        `INSERT INTO paginas_web (
-          tenant_id, tipo_pagina, titulo, slug, plantilla_id,
-          publica, activa, orden, contenido, meta
-        )
-        VALUES ($1, $2, $3, $4, $5, true, true, $6, '{}', '{}')`,
-        [tenantId, pagina.tipo_pagina, pagina.titulo, pagina.slug, plantillaId, pagina.orden]
-      );
+        const plantillaId = plantillaResult.rows.length > 0 ? plantillaResult.rows[0].id : null;
 
-      console.log(`  ✓ Página ${pagina.slug} creada (tipo: ${pagina.tipo_pagina})`);
+        // Insertar la página
+        await executeQuery(
+          `INSERT INTO paginas_web (
+            tenant_id, tipo_pagina, titulo, slug, plantilla_id,
+            publica, activa, orden, contenido, meta
+          )
+          VALUES ($1, $2, $3, $4, $5, true, true, $6, '{}', '{}')`,
+          [tenantId, pagina.tipo_pagina, pagina.titulo, pagina.slug, plantillaId, pagina.orden]
+        );
+
+        console.log(`  ✓ Página ${pagina.slug} creada (tipo: ${pagina.tipo_pagina})`);
+      }
+    } catch (pageError: any) {
+      console.warn(`⚠️ No se pudo crear página ${pagina.slug}: ${pageError.message}`);
+      // Continuar con las demás páginas
     }
   }
 
