@@ -84,10 +84,37 @@ const PORT = process.env.PORT || 3001;
 console.log('🔧 Puerto configurado para el servidor API:', PORT);
 console.log('🔧 DATABASE_URL configurada:', process.env.DATABASE_URL ? 'Sí' : 'No');
 
-// Middlewares
+// Middlewares - CORS configuration for Vercel
+const allowedOrigins = [
+  'https://clic-crm-frontend.vercel.app',
+  'https://crm.clicinmobiliario.com',
+  'http://localhost:5173',
+  'http://localhost:3000',
+];
+
 app.use(cors({
+  origin: (origin, callback) => {
+    // Allow requests with no origin (mobile apps, curl, etc)
+    if (!origin) return callback(null, true);
+    if (allowedOrigins.includes(origin)) {
+      callback(null, true);
+    } else {
+      // Allow any vercel preview deployments
+      if (origin.includes('.vercel.app')) {
+        callback(null, true);
+      } else {
+        callback(null, true); // Allow all for now, can restrict later
+      }
+    }
+  },
+  credentials: true,
+  methods: ['GET', 'POST', 'PUT', 'DELETE', 'PATCH', 'OPTIONS'],
+  allowedHeaders: ['Content-Type', 'Authorization', 'X-Requested-With'],
   exposedHeaders: ['X-Scope-Status'],
 }));
+
+// Handle preflight requests explicitly
+app.options('*', cors());
 
 // Meta Webhooks: mount BEFORE express.json() to preserve raw body for HMAC signature verification
 app.use('/api/webhooks/meta', express.raw({ type: 'application/json' }), metaWebhooksRouter);
