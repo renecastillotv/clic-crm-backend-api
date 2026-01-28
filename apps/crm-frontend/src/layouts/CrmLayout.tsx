@@ -1034,17 +1034,7 @@ export default function CrmLayout() {
                 </NavLink>
               )}
 
-              {/* Documentos con submenú */}
-              {visibleDocumentosItems.length === 1 ? (
-                <NavLink
-                  to={`${basePath}/${visibleDocumentosItems[0].path}`}
-                  className={({ isActive }) => `nav-item ${isActive ? 'active' : ''}`}
-                >
-                  <span className="nav-icon">{Icons.documentos}</span>
-                  <span className="nav-label">{visibleDocumentosItems[0].label}</span>
-                </NavLink>
-              ) : visibleDocumentosItems.length > 1 && (
-              <>
+              {/* Documentos con submenú - siempre visible */}
               <button
                 className={`nav-item nav-expandable ${isDocumentosActive ? 'active' : ''}`}
                 onClick={() => toggleSubmenu('documentos')}
@@ -1057,7 +1047,7 @@ export default function CrmLayout() {
               </button>
 
               <div className={`nav-submenu ${documentosOpen ? 'open' : ''}`}>
-                {visibleDocumentosItems.map((item) => (
+                {documentosSubItems.map((item) => (
                   <NavLink
                     key={item.id}
                     to={`${basePath}/${item.path}`}
@@ -1068,8 +1058,6 @@ export default function CrmLayout() {
                   </NavLink>
                 ))}
               </div>
-              </>
-              )}
 
               {/* Rendimiento (Fases + Productividad) */}
               {visibleSistemaFasesItems.length === 1 ? (
