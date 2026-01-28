@@ -27,7 +27,7 @@ import { resolveUserScope } from '../../middleware/scopeResolver.js';
 import * as plantillasService from '../../services/plantillasDocumentosService.js';
 import * as renderService from '../../services/documentoRenderService.js';
 import * as docusealService from '../../services/docusealService.js';
-import pool from '../../database/connection.js';
+import { query } from '../../utils/db.js';
 
 const router = express.Router({ mergeParams: true });
 
@@ -302,13 +302,13 @@ router.get('/unificados', async (req: any, res: Response, next: NextFunction) =>
         paramIdx++;
       }
 
-      const countGenRes = await pool.query(
+      const countGenRes = await query(
         `SELECT COUNT(*) FROM documentos_generados dg WHERE ${whereGenerados}`,
         paramsGenerados
       );
       totalGenerados = parseInt(countGenRes.rows[0].count);
 
-      const genRes = await pool.query(`
+      const genRes = await query(`
         SELECT
           dg.id,
           'generado' as tipo,
@@ -354,13 +354,13 @@ router.get('/unificados', async (req: any, res: Response, next: NextFunction) =>
         paramIdx++;
       }
 
-      const countEmpRes = await pool.query(
+      const countEmpRes = await query(
         `SELECT COUNT(*) FROM biblioteca_documentos bd WHERE ${whereEmpresa}`,
         paramsEmpresa
       );
       totalEmpresa = parseInt(countEmpRes.rows[0].count);
 
-      const empRes = await pool.query(`
+      const empRes = await query(`
         SELECT
           bd.id,
           'empresa' as tipo,
