@@ -149,6 +149,8 @@ export default function CrmUsuarios() {
   // Estados para nuevas acciones
   const [passwordModal, setPasswordModal] = useState<{ userId: string; userName: string } | null>(null);
   const [newPassword, setNewPassword] = useState('');
+  const [confirmPassword, setConfirmPassword] = useState('');
+  const [showPassword, setShowPassword] = useState(false);
   const [savingPassword, setSavingPassword] = useState(false);
   const [togglingStatus, setTogglingStatus] = useState<string | null>(null);
   const [togglingVisibility, setTogglingVisibility] = useState<string | null>(null);
@@ -329,11 +331,18 @@ export default function CrmUsuarios() {
       return;
     }
 
+    if (newPassword !== confirmPassword) {
+      setError('Las contraseñas no coinciden');
+      return;
+    }
+
     try {
       setSavingPassword(true);
       await resetUsuarioPassword(tenantActual.id, passwordModal.userId, newPassword);
       setPasswordModal(null);
       setNewPassword('');
+      setConfirmPassword('');
+      setShowPassword(false);
       setSuccessMessage('Contraseña actualizada correctamente');
       setTimeout(() => setSuccessMessage(null), 3000);
     } catch (err: any) {
@@ -342,6 +351,14 @@ export default function CrmUsuarios() {
     } finally {
       setSavingPassword(false);
     }
+  };
+
+  // Cerrar modal de contraseña y limpiar estados
+  const closePasswordModal = () => {
+    setPasswordModal(null);
+    setNewPassword('');
+    setConfirmPassword('');
+    setShowPassword(false);
   };
 
   // Formatear nombre completo
@@ -741,29 +758,59 @@ export default function CrmUsuarios() {
 
       {/* Modal de cambio de contraseña */}
       {passwordModal && (
-        <div className="modal-overlay" onClick={() => { setPasswordModal(null); setNewPassword(''); }}>
+        <div className="modal-overlay" onClick={closePasswordModal}>
           <div className="modal-content modal-small" onClick={(e) => e.stopPropagation()}>
             <div className="modal-icon info">
               <Icons.key />
             </div>
             <h3>Cambiar Contraseña</h3>
             <p>Nueva contraseña para <strong>{passwordModal.userName}</strong></p>
-            <input
-              type="password"
-              className="modal-input"
-              placeholder="Nueva contraseña (mín. 8 caracteres)"
-              value={newPassword}
-              onChange={(e) => setNewPassword(e.target.value)}
-              minLength={8}
-            />
+
+            <div className="password-input-wrapper">
+              <input
+                type={showPassword ? 'text' : 'password'}
+                className="modal-input"
+                placeholder="Nueva contraseña (mín. 8 caracteres)"
+                value={newPassword}
+                onChange={(e) => setNewPassword(e.target.value)}
+                onKeyDown={(e) => e.stopPropagation()}
+                minLength={8}
+                autoFocus
+              />
+              <button
+                type="button"
+                className="password-toggle-btn"
+                onClick={() => setShowPassword(!showPassword)}
+                title={showPassword ? 'Ocultar contraseña' : 'Mostrar contraseña'}
+              >
+                {showPassword ? <Icons.eyeOff /> : <Icons.eye />}
+              </button>
+            </div>
+
+            <div className="password-input-wrapper">
+              <input
+                type={showPassword ? 'text' : 'password'}
+                className="modal-input"
+                placeholder="Confirmar contraseña"
+                value={confirmPassword}
+                onChange={(e) => setConfirmPassword(e.target.value)}
+                onKeyDown={(e) => e.stopPropagation()}
+                minLength={8}
+              />
+            </div>
+
+            {newPassword && confirmPassword && newPassword !== confirmPassword && (
+              <p className="password-error">Las contraseñas no coinciden</p>
+            )}
+
             <div className="modal-actions">
-              <button className="btn-cancel" onClick={() => { setPasswordModal(null); setNewPassword(''); }}>
+              <button className="btn-cancel" onClick={closePasswordModal}>
                 Cancelar
               </button>
               <button
                 className="btn-primary"
                 onClick={handleResetPassword}
-                disabled={savingPassword || newPassword.length < 8}
+                disabled={savingPassword || newPassword.length < 8 || newPassword !== confirmPassword}
               >
                 {savingPassword ? <Icons.loader className="spinner" /> : 'Guardar'}
               </button>
@@ -1359,6 +1406,45 @@ const styles = `
     outline: none;
     border-color: #2563eb;
     box-shadow: 0 0 0 3px rgba(37, 99, 235, 0.1);
+  }
+
+  .password-input-wrapper {
+    position: relative;
+    margin-bottom: 12px;
+  }
+
+  .password-input-wrapper .modal-input {
+    margin-bottom: 0;
+    padding-right: 48px;
+  }
+
+  .password-toggle-btn {
+    position: absolute;
+    right: 8px;
+    top: 50%;
+    transform: translateY(-50%);
+    background: none;
+    border: none;
+    color: #64748b;
+    cursor: pointer;
+    padding: 8px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    border-radius: 6px;
+    transition: all 0.15s;
+  }
+
+  .password-toggle-btn:hover {
+    background: #f1f5f9;
+    color: #0f172a;
+  }
+
+  .password-error {
+    color: #dc2626;
+    font-size: 0.85rem;
+    margin: 0 0 12px 0;
+    text-align: left;
   }
 
   .success-toast {
