@@ -30,6 +30,96 @@ const router = express.Router();
 
 // Nota: La autenticación ya es aplicada por admin.ts
 
+// ==================== USO Y TRACKING ====================
+// IMPORTANTE: Estas rutas deben estar ANTES de /:id para evitar que "usage" sea capturado como ID
+
+/**
+ * GET /api/admin/memberships/usage
+ * Resumen de uso de todos los tenants
+ */
+router.get('/usage', async (req, res, next) => {
+  try {
+    const { estado_cuenta, tipo_membresia_id } = req.query;
+
+    const resumen = await getResumenUsoTodos({
+      estado_cuenta: estado_cuenta as string,
+      tipo_membresia_id: tipo_membresia_id as string,
+    });
+
+    res.json({ data: resumen, total: resumen.length });
+  } catch (error) {
+    next(error);
+  }
+});
+
+/**
+ * GET /api/admin/memberships/usage/:tenantId
+ * Uso detallado de un tenant
+ */
+router.get('/usage/:tenantId', async (req, res, next) => {
+  try {
+    const uso = await getUsoTenant(req.params.tenantId);
+    const costos = await calcularCostosPeriodo(req.params.tenantId);
+    const limites = await getLimitesTenant(req.params.tenantId);
+
+    res.json({
+      uso,
+      costos,
+      limites,
+    });
+  } catch (error) {
+    next(error);
+  }
+});
+
+/**
+ * GET /api/admin/memberships/usage/:tenantId/history
+ * Historial de uso de un tenant
+ */
+router.get('/usage/:tenantId/history', async (req, res, next) => {
+  try {
+    const { tipo_evento, fecha_desde, fecha_hasta, limit, offset } = req.query;
+
+    const historial = await getHistorialUso(req.params.tenantId, {
+      tipo_evento: tipo_evento as string,
+      fecha_desde: fecha_desde ? new Date(fecha_desde as string) : undefined,
+      fecha_hasta: fecha_hasta ? new Date(fecha_hasta as string) : undefined,
+      limit: limit ? parseInt(limit as string) : undefined,
+      offset: offset ? parseInt(offset as string) : undefined,
+    });
+
+    res.json(historial);
+  } catch (error) {
+    next(error);
+  }
+});
+
+/**
+ * POST /api/admin/memberships/usage/:tenantId/recalculate
+ * Forzar recálculo de contadores
+ */
+router.post('/usage/:tenantId/recalculate', async (req, res, next) => {
+  try {
+    const uso = await recalcularContadores(req.params.tenantId);
+    res.json({ success: true, uso });
+  } catch (error) {
+    next(error);
+  }
+});
+
+/**
+ * GET /api/admin/memberships/usage/:tenantId/calculate
+ * Calcular factura pendiente
+ */
+router.get('/usage/:tenantId/calculate', async (req, res, next) => {
+  try {
+    const costos = await calcularCostosPeriodo(req.params.tenantId);
+    res.json(costos);
+  } catch (error) {
+    next(error);
+  }
+});
+
 // ==================== TIPOS DE MEMBRESÍA ====================
 
 /**
@@ -265,95 +355,6 @@ router.get('/limits/:tenantId', async (req, res, next) => {
   try {
     const limites = await getLimitesTenant(req.params.tenantId);
     res.json(limites);
-  } catch (error) {
-    next(error);
-  }
-});
-
-// ==================== USO Y TRACKING ====================
-
-/**
- * GET /api/admin/memberships/usage
- * Resumen de uso de todos los tenants
- */
-router.get('/usage', async (req, res, next) => {
-  try {
-    const { estado_cuenta, tipo_membresia_id } = req.query;
-
-    const resumen = await getResumenUsoTodos({
-      estado_cuenta: estado_cuenta as string,
-      tipo_membresia_id: tipo_membresia_id as string,
-    });
-
-    res.json({ data: resumen, total: resumen.length });
-  } catch (error) {
-    next(error);
-  }
-});
-
-/**
- * GET /api/admin/memberships/usage/:tenantId
- * Uso detallado de un tenant
- */
-router.get('/usage/:tenantId', async (req, res, next) => {
-  try {
-    const uso = await getUsoTenant(req.params.tenantId);
-    const costos = await calcularCostosPeriodo(req.params.tenantId);
-    const limites = await getLimitesTenant(req.params.tenantId);
-
-    res.json({
-      uso,
-      costos,
-      limites,
-    });
-  } catch (error) {
-    next(error);
-  }
-});
-
-/**
- * GET /api/admin/memberships/usage/:tenantId/history
- * Historial de uso de un tenant
- */
-router.get('/usage/:tenantId/history', async (req, res, next) => {
-  try {
-    const { tipo_evento, fecha_desde, fecha_hasta, limit, offset } = req.query;
-
-    const historial = await getHistorialUso(req.params.tenantId, {
-      tipo_evento: tipo_evento as string,
-      fecha_desde: fecha_desde ? new Date(fecha_desde as string) : undefined,
-      fecha_hasta: fecha_hasta ? new Date(fecha_hasta as string) : undefined,
-      limit: limit ? parseInt(limit as string) : undefined,
-      offset: offset ? parseInt(offset as string) : undefined,
-    });
-
-    res.json(historial);
-  } catch (error) {
-    next(error);
-  }
-});
-
-/**
- * POST /api/admin/memberships/usage/:tenantId/recalculate
- * Forzar recálculo de contadores
- */
-router.post('/usage/:tenantId/recalculate', async (req, res, next) => {
-  try {
-    const uso = await recalcularContadores(req.params.tenantId);
-    res.json({ success: true, uso });
-  } catch (error) {
-    next(error);
-  }
-});
-
-/**
- * GET /api/admin/memberships/usage/:tenantId/calculate
- * Calcular factura pendiente
- */
-router.get('/usage/:tenantId/calculate', async (req, res, next) => {
-  try {
-    const costos = await calcularCostosPeriodo(req.params.tenantId);
-    res.json(costos);
   } catch (error) {
     next(error);
   }
