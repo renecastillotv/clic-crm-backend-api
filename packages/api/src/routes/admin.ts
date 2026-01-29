@@ -54,6 +54,7 @@ import {
   getRolesModulosStats,
   RolModuloInput
 } from '../services/adminRolesModulosService.js';
+import membershipRouter from './membership.routes.js';
 
 const router = express.Router();
 
@@ -1724,6 +1725,10 @@ router.post('/roles/:roleId/copy-permisos', async (req, res) => {
     });
   }
 });
+
+// ==================== MEMBRESÍAS Y USO ====================
+// Rutas para gestión de tipos de membresía, precios y tracking de uso
+router.use('/memberships', membershipRouter);
 
 export default router;
 

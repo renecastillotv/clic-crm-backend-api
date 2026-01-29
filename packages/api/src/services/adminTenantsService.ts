@@ -44,6 +44,7 @@ export interface UpdateTenantData {
   configuracion?: Record<string, any>;
   plan?: string;
   dominioPersonalizado?: string | null;
+  tipo_membresia_id?: string | null;
 }
 
 // OBSOLETA: insertRutasEstandarTenant fue eliminada
@@ -384,6 +385,22 @@ export async function updateTenant(tenantId: string, data: UpdateTenantData) {
       }
     }
 
+    // Tipo de membresía
+    if (data.tipo_membresia_id !== undefined) {
+      if (data.tipo_membresia_id) {
+        // Verificar que el tipo de membresía existe y está activo
+        const membresiaExists = await query(
+          `SELECT id FROM tipos_membresia WHERE id = $1 AND activo = true`,
+          [data.tipo_membresia_id]
+        );
+        if (membresiaExists.rows.length === 0) {
+          throw new Error('Tipo de membresía no encontrado o inactivo');
+        }
+      }
+      updates.push(`tipo_membresia_id = $${paramIndex++}`);
+      values.push(data.tipo_membresia_id || null);
+    }
+
     // El slug NO se puede actualizar después de crear el tenant
     if (data.slug !== undefined) {
       // Ignorar el slug - no permitir cambios
@@ -401,12 +418,13 @@ export async function updateTenant(tenantId: string, data: UpdateTenantData) {
     values.push(tenantId);
 
     const updateSql = `
-      UPDATE tenants 
+      UPDATE tenants
       SET ${updates.join(', ')}
       WHERE id = $${paramIndex}
-      RETURNING 
+      RETURNING
         id, nombre, slug, codigo_pais as "codigoPais",
         idioma_default as "idiomaDefault", activo, plan, dominio_personalizado as "dominioPersonalizado",
+        tipo_membresia_id, estado_cuenta, saldo_pendiente,
         created_at as "createdAt", updated_at as "updatedAt"
     `;
 
@@ -429,14 +447,19 @@ export async function updateTenant(tenantId: string, data: UpdateTenantData) {
 export async function getTenantById(tenantId: string) {
   try {
     const sql = `
-      SELECT 
-        id, nombre, slug, codigo_pais as "codigoPais",
-        idioma_default as "idiomaDefault", 
-        idiomas_disponibles as "idiomasDisponibles",
-        configuracion, activo, plan, dominio_personalizado as "dominioPersonalizado",
-        created_at as "createdAt", updated_at as "updatedAt"
-      FROM tenants
-      WHERE id = $1
+      SELECT
+        t.id, t.nombre, t.slug, t.codigo_pais as "codigoPais",
+        t.idioma_default as "idiomaDefault",
+        t.idiomas_disponibles as "idiomasDisponibles",
+        t.configuracion, t.activo, t.plan, t.dominio_personalizado as "dominioPersonalizado",
+        t.tipo_membresia_id,
+        tm.codigo as tipo_membresia_codigo,
+        tm.nombre as tipo_membresia_nombre,
+        t.estado_cuenta, t.saldo_pendiente,
+        t.created_at as "createdAt", t.updated_at as "updatedAt"
+      FROM tenants t
+      LEFT JOIN tipos_membresia tm ON t.tipo_membresia_id = tm.id
+      WHERE t.id = $1
     `;
 
     const result = await query(sql, [tenantId]);
@@ -446,7 +469,7 @@ export async function getTenantById(tenantId: string) {
     }
 
     const tenant = result.rows[0];
-    
+
     // Parsear JSON fields
     if (typeof tenant.idiomasDisponibles === 'string') {
       tenant.idiomasDisponibles = JSON.parse(tenant.idiomasDisponibles);

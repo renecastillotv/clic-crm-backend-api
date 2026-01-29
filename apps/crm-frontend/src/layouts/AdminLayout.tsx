@@ -108,6 +108,18 @@ const IconTags = () => (
   </svg>
 );
 
+const IconMemberships = () => (
+  <svg width="22" height="22" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+    <path d="M2 20H22M4 17L2 7L7 10L12 4L17 10L22 7L20 17H4Z" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
+  </svg>
+);
+
+const IconUsage = () => (
+  <svg width="22" height="22" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+    <path d="M18 20V10M12 20V4M6 20V14" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
+  </svg>
+);
+
 const IconBuilding = () => (
   <svg width="16" height="16" viewBox="0 0 16 16" fill="none" xmlns="http://www.w3.org/2000/svg">
     <path d="M2 14H14M6 6V8M6 10V8M10 6V8M10 10V8M2 14V3C2 2.44772 2.44772 2 3 2H8C8.55228 2 9 2.44772 9 3V6H13C13.5523 6 14 6.44772 14 7V14" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/>
@@ -124,6 +136,8 @@ export default function AdminLayout() {
     { path: '/admin/analytics', label: 'Analytics', icon: IconAnalytics },
     { path: '/admin/usuarios', label: 'Usuarios', icon: IconUsers },
     { path: '/admin/features', label: 'Features', icon: IconFeatures },
+    { path: '/admin/memberships', label: 'Membresías', icon: IconMemberships },
+    { path: '/admin/usage', label: 'Uso y Costos', icon: IconUsage },
     { path: '/admin/paginas', label: 'Páginas', icon: IconPaginas },
     { path: '/admin/plantillas', label: 'Plantillas', icon: IconPlantillas },
     { path: '/admin/roles', label: 'Roles', icon: IconRoles },

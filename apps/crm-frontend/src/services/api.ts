@@ -699,6 +699,12 @@ export interface TenantAdmin {
   totalUsuarios?: number;
   totalPropiedades?: number;
   totalPaginas?: number;
+  // Membresía y facturación
+  tipo_membresia_id?: string | null;
+  tipo_membresia_codigo?: string | null;
+  tipo_membresia_nombre?: string | null;
+  estado_cuenta?: string;
+  saldo_pendiente?: number;
 }
 
 /**
@@ -1366,6 +1372,7 @@ export interface UpdateTenantData {
   configuracion?: Record<string, any>;
   plan?: string;
   dominioPersonalizado?: string | null;
+  tipo_membresia_id?: string | null;
 }
 
 /**
@@ -7934,6 +7941,300 @@ export async function regenerarUrlPlanPago(tenantId: string, planId: string): Pr
     const error = await response.json();
     throw new Error(error.message || 'Error al regenerar URL');
   }
+  return response.json();
+}
+
+// ==================== MEMBERSHIPS API ====================
+
+export interface TipoMembresia {
+  id: string;
+  codigo: string;
+  nombre: string;
+  descripcion: string | null;
+  precio_base: number;
+  moneda: string;
+  ciclo_facturacion: string;
+  usuarios_incluidos: number;
+  propiedades_incluidas: number;
+  costo_usuario_adicional: number;
+  costo_propiedad_adicional: number;
+  permite_pagina_web: boolean;
+  permite_subtenants: boolean;
+  es_individual: boolean;
+  features_incluidos: string[];
+  activo: boolean;
+  orden: number;
+  created_at: string;
+  updated_at: string;
+  // Stats
+  tenants_count?: number;
+}
+
+export interface CreateTipoMembresiaData {
+  codigo: string;
+  nombre: string;
+  descripcion?: string;
+  precio_base: number;
+  moneda?: string;
+  ciclo_facturacion?: string;
+  usuarios_incluidos?: number;
+  propiedades_incluidas?: number;
+  costo_usuario_adicional?: number;
+  costo_propiedad_adicional?: number;
+  permite_pagina_web?: boolean;
+  permite_subtenants?: boolean;
+  es_individual?: boolean;
+  features_incluidos?: string[];
+  orden?: number;
+}
+
+export interface UpdateTipoMembresiaData {
+  nombre?: string;
+  descripcion?: string;
+  precio_base?: number;
+  moneda?: string;
+  ciclo_facturacion?: string;
+  usuarios_incluidos?: number;
+  propiedades_incluidas?: number;
+  costo_usuario_adicional?: number;
+  costo_propiedad_adicional?: number;
+  permite_pagina_web?: boolean;
+  permite_subtenants?: boolean;
+  es_individual?: boolean;
+  features_incluidos?: string[];
+  activo?: boolean;
+  orden?: number;
+}
+
+export interface PrecioFeature {
+  id: string;
+  feature_id: string;
+  feature_nombre?: string;
+  tipo_membresia_id: string | null;
+  precio_mensual: number | null;
+  precio_unico: number | null;
+  moneda: string;
+  activo: boolean;
+  created_at: string;
+}
+
+export interface UsoTenant {
+  id: string;
+  tenant_id: string;
+  usuarios_activos: number;
+  propiedades_activas: number;
+  propiedades_publicadas: number;
+  usuarios_max_periodo: number;
+  propiedades_max_periodo: number;
+  features_activos: Array<{ feature_id: string; fecha_activacion: string; precio: number }>;
+  periodo_inicio: string;
+  periodo_fin: string;
+  costo_base_periodo: number;
+  costo_usuarios_extra: number;
+  costo_propiedades_extra: number;
+  costo_features_extra: number;
+  costo_total_periodo: number;
+  updated_at: string;
+}
+
+export interface LimitesTenant {
+  usuarios_incluidos: number;
+  propiedades_incluidas: number;
+  limite_usuarios_override: number | null;
+  limite_propiedades_override: number | null;
+  costo_usuario_adicional: number;
+  costo_propiedad_adicional: number;
+  tipo_membresia?: TipoMembresia;
+}
+
+export interface CostosPeriodo {
+  costo_base: number;
+  usuarios_incluidos: number;
+  usuarios_activos: number;
+  usuarios_extra: number;
+  costo_usuarios_extra: number;
+  propiedades_incluidas: number;
+  propiedades_activas: number;
+  propiedades_extra: number;
+  costo_propiedades_extra: number;
+  features_activos: Array<{ feature_id: string; nombre: string; precio: number }>;
+  costo_features_extra: number;
+  subtotal: number;
+  descuento: number;
+  total: number;
+  periodo_inicio: string;
+  periodo_fin: string;
+}
+
+export interface ResumenUsoTenant {
+  tenant_id: string;
+  tenant_nombre: string;
+  tipo_membresia_codigo: string | null;
+  tipo_membresia_nombre: string | null;
+  estado_cuenta: string;
+  usuarios_activos: number;
+  propiedades_publicadas: number;
+  costo_total_periodo: number;
+  periodo_inicio: string;
+  periodo_fin: string;
+}
+
+/**
+ * Obtiene todos los tipos de membresía
+ */
+export async function getTiposMembresia(incluirInactivos: boolean = false, token?: string | null): Promise<TipoMembresia[]> {
+  const response = await apiFetch(`/admin/memberships?incluirInactivos=${incluirInactivos}`, {}, token);
+  const data = await response.json();
+  return data.tipos || data;
+}
+
+/**
+ * Obtiene un tipo de membresía por ID
+ */
+export async function getTipoMembresiaById(id: string, token?: string | null): Promise<TipoMembresia> {
+  const response = await apiFetch(`/admin/memberships/${id}`, {}, token);
+  return response.json();
+}
+
+/**
+ * Crea un nuevo tipo de membresía
+ */
+export async function createTipoMembresia(data: CreateTipoMembresiaData, token?: string | null): Promise<TipoMembresia> {
+  const response = await apiFetch('/admin/memberships', {
+    method: 'POST',
+    body: JSON.stringify(data),
+  }, token);
+  return response.json();
+}
+
+/**
+ * Actualiza un tipo de membresía
+ */
+export async function updateTipoMembresia(id: string, data: UpdateTipoMembresiaData, token?: string | null): Promise<TipoMembresia> {
+  const response = await apiFetch(`/admin/memberships/${id}`, {
+    method: 'PUT',
+    body: JSON.stringify(data),
+  }, token);
+  return response.json();
+}
+
+/**
+ * Elimina (desactiva) un tipo de membresía
+ */
+export async function deleteTipoMembresia(id: string, token?: string | null): Promise<void> {
+  await apiFetch(`/admin/memberships/${id}`, {
+    method: 'DELETE',
+  }, token);
+}
+
+/**
+ * Obtiene los precios de features para un tipo de membresía
+ */
+export async function getPreciosFeatures(tipoMembresiaId: string, token?: string | null): Promise<PrecioFeature[]> {
+  const response = await apiFetch(`/admin/memberships/${tipoMembresiaId}/features`, {}, token);
+  const data = await response.json();
+  return data.precios || data;
+}
+
+/**
+ * Establece precio de un feature para un tipo de membresía
+ */
+export async function setPrecioFeature(
+  tipoMembresiaId: string,
+  featureId: string,
+  precioMensual: number | null,
+  precioUnico: number | null,
+  moneda: string = 'USD',
+  token?: string | null
+): Promise<PrecioFeature> {
+  const response = await apiFetch(`/admin/memberships/${tipoMembresiaId}/features`, {
+    method: 'POST',
+    body: JSON.stringify({
+      feature_id: featureId,
+      precio_mensual: precioMensual,
+      precio_unico: precioUnico,
+      moneda,
+    }),
+  }, token);
+  return response.json();
+}
+
+/**
+ * Elimina precio de un feature
+ */
+export async function deletePrecioFeature(tipoMembresiaId: string, featureId: string, token?: string | null): Promise<void> {
+  await apiFetch(`/admin/memberships/${tipoMembresiaId}/features/${featureId}`, {
+    method: 'DELETE',
+  }, token);
+}
+
+/**
+ * Asigna membresía a un tenant
+ */
+export async function asignarMembresiaTenant(tenantId: string, tipoMembresiaId: string, token?: string | null): Promise<void> {
+  await apiFetch(`/admin/memberships/assign/${tenantId}`, {
+    method: 'PUT',
+    body: JSON.stringify({ tipo_membresia_id: tipoMembresiaId }),
+  }, token);
+}
+
+/**
+ * Obtiene límites de un tenant
+ */
+export async function getLimitesTenant(tenantId: string, token?: string | null): Promise<LimitesTenant> {
+  const response = await apiFetch(`/admin/memberships/limits/${tenantId}`, {}, token);
+  return response.json();
+}
+
+/**
+ * Establece límites personalizados para un tenant
+ */
+export async function setLimitesOverride(tenantId: string, limites: { usuarios?: number; propiedades?: number }, token?: string | null): Promise<LimitesTenant> {
+  const response = await apiFetch(`/admin/memberships/limits/${tenantId}`, {
+    method: 'PUT',
+    body: JSON.stringify(limites),
+  }, token);
+  const data = await response.json();
+  return data.limites || data;
+}
+
+/**
+ * Obtiene resumen de uso de todos los tenants
+ */
+export async function getResumenUsoTodos(filtros?: { estado_cuenta?: string; tipo_membresia_id?: string }, token?: string | null): Promise<ResumenUsoTenant[]> {
+  const params = new URLSearchParams();
+  if (filtros?.estado_cuenta) params.append('estado_cuenta', filtros.estado_cuenta);
+  if (filtros?.tipo_membresia_id) params.append('tipo_membresia_id', filtros.tipo_membresia_id);
+
+  const response = await apiFetch(`/admin/memberships/usage?${params.toString()}`, {}, token);
+  const data = await response.json();
+  return data.data || data;
+}
+
+/**
+ * Obtiene uso detallado de un tenant
+ */
+export async function getUsoTenant(tenantId: string, token?: string | null): Promise<{ uso: UsoTenant; costos: CostosPeriodo; limites: LimitesTenant }> {
+  const response = await apiFetch(`/admin/memberships/usage/${tenantId}`, {}, token);
+  return response.json();
+}
+
+/**
+ * Recalcula contadores de un tenant
+ */
+export async function recalcularContadores(tenantId: string, token?: string | null): Promise<UsoTenant> {
+  const response = await apiFetch(`/admin/memberships/usage/${tenantId}/recalculate`, {
+    method: 'POST',
+  }, token);
+  const data = await response.json();
+  return data.uso || data;
+}
+
+/**
+ * Calcula factura pendiente de un tenant
+ */
+export async function calcularFacturaTenant(tenantId: string, token?: string | null): Promise<CostosPeriodo> {
+  const response = await apiFetch(`/admin/memberships/usage/${tenantId}/calculate`, {}, token);
   return response.json();
 }
 

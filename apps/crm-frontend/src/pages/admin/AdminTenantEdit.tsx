@@ -6,7 +6,7 @@
 import { useState, useEffect } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
 import { useAuth } from '@clerk/clerk-react';
-import { getTenantById, updateTenant, getAllPaises, Pais, TenantAdmin, UpdateTenantData, getTenantFeatures, enableFeatureForTenant, disableFeatureForTenant, FeatureWithTenantStatus } from '../../services/api';
+import { getTenantById, updateTenant, getAllPaises, Pais, TenantAdmin, UpdateTenantData, getTenantFeatures, enableFeatureForTenant, disableFeatureForTenant, FeatureWithTenantStatus, getTiposMembresia, TipoMembresia } from '../../services/api';
 
 export default function AdminTenantEdit() {
   const { tenantId } = useParams<{ tenantId: string }>();
@@ -22,12 +22,15 @@ export default function AdminTenantEdit() {
     dominioPersonalizado: '',
     usarSubdominio: true,
     activo: true,
+    tipo_membresia_id: '' as string | null,
   });
   const [paises, setPaises] = useState<Pais[]>([]);
   const [features, setFeatures] = useState<FeatureWithTenantStatus[]>([]);
+  const [tiposMembresia, setTiposMembresia] = useState<TipoMembresia[]>([]);
   const [loading, setLoading] = useState(true);
   const [loadingPaises, setLoadingPaises] = useState(true);
   const [loadingFeatures, setLoadingFeatures] = useState(true);
+  const [loadingMembresias, setLoadingMembresias] = useState(true);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -36,6 +39,7 @@ export default function AdminTenantEdit() {
       loadTenant();
       loadPaises();
       loadFeatures();
+      loadTiposMembresia();
     }
   }, [tenantId]);
 
@@ -59,6 +63,7 @@ export default function AdminTenantEdit() {
         dominioPersonalizado: tenant.dominioPersonalizado || '',
         usarSubdominio: !tenant.dominioPersonalizado,
         activo: tenant.activo !== undefined ? tenant.activo : true,
+        tipo_membresia_id: tenant.tipo_membresia_id || null,
       });
     } catch (err: any) {
       setError(err.message || 'Error al cargar tenant');
@@ -100,6 +105,23 @@ export default function AdminTenantEdit() {
       console.error('Error cargando features:', err);
     } finally {
       setLoadingFeatures(false);
+    }
+  };
+
+  const loadTiposMembresia = async () => {
+    try {
+      setLoadingMembresias(true);
+      const token = await getToken();
+      if (!token) {
+        console.error('No se pudo obtener el token de autenticación');
+        return;
+      }
+      const data = await getTiposMembresia(false, token);
+      setTiposMembresia(data);
+    } catch (err: any) {
+      console.error('Error cargando tipos de membresía:', err);
+    } finally {
+      setLoadingMembresias(false);
     }
   };
 
@@ -149,6 +171,7 @@ export default function AdminTenantEdit() {
         plan: formData.plan,
         dominioPersonalizado: formData.usarSubdominio ? null : formData.dominioPersonalizado,
         activo: formData.activo,
+        tipo_membresia_id: formData.tipo_membresia_id || null,
       };
 
       await updateTenant(tenantId, updateData, token);
@@ -341,6 +364,64 @@ export default function AdminTenantEdit() {
                 <p className="form-hint">
                   Debes configurar el DNS del dominio para apuntar a nuestra plataforma
                 </p>
+              </div>
+            )}
+          </div>
+
+          {/* Membresía Section */}
+          <div className="form-section">
+            <h2 className="section-title">Tipo de Membresía</h2>
+            <p className="section-description">
+              Define el tipo de membresía que determina precios base, límites de usuarios y propiedades.
+            </p>
+
+            {loadingMembresias ? (
+              <div className="loading-mini">Cargando tipos de membresía...</div>
+            ) : (
+              <div className="form-group">
+                <label>Membresía Asignada</label>
+                <div className="membership-grid">
+                  <div
+                    className={`membership-card ${!formData.tipo_membresia_id ? 'selected' : ''}`}
+                    onClick={() => setFormData({ ...formData, tipo_membresia_id: null })}
+                  >
+                    <div className="membership-icon">
+                      <svg width="28" height="28" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+                        <circle cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="2"/>
+                        <path d="M8 12H16" stroke="currentColor" strokeWidth="2" strokeLinecap="round"/>
+                      </svg>
+                    </div>
+                    <div className="membership-info">
+                      <div className="membership-name">Sin Membresía</div>
+                      <div className="membership-price">Sin cargo base</div>
+                    </div>
+                  </div>
+
+                  {tiposMembresia.map((membresia) => (
+                    <div
+                      key={membresia.id}
+                      className={`membership-card ${formData.tipo_membresia_id === membresia.id ? 'selected' : ''}`}
+                      onClick={() => setFormData({ ...formData, tipo_membresia_id: membresia.id })}
+                    >
+                      <div className="membership-icon">
+                        <svg width="28" height="28" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+                          <path d="M2 20H22M4 17L2 7L7 10L12 4L17 10L22 7L20 17H4Z" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
+                        </svg>
+                      </div>
+                      <div className="membership-info">
+                        <div className="membership-name">{membresia.nombre}</div>
+                        <div className="membership-code">{membresia.codigo}</div>
+                        <div className="membership-price">
+                          ${Number(membresia.precio_base).toFixed(2)}/{membresia.ciclo_facturacion}
+                        </div>
+                        <div className="membership-limits">
+                          {membresia.usuarios_incluidos === -1 ? '∞' : membresia.usuarios_incluidos} usuarios |{' '}
+                          {membresia.propiedades_incluidas === -1 ? '∞' : membresia.propiedades_incluidas} propiedades
+                        </div>
+                      </div>
+                    </div>
+                  ))}
+                </div>
               </div>
             )}
           </div>
@@ -720,6 +801,101 @@ export default function AdminTenantEdit() {
           font-weight: 600;
           color: #0F172A;
           text-transform: capitalize;
+        }
+
+        /* Membership Grid Styles */
+        .membership-grid {
+          display: grid;
+          grid-template-columns: repeat(auto-fill, minmax(260px, 1fr));
+          gap: 16px;
+          margin-top: 16px;
+        }
+
+        .membership-card {
+          padding: 20px;
+          background: #FFFFFF;
+          border: 2px solid #E2E8F0;
+          border-radius: 12px;
+          cursor: pointer;
+          transition: all 0.2s;
+          display: flex;
+          align-items: flex-start;
+          gap: 16px;
+        }
+
+        .membership-card:hover {
+          border-color: #CBD5E1;
+          transform: translateY(-2px);
+          box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
+        }
+
+        .membership-card.selected {
+          background: linear-gradient(135deg, #EFF6FF 0%, #DBEAFE 100%);
+          border-color: #2563EB;
+          box-shadow: 0 0 20px rgba(37, 99, 235, 0.2);
+        }
+
+        .membership-icon {
+          width: 48px;
+          height: 48px;
+          display: flex;
+          align-items: center;
+          justify-content: center;
+          background: #F1F5F9;
+          border-radius: 10px;
+          color: #64748B;
+          flex-shrink: 0;
+        }
+
+        .membership-card.selected .membership-icon {
+          background: #2563EB;
+          color: white;
+        }
+
+        .membership-info {
+          flex: 1;
+        }
+
+        .membership-name {
+          font-weight: 600;
+          color: #0F172A;
+          font-size: 1rem;
+          margin-bottom: 4px;
+        }
+
+        .membership-code {
+          font-size: 0.75rem;
+          color: #64748B;
+          font-family: monospace;
+          background: #F1F5F9;
+          padding: 2px 8px;
+          border-radius: 4px;
+          display: inline-block;
+          margin-bottom: 8px;
+        }
+
+        .membership-card.selected .membership-code {
+          background: rgba(37, 99, 235, 0.15);
+          color: #1D4ED8;
+        }
+
+        .membership-price {
+          font-size: 1.125rem;
+          font-weight: 700;
+          color: #2563EB;
+          margin-bottom: 4px;
+        }
+
+        .membership-limits {
+          font-size: 0.75rem;
+          color: #64748B;
+        }
+
+        .loading-mini {
+          padding: 20px;
+          color: #64748B;
+          font-size: 0.875rem;
+          text-align: center;
         }
 
         .section-description {

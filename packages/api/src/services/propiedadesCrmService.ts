@@ -5,6 +5,12 @@
 import { query } from '../utils/db.js';
 import { generateMultiLanguageSlugs, translatePropertyContent, generateShortDescription } from './translationService.js';
 import { syncTagsForProperty } from './tagsSyncService.js';
+import {
+  registrarPropiedadCreada,
+  registrarPropiedadEliminada,
+  registrarPropiedadPublicada,
+  registrarPropiedadDespublicada,
+} from './usageTrackingService.js';
 
 /**
  * Busca el perfil_asesor_id basado en el usuario_id (captador)
@@ -685,6 +691,18 @@ export async function createPropiedad(
     console.error(`⚠️ Error sincronizando tags para propiedad ${parsed.id}:`, err);
   });
 
+  // Registrar evento de tracking para facturación
+  try {
+    await registrarPropiedadCreada(tenantId, parsed.id, data.titulo || undefined);
+    // Si la propiedad se crea ya publicada, registrar también el evento de publicación
+    if (data.estado_propiedad && data.estado_propiedad !== 'inactiva') {
+      await registrarPropiedadPublicada(tenantId, parsed.id, data.titulo || undefined);
+    }
+  } catch (trackingError) {
+    console.error('⚠️ Error registrando tracking de propiedad:', trackingError);
+    // No fallar la operación por error de tracking
+  }
+
   return parsed;
 }
 
@@ -696,6 +714,20 @@ export async function updatePropiedad(
   propiedadId: string,
   data: Partial<Propiedad>
 ): Promise<Propiedad | null> {
+  // Obtener estado actual para tracking de cambios de publicación
+  let estadoAnterior: string | null = null;
+  let tituloPropiedad: string | null = null;
+  if (data.estado_propiedad !== undefined) {
+    const currentResult = await query(
+      `SELECT estado_propiedad, titulo FROM propiedades WHERE id = $1 AND tenant_id = $2`,
+      [propiedadId, tenantId]
+    );
+    if (currentResult.rows[0]) {
+      estadoAnterior = currentResult.rows[0].estado_propiedad;
+      tituloPropiedad = currentResult.rows[0].titulo;
+    }
+  }
+
   // Si se actualiza captador_id, sincronizar agente_id y perfil_asesor_id
   if (data.captador_id !== undefined) {
     data.agente_id = data.captador_id; // Deprecado: mantener sincronizado
@@ -813,6 +845,26 @@ export async function updatePropiedad(
     console.error(`⚠️ Error sincronizando tags para propiedad ${propiedadId}:`, err);
   });
 
+  // Registrar eventos de tracking para cambios de publicación
+  if (data.estado_propiedad !== undefined && estadoAnterior !== null) {
+    try {
+      const titulo = tituloPropiedad || data.titulo || undefined;
+      const eraPublicada = estadoAnterior !== 'inactiva';
+      const esPublicada = data.estado_propiedad !== 'inactiva';
+
+      if (!eraPublicada && esPublicada) {
+        // Se publicó
+        await registrarPropiedadPublicada(tenantId, propiedadId, titulo);
+      } else if (eraPublicada && !esPublicada) {
+        // Se despublicó
+        await registrarPropiedadDespublicada(tenantId, propiedadId, titulo);
+      }
+    } catch (trackingError) {
+      console.error('⚠️ Error registrando tracking de cambio de estado:', trackingError);
+      // No fallar la operación por error de tracking
+    }
+  }
+
   return parsed;
 }
 
@@ -823,6 +875,13 @@ export async function deletePropiedad(
   tenantId: string,
   propiedadId: string
 ): Promise<boolean> {
+  // Obtener título y estado antes de eliminar para tracking
+  const currentResult = await query(
+    `SELECT titulo, estado_propiedad FROM propiedades WHERE id = $1 AND tenant_id = $2`,
+    [propiedadId, tenantId]
+  );
+  const propiedadInfo = currentResult.rows[0];
+
   const sql = `
     UPDATE propiedades
     SET activo = false, updated_at = NOW()
@@ -831,7 +890,24 @@ export async function deletePropiedad(
   `;
 
   const result = await query(sql, [propiedadId, tenantId]);
-  return result.rows.length > 0;
+  const eliminada = result.rows.length > 0;
+
+  // Registrar eventos de tracking
+  if (eliminada && propiedadInfo) {
+    try {
+      // Si estaba publicada, registrar despublicación primero
+      if (propiedadInfo.estado_propiedad !== 'inactiva') {
+        await registrarPropiedadDespublicada(tenantId, propiedadId, propiedadInfo.titulo);
+      }
+      // Registrar eliminación
+      await registrarPropiedadEliminada(tenantId, propiedadId, propiedadInfo.titulo);
+    } catch (trackingError) {
+      console.error('⚠️ Error registrando tracking de propiedad eliminada:', trackingError);
+      // No fallar la operación por error de tracking
+    }
+  }
+
+  return eliminada;
 }
 
 /**
