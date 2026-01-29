@@ -10,6 +10,17 @@ import { createTenant, updateTenant, getTenantById, createTenantWithAdmin, getAl
 import { getAllPaises } from '../services/paisesService.js';
 import { getAllFeatures, getFeatureById, createFeature, updateFeature, deleteFeature, CreateFeatureData, UpdateFeatureData } from '../services/adminFeaturesService.js';
 import { getBillingStats, getAllFacturas, getAllSuscripciones } from '../services/adminBillingService.js';
+import {
+  calcularFacturaTenant,
+  generarFactura,
+  proyectarCostoMensual,
+  getEstadoCuenta,
+  registrarPago,
+  cambiarEstadoFactura,
+  getResumenFacturacion,
+  getFacturaDetallada,
+} from '../services/billingCalculationService.js';
+import { getUsoTenant, getHistorialUso, recalcularContadores, getResumenUsoTodos } from '../services/usageTrackingService.js';
 import { getAllConfig, getConfigByKey, updateConfig, updateMultipleConfig } from '../services/adminConfigService.js';
 import { getAllTiposPagina, getTipoPaginaById, updateTipoPagina, createTipoPagina, TipoPaginaUpdate, TipoPaginaCreate } from '../services/adminTiposPaginaService.js';
 import {
@@ -806,7 +817,7 @@ router.get('/billing/facturas', async (req, res) => {
 
 /**
  * GET /api/admin/billing/suscripciones
- * 
+ *
  * Obtiene todas las suscripciones
  */
 router.get('/billing/suscripciones', async (req, res) => {
@@ -818,6 +829,301 @@ router.get('/billing/suscripciones', async (req, res) => {
     res.status(500).json({
       error: 'Error al obtener suscripciones',
       message: error.message
+    });
+  }
+});
+
+/**
+ * GET /api/admin/billing/resumen
+ *
+ * Obtiene resumen de facturación (mes actual o especificado)
+ */
+router.get('/billing/resumen', async (req, res) => {
+  try {
+    const { mes, anio, estado } = req.query;
+    const resumen = await getResumenFacturacion({
+      mes: mes ? parseInt(String(mes)) : undefined,
+      anio: anio ? parseInt(String(anio)) : undefined,
+      estado: estado ? String(estado) : undefined,
+    });
+    res.json(resumen);
+  } catch (error: any) {
+    console.error('Error en GET /admin/billing/resumen:', error);
+    res.status(500).json({
+      error: 'Error al obtener resumen de facturación',
+      message: error.message,
+    });
+  }
+});
+
+/**
+ * GET /api/admin/billing/facturas/:facturaId
+ *
+ * Obtiene detalle completo de una factura
+ */
+router.get('/billing/facturas/:facturaId', async (req, res) => {
+  try {
+    const { facturaId } = req.params;
+    const factura = await getFacturaDetallada(facturaId);
+    res.json(factura);
+  } catch (error: any) {
+    console.error('Error en GET /admin/billing/facturas/:facturaId:', error);
+    if (error.message === 'Factura no encontrada') {
+      res.status(404).json({
+        error: 'Factura no encontrada',
+        message: error.message,
+      });
+    } else {
+      res.status(500).json({
+        error: 'Error al obtener factura',
+        message: error.message,
+      });
+    }
+  }
+});
+
+/**
+ * PUT /api/admin/billing/facturas/:facturaId/estado
+ *
+ * Cambia el estado de una factura
+ */
+router.put('/billing/facturas/:facturaId/estado', async (req, res) => {
+  try {
+    const { facturaId } = req.params;
+    const { estado, metodo_pago, referencia_pago, notas } = req.body;
+
+    if (!estado || !['pendiente', 'pagada', 'vencida', 'cancelada'].includes(estado)) {
+      return res.status(400).json({
+        error: 'Estado inválido',
+        message: 'El estado debe ser: pendiente, pagada, vencida o cancelada',
+      });
+    }
+
+    await cambiarEstadoFactura(facturaId, estado, { metodo_pago, referencia_pago, notas });
+    res.json({ success: true, message: `Estado cambiado a ${estado}` });
+  } catch (error: any) {
+    console.error('Error en PUT /admin/billing/facturas/:facturaId/estado:', error);
+    res.status(400).json({
+      error: 'Error al cambiar estado de factura',
+      message: error.message,
+    });
+  }
+});
+
+/**
+ * GET /api/admin/billing/calculate/:tenantId
+ *
+ * Calcula la factura pendiente de un tenant (sin generarla)
+ */
+router.get('/billing/calculate/:tenantId', async (req, res) => {
+  try {
+    const { tenantId } = req.params;
+    const calculo = await calcularFacturaTenant(tenantId);
+    res.json(calculo);
+  } catch (error: any) {
+    console.error('Error en GET /admin/billing/calculate/:tenantId:', error);
+    res.status(500).json({
+      error: 'Error al calcular factura',
+      message: error.message,
+    });
+  }
+});
+
+/**
+ * POST /api/admin/billing/generate/:tenantId
+ *
+ * Genera una factura para un tenant
+ */
+router.post('/billing/generate/:tenantId', async (req, res) => {
+  try {
+    const { tenantId } = req.params;
+    const { fecha_vencimiento, notas, forzar } = req.body;
+
+    const factura = await generarFactura(tenantId, {
+      fecha_vencimiento: fecha_vencimiento ? new Date(fecha_vencimiento) : undefined,
+      notas,
+      forzar,
+    });
+    res.status(201).json(factura);
+  } catch (error: any) {
+    console.error('Error en POST /admin/billing/generate/:tenantId:', error);
+    if (error.message.includes('Ya existe una factura')) {
+      res.status(409).json({
+        error: 'Factura duplicada',
+        message: error.message,
+      });
+    } else {
+      res.status(400).json({
+        error: 'Error al generar factura',
+        message: error.message,
+      });
+    }
+  }
+});
+
+/**
+ * GET /api/admin/billing/projection/:tenantId
+ *
+ * Proyección de costo mensual para un tenant
+ */
+router.get('/billing/projection/:tenantId', async (req, res) => {
+  try {
+    const { tenantId } = req.params;
+    const proyeccion = await proyectarCostoMensual(tenantId);
+    res.json(proyeccion);
+  } catch (error: any) {
+    console.error('Error en GET /admin/billing/projection/:tenantId:', error);
+    res.status(500).json({
+      error: 'Error al proyectar costo',
+      message: error.message,
+    });
+  }
+});
+
+/**
+ * GET /api/admin/billing/account/:tenantId
+ *
+ * Estado de cuenta de un tenant
+ */
+router.get('/billing/account/:tenantId', async (req, res) => {
+  try {
+    const { tenantId } = req.params;
+    const estado = await getEstadoCuenta(tenantId);
+    res.json(estado);
+  } catch (error: any) {
+    console.error('Error en GET /admin/billing/account/:tenantId:', error);
+    if (error.message === 'Tenant no encontrado') {
+      res.status(404).json({
+        error: 'Tenant no encontrado',
+        message: error.message,
+      });
+    } else {
+      res.status(500).json({
+        error: 'Error al obtener estado de cuenta',
+        message: error.message,
+      });
+    }
+  }
+});
+
+/**
+ * POST /api/admin/billing/payment/:tenantId
+ *
+ * Registra un pago para un tenant
+ */
+router.post('/billing/payment/:tenantId', async (req, res) => {
+  try {
+    const { tenantId } = req.params;
+    const { monto, factura_id, metodo_pago, referencia_pago, notas } = req.body;
+
+    if (!monto || monto <= 0) {
+      return res.status(400).json({
+        error: 'Monto inválido',
+        message: 'El monto debe ser mayor a 0',
+      });
+    }
+
+    const resultado = await registrarPago(tenantId, monto, {
+      factura_id,
+      metodo_pago,
+      referencia_pago,
+      notas,
+    });
+    res.json(resultado);
+  } catch (error: any) {
+    console.error('Error en POST /admin/billing/payment/:tenantId:', error);
+    res.status(400).json({
+      error: 'Error al registrar pago',
+      message: error.message,
+    });
+  }
+});
+
+// ==================== USO DE TENANTS ====================
+
+/**
+ * GET /api/admin/usage
+ *
+ * Obtiene resumen de uso de todos los tenants
+ */
+router.get('/usage', async (req, res) => {
+  try {
+    const { estado_cuenta, tipo_membresia_id } = req.query;
+    const resumen = await getResumenUsoTodos({
+      estado_cuenta: estado_cuenta ? String(estado_cuenta) : undefined,
+      tipo_membresia_id: tipo_membresia_id ? String(tipo_membresia_id) : undefined,
+    });
+    res.json({ tenants: resumen });
+  } catch (error: any) {
+    console.error('Error en GET /admin/usage:', error);
+    res.status(500).json({
+      error: 'Error al obtener resumen de uso',
+      message: error.message,
+    });
+  }
+});
+
+/**
+ * GET /api/admin/usage/:tenantId
+ *
+ * Obtiene uso detallado de un tenant
+ */
+router.get('/usage/:tenantId', async (req, res) => {
+  try {
+    const { tenantId } = req.params;
+    const uso = await getUsoTenant(tenantId);
+    res.json(uso);
+  } catch (error: any) {
+    console.error('Error en GET /admin/usage/:tenantId:', error);
+    res.status(500).json({
+      error: 'Error al obtener uso del tenant',
+      message: error.message,
+    });
+  }
+});
+
+/**
+ * GET /api/admin/usage/:tenantId/history
+ *
+ * Obtiene historial de uso de un tenant
+ */
+router.get('/usage/:tenantId/history', async (req, res) => {
+  try {
+    const { tenantId } = req.params;
+    const { tipo_evento, fecha_desde, fecha_hasta, limit, offset } = req.query;
+
+    const historial = await getHistorialUso(tenantId, {
+      tipo_evento: tipo_evento ? String(tipo_evento) : undefined,
+      fecha_desde: fecha_desde ? new Date(String(fecha_desde)) : undefined,
+      fecha_hasta: fecha_hasta ? new Date(String(fecha_hasta)) : undefined,
+      limit: limit ? parseInt(String(limit)) : undefined,
+      offset: offset ? parseInt(String(offset)) : undefined,
+    });
+    res.json(historial);
+  } catch (error: any) {
+    console.error('Error en GET /admin/usage/:tenantId/history:', error);
+    res.status(500).json({
+      error: 'Error al obtener historial de uso',
+      message: error.message,
+    });
+  }
+});
+
+/**
+ * POST /api/admin/usage/:tenantId/recalculate
+ *
+ * Recalcula contadores de un tenant
+ */
+router.post('/usage/:tenantId/recalculate', async (req, res) => {
+  try {
+    const { tenantId } = req.params;
+    const uso = await recalcularContadores(tenantId);
+    res.json({ success: true, uso });
+  } catch (error: any) {
+    console.error('Error en POST /admin/usage/:tenantId/recalculate:', error);
+    res.status(500).json({
+      error: 'Error al recalcular contadores',
+      message: error.message,
     });
   }
 });

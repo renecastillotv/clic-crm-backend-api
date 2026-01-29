@@ -8238,3 +8238,187 @@ export async function calcularFacturaTenant(tenantId: string, token?: string | n
   return response.json();
 }
 
+// ==================== BILLING CALCULATION API ====================
+
+export interface CalculoFactura {
+  tenant_id: string;
+  tenant_nombre: string;
+  tipo_membresia_id: string | null;
+  tipo_membresia_nombre: string | null;
+  periodo: {
+    inicio: string;
+    fin: string;
+  };
+  costo_base: number;
+  usuarios_incluidos: number;
+  usuarios_activos: number;
+  usuarios_max_periodo: number;
+  usuarios_extra: number;
+  costo_usuario_adicional: number;
+  costo_usuarios_extra: number;
+  propiedades_incluidas: number;
+  propiedades_publicadas: number;
+  propiedades_max_periodo: number;
+  propiedades_extra: number;
+  costo_propiedad_adicional: number;
+  costo_propiedades_extra: number;
+  features_extra: Array<{ feature_id: string; nombre: string; precio_mensual: number }>;
+  costo_features_extra: number;
+  subtotal: number;
+  descuento: number;
+  descuento_porcentaje: number;
+  descripcion_descuento: string | null;
+  total: number;
+  moneda: string;
+}
+
+export interface EstadoCuenta {
+  tenant_id: string;
+  tenant_nombre: string;
+  estado: 'al_dia' | 'por_vencer' | 'vencido' | 'suspendido';
+  saldo_pendiente: number;
+  fecha_ultimo_pago: string | null;
+  facturas_pendientes: number;
+  facturas_vencidas: number;
+  proxima_factura?: {
+    monto_estimado: number;
+    fecha_emision: string;
+  };
+}
+
+export interface FacturaDetallada extends Factura {
+  costo_base: number;
+  costo_usuarios_extra: number;
+  cantidad_usuarios_extra: number;
+  costo_propiedades_extra: number;
+  cantidad_propiedades_extra: number;
+  costo_features: number;
+  features_facturados: Array<{ feature_id: string; nombre: string; precio: number }>;
+  descuento: number;
+  descripcion_descuento: string | null;
+  subtotal: number;
+  tipo_membresia_nombre: string | null;
+}
+
+export interface ResumenFacturacion {
+  total_facturado: number;
+  total_cobrado: number;
+  total_pendiente: number;
+  total_vencido: number;
+  moneda: string;
+  por_estado: Array<{ estado: string; cantidad: number; monto: number }>;
+  por_membresia: Array<{ tipo: string; cantidad: number; monto: number }>;
+}
+
+/**
+ * Obtiene el cálculo de factura de un tenant (sin generar)
+ */
+export async function getCalculoFactura(tenantId: string, token?: string | null): Promise<CalculoFactura> {
+  const response = await apiFetch(`/admin/billing/calculate/${tenantId}`, {}, token);
+  return response.json();
+}
+
+/**
+ * Genera una factura para un tenant
+ */
+export async function generarFactura(tenantId: string, opciones?: {
+  fecha_vencimiento?: string;
+  notas?: string;
+  forzar?: boolean;
+}, token?: string | null): Promise<Factura> {
+  const response = await apiFetch(`/admin/billing/generate/${tenantId}`, {
+    method: 'POST',
+    body: JSON.stringify(opciones || {}),
+  }, token);
+  return response.json();
+}
+
+/**
+ * Obtiene factura detallada por ID
+ */
+export async function getFacturaDetallada(facturaId: string, token?: string | null): Promise<FacturaDetallada> {
+  const response = await apiFetch(`/admin/billing/facturas/${facturaId}`, {}, token);
+  return response.json();
+}
+
+/**
+ * Cambia el estado de una factura
+ */
+export async function cambiarEstadoFactura(facturaId: string, estado: string, opciones?: {
+  metodo_pago?: string;
+  referencia_pago?: string;
+  notas?: string;
+}, token?: string | null): Promise<void> {
+  await apiFetch(`/admin/billing/facturas/${facturaId}/estado`, {
+    method: 'PUT',
+    body: JSON.stringify({ estado, ...opciones }),
+  }, token);
+}
+
+/**
+ * Registra un pago para un tenant
+ */
+export async function registrarPago(tenantId: string, data: {
+  monto: number;
+  factura_id?: string;
+  metodo_pago?: string;
+  referencia_pago?: string;
+  notas?: string;
+}, token?: string | null): Promise<{
+  monto_aplicado: number;
+  facturas_pagadas: string[];
+  saldo_restante: number;
+}> {
+  const response = await apiFetch(`/admin/billing/payment/${tenantId}`, {
+    method: 'POST',
+    body: JSON.stringify(data),
+  }, token);
+  return response.json();
+}
+
+/**
+ * Obtiene estado de cuenta de un tenant
+ */
+export async function getEstadoCuentaTenant(tenantId: string, token?: string | null): Promise<EstadoCuenta> {
+  const response = await apiFetch(`/admin/billing/account/${tenantId}`, {}, token);
+  return response.json();
+}
+
+/**
+ * Obtiene proyección de costo mensual
+ */
+export async function getProyeccionCosto(tenantId: string, token?: string | null): Promise<{
+  tenant_id: string;
+  costo_actual: number;
+  costo_proyectado: number;
+  moneda: string;
+  desglose: {
+    base: number;
+    usuarios_extra: number;
+    propiedades_extra: number;
+    features: number;
+  };
+  tendencia: string;
+  nota?: string;
+}> {
+  const response = await apiFetch(`/admin/billing/projection/${tenantId}`, {}, token);
+  return response.json();
+}
+
+/**
+ * Obtiene resumen de facturación
+ */
+export async function getResumenFacturacion(filtros?: {
+  mes?: number;
+  anio?: number;
+  estado?: string;
+}, token?: string | null): Promise<ResumenFacturacion> {
+  const params = new URLSearchParams();
+  if (filtros?.mes) params.append('mes', filtros.mes.toString());
+  if (filtros?.anio) params.append('anio', filtros.anio.toString());
+  if (filtros?.estado) params.append('estado', filtros.estado);
+
+  const response = await apiFetch(`/admin/billing/resumen?${params.toString()}`, {}, token);
+  return response.json();
+}
+
