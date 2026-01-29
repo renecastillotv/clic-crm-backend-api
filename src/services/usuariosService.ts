@@ -7,6 +7,7 @@
 import { query } from '../utils/db.js';
 import { createClerkUser, createClerkUserWithoutPassword, deactivateClerkUser, reactivateClerkUser } from '../middleware/clerkAuth.js';
 import { v4 as uuidv4 } from 'uuid';
+import { registrarUsuarioCreado, registrarUsuarioEliminado } from './usageTrackingService.js';
 
 export interface Usuario {
   id: string;
@@ -938,6 +939,18 @@ export async function agregarUsuarioATenant(
     }
   }
 
+  // Registrar evento de tracking para facturación
+  try {
+    await registrarUsuarioCreado(
+      tenantId,
+      usuario.id,
+      `${data.nombre || ''} ${data.apellido || ''}`.trim() || data.email
+    );
+  } catch (trackingError) {
+    console.error('⚠️ Error registrando tracking de usuario:', trackingError);
+    // No fallar la operación por error de tracking
+  }
+
   // Retornar usuario con roles
   const usuarioCompleto = await getUsuarioTenantById(tenantId, usuario.id);
   if (!usuarioCompleto) {
@@ -1319,6 +1332,14 @@ export async function eliminarUsuarioDeTenant(
     }
 
     console.log(`✅ Usuario ${usuario.email} desactivado correctamente del tenant`);
+
+    // Registrar evento de tracking para facturación
+    try {
+      await registrarUsuarioEliminado(tenantId, usuarioId, usuario.email);
+    } catch (trackingError) {
+      console.error('⚠️ Error registrando tracking de usuario eliminado:', trackingError);
+      // No fallar la operación por error de tracking
+    }
 
     return (updateResult.rowCount ?? 0) > 0;
   } catch (error: any) {
