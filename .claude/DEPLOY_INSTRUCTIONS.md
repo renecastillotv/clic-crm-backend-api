@@ -2,6 +2,18 @@
 
 > **NOTA PARA CLAUDE**: Este archivo fue creado por ti mismo (Claude) el 2026-01-20 para recordar cómo hacer deploys correctamente. Si estás leyendo esto, sigue estas instrucciones exactamente.
 
+## IMPORTANTE: Entorno de Pruebas
+
+**TODO se prueba en la versión pública desplegada en Vercel.** No preguntes si el usuario está usando localhost o producción - SIEMPRE asume que está probando en:
+
+- **Frontend**: https://clic-crm-frontend.vercel.app
+- **Backend API**: https://clic-crm-backend-api.vercel.app/api
+
+Por lo tanto:
+1. Después de cada fix, SIEMPRE haz deploy a Vercel
+2. No sugieras reiniciar servidores locales como solución
+3. El `.env` local debe apuntar a la API de producción para desarrollo
+
 ## Estructura del Proyecto
 
 Este es un **monorepo** con la siguiente estructura:
