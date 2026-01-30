@@ -23,8 +23,12 @@ const CrmFinanzasVentaExpediente: React.FC<CrmFinanzasVentaExpedienteProps> = ({
   ventaId,
   venta,
 }) => {
-  const { tenantActual, user } = useAuth();
+  const { tenantActual, user, tieneAcceso, isPlatformAdmin } = useAuth();
   const { getToken } = useClerkAuth();
+
+  // Solo admin o el cerrador de la venta pueden subir documentos
+  const esAdmin = isPlatformAdmin || tieneAcceso('finanzas-config');
+  const puedeSubirDocumentos = esAdmin || (venta?.usuario_cerrador_id === user?.id);
   const [requerimientos, setRequerimientos] = useState<RequerimientoExpediente[]>([]);
   const [itemsSubidos, setItemsSubidos] = useState<Record<string, ItemExpediente>>({});
   const [loading, setLoading] = useState(false);
@@ -663,63 +667,67 @@ const CrmFinanzasVentaExpediente: React.FC<CrmFinanzasVentaExpedienteProps> = ({
                       </>
                     )}
 
-                    <input
-                      type="file"
-                      id={`upload-${req.id}`}
-                      style={{ display: 'none' }}
-                      accept={req.tipos_archivo_permitidos.map(t => `.${t}`).join(',')}
-                      onChange={(e) => handleFileSelect(req, e)}
-                      disabled={isUploading}
-                    />
+                    {puedeSubirDocumentos && (
+                      <>
+                        <input
+                          type="file"
+                          id={`upload-${req.id}`}
+                          style={{ display: 'none' }}
+                          accept={req.tipos_archivo_permitidos.map(t => `.${t}`).join(',')}
+                          onChange={(e) => handleFileSelect(req, e)}
+                          disabled={isUploading}
+                        />
 
-                    <button
-                      onClick={() => document.getElementById(`upload-${req.id}`)?.click()}
-                      disabled={isUploading}
-                      style={{
-                        display: 'flex',
-                        alignItems: 'center',
-                        gap: '6px',
-                        padding: '10px 16px',
-                        borderRadius: '10px',
-                        border: 'none',
-                        background: estado.estado === 'completado'
-                          ? 'linear-gradient(135deg, #f1f5f9 0%, #e2e8f0 100%)'
-                          : 'linear-gradient(135deg, #f97316 0%, #ea580c 100%)',
-                        color: estado.estado === 'completado' ? '#475569' : 'white',
-                        fontWeight: 600,
-                        fontSize: '0.8125rem',
-                        cursor: isUploading ? 'not-allowed' : 'pointer',
-                        transition: 'all 0.2s',
-                        opacity: isUploading ? 0.6 : 1,
-                        boxShadow: estado.estado === 'completado' ? 'none' : '0 2px 4px rgba(249, 115, 22, 0.3)'
-                      }}
-                      onMouseEnter={(e) => {
-                        if (!isUploading) {
-                          e.currentTarget.style.transform = 'translateY(-1px)';
-                          if (estado.estado !== 'completado') {
-                            e.currentTarget.style.boxShadow = '0 4px 6px rgba(249, 115, 22, 0.4)';
-                          }
-                        }
-                      }}
-                      onMouseLeave={(e) => {
-                        e.currentTarget.style.transform = 'translateY(0)';
-                        if (estado.estado !== 'completado') {
-                          e.currentTarget.style.boxShadow = '0 2px 4px rgba(249, 115, 22, 0.3)';
-                        }
-                      }}
-                    >
-                      {isUploading ? (
-                        <>
-                          <RefreshCw className="w-4 h-4 animate-spin" />
-                          Subiendo...
-                        </>
-                      ) : (
-                        <>
-                          <Upload className="w-4 h-4" />
-                          {estado.estado === 'completado' ? 'Actualizar' : 'Subir'}
-                        </>
-                      )}
-                    </button>
+                        <button
+                          onClick={() => document.getElementById(`upload-${req.id}`)?.click()}
+                          disabled={isUploading}
+                          style={{
+                            display: 'flex',
+                            alignItems: 'center',
+                            gap: '6px',
+                            padding: '10px 16px',
+                            borderRadius: '10px',
+                            border: 'none',
+                            background: estado.estado === 'completado'
+                              ? 'linear-gradient(135deg, #f1f5f9 0%, #e2e8f0 100%)'
+                              : 'linear-gradient(135deg, #f97316 0%, #ea580c 100%)',
+                            color: estado.estado === 'completado' ? '#475569' : 'white',
+                            fontWeight: 600,
+                            fontSize: '0.8125rem',
+                            cursor: isUploading ? 'not-allowed' : 'pointer',
+                            transition: 'all 0.2s',
+                            opacity: isUploading ? 0.6 : 1,
+                            boxShadow: estado.estado === 'completado' ? 'none' : '0 2px 4px rgba(249, 115, 22, 0.3)'
+                          }}
+                          onMouseEnter={(e) => {
+                            if (!isUploading) {
+                              e.currentTarget.style.transform = 'translateY(-1px)';
+                              if (estado.estado !== 'completado') {
+                                e.currentTarget.style.boxShadow = '0 4px 6px rgba(249, 115, 22, 0.4)';
+                              }
+                            }
+                          }}
+                          onMouseLeave={(e) => {
+                            e.currentTarget.style.transform = 'translateY(0)';
+                            if (estado.estado !== 'completado') {
+                              e.currentTarget.style.boxShadow = '0 2px 4px rgba(249, 115, 22, 0.3)';
+                            }
+                          }}
+                        >
+                          {isUploading ? (
+                            <>
+                              <RefreshCw className="w-4 h-4 animate-spin" />
+                              Subiendo...
+                            </>
+                          ) : (
+                            <>
+                              <Upload className="w-4 h-4" />
+                              {estado.estado === 'completado' ? 'Actualizar' : 'Subir'}
+                            </>
+                          )}
+                        </button>
+                      </>
+                    )}
                   </div>
                 </div>
               </div>
