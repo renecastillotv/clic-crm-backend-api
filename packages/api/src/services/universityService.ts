@@ -233,7 +233,50 @@ export async function createCurso(
     data.orden || 0,
     JSON.stringify(data.metadata || {})
   ]);
-  return result.rows[0];
+
+  const curso = result.rows[0];
+
+  // Asignar automáticamente acceso a los roles principales del tenant
+  // Esto permite que todos los usuarios del tenant vean el curso por defecto
+  try {
+    // Obtener roles globales (tenant_owner, tenant_admin, tenant_user)
+    const rolesResult = await query(`
+      SELECT id FROM roles
+      WHERE codigo IN ('tenant_owner', 'tenant_admin', 'tenant_user')
+        AND (tenant_id IS NULL OR tenant_id = $1)
+      LIMIT 3
+    `, [tenantId]);
+
+    // También obtener roles específicos del tenant
+    const tenantRolesResult = await query(`
+      SELECT DISTINCT r.id
+      FROM roles r
+      JOIN usuarios_roles ur ON ur.rol_id = r.id
+      WHERE ur.tenant_id = $1
+      LIMIT 10
+    `, [tenantId]);
+
+    // Combinar ambos resultados (sin duplicados)
+    const roleIds = new Set<string>();
+    rolesResult.rows.forEach((r: any) => roleIds.add(r.id));
+    tenantRolesResult.rows.forEach((r: any) => roleIds.add(r.id));
+
+    // Insertar acceso para cada rol
+    for (const rolId of roleIds) {
+      await query(`
+        INSERT INTO university_cursos_acceso_roles (curso_id, rol_id)
+        VALUES ($1, $2)
+        ON CONFLICT (curso_id, rol_id) DO NOTHING
+      `, [curso.id, rolId]);
+    }
+
+    console.log(`📚 [createCurso] Curso ${curso.id} creado con acceso para ${roleIds.size} roles`);
+  } catch (err) {
+    // Si falla la asignación de roles, no bloquear la creación del curso
+    console.error('[createCurso] Error asignando roles por defecto:', err);
+  }
+
+  return curso;
 }
 
 export async function updateCurso(
