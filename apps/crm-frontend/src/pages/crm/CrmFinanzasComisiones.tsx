@@ -426,118 +426,192 @@ export default function CrmFinanzasComisiones() {
 
   return (
     <div style={{ padding: '24px' }}>
-      {/* Stats Cards - 5 tarjetas para el flujo completo */}
-      <div style={{
-        display: 'grid',
-        gridTemplateColumns: 'repeat(5, 1fr)',
-        gap: '12px',
-        marginBottom: '24px',
-      }}>
-        {/* 1. Total Proyectado (lo que se espera recibir en total) */}
+      {/* Stats Cards - Diferentes para admin vs usuario regular */}
+      {esAdmin ? (
+        /* Vista Admin: 5 tarjetas con info completa de flujo de dinero */
         <div style={{
-          background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)',
-          borderRadius: '12px',
-          padding: '16px',
-          color: 'white',
+          display: 'grid',
+          gridTemplateColumns: 'repeat(5, 1fr)',
+          gap: '12px',
+          marginBottom: '24px',
         }}>
-          <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
-            <DollarSign size={20} />
-            <div>
-              <div style={{ fontSize: '11px', opacity: 0.9 }}>Total Proyectado</div>
-              <div style={{ fontSize: '20px', fontWeight: 700 }}>
-                {formatCurrency(resumen?.montos.total_proyectado || 0)}
-              </div>
-              <div style={{ fontSize: '10px', opacity: 0.8, marginTop: '2px' }}>
-                {resumen?.estados.total || 0} comisiones
+          {/* 1. Total Proyectado (lo que se espera recibir en total) */}
+          <div style={{
+            background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)',
+            borderRadius: '12px',
+            padding: '16px',
+            color: 'white',
+          }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+              <DollarSign size={20} />
+              <div>
+                <div style={{ fontSize: '11px', opacity: 0.9 }}>Total Proyectado</div>
+                <div style={{ fontSize: '20px', fontWeight: 700 }}>
+                  {formatCurrency(resumen?.montos.total_proyectado || 0)}
+                </div>
+                <div style={{ fontSize: '10px', opacity: 0.8, marginTop: '2px' }}>
+                  {resumen?.estados.total || 0} comisiones
+                </div>
               </div>
             </div>
           </div>
-        </div>
 
-        {/* 2. Cobrado del Cliente (dinero que ya entró) */}
-        <div style={{
-          background: 'linear-gradient(135deg, #06b6d4 0%, #0891b2 100%)',
-          borderRadius: '12px',
-          padding: '16px',
-          color: 'white',
-        }}>
-          <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
-            <TrendingUp size={20} />
-            <div>
-              <div style={{ fontSize: '11px', opacity: 0.9 }}>Cobrado Cliente</div>
-              <div style={{ fontSize: '20px', fontWeight: 700 }}>
-                {formatCurrency(resumen?.montos.total_cobrado || 0)}
-              </div>
-              <div style={{ fontSize: '10px', opacity: 0.8, marginTop: '2px' }}>
-                Dinero recibido
+          {/* 2. Cobrado del Cliente (dinero que ya entró) */}
+          <div style={{
+            background: 'linear-gradient(135deg, #06b6d4 0%, #0891b2 100%)',
+            borderRadius: '12px',
+            padding: '16px',
+            color: 'white',
+          }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+              <TrendingUp size={20} />
+              <div>
+                <div style={{ fontSize: '11px', opacity: 0.9 }}>Cobrado Cliente</div>
+                <div style={{ fontSize: '20px', fontWeight: 700 }}>
+                  {formatCurrency(resumen?.montos.total_cobrado || 0)}
+                </div>
+                <div style={{ fontSize: '10px', opacity: 0.8, marginTop: '2px' }}>
+                  Dinero recibido
+                </div>
               </div>
             </div>
           </div>
-        </div>
 
-        {/* 3. Habilitado para Pagar (proporcional a lo cobrado) */}
-        <div style={{
-          background: 'linear-gradient(135deg, #3b82f6 0%, #2563eb 100%)',
-          borderRadius: '12px',
-          padding: '16px',
-          color: 'white',
-        }}>
-          <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
-            <Users size={20} />
-            <div>
-              <div style={{ fontSize: '11px', opacity: 0.9 }}>Habilitado</div>
-              <div style={{ fontSize: '20px', fontWeight: 700 }}>
-                {formatCurrency(resumen?.montos.total_habilitado || 0)}
-              </div>
-              <div style={{ fontSize: '10px', opacity: 0.8, marginTop: '2px' }}>
-                Disponible para pagar
+          {/* 3. Habilitado para Pagar (proporcional a lo cobrado) */}
+          <div style={{
+            background: 'linear-gradient(135deg, #3b82f6 0%, #2563eb 100%)',
+            borderRadius: '12px',
+            padding: '16px',
+            color: 'white',
+          }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+              <Users size={20} />
+              <div>
+                <div style={{ fontSize: '11px', opacity: 0.9 }}>Habilitado</div>
+                <div style={{ fontSize: '20px', fontWeight: 700 }}>
+                  {formatCurrency(resumen?.montos.total_habilitado || 0)}
+                </div>
+                <div style={{ fontSize: '10px', opacity: 0.8, marginTop: '2px' }}>
+                  Disponible para pagar
+                </div>
               </div>
             </div>
           </div>
-        </div>
 
-        {/* 4. Pagado a Participantes (dinero que ya salió) */}
-        <div style={{
-          background: 'linear-gradient(135deg, #10b981 0%, #059669 100%)',
-          borderRadius: '12px',
-          padding: '16px',
-          color: 'white',
-        }}>
-          <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
-            <CheckCircle size={20} />
-            <div>
-              <div style={{ fontSize: '11px', opacity: 0.9 }}>Pagado</div>
-              <div style={{ fontSize: '20px', fontWeight: 700 }}>
-                {formatCurrency(resumen?.montos.total_pagado || 0)}
-              </div>
-              <div style={{ fontSize: '10px', opacity: 0.8, marginTop: '2px' }}>
-                {resumen?.estados.pagadas || 0} completas
+          {/* 4. Pagado a Participantes (dinero que ya salió) */}
+          <div style={{
+            background: 'linear-gradient(135deg, #10b981 0%, #059669 100%)',
+            borderRadius: '12px',
+            padding: '16px',
+            color: 'white',
+          }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+              <CheckCircle size={20} />
+              <div>
+                <div style={{ fontSize: '11px', opacity: 0.9 }}>Pagado</div>
+                <div style={{ fontSize: '20px', fontWeight: 700 }}>
+                  {formatCurrency(resumen?.montos.total_pagado || 0)}
+                </div>
+                <div style={{ fontSize: '10px', opacity: 0.8, marginTop: '2px' }}>
+                  {resumen?.estados.pagadas || 0} completas
+                </div>
               </div>
             </div>
           </div>
-        </div>
 
-        {/* 5. Pendiente por Pagar (habilitado - pagado) */}
-        <div style={{
-          background: 'linear-gradient(135deg, #f59e0b 0%, #d97706 100%)',
-          borderRadius: '12px',
-          padding: '16px',
-          color: 'white',
-        }}>
-          <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
-            <Clock size={20} />
-            <div>
-              <div style={{ fontSize: '11px', opacity: 0.9 }}>Pendiente Pagar</div>
-              <div style={{ fontSize: '20px', fontWeight: 700 }}>
-                {formatCurrency(resumen?.montos.pendiente_cobro || 0)}
-              </div>
-              <div style={{ fontSize: '10px', opacity: 0.8, marginTop: '2px' }}>
-                {resumen?.estados.parciales || 0} parciales / {resumen?.estados.pendientes || 0} pend.
+          {/* 5. Pendiente por Pagar (habilitado - pagado) */}
+          <div style={{
+            background: 'linear-gradient(135deg, #f59e0b 0%, #d97706 100%)',
+            borderRadius: '12px',
+            padding: '16px',
+            color: 'white',
+          }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+              <Clock size={20} />
+              <div>
+                <div style={{ fontSize: '11px', opacity: 0.9 }}>Pendiente Pagar</div>
+                <div style={{ fontSize: '20px', fontWeight: 700 }}>
+                  {formatCurrency(resumen?.montos.pendiente_cobro || 0)}
+                </div>
+                <div style={{ fontSize: '10px', opacity: 0.8, marginTop: '2px' }}>
+                  {resumen?.estados.parciales || 0} parciales / {resumen?.estados.pendientes || 0} pend.
+                </div>
               </div>
             </div>
           </div>
         </div>
-      </div>
+      ) : (
+        /* Vista Usuario: 3 tarjetas con info personal de comisiones */
+        <div style={{
+          display: 'grid',
+          gridTemplateColumns: 'repeat(3, 1fr)',
+          gap: '12px',
+          marginBottom: '24px',
+        }}>
+          {/* 1. Mi Comisión Generada (total de mis comisiones) */}
+          <div style={{
+            background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)',
+            borderRadius: '12px',
+            padding: '20px',
+            color: 'white',
+          }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+              <DollarSign size={24} />
+              <div>
+                <div style={{ fontSize: '12px', opacity: 0.9 }}>Mi Comisión Generada</div>
+                <div style={{ fontSize: '24px', fontWeight: 700 }}>
+                  {formatCurrency(resumen?.montos.total_proyectado || 0)}
+                </div>
+                <div style={{ fontSize: '11px', opacity: 0.8, marginTop: '4px' }}>
+                  {resumen?.estados.total || 0} participaciones en ventas
+                </div>
+              </div>
+            </div>
+          </div>
+
+          {/* 2. Mi Comisión Cobrada (lo que ya me pagaron) */}
+          <div style={{
+            background: 'linear-gradient(135deg, #10b981 0%, #059669 100%)',
+            borderRadius: '12px',
+            padding: '20px',
+            color: 'white',
+          }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+              <CheckCircle size={24} />
+              <div>
+                <div style={{ fontSize: '12px', opacity: 0.9 }}>Mi Comisión Cobrada</div>
+                <div style={{ fontSize: '24px', fontWeight: 700 }}>
+                  {formatCurrency(resumen?.montos.total_pagado || 0)}
+                </div>
+                <div style={{ fontSize: '11px', opacity: 0.8, marginTop: '4px' }}>
+                  {resumen?.estados.pagadas || 0} comisiones completas
+                </div>
+              </div>
+            </div>
+          </div>
+
+          {/* 3. Mi Comisión Por Cobrar (lo que me falta recibir) */}
+          <div style={{
+            background: 'linear-gradient(135deg, #f59e0b 0%, #d97706 100%)',
+            borderRadius: '12px',
+            padding: '20px',
+            color: 'white',
+          }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+              <Clock size={24} />
+              <div>
+                <div style={{ fontSize: '12px', opacity: 0.9 }}>Mi Comisión Por Cobrar</div>
+                <div style={{ fontSize: '24px', fontWeight: 700 }}>
+                  {formatCurrency((resumen?.montos.total_proyectado || 0) - (resumen?.montos.total_pagado || 0))}
+                </div>
+                <div style={{ fontSize: '11px', opacity: 0.8, marginTop: '4px' }}>
+                  {(resumen?.estados.pendientes || 0) + (resumen?.estados.parciales || 0)} pendientes de pago
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* Filtros */}
       <div style={{

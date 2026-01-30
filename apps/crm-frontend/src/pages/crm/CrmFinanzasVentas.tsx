@@ -1699,71 +1699,78 @@ export default function CrmFinanzasVentas() {
                   </td>
                   <td style={{ padding: '12px 8px' }}>
                     <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                      <button
-                        style={{
-                          display: 'flex',
-                          alignItems: 'center',
-                          justifyContent: 'center',
-                          width: '32px',
-                          height: '32px',
-                          borderRadius: '8px',
-                          border: '1px solid #e2e8f0',
-                          background: 'white',
-                          color: '#475569',
-                          cursor: 'pointer',
-                          transition: 'all 0.2s'
-                        }}
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          openModal(venta);
-                        }}
-                        onMouseEnter={(e) => {
-                          e.currentTarget.style.background = '#fff7ed';
-                          e.currentTarget.style.borderColor = '#fb923c';
-                          e.currentTarget.style.color = '#ea580c';
-                        }}
-                        onMouseLeave={(e) => {
-                          e.currentTarget.style.background = 'white';
-                          e.currentTarget.style.borderColor = '#e2e8f0';
-                          e.currentTarget.style.color = '#475569';
-                        }}
-                        title="Editar"
-                      >
-                        <Edit style={{ width: '16px', height: '16px' }} />
-                      </button>
-                      <button
-                        style={{
-                          display: 'flex',
-                          alignItems: 'center',
-                          justifyContent: 'center',
-                          width: '32px',
-                          height: '32px',
-                          borderRadius: '8px',
-                          border: '1px solid #e2e8f0',
-                          background: 'white',
-                          color: '#dc2626',
-                          cursor: 'pointer',
-                          transition: 'all 0.2s'
-                        }}
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          setDeleteConfirm(venta.id);
-                        }}
-                        onMouseEnter={(e) => {
-                          e.currentTarget.style.background = '#fee2e2';
-                          e.currentTarget.style.borderColor = '#fca5a5';
-                          e.currentTarget.style.color = '#b91c1c';
-                        }}
-                        onMouseLeave={(e) => {
-                          e.currentTarget.style.background = 'white';
-                          e.currentTarget.style.borderColor = '#e2e8f0';
-                          e.currentTarget.style.color = '#dc2626';
-                        }}
-                        title="Eliminar"
-                      >
-                        <Trash2 style={{ width: '16px', height: '16px' }} />
-                      </button>
-                      {venta.monto_comision && (
+                      {/* Botón Editar - solo admin o creador de la venta */}
+                      {(esAdmin || venta.usuario_cerrador_id === user?.id) && (
+                        <button
+                          style={{
+                            display: 'flex',
+                            alignItems: 'center',
+                            justifyContent: 'center',
+                            width: '32px',
+                            height: '32px',
+                            borderRadius: '8px',
+                            border: '1px solid #e2e8f0',
+                            background: 'white',
+                            color: '#475569',
+                            cursor: 'pointer',
+                            transition: 'all 0.2s'
+                          }}
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            openModal(venta);
+                          }}
+                          onMouseEnter={(e) => {
+                            e.currentTarget.style.background = '#fff7ed';
+                            e.currentTarget.style.borderColor = '#fb923c';
+                            e.currentTarget.style.color = '#ea580c';
+                          }}
+                          onMouseLeave={(e) => {
+                            e.currentTarget.style.background = 'white';
+                            e.currentTarget.style.borderColor = '#e2e8f0';
+                            e.currentTarget.style.color = '#475569';
+                          }}
+                          title="Editar"
+                        >
+                          <Edit style={{ width: '16px', height: '16px' }} />
+                        </button>
+                      )}
+                      {/* Botón Eliminar - solo admin o creador de la venta */}
+                      {(esAdmin || venta.usuario_cerrador_id === user?.id) && (
+                        <button
+                          style={{
+                            display: 'flex',
+                            alignItems: 'center',
+                            justifyContent: 'center',
+                            width: '32px',
+                            height: '32px',
+                            borderRadius: '8px',
+                            border: '1px solid #e2e8f0',
+                            background: 'white',
+                            color: '#dc2626',
+                            cursor: 'pointer',
+                            transition: 'all 0.2s'
+                          }}
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            setDeleteConfirm(venta.id);
+                          }}
+                          onMouseEnter={(e) => {
+                            e.currentTarget.style.background = '#fee2e2';
+                            e.currentTarget.style.borderColor = '#fca5a5';
+                            e.currentTarget.style.color = '#b91c1c';
+                          }}
+                          onMouseLeave={(e) => {
+                            e.currentTarget.style.background = 'white';
+                            e.currentTarget.style.borderColor = '#e2e8f0';
+                            e.currentTarget.style.color = '#dc2626';
+                          }}
+                          title="Eliminar"
+                        >
+                          <Trash2 style={{ width: '16px', height: '16px' }} />
+                        </button>
+                      )}
+                      {/* Botón Registrar Cobro - solo admin y si no está 100% cobrado */}
+                      {esAdmin && venta.monto_comision && (venta.cache_porcentaje_cobrado === null || venta.cache_porcentaje_cobrado === undefined || parseFloat(venta.cache_porcentaje_cobrado) < 100) && (
                         <button
                           style={{
                             display: 'flex',
@@ -1785,7 +1792,7 @@ export default function CrmFinanzasVentas() {
                             setVentaParaPago(venta);
                             setLoadingComision(true);
                             setComisionData(null);
-                            
+
                             // Cargar datos de comisión
                             if (tenantActual?.id) {
                               try {
@@ -1797,8 +1804,8 @@ export default function CrmFinanzasVentas() {
                                     montoPagado: Number(comision.monto_pagado || 0)
                                   });
                                 } else {
-                                  const montoComision = typeof venta.monto_comision === 'number' 
-                                    ? venta.monto_comision 
+                                  const montoComision = typeof venta.monto_comision === 'number'
+                                    ? venta.monto_comision
                                     : parseFloat(venta.monto_comision || '0') || 0;
                                   setComisionData({
                                     montoTotal: montoComision,
@@ -1807,8 +1814,8 @@ export default function CrmFinanzasVentas() {
                                 }
                               } catch (error) {
                                 console.error('Error cargando comisión:', error);
-                                const montoComision = typeof venta.monto_comision === 'number' 
-                                  ? venta.monto_comision 
+                                const montoComision = typeof venta.monto_comision === 'number'
+                                  ? venta.monto_comision
                                   : parseFloat(venta.monto_comision || '0') || 0;
                                 setComisionData({
                                   montoTotal: montoComision,
@@ -1818,7 +1825,7 @@ export default function CrmFinanzasVentas() {
                                 setLoadingComision(false);
                               }
                             }
-                            
+
                             setShowAplicarPagoModal(true);
                           }}
                           onMouseEnter={(e) => {
@@ -1829,7 +1836,7 @@ export default function CrmFinanzasVentas() {
                             e.currentTarget.style.transform = 'translateY(0)';
                             e.currentTarget.style.boxShadow = '0 2px 4px rgba(102, 126, 234, 0.2)';
                           }}
-                          title="Aplicar Pago"
+                          title="Registrar Cobro"
                         >
                           <CreditCard style={{ width: '16px', height: '16px' }} />
                         </button>

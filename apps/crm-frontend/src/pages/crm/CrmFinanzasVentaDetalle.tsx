@@ -8,20 +8,27 @@ import {
 } from 'lucide-react';
 import { useAuth } from '../../contexts/AuthContext';
 import { usePageHeader } from '../../layouts/CrmLayout';
-import { getVenta, updateVenta, getTasasCambio, convertirAUSD, Venta, TasasCambio } from '../../services/api';
+import { getVenta, updateVenta, cancelarVenta, getTasasCambio, convertirAUSD, Venta, TasasCambio } from '../../services/api';
 import CrmFinanzasVentaExpediente from './CrmFinanzasVentaExpediente';
 import CrmFinanzasVentaComisiones from './CrmFinanzasVentaComisiones';
 
 export default function CrmFinanzasVentaDetalle() {
   const { tenantSlug, ventaId } = useParams<{ tenantSlug: string; ventaId: string }>();
   const navigate = useNavigate();
-  const { tenantActual, user } = useAuth();
+  const { tenantActual, user, tieneAcceso, isPlatformAdmin } = useAuth();
   const { setPageHeader } = usePageHeader();
   const [venta, setVenta] = useState<Venta | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [showCancelModal, setShowCancelModal] = useState(false);
+  const [razonCancelacion, setRazonCancelacion] = useState('');
+  const [cancelando, setCancelando] = useState(false);
   const [tasasCambio, setTasasCambio] = useState<TasasCambio>({});
+
+  // Solo admin (finanzas-config) o platform admin pueden anular cualquier venta
+  const esAdmin = isPlatformAdmin || tieneAcceso('finanzas-config');
+  // El usuario puede anular si es admin O si es el creador de la venta
+  const puedeAnular = esAdmin || (venta?.usuario_cerrador_id === user?.id);
 
   useEffect(() => {
     if (ventaId && tenantActual?.id) {
@@ -143,12 +150,14 @@ export default function CrmFinanzasVentaDetalle() {
               <Download className="w-4 h-4" />
               Exportar
             </button>
-            {!venta.cancelada && (
+            {/* Botón Anular - solo admin o creador de la venta */}
+            {!venta.cancelada && puedeAnular && (
               <button
                 onClick={(e) => {
                   e.preventDefault();
                   e.stopPropagation();
-                  console.log('🔴 Botón Anular clickeado, abriendo modal...');
+                  setError(null);
+                  setRazonCancelacion('');
                   setShowCancelModal(true);
                 }}
                 style={{
@@ -223,17 +232,26 @@ export default function CrmFinanzasVentaDetalle() {
 
   const handleCancelVenta = async () => {
     if (!tenantActual?.id || !ventaId) return;
+    if (!razonCancelacion.trim()) {
+      setError('Debe proporcionar una razón para la cancelación');
+      return;
+    }
 
     try {
-      await updateVenta(tenantActual.id, ventaId, {
-        cancelada: true,
-        fecha_cancelacion: new Date().toISOString(),
-      });
+      setCancelando(true);
+      setError(null);
+      const resultado = await cancelarVenta(tenantActual.id, ventaId, razonCancelacion.trim());
+      console.log(`✅ Venta anulada. ${resultado.comisiones_anuladas} comisiones anuladas.`);
       await loadVenta();
       setShowCancelModal(false);
+      setRazonCancelacion('');
     } catch (error: any) {
       console.error('Error anulando venta:', error);
-      setError('Error al anular la venta: ' + error.message);
+      // Mostrar mensaje de error específico del backend
+      const errorMessage = error.message || 'Error al anular la venta';
+      setError(errorMessage);
+    } finally {
+      setCancelando(false);
     }
   };
 
@@ -619,11 +637,13 @@ export default function CrmFinanzasVentaDetalle() {
 
       {/* Modal de cancelación - Renderizado fuera del contenedor principal */}
       {showCancelModal && typeof document !== 'undefined' && createPortal(
-        <div 
+        <div
           className="modal-overlay"
           onClick={() => {
-            console.log('🔴 Clic en overlay, cerrando modal...');
-            setShowCancelModal(false);
+            if (!cancelando) {
+              setShowCancelModal(false);
+              setError(null);
+            }
           }}
           style={{
             position: 'fixed',
@@ -638,7 +658,7 @@ export default function CrmFinanzasVentaDetalle() {
             zIndex: 9999
           }}
         >
-          <div 
+          <div
             className="modal-content"
             onClick={(e) => e.stopPropagation()}
             style={{
@@ -659,14 +679,73 @@ export default function CrmFinanzasVentaDetalle() {
               </div>
             </div>
             <div className="modal-body" style={{ marginBottom: '24px' }}>
-              <p style={{ color: '#64748b', fontSize: '0.9375rem', lineHeight: '1.6' }}>
-                ¿Estás seguro de que deseas anular esta venta? Esta acción no se puede deshacer.
+              <p style={{ color: '#64748b', fontSize: '0.9375rem', lineHeight: '1.6', marginBottom: '16px' }}>
+                ¿Estás seguro de que deseas anular esta venta? Esta acción anulará todas las comisiones asociadas.
               </p>
+
+              {/* Mensaje de error si existe */}
+              {error && (
+                <div style={{
+                  background: '#fef2f2',
+                  border: '1px solid #fecaca',
+                  borderRadius: '8px',
+                  padding: '12px',
+                  marginBottom: '16px',
+                  display: 'flex',
+                  alignItems: 'flex-start',
+                  gap: '10px'
+                }}>
+                  <AlertCircle className="w-5 h-5" style={{ color: '#dc2626', flexShrink: 0, marginTop: '1px' }} />
+                  <span style={{ color: '#991b1b', fontSize: '0.875rem' }}>{error}</span>
+                </div>
+              )}
+
+              {/* Campo de razón de cancelación */}
+              <div style={{ marginTop: '16px' }}>
+                <label style={{
+                  display: 'block',
+                  fontSize: '0.875rem',
+                  fontWeight: 600,
+                  color: '#374151',
+                  marginBottom: '8px'
+                }}>
+                  Razón de la cancelación <span style={{ color: '#dc2626' }}>*</span>
+                </label>
+                <textarea
+                  value={razonCancelacion}
+                  onChange={(e) => setRazonCancelacion(e.target.value)}
+                  placeholder="Indique el motivo por el cual se anula esta venta..."
+                  disabled={cancelando}
+                  style={{
+                    width: '100%',
+                    minHeight: '100px',
+                    padding: '12px',
+                    border: '1px solid #e2e8f0',
+                    borderRadius: '8px',
+                    fontSize: '0.9375rem',
+                    resize: 'vertical',
+                    fontFamily: 'inherit',
+                    outline: 'none',
+                    transition: 'border-color 0.2s',
+                    boxSizing: 'border-box'
+                  }}
+                  onFocus={(e) => {
+                    e.currentTarget.style.borderColor = '#667eea';
+                  }}
+                  onBlur={(e) => {
+                    e.currentTarget.style.borderColor = '#e2e8f0';
+                  }}
+                />
+              </div>
             </div>
             <div className="modal-footer" style={{ display: 'flex', gap: '12px', justifyContent: 'flex-end' }}>
               <button
                 className="btn-secondary"
-                onClick={() => setShowCancelModal(false)}
+                onClick={() => {
+                  setShowCancelModal(false);
+                  setError(null);
+                }}
+                disabled={cancelando}
                 style={{
                   padding: '10px 20px',
                   borderRadius: '8px',
@@ -674,12 +753,15 @@ export default function CrmFinanzasVentaDetalle() {
                   background: 'white',
                   color: '#475569',
                   fontWeight: 500,
-                  cursor: 'pointer',
-                  transition: 'all 0.2s'
+                  cursor: cancelando ? 'not-allowed' : 'pointer',
+                  transition: 'all 0.2s',
+                  opacity: cancelando ? 0.6 : 1
                 }}
                 onMouseEnter={(e) => {
-                  e.currentTarget.style.background = '#f8fafc';
-                  e.currentTarget.style.borderColor = '#cbd5e1';
+                  if (!cancelando) {
+                    e.currentTarget.style.background = '#f8fafc';
+                    e.currentTarget.style.borderColor = '#cbd5e1';
+                  }
                 }}
                 onMouseLeave={(e) => {
                   e.currentTarget.style.background = 'white';
@@ -691,6 +773,7 @@ export default function CrmFinanzasVentaDetalle() {
               <button
                 className="btn-danger"
                 onClick={handleCancelVenta}
+                disabled={cancelando || !razonCancelacion.trim()}
                 style={{
                   display: 'flex',
                   alignItems: 'center',
@@ -698,21 +781,42 @@ export default function CrmFinanzasVentaDetalle() {
                   padding: '10px 20px',
                   borderRadius: '8px',
                   border: 'none',
-                  background: '#dc2626',
+                  background: (cancelando || !razonCancelacion.trim()) ? '#f87171' : '#dc2626',
                   color: 'white',
                   fontWeight: 600,
-                  cursor: 'pointer',
-                  transition: 'all 0.2s'
+                  cursor: (cancelando || !razonCancelacion.trim()) ? 'not-allowed' : 'pointer',
+                  transition: 'all 0.2s',
+                  opacity: (cancelando || !razonCancelacion.trim()) ? 0.7 : 1
                 }}
                 onMouseEnter={(e) => {
-                  e.currentTarget.style.background = '#b91c1c';
+                  if (!cancelando && razonCancelacion.trim()) {
+                    e.currentTarget.style.background = '#b91c1c';
+                  }
                 }}
                 onMouseLeave={(e) => {
-                  e.currentTarget.style.background = '#dc2626';
+                  if (!cancelando && razonCancelacion.trim()) {
+                    e.currentTarget.style.background = '#dc2626';
+                  }
                 }}
               >
-                <Ban className="w-4 h-4" />
-                Sí, Anular
+                {cancelando ? (
+                  <>
+                    <span className="animate-spin" style={{
+                      width: '16px',
+                      height: '16px',
+                      border: '2px solid transparent',
+                      borderTopColor: 'white',
+                      borderRadius: '50%',
+                      animation: 'spin 1s linear infinite'
+                    }} />
+                    Anulando...
+                  </>
+                ) : (
+                  <>
+                    <Ban className="w-4 h-4" />
+                    Sí, Anular
+                  </>
+                )}
               </button>
             </div>
           </div>

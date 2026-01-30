@@ -3897,6 +3897,28 @@ export async function deleteVenta(tenantId: string, ventaId: string, token?: str
   }, token);
 }
 
+/**
+ * Cancela (anula) una venta
+ * Solo admin o creador puede cancelar
+ * No se puede cancelar si tiene cobros registrados
+ * @param tenantId - ID del tenant
+ * @param ventaId - ID de la venta
+ * @param razonCancelacion - Motivo de la cancelación
+ * @param token - Token de autenticación opcional
+ */
+export async function cancelarVenta(
+  tenantId: string,
+  ventaId: string,
+  razonCancelacion: string,
+  token?: string | null
+): Promise<Venta & { comisiones_anuladas: number }> {
+  const response = await apiFetch(`/tenants/${tenantId}/ventas/${ventaId}/cancelar`, {
+    method: 'POST',
+    body: JSON.stringify({ razon_cancelacion: razonCancelacion }),
+  }, token);
+  return response.json();
+}
+
 // ==================== COMISIONES ====================
 
 /**
