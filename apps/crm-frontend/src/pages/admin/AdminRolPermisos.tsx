@@ -47,6 +47,14 @@ export default function AdminRolPermisos() {
   const [showCopyModal, setShowCopyModal] = useState(false);
   const [copySourceRoleId, setCopySourceRoleId] = useState<string>('');
 
+  // Filtro de categoría (platform-admin vs tenant modules)
+  const [categoryFilter, setCategoryFilter] = useState<'all' | 'platform' | 'tenant'>('all');
+
+  // Categorías de plataforma (admin panel)
+  const platformCategories = ['platform-admin'];
+  // Categorías de tenant (CRM)
+  const tenantCategories = ['crm', 'web', 'admin', 'tools', 'finanzas', 'sistema-fases', 'mensajeria', 'documentos', 'marketing'];
+
   // Cargar roles al inicio
   useEffect(() => {
     loadRoles();
@@ -228,15 +236,29 @@ export default function AdminRolPermisos() {
   };
 
   // Marcar/desmarcar todos los permisos de una columna
+  // Función helper para filtrar módulos según el filtro activo
+  const getFilteredModulos = () => {
+    if (!matrix) return [];
+    return matrix.modulos.filter(modulo => {
+      if (categoryFilter === 'all') return true;
+      if (categoryFilter === 'platform') return platformCategories.includes(modulo.categoria || '');
+      if (categoryFilter === 'tenant') return tenantCategories.includes(modulo.categoria || '');
+      return true;
+    });
+  };
+
   const handleToggleColumn = (campo: 'puedeVer' | 'puedeCrear' | 'puedeEditar' | 'puedeEliminar') => {
     if (!matrix) return;
 
-    // Verificar si todos están marcados
-    const allChecked = matrix.modulos.every(m => editedPermisos.get(m.id)?.[campo]);
+    // Solo afectar módulos visibles según el filtro actual
+    const visibleModulos = getFilteredModulos();
+
+    // Verificar si todos los visibles están marcados
+    const allChecked = visibleModulos.every(m => editedPermisos.get(m.id)?.[campo]);
 
     setEditedPermisos(prev => {
       const newMap = new Map(prev);
-      matrix.modulos.forEach(modulo => {
+      visibleModulos.forEach(modulo => {
         const current = newMap.get(modulo.id);
         if (current) {
           if (campo === 'puedeVer') {
@@ -389,6 +411,31 @@ export default function AdminRolPermisos() {
             </div>
           </div>
 
+          {/* Filtro de categorías */}
+          <div className="category-filter">
+            <span className="filter-label">Filtrar módulos:</span>
+            <div className="filter-buttons">
+              <button
+                className={`filter-btn ${categoryFilter === 'all' ? 'active' : ''}`}
+                onClick={() => setCategoryFilter('all')}
+              >
+                Todos ({matrix.modulos.length})
+              </button>
+              <button
+                className={`filter-btn ${categoryFilter === 'platform' ? 'active' : ''}`}
+                onClick={() => setCategoryFilter('platform')}
+              >
+                Plataforma ({matrix.modulos.filter(m => platformCategories.includes(m.categoria || '')).length})
+              </button>
+              <button
+                className={`filter-btn ${categoryFilter === 'tenant' ? 'active' : ''}`}
+                onClick={() => setCategoryFilter('tenant')}
+              >
+                Tenant/CRM ({matrix.modulos.filter(m => tenantCategories.includes(m.categoria || '')).length})
+              </button>
+            </div>
+          </div>
+
           <div className="matrix-table-container">
             <table className="matrix-table">
               <thead>
@@ -448,7 +495,7 @@ export default function AdminRolPermisos() {
                 </tr>
               </thead>
               <tbody>
-                {matrix.modulos.map(modulo => {
+                {getFilteredModulos().map(modulo => {
                   const permisos = editedPermisos.get(modulo.id);
                   return (
                     <tr key={modulo.id} className={permisos?.puedeVer ? 'has-access' : 'no-access'}>
@@ -457,7 +504,7 @@ export default function AdminRolPermisos() {
                           <span className="module-name">{modulo.nombre}</span>
                           <span className="module-code">{modulo.id}</span>
                           {modulo.categoria && (
-                            <span className="module-category">{modulo.categoria}</span>
+                            <span className={`module-category cat-${modulo.categoria}`}>{modulo.categoria}</span>
                           )}
                         </div>
                       </td>
@@ -829,6 +876,49 @@ const styles = `
     text-transform: uppercase;
   }
 
+  .category-filter {
+    display: flex;
+    align-items: center;
+    gap: 16px;
+    padding: 16px 24px;
+    background: #F1F5F9;
+    border-bottom: 1px solid #E2E8F0;
+  }
+
+  .filter-label {
+    font-size: 0.875rem;
+    font-weight: 600;
+    color: #475569;
+  }
+
+  .filter-buttons {
+    display: flex;
+    gap: 8px;
+  }
+
+  .filter-btn {
+    padding: 8px 16px;
+    border: 1px solid #CBD5E1;
+    background: #FFFFFF;
+    border-radius: 8px;
+    font-size: 0.8125rem;
+    font-weight: 500;
+    color: #475569;
+    cursor: pointer;
+    transition: all 0.2s;
+  }
+
+  .filter-btn:hover {
+    background: #F8FAFC;
+    border-color: #94A3B8;
+  }
+
+  .filter-btn.active {
+    background: #2563EB;
+    border-color: #2563EB;
+    color: white;
+  }
+
   .matrix-table-container {
     overflow-x: auto;
   }
@@ -911,6 +1001,38 @@ const styles = `
     border-radius: 4px;
     text-transform: uppercase;
     margin-left: 6px;
+  }
+
+  /* Colores por categoría */
+  .module-category.cat-platform-admin {
+    background: #7C3AED;
+  }
+  .module-category.cat-crm {
+    background: #2563EB;
+  }
+  .module-category.cat-web {
+    background: #059669;
+  }
+  .module-category.cat-admin {
+    background: #DC2626;
+  }
+  .module-category.cat-tools {
+    background: #D97706;
+  }
+  .module-category.cat-finanzas {
+    background: #16A34A;
+  }
+  .module-category.cat-sistema-fases {
+    background: #0891B2;
+  }
+  .module-category.cat-mensajeria {
+    background: #7C3AED;
+  }
+  .module-category.cat-documentos {
+    background: #6366F1;
+  }
+  .module-category.cat-marketing {
+    background: #EA580C;
   }
 
   .matrix-table tr.has-access {
