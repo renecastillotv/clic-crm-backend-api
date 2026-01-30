@@ -305,10 +305,40 @@ export default function CrmFinanzasComisiones() {
   };
 
   // Verificar si hay filtros activos
-  const hayFiltrosActivos = filtroUsuarioTipo !== 'todo_equipo' || filtroRol || filtroEstado;
+  // Para usuarios no-admin, filtroUsuarioTipo está fijo en 'mis_comisiones' y no se considera como filtro activo
+  // Para admin, 'todo_equipo' es el valor por defecto
+  const hayFiltrosActivos = esAdmin
+    ? (filtroUsuarioTipo !== 'todo_equipo' || filtroRol || filtroEstado || busqueda)
+    : (filtroRol || filtroEstado || busqueda);
+
+  // Filtrar roles disponibles para mostrar solo los que el usuario realmente tiene
+  // Esto aplica para usuarios no-admin (admin ve todos los roles)
+  const rolesDisponiblesFiltered = useMemo(() => {
+    if (esAdmin || !resumen?.roles) {
+      return ROLES_DISPONIBLES;
+    }
+    // Para usuarios normales, filtrar por los roles que realmente tienen comisiones
+    const rolesConComisiones = new Set<string>();
+    if (resumen.roles.vendedor > 0) rolesConComisiones.add('vendedor');
+    if (resumen.roles.captador > 0) rolesConComisiones.add('captador');
+    if (resumen.roles.referidor > 0) rolesConComisiones.add('referidor');
+    if (resumen.roles.externo > 0) rolesConComisiones.add('vendedor_externo');
+    // No mostrar 'owner' para usuarios normales
+
+    // Si solo tiene un rol, no mostrar el dropdown de filtro (siempre devolver array vacío para ocultar)
+    if (rolesConComisiones.size <= 1) {
+      return []; // No tiene sentido filtrar si solo tiene un rol
+    }
+
+    // Filtrar ROLES_DISPONIBLES para mostrar solo los roles que tiene + "Todos los roles"
+    return ROLES_DISPONIBLES.filter(r =>
+      r.value === '' || rolesConComisiones.has(r.value)
+    );
+  }, [esAdmin, resumen?.roles]);
 
   const limpiarFiltros = () => {
-    setFiltroUsuarioTipo('todo_equipo');
+    // Para admin, limpiar vuelve a 'todo_equipo'; para usuarios normales, mantiene 'mis_comisiones'
+    setFiltroUsuarioTipo(esAdmin ? 'todo_equipo' : 'mis_comisiones');
     setUsuarioSeleccionado('');
     setFiltroRol('');
     setFiltroEstado('');
@@ -739,26 +769,28 @@ export default function CrmFinanzasComisiones() {
             </select>
           )}
 
-          {/* Filtro de rol */}
-          <select
-            value={filtroRol}
-            onChange={(e) => setFiltroRol(e.target.value)}
-            disabled={filtroUsuarioTipo === 'empresa'}
-            style={{
-              padding: '10px 12px',
-              border: '1px solid #e2e8f0',
-              borderRadius: '8px',
-              fontSize: '14px',
-              background: 'white',
-              cursor: filtroUsuarioTipo === 'empresa' ? 'not-allowed' : 'pointer',
-              opacity: filtroUsuarioTipo === 'empresa' ? 0.5 : 1,
-              minWidth: '140px',
-            }}
-          >
-            {ROLES_DISPONIBLES.map(r => (
-              <option key={r.value} value={r.value}>{r.label}</option>
-            ))}
-          </select>
+          {/* Filtro de rol - solo mostrar si hay más de un rol disponible */}
+          {rolesDisponiblesFiltered.length > 0 && (
+            <select
+              value={filtroRol}
+              onChange={(e) => setFiltroRol(e.target.value)}
+              disabled={filtroUsuarioTipo === 'empresa'}
+              style={{
+                padding: '10px 12px',
+                border: '1px solid #e2e8f0',
+                borderRadius: '8px',
+                fontSize: '14px',
+                background: 'white',
+                cursor: filtroUsuarioTipo === 'empresa' ? 'not-allowed' : 'pointer',
+                opacity: filtroUsuarioTipo === 'empresa' ? 0.5 : 1,
+                minWidth: '140px',
+              }}
+            >
+              {rolesDisponiblesFiltered.map(r => (
+                <option key={r.value} value={r.value}>{r.label}</option>
+              ))}
+            </select>
+          )}
 
           {/* Filtro de estado */}
           <select
