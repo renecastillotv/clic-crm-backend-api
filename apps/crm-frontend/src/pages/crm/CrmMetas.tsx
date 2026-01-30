@@ -558,6 +558,23 @@ export default function CrmMetas() {
                   </div>
                 )}
 
+                {/* Indicador de meta personal vs asignada (solo en Mis Metas) */}
+                {vistaActiva === 'mis-metas' && (
+                  <div className={`meta-origen ${meta.origen === 'personal' ? 'personal' : 'asignada'}`}>
+                    {meta.origen === 'personal' ? (
+                      <>
+                        <User className="w-4 h-4" />
+                        <span>Meta personal</span>
+                      </>
+                    ) : (
+                      <>
+                        <Crown className="w-4 h-4" />
+                        <span>Asignada por {meta.creador_nombre || 'admin'}</span>
+                      </>
+                    )}
+                  </div>
+                )}
+
                 {/* Progreso visual */}
                 <div className="meta-progreso">
                   <div className="progreso-header">
@@ -628,6 +645,7 @@ export default function CrmMetas() {
 
                 {/* Acciones */}
                 <div className="meta-actions">
+                  {/* Actualizar progreso - el usuario siempre puede actualizar sus metas */}
                   {meta.estado === 'activa' && (
                     <button
                       className="action-btn progress-btn"
@@ -640,18 +658,23 @@ export default function CrmMetas() {
                       Actualizar
                     </button>
                   )}
-                  <button
-                    className="action-btn"
-                    onClick={() => openModal(meta)}
-                  >
-                    <Edit3 className="w-4 h-4" />
-                  </button>
-                  <button
-                    className="action-btn danger"
-                    onClick={() => setDeleteConfirm(meta.id)}
-                  >
-                    <Trash2 className="w-4 h-4" />
-                  </button>
+                  {/* Editar/Eliminar - solo admin o si es meta personal del usuario */}
+                  {(isTenantAdmin || meta.origen === 'personal') && (
+                    <>
+                      <button
+                        className="action-btn"
+                        onClick={() => openModal(meta)}
+                      >
+                        <Edit3 className="w-4 h-4" />
+                      </button>
+                      <button
+                        className="action-btn danger"
+                        onClick={() => setDeleteConfirm(meta.id)}
+                      >
+                        <Trash2 className="w-4 h-4" />
+                      </button>
+                    </>
+                  )}
                 </div>
               </div>
             );
@@ -1357,6 +1380,38 @@ const styles = `
     border-radius: 3px;
     font-size: 0.65rem;
     font-weight: 600;
+  }
+
+  /* Indicador de origen de meta (personal vs asignada) */
+  .meta-origen {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    font-size: 0.75rem;
+    padding: 6px 10px;
+    border-radius: 6px;
+    margin-bottom: 10px;
+  }
+
+  .meta-origen.personal {
+    background: linear-gradient(135deg, #f0fdf4 0%, #dcfce7 100%);
+    color: #166534;
+    border: 1px solid #bbf7d0;
+  }
+
+  .meta-origen.asignada {
+    background: linear-gradient(135deg, #eff6ff 0%, #dbeafe 100%);
+    color: #1e40af;
+    border: 1px solid #93c5fd;
+  }
+
+  .meta-origen svg {
+    width: 14px;
+    height: 14px;
+  }
+
+  .meta-origen span {
+    font-weight: 500;
   }
 
   /* Progreso */
