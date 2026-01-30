@@ -18,7 +18,7 @@ import { calcularYCrearComisiones, modificarDistribucion, getMisComisiones } fro
 import * as ventasCobrosService from '../../services/ventasCobrosService.js';
 import * as ventasHistorialService from '../../services/ventasHistorialService.js';
 import * as pagosComisionesService from '../../services/pagosComisionesService.js';
-import { resolveUserScope, getOwnFilter, requirePermission } from '../../middleware/scopeResolver.js';
+import { resolveUserScope, getOwnFilter, requirePermission, canEdit, hasPermission } from '../../middleware/scopeResolver.js';
 
 const router = express.Router({ mergeParams: true });
 
@@ -489,10 +489,40 @@ router.post('/', requirePermission('finanzas-ventas', 'crear'), async (req: Requ
 /**
  * PUT /api/tenants/:tenantId/ventas/:ventaId
  * Actualiza una venta
+ *
+ * Restricciones:
+ * - Solo admin o creador de la venta puede editar
  */
 router.put('/:ventaId', requirePermission('finanzas-ventas', 'editar'), async (req: Request<VentaParams>, res: Response, next: NextFunction) => {
   try {
     const { tenantId, ventaId } = req.params;
+
+    // 1. Obtener la venta para validar permisos de ownership
+    const ventaExistente = await query(
+      `SELECT id, usuario_cerrador_id, cancelada FROM ventas WHERE tenant_id = $1 AND id = $2 AND activo = true`,
+      [tenantId, ventaId]
+    );
+
+    if (ventaExistente.rows.length === 0) {
+      return res.status(404).json({ error: 'Venta no encontrada' });
+    }
+
+    // 2. Validar que el usuario puede editar (es admin o creador)
+    if (!canEdit(req, 'finanzas-ventas', ventaExistente.rows[0].usuario_cerrador_id)) {
+      return res.status(403).json({
+        error: 'Sin permisos',
+        message: 'Solo el administrador o el creador de la venta puede editarla'
+      });
+    }
+
+    // 3. No permitir editar ventas canceladas
+    if (ventaExistente.rows[0].cancelada) {
+      return res.status(400).json({
+        error: 'Venta cancelada',
+        message: 'No se puede editar una venta que ha sido cancelada'
+      });
+    }
+
     const {
       nombre_negocio,
       descripcion,
@@ -658,15 +688,35 @@ router.put('/:ventaId', requirePermission('finanzas-ventas', 'editar'), async (r
 /**
  * DELETE /api/tenants/:tenantId/ventas/:ventaId
  * Elimina (desactiva) una venta
+ *
+ * Restricciones:
+ * - Solo admin o creador de la venta puede eliminar
+ * - Preferir cancelar en lugar de eliminar (conserva historial)
  */
 router.delete('/:ventaId', requirePermission('finanzas-ventas', 'eliminar'), async (req: Request<VentaParams>, res: Response, next: NextFunction) => {
   try {
     const { tenantId, ventaId } = req.params;
-    const sql = 'UPDATE ventas SET activo = false, updated_at = NOW() WHERE tenant_id = $1 AND id = $2 RETURNING *';
-    const result = await query(sql, [tenantId, ventaId]);
-    if (result.rows.length === 0) {
+
+    // 1. Obtener la venta para validar permisos de ownership
+    const ventaExistente = await query(
+      `SELECT id, usuario_cerrador_id FROM ventas WHERE tenant_id = $1 AND id = $2 AND activo = true`,
+      [tenantId, ventaId]
+    );
+
+    if (ventaExistente.rows.length === 0) {
       return res.status(404).json({ error: 'Venta no encontrada' });
     }
+
+    // 2. Validar que el usuario puede eliminar (es admin o creador)
+    if (!canEdit(req, 'finanzas-ventas', ventaExistente.rows[0].usuario_cerrador_id)) {
+      return res.status(403).json({
+        error: 'Sin permisos',
+        message: 'Solo el administrador o el creador de la venta puede eliminarla'
+      });
+    }
+
+    const sql = 'UPDATE ventas SET activo = false, updated_at = NOW() WHERE tenant_id = $1 AND id = $2 RETURNING *';
+    const result = await query(sql, [tenantId, ventaId]);
     res.json({ success: true, message: 'Venta eliminada correctamente' });
   } catch (error) {
     next(error);
@@ -864,10 +914,34 @@ router.post('/:ventaId/recalcular-habilitados', async (req: Request<VentaParams>
 /**
  * POST /api/tenants/:tenantId/ventas/:ventaId/completar
  * Marca una venta como completada
+ *
+ * Restricciones:
+ * - Solo admin o creador de la venta puede marcar como completada
  */
-router.post('/:ventaId/completar', async (req: Request<VentaParams>, res: Response, next: NextFunction) => {
+router.post('/:ventaId/completar', requirePermission('finanzas-ventas', 'editar'), async (req: Request<VentaParams>, res: Response, next: NextFunction) => {
   try {
     const { tenantId, ventaId } = req.params;
+
+    // 1. Obtener la venta para validar permisos
+    const ventaResult = await query(
+      `SELECT id, usuario_cerrador_id FROM ventas WHERE tenant_id = $1 AND id = $2 AND activo = true`,
+      [tenantId, ventaId]
+    );
+
+    if (ventaResult.rows.length === 0) {
+      return res.status(404).json({ error: 'Venta no encontrada' });
+    }
+
+    const venta = ventaResult.rows[0];
+
+    // 2. Validar que el usuario puede completar (es admin o creador)
+    if (!canEdit(req, 'finanzas-ventas', venta.usuario_cerrador_id)) {
+      return res.status(403).json({
+        error: 'Sin permisos',
+        message: 'Solo el administrador o el creador de la venta puede marcarla como completada'
+      });
+    }
+
     const sql = `
       UPDATE ventas SET
         completada = true,
@@ -877,9 +951,6 @@ router.post('/:ventaId/completar', async (req: Request<VentaParams>, res: Respon
       RETURNING *
     `;
     const result = await query(sql, [tenantId, ventaId]);
-    if (result.rows.length === 0) {
-      return res.status(404).json({ error: 'Venta no encontrada' });
-    }
     res.json(result.rows[0]);
   } catch (error) {
     next(error);
@@ -888,13 +959,62 @@ router.post('/:ventaId/completar', async (req: Request<VentaParams>, res: Respon
 
 /**
  * POST /api/tenants/:tenantId/ventas/:ventaId/cancelar
- * Cancela una venta
+ * Cancela una venta (soft delete)
+ *
+ * Restricciones:
+ * - Solo admin o creador de la venta puede cancelar
+ * - No se puede cancelar si tiene pagos (cobros) registrados
+ * - Al cancelar se anulan las comisiones asociadas
  */
-router.post('/:ventaId/cancelar', async (req: Request<VentaParams>, res: Response, next: NextFunction) => {
+router.post('/:ventaId/cancelar', requirePermission('finanzas-ventas', 'eliminar'), async (req: Request<VentaParams>, res: Response, next: NextFunction) => {
   try {
     const { tenantId, ventaId } = req.params;
-    const { razon_cancelacion, cancelado_por_id } = req.body;
+    const { razon_cancelacion } = req.body;
+    const cancelado_por_id = (req as any).scope?.dbUserId;
 
+    // 1. Obtener la venta para validar permisos
+    const ventaResult = await query(
+      `SELECT id, usuario_cerrador_id, nombre_negocio, cancelada
+       FROM ventas WHERE tenant_id = $1 AND id = $2 AND activo = true`,
+      [tenantId, ventaId]
+    );
+
+    if (ventaResult.rows.length === 0) {
+      return res.status(404).json({ error: 'Venta no encontrada' });
+    }
+
+    const venta = ventaResult.rows[0];
+
+    // Ya está cancelada
+    if (venta.cancelada) {
+      return res.status(400).json({ error: 'La venta ya está cancelada' });
+    }
+
+    // 2. Validar que el usuario puede cancelar (es admin o creador)
+    if (!canEdit(req, 'finanzas-ventas', venta.usuario_cerrador_id)) {
+      return res.status(403).json({
+        error: 'Sin permisos',
+        message: 'Solo el administrador o el creador de la venta puede cancelarla'
+      });
+    }
+
+    // 3. Verificar que no tenga cobros activos
+    const cobrosResult = await query(
+      `SELECT COUNT(*) as count, COALESCE(SUM(monto), 0) as total_cobrado
+       FROM ventas_cobros
+       WHERE tenant_id = $1 AND venta_id = $2 AND activo = true`,
+      [tenantId, ventaId]
+    );
+
+    const cobros = cobrosResult.rows[0];
+    if (parseInt(cobros.count) > 0) {
+      return res.status(400).json({
+        error: 'No se puede cancelar',
+        message: `La venta tiene ${cobros.count} cobro(s) registrado(s) por un total de ${parseFloat(cobros.total_cobrado).toFixed(2)}. Debe eliminar los cobros antes de cancelar la venta.`
+      });
+    }
+
+    // 4. Cancelar la venta
     const sql = `
       UPDATE ventas SET
         cancelada = true,
@@ -906,10 +1026,43 @@ router.post('/:ventaId/cancelar', async (req: Request<VentaParams>, res: Respons
       RETURNING *
     `;
     const result = await query(sql, [tenantId, ventaId, cancelado_por_id, razon_cancelacion]);
-    if (result.rows.length === 0) {
-      return res.status(404).json({ error: 'Venta no encontrada' });
-    }
-    res.json(result.rows[0]);
+
+    // 5. Anular las comisiones asociadas (marcar como anulado)
+    const comisionesAnuladas = await query(
+      `UPDATE comisiones SET
+        estado = 'anulado',
+        monto_habilitado = 0,
+        notas = COALESCE(notas, '') || E'\n[Anulada por cancelación de venta: ' || $3 || ']',
+        updated_at = NOW()
+       WHERE tenant_id = $1 AND venta_id = $2
+       RETURNING id, usuario_id, monto, datos_extra`,
+      [tenantId, ventaId, razon_cancelacion || 'Sin razón especificada']
+    );
+
+    console.log(`✅ Venta ${ventaId} cancelada. ${comisionesAnuladas.rows.length} comisiones anuladas.`);
+
+    // 6. Registrar en historial
+    await ventasHistorialService.registrarCambio({
+      tenantId,
+      ventaId,
+      tipoCambio: 'venta_cancelada',
+      entidad: 'venta',
+      entidadId: ventaId,
+      datosAnteriores: { cancelada: false },
+      datosNuevos: {
+        cancelada: true,
+        razon_cancelacion,
+        comisiones_anuladas: comisionesAnuladas.rows.length
+      },
+      descripcion: `Venta cancelada: ${venta.nombre_negocio}. Razón: ${razon_cancelacion || 'No especificada'}`,
+      usuarioId: cancelado_por_id,
+      usuarioNombre: '',
+    });
+
+    res.json({
+      ...result.rows[0],
+      comisiones_anuladas: comisionesAnuladas.rows.length,
+    });
   } catch (error) {
     next(error);
   }
@@ -1008,10 +1161,31 @@ router.get('/:ventaId/comisiones', async (req: Request<VentaParams>, res: Respon
 /**
  * POST /api/tenants/:tenantId/ventas/:ventaId/comisiones
  * Crea una nueva comisión para una venta
+ *
+ * Restricciones:
+ * - Solo admin o creador de la venta puede agregar comisiones
  */
-router.post('/:ventaId/comisiones', async (req: Request<VentaParams>, res: Response, next: NextFunction) => {
+router.post('/:ventaId/comisiones', requirePermission('finanzas-comisiones', 'crear'), async (req: Request<VentaParams>, res: Response, next: NextFunction) => {
   try {
     const { tenantId, ventaId } = req.params;
+
+    // Verificar que el usuario puede modificar la venta
+    const ventaResult = await query(
+      `SELECT usuario_cerrador_id FROM ventas WHERE tenant_id = $1 AND id = $2 AND activo = true`,
+      [tenantId, ventaId]
+    );
+
+    if (ventaResult.rows.length === 0) {
+      return res.status(404).json({ error: 'Venta no encontrada' });
+    }
+
+    if (!canEdit(req, 'finanzas-ventas', ventaResult.rows[0].usuario_cerrador_id)) {
+      return res.status(403).json({
+        error: 'Sin permisos',
+        message: 'Solo el administrador o el creador de la venta puede agregar comisiones'
+      });
+    }
+
     const {
       usuario_id,
       monto,
@@ -1051,10 +1225,31 @@ router.post('/:ventaId/comisiones', async (req: Request<VentaParams>, res: Respo
 /**
  * PUT /api/tenants/:tenantId/ventas/:ventaId/comisiones/:comisionId
  * Actualiza una comisión
+ *
+ * Restricciones:
+ * - Solo admin o creador de la venta puede editar comisiones
  */
-router.put('/:ventaId/comisiones/:comisionId', async (req: Request<ComisionParams>, res: Response, next: NextFunction) => {
+router.put('/:ventaId/comisiones/:comisionId', requirePermission('finanzas-comisiones', 'editar'), async (req: Request<ComisionParams>, res: Response, next: NextFunction) => {
   try {
     const { tenantId, ventaId, comisionId } = req.params;
+
+    // Verificar que el usuario puede modificar la venta
+    const ventaResult = await query(
+      `SELECT usuario_cerrador_id FROM ventas WHERE tenant_id = $1 AND id = $2 AND activo = true`,
+      [tenantId, ventaId]
+    );
+
+    if (ventaResult.rows.length === 0) {
+      return res.status(404).json({ error: 'Venta no encontrada' });
+    }
+
+    if (!canEdit(req, 'finanzas-ventas', ventaResult.rows[0].usuario_cerrador_id)) {
+      return res.status(403).json({
+        error: 'Sin permisos',
+        message: 'Solo el administrador o el creador de la venta puede editar comisiones'
+      });
+    }
+
     const {
       monto,
       moneda,
@@ -1097,10 +1292,31 @@ router.put('/:ventaId/comisiones/:comisionId', async (req: Request<ComisionParam
 /**
  * DELETE /api/tenants/:tenantId/ventas/:ventaId/comisiones/:comisionId
  * Elimina una comisión
+ *
+ * Restricciones:
+ * - Solo admin o creador de la venta puede eliminar comisiones
  */
-router.delete('/:ventaId/comisiones/:comisionId', async (req: Request<ComisionParams>, res: Response, next: NextFunction) => {
+router.delete('/:ventaId/comisiones/:comisionId', requirePermission('finanzas-comisiones', 'eliminar'), async (req: Request<ComisionParams>, res: Response, next: NextFunction) => {
   try {
     const { tenantId, ventaId, comisionId } = req.params;
+
+    // Verificar que el usuario puede modificar la venta
+    const ventaResult = await query(
+      `SELECT usuario_cerrador_id FROM ventas WHERE tenant_id = $1 AND id = $2 AND activo = true`,
+      [tenantId, ventaId]
+    );
+
+    if (ventaResult.rows.length === 0) {
+      return res.status(404).json({ error: 'Venta no encontrada' });
+    }
+
+    if (!canEdit(req, 'finanzas-ventas', ventaResult.rows[0].usuario_cerrador_id)) {
+      return res.status(403).json({
+        error: 'Sin permisos',
+        message: 'Solo el administrador o el creador de la venta puede eliminar comisiones'
+      });
+    }
+
     const sql = 'DELETE FROM comisiones WHERE tenant_id = $1 AND venta_id = $2 AND id = $3 RETURNING *';
     const result = await query(sql, [tenantId, ventaId, comisionId]);
     if (result.rows.length === 0) {
