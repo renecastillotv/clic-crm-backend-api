@@ -543,10 +543,10 @@ export default function CrmFinanzasComisiones() {
           </div>
         </div>
       ) : (
-        /* Vista Usuario: 3 tarjetas con info personal de comisiones */
+        /* Vista Usuario: 4 tarjetas con info personal de comisiones */
         <div style={{
           display: 'grid',
-          gridTemplateColumns: 'repeat(3, 1fr)',
+          gridTemplateColumns: 'repeat(4, 1fr)',
           gap: '12px',
           marginBottom: '24px',
         }}>
@@ -608,6 +608,52 @@ export default function CrmFinanzasComisiones() {
                 </div>
                 <div style={{ fontSize: '11px', opacity: 0.8, marginTop: '4px' }}>
                   {(resumen?.estados.pendientes || 0) + (resumen?.estados.parciales || 0)} pendientes de pago
+                </div>
+              </div>
+            </div>
+          </div>
+
+          {/* 4. Proyectado a Cobrar (basado en fechas de entrega de proyectos) */}
+          <div style={{
+            background: 'linear-gradient(135deg, #06b6d4 0%, #0891b2 100%)',
+            borderRadius: '12px',
+            padding: '20px',
+            color: 'white',
+            position: 'relative',
+          }}>
+            <div style={{ display: 'flex', alignItems: 'flex-start', gap: '12px' }}>
+              <TrendingUp size={24} style={{ flexShrink: 0, marginTop: '2px' }} />
+              <div style={{ flex: 1, minWidth: 0 }}>
+                <div style={{ fontSize: '12px', opacity: 0.9, marginBottom: '4px' }}>Proyectado a Cobrar</div>
+                {/* Desglose por período */}
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                    <span style={{ fontSize: '11px', opacity: 0.85 }}>Próx. Trimestre:</span>
+                    <span style={{ fontSize: '14px', fontWeight: 700 }}>
+                      {formatCurrency(resumen?.proyecciones?.proximo_trimestre || 0)}
+                    </span>
+                  </div>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                    <span style={{ fontSize: '11px', opacity: 0.85 }}>Resto del Año:</span>
+                    <span style={{ fontSize: '14px', fontWeight: 700 }}>
+                      {formatCurrency(resumen?.proyecciones?.resto_año || 0)}
+                    </span>
+                  </div>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                    <span style={{ fontSize: '11px', opacity: 0.85 }}>Próximo Año:</span>
+                    <span style={{ fontSize: '14px', fontWeight: 700 }}>
+                      {formatCurrency(resumen?.proyecciones?.proximo_año || 0)}
+                    </span>
+                  </div>
+                </div>
+                <div style={{
+                  fontSize: '10px',
+                  opacity: 0.7,
+                  marginTop: '8px',
+                  borderTop: '1px solid rgba(255,255,255,0.2)',
+                  paddingTop: '6px'
+                }}>
+                  Basado en fechas de entrega +45 días
                 </div>
               </div>
             </div>

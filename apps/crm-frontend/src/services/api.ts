@@ -4149,6 +4149,12 @@ export interface ComisionesResumen {
     empresa: number;
     externo: number;
   };
+  proyecciones?: {
+    proximo_trimestre: number;
+    resto_año: number;
+    proximo_año: number;
+    despues: number;
+  };
 }
 
 /**

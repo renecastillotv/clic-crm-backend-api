@@ -443,6 +443,60 @@ router.get('/resumen', async (req: Request<TenantParams, any, any, ComisionesQue
     // Por cobrar futuro = lo proyectado menos lo ya cobrado del cliente
     const porCobrarFuturo = Math.max(0, totalProyectado - totalCobradoCliente);
 
+    // Query para proyecciones basadas en fecha_entrega_proyecto
+    // La fecha de pago esperada es fecha_entrega + 45 días
+    const proyeccionesSql = `
+      WITH fechas_referencia AS (
+        SELECT
+          CURRENT_DATE as hoy,
+          DATE_TRUNC('quarter', CURRENT_DATE) + INTERVAL '3 months' - INTERVAL '1 day' as fin_trimestre,
+          DATE_TRUNC('year', CURRENT_DATE) + INTERVAL '1 year' - INTERVAL '1 day' as fin_año,
+          DATE_TRUNC('year', CURRENT_DATE) + INTERVAL '2 years' - INTERVAL '1 day' as fin_proximo_año
+      ),
+      comisiones_proyectadas AS (
+        SELECT
+          c.id,
+          c.monto,
+          c.estado,
+          c.monto_pagado,
+          -- Monto pendiente de esta comisión
+          GREATEST(0, c.monto - COALESCE(c.monto_pagado, 0)) as monto_pendiente,
+          -- Fecha de pago esperada: fecha_entrega + 45 días
+          COALESCE(c.fecha_entrega_proyecto + INTERVAL '45 days', NULL) as fecha_pago_esperada,
+          f.hoy,
+          f.fin_trimestre,
+          f.fin_año,
+          f.fin_proximo_año
+        FROM comisiones c
+        INNER JOIN ventas v ON c.venta_id = v.id AND v.activo = true
+        CROSS JOIN fechas_referencia f
+        ${whereClause}
+          AND c.estado != 'pagado'
+          AND c.fecha_entrega_proyecto IS NOT NULL
+      )
+      SELECT
+        -- Próximo trimestre: desde hoy hasta fin del trimestre actual
+        COALESCE(SUM(monto_pendiente) FILTER (
+          WHERE fecha_pago_esperada >= hoy AND fecha_pago_esperada <= fin_trimestre
+        ), 0) as proximo_trimestre,
+        -- Resto del año: desde fin del trimestre hasta fin de año
+        COALESCE(SUM(monto_pendiente) FILTER (
+          WHERE fecha_pago_esperada > fin_trimestre AND fecha_pago_esperada <= fin_año
+        ), 0) as resto_año,
+        -- Próximo año: todo el año siguiente
+        COALESCE(SUM(monto_pendiente) FILTER (
+          WHERE fecha_pago_esperada > fin_año AND fecha_pago_esperada <= fin_proximo_año
+        ), 0) as proximo_año,
+        -- Sin fecha definida o más allá de próximo año
+        COALESCE(SUM(monto_pendiente) FILTER (
+          WHERE fecha_pago_esperada > fin_proximo_año OR fecha_pago_esperada IS NULL
+        ), 0) as despues
+      FROM comisiones_proyectadas
+    `;
+
+    const proyeccionesResult = await query(proyeccionesSql, params);
+    const proyRow = proyeccionesResult.rows[0] || {};
+
     res.json({
       montos: {
         total_proyectado: totalProyectado,
@@ -464,6 +518,12 @@ router.get('/resumen', async (req: Request<TenantParams, any, any, ComisionesQue
         referidor: parseInt(row.comisiones_referidor) || 0,
         empresa: parseInt(row.comisiones_empresa) || 0,
         externo: parseInt(row.comisiones_externo) || 0,
+      },
+      proyecciones: {
+        proximo_trimestre: parseFloat(proyRow.proximo_trimestre) || 0,
+        resto_año: parseFloat(proyRow.resto_año) || 0,
+        proximo_año: parseFloat(proyRow.proximo_año) || 0,
+        despues: parseFloat(proyRow.despues) || 0,
       }
     });
   } catch (error) {

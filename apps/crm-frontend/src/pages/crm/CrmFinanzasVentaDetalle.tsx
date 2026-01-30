@@ -29,6 +29,8 @@ export default function CrmFinanzasVentaDetalle() {
   const esAdmin = isPlatformAdmin || tieneAcceso('finanzas-config');
   // El usuario puede anular si es admin O si es el creador de la venta
   const puedeAnular = esAdmin || (venta?.usuario_cerrador_id === user?.id);
+  // El usuario puede editar si NO está anulada Y (es admin O es el cerrador de la venta)
+  const puedeEditar = !venta?.cancelada && (esAdmin || venta?.usuario_cerrador_id === user?.id);
 
   useEffect(() => {
     if (ventaId && tenantActual?.id) {
@@ -88,39 +90,42 @@ export default function CrmFinanzasVentaDetalle() {
         },
         actions: (
           <div style={{ display: 'flex', alignItems: 'center', gap: '10px', flexShrink: 0 }}>
-            <button 
-              style={{
-                display: 'flex',
-                alignItems: 'center',
-                gap: '8px',
-                padding: '10px 20px',
-                borderRadius: '10px',
-                border: '1px solid #e2e8f0',
-                background: 'white',
-                color: '#475569',
-                fontWeight: 500,
-                fontSize: '0.9375rem',
-                cursor: 'pointer',
-                transition: 'all 0.2s'
-              }}
-              onMouseEnter={(e) => {
-                e.currentTarget.style.background = '#f8fafc';
-                e.currentTarget.style.borderColor = '#cbd5e1';
-                e.currentTarget.style.transform = 'translateY(-1px)';
-              }}
-              onMouseLeave={(e) => {
-                e.currentTarget.style.background = 'white';
-                e.currentTarget.style.borderColor = '#e2e8f0';
-                e.currentTarget.style.transform = 'translateY(0)';
-              }}
-              onClick={() => {
-                // Navegar a la página de listados y abrir el modal de edición
-                navigate(`/crm/${tenantSlug}/finanzas/ventas?edit=${ventaId}`);
-              }}
-            >
-              <Edit className="w-4 h-4" />
-              Editar
-            </button>
+            {/* Botón Editar - solo si puede editar */}
+            {puedeEditar && (
+              <button
+                style={{
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: '8px',
+                  padding: '10px 20px',
+                  borderRadius: '10px',
+                  border: '1px solid #e2e8f0',
+                  background: 'white',
+                  color: '#475569',
+                  fontWeight: 500,
+                  fontSize: '0.9375rem',
+                  cursor: 'pointer',
+                  transition: 'all 0.2s'
+                }}
+                onMouseEnter={(e) => {
+                  e.currentTarget.style.background = '#f8fafc';
+                  e.currentTarget.style.borderColor = '#cbd5e1';
+                  e.currentTarget.style.transform = 'translateY(-1px)';
+                }}
+                onMouseLeave={(e) => {
+                  e.currentTarget.style.background = 'white';
+                  e.currentTarget.style.borderColor = '#e2e8f0';
+                  e.currentTarget.style.transform = 'translateY(0)';
+                }}
+                onClick={() => {
+                  // Navegar a la página de listados y abrir el modal de edición
+                  navigate(`/crm/${tenantSlug}/finanzas/ventas?edit=${ventaId}`);
+                }}
+              >
+                <Edit className="w-4 h-4" />
+                Editar
+              </button>
+            )}
             <button 
               style={{
                 display: 'flex',
