@@ -684,8 +684,8 @@ export default function CrmMetas() {
 
       {/* Modal de confirmación de eliminación */}
       {deleteConfirm && (
-        <div className="modal-overlay" onClick={() => setDeleteConfirm(null)}>
-          <div className="modal-content modal-small" onClick={(e) => e.stopPropagation()}>
+        <div className="modal-overlay" onMouseDown={(e) => { if (e.target === e.currentTarget) setDeleteConfirm(null); }}>
+          <div className="modal-content modal-small">
             <div className="modal-icon warning">
               <Trash2 className="w-8 h-8" />
             </div>
@@ -705,8 +705,8 @@ export default function CrmMetas() {
 
       {/* Modal de actualizar progreso */}
       {showProgresoModal && (
-        <div className="modal-overlay" onClick={() => setShowProgresoModal(null)}>
-          <div className="modal-content" onClick={(e) => e.stopPropagation()}>
+        <div className="modal-overlay" onMouseDown={(e) => { if (e.target === e.currentTarget) setShowProgresoModal(null); }}>
+          <div className="modal-content">
             <div className="modal-header-custom">
               <div className="modal-header-icon" style={{ backgroundColor: TIPOS_META[showProgresoModal.tipo_meta]?.bgColor }}>
                 <TrendingUp className="w-6 h-6" style={{ color: TIPOS_META[showProgresoModal.tipo_meta]?.color }} />
@@ -773,8 +773,8 @@ export default function CrmMetas() {
 
       {/* Modal de crear/editar */}
       {showModal && (
-        <div className="modal-overlay" onClick={() => setShowModal(false)}>
-          <div className="modal-content modal-form" onClick={(e) => e.stopPropagation()}>
+        <div className="modal-overlay" onMouseDown={(e) => { if (e.target === e.currentTarget) setShowModal(false); }}>
+          <div className="modal-content modal-form">
             <div className="modal-header-custom">
               <div className="modal-header-icon">
                 <Target className="w-6 h-6" />
