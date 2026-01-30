@@ -259,7 +259,7 @@ const CrmFinanzasVentaComisiones: React.FC<CrmFinanzasVentaComisionesProps> = ({
         formData.append('folder', `comisiones/${ventaId}/recibos`);
         const token = await getToken();
         const uploadResponse = await fetch(
-          `${import.meta.env.VITE_API_BASE_URL || 'http://localhost:3001/api'}/tenants/${tenantActual.id}/upload/file`,
+          `${import.meta.env.VITE_API_URL || 'http://localhost:3001/api'}/tenants/${tenantActual.id}/upload/file`,
           {
             method: 'POST',
             headers: {

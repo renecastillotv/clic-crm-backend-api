@@ -2491,7 +2491,7 @@ export default function CrmFinanzasVentas() {
               const token = await getToken();
               // Usar endpoint de upload del tenant
               const uploadResponse = await fetch(
-                `${import.meta.env.VITE_API_BASE_URL || 'http://localhost:3001/api'}/tenants/${tenantActual.id}/upload/file`,
+                `${import.meta.env.VITE_API_URL || 'http://localhost:3001/api'}/tenants/${tenantActual.id}/upload/file`,
                 {
                   method: 'POST',
                   headers: {

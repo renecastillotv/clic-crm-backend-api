@@ -406,6 +406,90 @@ interface ParticipanteDistribucion {
 }
 
 /**
+ * Verificar si los participantes de la venta cambiaron
+ * Compara las comisiones existentes con los nuevos participantes
+ */
+function verificarCambioParticipantes(
+  comisionesExistentes: Comision[],
+  nuevosParticipantes: ParticipantesVenta,
+  vendedorId: string | null
+): boolean {
+  // Extraer participantes actuales de las comisiones
+  const participantesActuales: Record<string, { usuarioId?: string | null; contactoId?: string | null }> = {};
+
+  for (const comision of comisionesExistentes) {
+    const split = comision.datos_extra?.split;
+    if (split && split !== 'owner') {
+      participantesActuales[split] = {
+        usuarioId: comision.usuario_id || null,
+        contactoId: comision.contacto_externo_id || null,
+      };
+    }
+  }
+
+  // Construir nuevos participantes
+  const nuevos: Record<string, { usuarioId?: string | null; contactoId?: string | null }> = {};
+
+  // Vendedor
+  const nuevoVendedorId = nuevosParticipantes.vendedor_id || vendedorId;
+  if (nuevoVendedorId) {
+    nuevos['vendedor'] = { usuarioId: nuevoVendedorId };
+  }
+
+  // Captador
+  if (nuevosParticipantes.captador_id) {
+    nuevos['captador'] = { usuarioId: nuevosParticipantes.captador_id };
+  }
+
+  // Referidor
+  if (nuevosParticipantes.referidor_id || nuevosParticipantes.referidor_contacto_id) {
+    nuevos['referidor'] = {
+      usuarioId: nuevosParticipantes.referidor_id || null,
+      contactoId: nuevosParticipantes.referidor_contacto_id || null,
+    };
+  }
+
+  // Vendedor externo
+  if (nuevosParticipantes.vendedor_externo_id || nuevosParticipantes.vendedor_externo_nombre) {
+    nuevos['vendedor_externo'] = {
+      contactoId: nuevosParticipantes.vendedor_externo_id || null,
+    };
+  }
+
+  // Comparar: verificar si hay diferencias
+  const rolesActuales = Object.keys(participantesActuales).sort();
+  const rolesNuevos = Object.keys(nuevos).sort();
+
+  // Si los roles son diferentes, hay cambio
+  if (rolesActuales.join(',') !== rolesNuevos.join(',')) {
+    console.log('📋 Cambio detectado: roles diferentes', { rolesActuales, rolesNuevos });
+    return true;
+  }
+
+  // Verificar si los IDs de cada rol cambiaron
+  for (const rol of rolesNuevos) {
+    const actual = participantesActuales[rol];
+    const nuevo = nuevos[rol];
+
+    if (!actual) {
+      console.log(`📋 Cambio detectado: nuevo rol ${rol}`);
+      return true;
+    }
+
+    if (actual.usuarioId !== nuevo.usuarioId || actual.contactoId !== nuevo.contactoId) {
+      console.log(`📋 Cambio detectado en ${rol}:`, {
+        anterior: { usuarioId: actual.usuarioId, contactoId: actual.contactoId },
+        nuevo: { usuarioId: nuevo.usuarioId, contactoId: nuevo.contactoId }
+      });
+      return true;
+    }
+  }
+
+  console.log('📋 Sin cambios en participantes');
+  return false;
+}
+
+/**
  * Calcular y crear comisiones automáticamente para una venta
  * Considera todos los participantes: vendedor, captador, referidor, vendedor externo
  * La distribución suma siempre 100%
@@ -444,15 +528,37 @@ export async function calcularYCrearComisiones(
   );
 
   if (comisionesExistentes.rows.length > 0) {
-    console.log('⚠️ Ya existen comisiones para esta venta, actualizando en lugar de crear nuevas');
-    return await actualizarComisionesExistentes(
-      tenantId,
-      ventaId,
-      montoComisionTotal,
-      moneda,
-      porcentajeComision,
+    console.log('⚠️ Ya existen comisiones para esta venta, verificando si cambiaron los participantes...');
+
+    // Obtener comisiones existentes con sus datos
+    const comisionesDetalle = await getComisiones(tenantId, { ventaId });
+
+    // Verificar si los participantes cambiaron
+    const participantesCambiaron = verificarCambioParticipantes(
+      comisionesDetalle,
+      participantes || {},
       usuarioVendedorId
     );
+
+    if (participantesCambiaron) {
+      console.log('🔄 Los participantes cambiaron, eliminando comisiones antiguas y creando nuevas...');
+      // Eliminar comisiones existentes (los participantes cambiaron)
+      await query(
+        `DELETE FROM comisiones WHERE venta_id = $1 AND tenant_id = $2`,
+        [ventaId, tenantId]
+      );
+      // Continuar con la creación de nuevas comisiones (no retornar aquí)
+    } else {
+      console.log('✓ Los participantes no cambiaron, solo actualizando montos...');
+      return await actualizarComisionesExistentes(
+        tenantId,
+        ventaId,
+        montoComisionTotal,
+        moneda,
+        porcentajeComision,
+        usuarioVendedorId
+      );
+    }
   }
 
   const comisionesCreadas: Comision[] = [];

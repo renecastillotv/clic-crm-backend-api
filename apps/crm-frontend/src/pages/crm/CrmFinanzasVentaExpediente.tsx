@@ -100,7 +100,7 @@ const CrmFinanzasVentaExpediente: React.FC<CrmFinanzasVentaExpedienteProps> = ({
 
       const token = await getToken();
       const uploadResponse = await fetch(
-        `${import.meta.env.VITE_API_BASE_URL || 'http://localhost:3001/api'}/tenants/${tenantActual.id}/upload/file`,
+        `${import.meta.env.VITE_API_URL || 'http://localhost:3001/api'}/tenants/${tenantActual.id}/upload/file`,
         {
           method: 'POST',
           headers: {
@@ -144,7 +144,7 @@ const CrmFinanzasVentaExpediente: React.FC<CrmFinanzasVentaExpedienteProps> = ({
     if (!tenantActual?.id) return;
 
     // Usar endpoint proxy del backend para evitar problemas de CORS con R2
-    const downloadUrl = `${import.meta.env.VITE_API_BASE_URL || 'http://localhost:3001/api'}/tenants/${tenantActual.id}/upload/download?url=${encodeURIComponent(url)}&filename=${encodeURIComponent(fileName)}`;
+    const downloadUrl = `${import.meta.env.VITE_API_URL || 'http://localhost:3001/api'}/tenants/${tenantActual.id}/upload/download?url=${encodeURIComponent(url)}&filename=${encodeURIComponent(fileName)}`;
 
     const link = document.createElement('a');
     link.href = downloadUrl;
