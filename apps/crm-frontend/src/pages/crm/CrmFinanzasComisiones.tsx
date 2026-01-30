@@ -373,8 +373,10 @@ export default function CrmFinanzasComisiones() {
           comision_id: comisionSeleccionada.id,
           monto: data.monto,
           moneda: comisionSeleccionada.moneda,
+          tipo_pago: data.tipoPago,
           fecha_pago: data.fechaPago,
           notas: data.notas,
+          tipo_movimiento: 'pago', // Es un pago a participante
         },
         token
       );
