@@ -530,7 +530,7 @@ export async function verificarYActualizarEstadoExpediente(
   // 1. Obtener la venta para saber su categoría
   const ventaSql = `
     SELECT v.id, v.completada, v.propiedad_id, v.es_propiedad_externa,
-           p.tipo_operacion, p.categoria as categoria_propiedad
+           p.operacion, p.tipo as tipo_propiedad
     FROM ventas v
     LEFT JOIN propiedades p ON v.propiedad_id = p.id
     WHERE v.id = $1 AND v.tenant_id = $2
@@ -544,13 +544,15 @@ export async function verificarYActualizarEstadoExpediente(
   const venta = ventaResult.rows[0];
 
   // 2. Determinar la categoría de documentos según el tipo de venta
+  // operacion puede ser: venta, renta, traspaso
+  // tipo_propiedad puede ser: casa, departamento, terreno, proyecto, etc.
   let categoria: CategoriaDocumento = 'cierre_venta_lista';
-  const tipoOperacion = venta.tipo_operacion?.toLowerCase() || '';
-  const categoriaPropiedad = venta.categoria_propiedad?.toLowerCase() || '';
+  const operacion = venta.operacion?.toLowerCase() || '';
+  const tipoPropiedad = venta.tipo_propiedad?.toLowerCase() || '';
 
-  if (tipoOperacion.includes('alquiler') || tipoOperacion.includes('renta')) {
+  if (operacion.includes('alquiler') || operacion.includes('renta')) {
     categoria = 'cierre_alquiler';
-  } else if (categoriaPropiedad.includes('proyecto')) {
+  } else if (tipoPropiedad.includes('proyecto')) {
     categoria = 'cierre_venta_proyecto';
   }
 
