@@ -90,13 +90,13 @@ async function recalcularCachesVentaInterno(ventaId: string): Promise<void> {
   `, [ventaId]);
   const montoCobrado = parseFloat(cobradoResult.rows[0].total) || 0;
 
-  // Calcular porcentaje cobrado (sobre VALOR, no comisión)
-  const porcentajeCobrado = valorCierre > 0
-    ? Math.min(Math.round((montoCobrado / valorCierre) * 10000) / 100, 100)
+  // Calcular porcentaje cobrado (sobre la COMISIÓN, que es lo que cobra la empresa)
+  const porcentajeCobrado = montoComision > 0
+    ? Math.min(Math.round((montoCobrado / montoComision) * 10000) / 100, 100)
     : 0;
 
-  // Calcular comisión disponible (proporcional)
-  const comisionDisponible = Math.round((porcentajeCobrado / 100) * montoComision * 100) / 100;
+  // La comisión disponible es igual a lo cobrado (ya que cobramos la comisión directamente)
+  const comisionDisponible = montoCobrado;
 
   // Calcular pagos a asesores
   const pagadoResult = await query(`
@@ -190,14 +190,15 @@ export async function registrarCobro(params: RegistrarCobroParams): Promise<Cobr
     throw new Error('La venta no está activa');
   }
 
-  // 2. Validar que el monto no exceda el VALOR de la venta (no la comisión)
-  const valorCierre = parseFloat(venta.valor_cierre) || 0;
+  // 2. Validar que el monto no exceda la COMISIÓN de la venta
+  // El cobro es sobre la comisión, no sobre el valor total de la venta
+  const montoComision = parseFloat(venta.monto_comision) || 0;
   const yaCobrado = parseFloat(venta.cache_monto_cobrado) || 0;
-  const pendiente = valorCierre - yaCobrado;
+  const pendiente = montoComision - yaCobrado;
 
   if (monto > pendiente + 0.01) {
     throw new Error(
-      `El monto del cobro (${monto}) excede el pendiente de cobro (${pendiente.toFixed(2)})`
+      `El monto del cobro (${monto}) excede la comisión pendiente (${pendiente.toFixed(2)})`
     );
   }
 
@@ -229,8 +230,8 @@ export async function registrarCobro(params: RegistrarCobroParams): Promise<Cobr
   await recalcularCachesVentaInterno(ventaId);
 
   // 5. Registrar en historial
-  const porcentajeNuevo = valorCierre > 0
-    ? ((yaCobrado + monto) / valorCierre * 100).toFixed(2)
+  const porcentajeNuevo = montoComision > 0
+    ? ((yaCobrado + monto) / montoComision * 100).toFixed(2)
     : '0';
 
   await registrarHistorial(tenantId, ventaId, 'cobro_registrado', {
@@ -240,7 +241,7 @@ export async function registrarCobro(params: RegistrarCobroParams): Promise<Cobr
     porcentaje_cobrado: porcentajeNuevo
   }, registradoPorId || undefined);
 
-  console.log(`✅ Cobro registrado: $${monto} (${porcentajeNuevo}% cobrado del valor $${valorCierre})`);
+  console.log(`✅ Cobro registrado: $${monto} (${porcentajeNuevo}% de comisión $${montoComision} cobrada)`);
 
   return cobro;
 }
