@@ -1847,6 +1847,81 @@ router.delete('/:ventaId/cobros/:cobroId', async (req: Request<CobroParams>, res
   }
 });
 
+// ==================== RUTAS: ADJUNTOS DE COBROS ====================
+
+interface AdjuntoParams extends CobroParams { adjuntoId: string }
+
+/**
+ * GET /api/tenants/:tenantId/ventas/:ventaId/cobros/:cobroId/adjuntos
+ * Obtiene los adjuntos de un cobro
+ */
+router.get('/:ventaId/cobros/:cobroId/adjuntos', async (req: Request<CobroParams>, res: Response, next: NextFunction) => {
+  try {
+    const { tenantId, cobroId } = req.params;
+    const adjuntos = await ventasCobrosService.getAdjuntosCobro(tenantId, cobroId);
+    res.json({ adjuntos });
+  } catch (error) {
+    next(error);
+  }
+});
+
+/**
+ * POST /api/tenants/:tenantId/ventas/:ventaId/cobros/:cobroId/adjuntos
+ * Agrega un adjunto a un cobro existente
+ */
+router.post('/:ventaId/cobros/:cobroId/adjuntos', async (req: Request<CobroParams>, res: Response, next: NextFunction) => {
+  try {
+    const { tenantId, cobroId } = req.params;
+    const {
+      url,
+      nombre_archivo,
+      tipo_archivo,
+      tamaño_bytes,
+      descripcion,
+      subido_por_id
+    } = req.body;
+
+    if (!url) {
+      return res.status(400).json({ error: 'La URL del archivo es requerida' });
+    }
+
+    const adjunto = await ventasCobrosService.agregarAdjuntoCobro({
+      tenantId,
+      cobroId,
+      url,
+      nombreArchivo: nombre_archivo,
+      tipoArchivo: tipo_archivo,
+      tamañoBytes: tamaño_bytes,
+      descripcion,
+      subidoPorId: subido_por_id
+    });
+
+    res.status(201).json({ adjunto });
+  } catch (error: any) {
+    if (error.message === 'Cobro no encontrado') {
+      return res.status(404).json({ error: error.message });
+    }
+    next(error);
+  }
+});
+
+/**
+ * DELETE /api/tenants/:tenantId/ventas/:ventaId/cobros/:cobroId/adjuntos/:adjuntoId
+ * Elimina un adjunto de un cobro
+ */
+router.delete('/:ventaId/cobros/:cobroId/adjuntos/:adjuntoId', async (req: Request<AdjuntoParams>, res: Response, next: NextFunction) => {
+  try {
+    const { tenantId, adjuntoId } = req.params;
+    await ventasCobrosService.eliminarAdjuntoCobro(tenantId, adjuntoId);
+    res.json({ success: true, message: 'Adjunto eliminado correctamente' });
+  } catch (error: any) {
+    if (error.message === 'Adjunto no encontrado') {
+      return res.status(404).json({ error: error.message });
+    }
+    next(error);
+  }
+});
+
 // ==================== RUTAS: HISTORIAL DE VENTA ====================
 
 /**

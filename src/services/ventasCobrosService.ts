@@ -608,3 +608,117 @@ async function registrarHistorial(
     // No lanzar error, el historial es secundario
   }
 }
+
+// ============================================================
+// ADJUNTOS DE COBROS
+// ============================================================
+
+export interface CobroAdjunto {
+  id: string;
+  tenant_id: string;
+  cobro_id: string;
+  url: string;
+  nombre_archivo: string | null;
+  tipo_archivo: string | null;
+  tamaño_bytes: number | null;
+  descripcion: string | null;
+  subido_por_id: string | null;
+  created_at: string;
+  subido_por_nombre?: string;
+}
+
+export interface AgregarAdjuntoParams {
+  tenantId: string;
+  cobroId: string;
+  url: string;
+  nombreArchivo?: string;
+  tipoArchivo?: string;
+  tamañoBytes?: number;
+  descripcion?: string;
+  subidoPorId?: string;
+}
+
+/**
+ * Agrega un archivo adjunto a un cobro existente
+ */
+export async function agregarAdjuntoCobro(params: AgregarAdjuntoParams): Promise<CobroAdjunto> {
+  const {
+    tenantId,
+    cobroId,
+    url,
+    nombreArchivo,
+    tipoArchivo,
+    tamañoBytes,
+    descripcion,
+    subidoPorId
+  } = params;
+
+  // Verificar que el cobro existe y pertenece al tenant
+  const cobroResult = await query(`
+    SELECT id, venta_id FROM ventas_cobros
+    WHERE id = $1 AND tenant_id = $2 AND activo = true
+  `, [cobroId, tenantId]);
+
+  if (cobroResult.rows.length === 0) {
+    throw new Error('Cobro no encontrado');
+  }
+
+  // Insertar adjunto
+  const insertResult = await query(`
+    INSERT INTO ventas_cobros_adjuntos (
+      tenant_id, cobro_id, url, nombre_archivo, tipo_archivo,
+      tamaño_bytes, descripcion, subido_por_id
+    ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
+    RETURNING *
+  `, [
+    tenantId,
+    cobroId,
+    url,
+    nombreArchivo || null,
+    tipoArchivo || null,
+    tamañoBytes || null,
+    descripcion || null,
+    subidoPorId || null
+  ]);
+
+  console.log(`✅ Adjunto agregado al cobro ${cobroId}: ${nombreArchivo || url}`);
+
+  return insertResult.rows[0];
+}
+
+/**
+ * Obtiene los adjuntos de un cobro
+ */
+export async function getAdjuntosCobro(tenantId: string, cobroId: string): Promise<CobroAdjunto[]> {
+  const result = await query(`
+    SELECT
+      a.*,
+      COALESCE(u.nombre || ' ' || u.apellido, '') as subido_por_nombre
+    FROM ventas_cobros_adjuntos a
+    LEFT JOIN usuarios u ON a.subido_por_id = u.id
+    WHERE a.tenant_id = $1 AND a.cobro_id = $2
+    ORDER BY a.created_at DESC
+  `, [tenantId, cobroId]);
+
+  return result.rows;
+}
+
+/**
+ * Elimina un adjunto de un cobro
+ */
+export async function eliminarAdjuntoCobro(
+  tenantId: string,
+  adjuntoId: string
+): Promise<void> {
+  const deleteResult = await query(`
+    DELETE FROM ventas_cobros_adjuntos
+    WHERE id = $1 AND tenant_id = $2
+    RETURNING *
+  `, [adjuntoId, tenantId]);
+
+  if (deleteResult.rows.length === 0) {
+    throw new Error('Adjunto no encontrado');
+  }
+
+  console.log(`⚠️ Adjunto eliminado: ${deleteResult.rows[0].nombre_archivo || adjuntoId}`);
+}
