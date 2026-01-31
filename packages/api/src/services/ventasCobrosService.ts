@@ -10,7 +10,7 @@
  * - estado_cobro
  */
 
-import { query } from '../database/index.js';
+import { query } from '../utils/db.js';
 
 // Interface compatible con las rutas existentes
 export interface RegistrarCobroParams {
