@@ -16,6 +16,7 @@
  */
 
 import { query } from '../utils/db.js';
+import { getTasasCambio } from './tasasCambioService.js';
 
 export interface Meta {
   id: string;
@@ -84,14 +85,45 @@ async function calcularProgresoAutomatico(
       // Contar ventas con fecha_cierre en el período y no canceladas
       // (ignoramos el campo completada porque las ventas registradas cuentan como completadas)
       if (metrica === 'monto') {
+        // Para monto, necesitamos convertir cada venta a USD antes de sumar
         sql = `
-          SELECT COALESCE(SUM(valor_cierre), 0) as total
+          SELECT valor_cierre, COALESCE(moneda, 'USD') as moneda
           FROM ventas
           WHERE tenant_id = $1
             AND fecha_cierre >= $2 AND fecha_cierre <= $3
             AND cancelada = false
             ${usuarioFilter.replace('{USER_FIELD}', 'usuario_cerrador_id')}
         `;
+        try {
+          const result = await query(sql, params);
+          if (result.rows.length === 0) return 0;
+
+          // Obtener tasas de cambio del tenant
+          const tasas = await getTasasCambio(tenantId);
+
+          // Sumar convirtiendo cada venta a USD
+          let totalUSD = 0;
+          for (const row of result.rows) {
+            const valor = parseFloat(row.valor_cierre) || 0;
+            const moneda = (row.moneda || 'USD').toUpperCase();
+
+            if (moneda === 'USD') {
+              totalUSD += valor;
+            } else {
+              const tasa = tasas[moneda];
+              if (tasa && tasa > 0) {
+                totalUSD += valor / tasa;
+              } else {
+                // Si no hay tasa, asumimos es USD
+                totalUSD += valor;
+              }
+            }
+          }
+          return Math.round(totalUSD * 100) / 100; // Redondear a 2 decimales
+        } catch (error) {
+          console.error('Error calculando monto con conversión:', error);
+          return 0;
+        }
       } else {
         sql = `
           SELECT COUNT(*) as total
