@@ -1735,6 +1735,8 @@ router.post('/:ventaId/cobros', async (req: Request<VentaParams>, res: Response,
       registrado_por_id
     } = req.body;
 
+    console.log('[POST cobros] Recibido:', { tenantId, ventaId, monto, moneda, fecha_cobro, registrado_por_id });
+
     if (!monto || !fecha_cobro) {
       return res.status(400).json({ error: 'monto y fecha_cobro son requeridos' });
     }
@@ -1742,20 +1744,22 @@ router.post('/:ventaId/cobros', async (req: Request<VentaParams>, res: Response,
     const cobro = await ventasCobrosService.registrarCobro({
       tenantId,
       ventaId,
-      monto,
-      moneda,
+      monto: parseFloat(monto),
+      moneda: moneda || 'USD',
       fechaCobro: fecha_cobro,
-      metodoPago: metodo_pago,
-      referencia,
-      banco,
-      reciboUrl: recibo_url,
-      notas,
-      registradoPorId: registrado_por_id
+      metodoPago: metodo_pago || null,
+      referencia: referencia || null,
+      banco: banco || null,
+      reciboUrl: recibo_url || null,
+      notas: notas || null,
+      registradoPorId: registrado_por_id || null
     });
 
+    console.log('[POST cobros] Cobro registrado:', cobro.id);
     res.status(201).json(cobro);
-  } catch (error) {
-    next(error);
+  } catch (error: any) {
+    console.error('[POST cobros] Error:', error.message, error.stack);
+    res.status(500).json({ error: error.message || 'Error interno del servidor' });
   }
 });
 
