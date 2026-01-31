@@ -557,15 +557,23 @@ export async function verificarYActualizarEstadoExpediente(
   }
 
   // 3. Obtener todos los requerimientos obligatorios de esta categoría
+  // Incluir también categorías legacy para compatibilidad
+  const categoriasABuscar: string[] = [categoria];
+  if (categoria === 'cierre_venta_lista') {
+    categoriasABuscar.push('cierre_venta');
+  } else if (categoria === 'cierre_alquiler') {
+    categoriasABuscar.push('cierre_renta');
+  }
+
   const requerimientosSql = `
     SELECT id
     FROM documentos_requeridos
     WHERE tenant_id = $1
-      AND categoria = $2
+      AND categoria = ANY($2)
       AND es_obligatorio = true
       AND activo = true
   `;
-  const requerimientosResult = await query(requerimientosSql, [tenantId, categoria]);
+  const requerimientosResult = await query(requerimientosSql, [tenantId, categoriasABuscar]);
   const requerimientosObligatorios = requerimientosResult.rows;
 
   // Si no hay requerimientos obligatorios, el expediente está completo

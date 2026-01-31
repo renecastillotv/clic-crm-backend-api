@@ -1487,6 +1487,85 @@ router.post('/:ventaId/pagos', async (req: Request<VentaParams>, res: Response, 
         WHERE tenant_id = $2 AND venta_id = $3
           AND (datos_extra->>'split' IS NULL OR datos_extra->>'split' NOT IN ('empresa', 'owner'))
       `, [porcentajeHabilitado, tenantId, ventaId]);
+    } else if (tipo_movimiento === 'pago' && comision_id) {
+      // Es un PAGO a participante, actualizar estado de la comisión
+      // Calcular total pagado para esta comisión
+      const pagosResult = await query(`
+        SELECT COALESCE(SUM(monto), 0) as total_pagado
+        FROM pagos_comisiones
+        WHERE tenant_id = $1 AND comision_id = $2 AND tipo_movimiento = 'pago'
+      `, [tenantId, comision_id]);
+
+      const totalPagado = parseFloat(pagosResult.rows[0]?.total_pagado || 0);
+
+      // Obtener la comisión para verificar monto_habilitado
+      const comisionResult = await query(
+        `SELECT monto, monto_habilitado FROM comisiones WHERE id = $1 AND tenant_id = $2`,
+        [comision_id, tenantId]
+      );
+
+      if (comisionResult.rows.length > 0) {
+        const comision = comisionResult.rows[0];
+        const montoHabilitado = parseFloat(comision.monto_habilitado) || parseFloat(comision.monto) || 0;
+
+        // Determinar estado de la comisión
+        let estadoComision: string;
+        if (totalPagado === 0) {
+          estadoComision = 'pendiente';
+        } else if (totalPagado >= montoHabilitado) {
+          estadoComision = 'pagado';
+        } else {
+          estadoComision = 'parcial';
+        }
+
+        // Actualizar la comisión
+        await query(`
+          UPDATE comisiones SET
+            monto_pagado = $1,
+            estado = $2,
+            updated_at = NOW()
+          WHERE id = $3 AND tenant_id = $4
+        `, [totalPagado, estadoComision, comision_id, tenantId]);
+      }
+
+      // También actualizar los caches de pagos de la venta
+      const pagosTotalesResult = await query(`
+        SELECT COALESCE(SUM(p.monto), 0) as total_pagado_venta
+        FROM pagos_comisiones p
+        WHERE p.tenant_id = $1 AND p.venta_id = $2 AND p.tipo_movimiento = 'pago'
+      `, [tenantId, ventaId]);
+
+      const totalPagadoVenta = parseFloat(pagosTotalesResult.rows[0]?.total_pagado_venta || 0);
+
+      // Obtener total habilitado de las comisiones (excluyendo empresa)
+      const comisionesResult = await query(`
+        SELECT COALESCE(SUM(monto_habilitado), 0) as total_habilitado
+        FROM comisiones
+        WHERE venta_id = $1 AND tenant_id = $2
+          AND tipo_participante != 'empresa'
+          AND activo = true
+      `, [ventaId, tenantId]);
+
+      const totalHabilitado = parseFloat(comisionesResult.rows[0]?.total_habilitado || 0);
+
+      // Determinar estado de pagos de la venta
+      let estadoPagos: string;
+      if (totalPagadoVenta === 0) {
+        estadoPagos = 'pendiente';
+      } else if (totalHabilitado > 0 && totalPagadoVenta >= totalHabilitado) {
+        estadoPagos = 'pagado';
+      } else {
+        estadoPagos = 'parcial';
+      }
+
+      // Actualizar venta
+      await query(`
+        UPDATE ventas SET
+          cache_monto_pagado_asesores = $1,
+          estado_pagos = $2,
+          updated_at = NOW()
+        WHERE id = $3 AND tenant_id = $4
+      `, [totalPagadoVenta, estadoPagos, ventaId, tenantId]);
     }
 
     res.status(201).json(result.rows[0]);
