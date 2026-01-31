@@ -263,23 +263,37 @@ export default function CrmMetas() {
   const handleSave = async () => {
     if (!tenantActual?.id || !form.titulo.trim() || !form.valor_objetivo) return;
 
+    // Validar que si es asignada, tenga usuario seleccionado
+    if (form.origen === 'asignada' && !form.usuario_id) {
+      setError('Debes seleccionar un usuario para asignar la meta');
+      return;
+    }
+
     try {
       setSaving(true);
 
       // Determinar origen y usuario_id según la selección
-      let origen = form.origen;
+      // IMPORTANTE: Respetar el origen seleccionado por el admin
+      let origen: 'personal' | 'asignada' | 'empresa' = form.origen;
       let usuarioId: string | null = null;
 
-      if (form.origen === 'empresa') {
-        // Meta de empresa: sin usuario específico
-        usuarioId = null;
-      } else if (form.origen === 'asignada' && form.usuario_id) {
-        // Meta asignada a un usuario específico
-        usuarioId = form.usuario_id;
-      } else {
-        // Meta personal: para el usuario actual
-        origen = 'personal';
-        usuarioId = user?.id || null;
+      switch (form.origen) {
+        case 'empresa':
+          // Meta de empresa: sin usuario específico
+          origen = 'empresa';
+          usuarioId = null;
+          break;
+        case 'asignada':
+          // Meta asignada a un usuario específico
+          origen = 'asignada';
+          usuarioId = form.usuario_id || null;
+          break;
+        case 'personal':
+        default:
+          // Meta personal: para el usuario actual
+          origen = 'personal';
+          usuarioId = user?.id || null;
+          break;
       }
 
       const data = {
@@ -291,13 +305,15 @@ export default function CrmMetas() {
         periodo: form.periodo,
         fecha_inicio: form.fecha_inicio,
         fecha_fin: form.fecha_fin,
-        origen: origen as 'personal' | 'asignada' | 'empresa',
+        origen: origen,
         usuario_id: usuarioId,
         creado_por_id: user?.id,
         tipo_recompensa: form.tipo_recompensa || undefined,
         descripcion_recompensa: form.descripcion_recompensa || undefined,
         monto_recompensa: form.monto_recompensa ? parseFloat(form.monto_recompensa) : undefined,
       };
+
+      console.log('[CrmMetas] Guardando meta con datos:', data); // DEBUG
 
       if (editingMeta) {
         await updateMeta(tenantActual.id, editingMeta.id, data);

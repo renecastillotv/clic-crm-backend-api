@@ -16,6 +16,33 @@ import {
   getMetasResumen,
 } from '../../services/metasService.js';
 import { resolveUserScope, getOwnFilter } from '../../middleware/scopeResolver.js';
+import { query } from '../../utils/db.js';
+
+/**
+ * Helper para verificar si el usuario es admin del tenant
+ * Consulta los roles del usuario para verificar si tiene tenant_owner o tenant_admin
+ */
+async function isUserTenantAdmin(userId: string, tenantId: string): Promise<boolean> {
+  if (!userId || !tenantId) return false;
+
+  try {
+    const result = await query(`
+      SELECT r.codigo
+      FROM usuarios_roles ur
+      JOIN roles r ON ur.rol_id = r.id
+      WHERE ur.usuario_id = $1
+        AND (ur.tenant_id = $2 OR ur.tenant_id IS NULL)
+        AND ur.activo = true
+        AND r.codigo IN ('tenant_owner', 'tenant_admin')
+      LIMIT 1
+    `, [userId, tenantId]);
+
+    return result.rows.length > 0;
+  } catch (error) {
+    console.error('[isUserTenantAdmin] Error:', error);
+    return false;
+  }
+}
 
 // Tipos para params con mergeParams
 interface RouteParams { [key: string]: string | undefined;
@@ -107,19 +134,28 @@ router.post('/', async (req, res, next) => {
     const { tenantId } = req.params as RouteParams;
     const scope = (req as any).scope;
     const currentUserId = scope?.dbUserId;
-    const isAdmin = scope?.roleCode === 'tenant_owner' || scope?.roleCode === 'tenant_admin';
+
+    // Verificar si es admin consultando sus roles (no usar scope.roleCode que no existe)
+    const isAdmin = scope?.isPlatformAdmin || await isUserTenantAdmin(currentUserId, tenantId);
+
+    console.log('[Metas POST] userId:', currentUserId, 'isAdmin:', isAdmin);
+    console.log('[Metas POST] body.origen:', req.body.origen, 'body.usuario_id:', req.body.usuario_id);
 
     // Si no es admin, solo puede crear metas para sí mismo
     if (!isAdmin) {
+      console.log('[Metas POST] NO es admin, forzando origen=personal');
       if (!currentUserId) {
         return res.status(403).json({ error: 'No autorizado para crear metas' });
       }
       // Forzar que la meta sea para el usuario actual y sea personal
       req.body.usuario_id = currentUserId;
       req.body.origen = 'personal';
+    } else {
+      console.log('[Metas POST] ES admin, respetando origen:', req.body.origen);
     }
 
     const meta = await createMeta(tenantId, req.body);
+    console.log('[Metas POST] Meta creada:', { id: meta.id, origen: meta.origen, usuario_id: meta.usuario_id });
     res.status(201).json(meta);
   } catch (error) {
     next(error);
@@ -139,7 +175,7 @@ router.put('/:metaId', async (req, res, next) => {
     const { tenantId, metaId } = req.params as RouteParams;
     const scope = (req as any).scope;
     const currentUserId = scope?.dbUserId;
-    const isAdmin = scope?.roleCode === 'tenant_owner' || scope?.roleCode === 'tenant_admin';
+    const isAdmin = scope?.isPlatformAdmin || await isUserTenantAdmin(currentUserId, tenantId);
 
     // Si no es admin, verificar que sea una meta personal del usuario
     if (!isAdmin) {
@@ -183,7 +219,7 @@ router.delete('/:metaId', async (req, res, next) => {
     const { tenantId, metaId } = req.params as RouteParams;
     const scope = (req as any).scope;
     const currentUserId = scope?.dbUserId;
-    const isAdmin = scope?.roleCode === 'tenant_owner' || scope?.roleCode === 'tenant_admin';
+    const isAdmin = scope?.isPlatformAdmin || await isUserTenantAdmin(currentUserId, tenantId);
 
     // Si no es admin, verificar que sea una meta personal del usuario
     if (!isAdmin) {
