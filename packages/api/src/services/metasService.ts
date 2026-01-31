@@ -245,8 +245,9 @@ export async function getMetas(
   }
 
   if (usuario_id) {
-    // Include metas assigned to this user OR empresa metas (visible to all)
-    whereClause += ` AND (m.usuario_id = $${paramIndex} OR m.origen = 'empresa')`;
+    // Solo incluir metas asignadas a este usuario específico
+    // Las metas de empresa se filtran por separado usando el filtro origen='empresa'
+    whereClause += ` AND m.usuario_id = $${paramIndex}`;
     params.push(usuario_id);
     paramIndex++;
   }

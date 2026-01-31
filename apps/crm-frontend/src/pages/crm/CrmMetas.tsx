@@ -176,27 +176,40 @@ export default function CrmMetas() {
 
       // Si es admin, cargar metas de asesores (asignadas), metas empresa, y lista de usuarios
       if (isTenantAdmin) {
+        // Cargar todas las metas sin filtro de usuario
         const todosFiltros: MetaFiltros = {
           estado: estadoFiltro || undefined,
           tipo_meta: tipoFiltro || undefined,
           limit: 100,
         };
 
-        const [todasResponse, resumenTotalResponse, usuariosResponse] = await Promise.all([
+        // Cargar específicamente las metas de empresa
+        const empresaFiltros: MetaFiltros = {
+          origen: 'empresa',
+          estado: estadoFiltro || undefined,
+          tipo_meta: tipoFiltro || undefined,
+          limit: 100,
+        };
+
+        const [todasResponse, empresaResponse, resumenTotalResponse, usuariosResponse] = await Promise.all([
           getMetas(tenantActual.id, todosFiltros),
+          getMetas(tenantActual.id, empresaFiltros),
           getMetasResumen(tenantActual.id),
           getUsuariosTenant(tenantActual.id),
         ]);
 
         // Separar metas por tipo:
-        // - Asesores: metas asignadas a usuarios específicos (excluyendo mis propias metas personales)
+        // - Asesores: metas asignadas a OTROS usuarios (no a mí) + metas personales de otros usuarios
         const asesores = todasResponse.data.filter(m =>
-          m.origen === 'asignada' ||
-          (m.usuario_id && m.usuario_id !== user.id && m.origen !== 'empresa')
+          // Metas asignadas a otros usuarios (no a mí)
+          (m.origen === 'asignada' && m.usuario_id && m.usuario_id !== user.id) ||
+          // Metas personales de otros usuarios
+          (m.origen === 'personal' && m.usuario_id && m.usuario_id !== user.id)
         );
 
-        // - Empresa: metas globales sin usuario específico
-        const empresa = todasResponse.data.filter(m => m.origen === 'empresa');
+        // - Empresa: metas globales (origen='empresa')
+        // Usamos la query específica para garantizar que solo traemos empresa
+        const empresa = empresaResponse.data;
 
         setMetasAsesores(asesores);
         setMetasEmpresa(empresa);
