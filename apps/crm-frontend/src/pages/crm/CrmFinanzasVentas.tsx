@@ -1800,17 +1800,17 @@ export default function CrmFinanzasVentas() {
                             setVentaParaPago(venta);
 
                             // Usar datos de cobro de empresa directamente de la venta
-                            // Para cobros: el total es el VALOR de la venta (lo que paga el cliente)
-                            // cache_monto_cobrado = lo que la empresa ya cobró al cliente
-                            const valorVenta = typeof venta.valor === 'number'
-                              ? venta.valor
-                              : parseFloat(venta.valor || '0') || 0;
+                            // Para cobros: el total es la COMISIÓN (lo que la empresa cobra)
+                            // cache_monto_cobrado = lo que la empresa ya cobró
+                            const montoComision = typeof venta.monto_comision === 'number'
+                              ? venta.monto_comision
+                              : parseFloat(String(venta.monto_comision) || '0') || 0;
                             const montoCobrado = typeof venta.cache_monto_cobrado === 'number'
                               ? venta.cache_monto_cobrado
                               : parseFloat(String(venta.cache_monto_cobrado || '0')) || 0;
 
                             setComisionData({
-                              montoTotal: valorVenta,
+                              montoTotal: montoComision,
                               montoPagado: montoCobrado
                             });
                             setLoadingComision(false);
