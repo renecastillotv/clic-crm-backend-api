@@ -35,7 +35,7 @@ export default function ModalAplicarPago({
   montoPagado,
   moneda,
   loading = false,
-  titulo = 'Aplicar Pago',
+  titulo = 'Aplicar Cobro',
   descripcion
 }: ModalAplicarPagoProps) {
   const [tipoPago, setTipoPago] = useState<'parcial' | 'total'>('parcial');

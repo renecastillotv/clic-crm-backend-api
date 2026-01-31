@@ -148,6 +148,9 @@ export default function CrmContenido() {
   const [successMessage, setSuccessMessage] = useState<string | null>(null);
   const [busqueda, setBusqueda] = useState('');
   const [deleteConfirm, setDeleteConfirm] = useState<{ tipo: string; id: string } | null>(null);
+  const [showYouTubeImportModal, setShowYouTubeImportModal] = useState(false);
+  const [youtubeUrl, setYoutubeUrl] = useState('');
+  const [importingYouTube, setImportingYouTube] = useState(false);
 
   // Datos de cada tab
   const [articulos, setArticulos] = useState<Articulo[]>([]);
@@ -231,10 +234,20 @@ export default function CrmContenido() {
           title: 'Videos',
           subtitle: 'Gestiona tu galería de videos',
           action: canCreate ? (
-            <button onClick={() => navigate(`/crm/${tenantSlug}/contenido/videos/nuevo`)} className="btn-primary">
-              <span className="icon">{Icons.plus}</span>
-              Nuevo Video
-            </button>
+            <div style={{ display: 'flex', gap: '10px' }}>
+              <button
+                onClick={() => setShowYouTubeImportModal(true)}
+                className="btn-secondary"
+                style={{ display: 'flex', alignItems: 'center', gap: '6px' }}
+              >
+                <LucideIcons.Youtube size={16} />
+                Importar YouTube
+              </button>
+              <button onClick={() => navigate(`/crm/${tenantSlug}/contenido/videos/nuevo`)} className="btn-primary">
+                <span className="icon">{Icons.plus}</span>
+                Nuevo Video
+              </button>
+            </div>
           ) : undefined,
         },
         faqs: {
@@ -2686,6 +2699,119 @@ export default function CrmContenido() {
             <div className="modal-footer">
               <button onClick={() => setDeleteConfirm(null)} className="btn-secondary">Cancelar</button>
               <button onClick={handleDelete} className="btn-danger">Eliminar</button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Modal de Importar Videos de YouTube */}
+      {showYouTubeImportModal && (
+        <div className="modal-overlay" onClick={() => setShowYouTubeImportModal(false)}>
+          <div className="modal-content modal-form" onClick={(e) => e.stopPropagation()} style={{ maxWidth: '600px' }}>
+            <div className="modal-header">
+              <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+                <div style={{
+                  width: '40px',
+                  height: '40px',
+                  borderRadius: '10px',
+                  background: 'linear-gradient(135deg, #FF0000, #CC0000)',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center'
+                }}>
+                  <LucideIcons.Youtube size={20} color="white" />
+                </div>
+                <div>
+                  <h3 style={{ margin: 0, fontWeight: 700 }}>Importar de YouTube</h3>
+                  <p style={{ margin: 0, fontSize: '0.85rem', color: '#64748b' }}>Agrega un video desde una URL de YouTube</p>
+                </div>
+              </div>
+              <button onClick={() => setShowYouTubeImportModal(false)} className="btn-icon">{Icons.x}</button>
+            </div>
+            <div className="modal-body">
+              <div className="form-group">
+                <label style={{ fontWeight: 600, marginBottom: '8px', display: 'block' }}>
+                  URL del Video de YouTube
+                </label>
+                <input
+                  type="url"
+                  value={youtubeUrl}
+                  onChange={(e) => setYoutubeUrl(e.target.value)}
+                  placeholder="https://www.youtube.com/watch?v=..."
+                  style={{
+                    width: '100%',
+                    padding: '12px 14px',
+                    border: '2px solid #e2e8f0',
+                    borderRadius: '10px',
+                    fontSize: '0.95rem',
+                    transition: 'border-color 0.2s'
+                  }}
+                  onFocus={(e) => e.target.style.borderColor = '#FF0000'}
+                  onBlur={(e) => e.target.style.borderColor = '#e2e8f0'}
+                />
+                <p style={{ margin: '8px 0 0', fontSize: '0.8rem', color: '#64748b' }}>
+                  Formatos aceptados: youtube.com/watch?v=..., youtu.be/..., youtube.com/embed/...
+                </p>
+              </div>
+
+              <div style={{
+                marginTop: '16px',
+                padding: '16px',
+                background: '#fef3c7',
+                borderRadius: '10px',
+                border: '1px solid #fcd34d'
+              }}>
+                <div style={{ display: 'flex', alignItems: 'flex-start', gap: '12px' }}>
+                  <LucideIcons.Info size={20} style={{ color: '#d97706', flexShrink: 0, marginTop: '2px' }} />
+                  <div style={{ fontSize: '0.85rem', color: '#92400e' }}>
+                    <p style={{ margin: 0, fontWeight: 600 }}>Próximamente: Importación masiva</p>
+                    <p style={{ margin: '4px 0 0' }}>
+                      La función para importar videos completos de un canal de YouTube estará disponible próximamente.
+                    </p>
+                  </div>
+                </div>
+              </div>
+            </div>
+            <div className="modal-footer">
+              <button onClick={() => setShowYouTubeImportModal(false)} className="btn-secondary">Cancelar</button>
+              <button
+                onClick={async () => {
+                  if (!youtubeUrl.trim()) {
+                    alert('Por favor ingresa una URL de YouTube');
+                    return;
+                  }
+
+                  // Extraer el video ID de la URL
+                  let videoId: string | null = null;
+                  const patterns = [
+                    /(?:youtube\.com\/watch\?v=|youtu\.be\/|youtube\.com\/embed\/)([a-zA-Z0-9_-]+)/,
+                    /youtube\.com\/v\/([a-zA-Z0-9_-]+)/,
+                  ];
+
+                  for (const pattern of patterns) {
+                    const match = youtubeUrl.match(pattern);
+                    if (match) {
+                      videoId = match[1];
+                      break;
+                    }
+                  }
+
+                  if (!videoId) {
+                    alert('URL de YouTube no válida. Por favor verifica el formato.');
+                    return;
+                  }
+
+                  // Navegar al editor de video con los parámetros de YouTube
+                  navigate(`/crm/${tenantSlug}/contenido/videos/nuevo?youtube=${videoId}`);
+                  setShowYouTubeImportModal(false);
+                  setYoutubeUrl('');
+                }}
+                className="btn-primary"
+                style={{ display: 'flex', alignItems: 'center', gap: '6px' }}
+              >
+                <LucideIcons.Play size={16} />
+                Importar Video
+              </button>
             </div>
           </div>
         </div>

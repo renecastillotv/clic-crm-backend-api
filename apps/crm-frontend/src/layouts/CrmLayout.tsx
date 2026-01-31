@@ -634,6 +634,7 @@ export default function CrmLayout() {
     const isCrmRoute = location.pathname.includes('/contactos') ||
                        location.pathname.includes('/pipeline') ||
                        location.pathname.includes('/propuestas') ||
+                       location.pathname.includes('/planes-pago') ||
                        location.pathname.includes('/actividades') ||
                        location.pathname.includes('/metas');
     const isFinanzasRoute = location.pathname.includes('/finanzas');
@@ -769,6 +770,7 @@ export default function CrmLayout() {
   const isCrmActive = location.pathname.includes('/contactos') ||
                       location.pathname.includes('/pipeline') ||
                       location.pathname.includes('/propuestas') ||
+                      location.pathname.includes('/planes-pago') ||
                       location.pathname.includes('/actividades') ||
                       location.pathname.includes('/metas');
 

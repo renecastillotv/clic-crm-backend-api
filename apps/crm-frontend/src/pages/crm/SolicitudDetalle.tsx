@@ -252,6 +252,28 @@ const Icons = {
       <polyline points="22,6 12,13 2,6"/>
     </svg>
   ),
+  zap: (
+    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+      <polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"/>
+    </svg>
+  ),
+  document: (
+    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+      <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/>
+      <polyline points="14 2 14 8 20 8"/>
+      <line x1="16" y1="13" x2="8" y2="13"/>
+      <line x1="16" y1="17" x2="8" y2="17"/>
+    </svg>
+  ),
+  list: (
+    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+      <rect x="4" y="2" width="16" height="20" rx="2"/>
+      <line x1="8" y1="6" x2="16" y2="6"/>
+      <line x1="8" y1="10" x2="16" y2="10"/>
+      <line x1="8" y1="14" x2="12" y2="14"/>
+      <line x1="8" y1="18" x2="10" y2="18"/>
+    </svg>
+  ),
 };
 
 export default function SolicitudDetalle() {
@@ -933,6 +955,29 @@ export default function SolicitudDetalle() {
               </div>
             )}
           </div>
+
+          {/* Acciones Rápidas */}
+          <div className="card quick-actions-card">
+            <div className="card-header">
+              <h3>{Icons.zap} Acciones Rápidas</h3>
+            </div>
+            <div className="quick-actions-grid">
+              <button
+                className="quick-action-btn"
+                onClick={() => navigate(`/crm/${tenantSlug}/propuestas?crear=true&solicitud_id=${solicitudId}&contacto_id=${solicitud?.contacto_id || ''}`)}
+              >
+                <span className="quick-action-icon propuesta">{Icons.document}</span>
+                <span className="quick-action-label">Crear Propuesta</span>
+              </button>
+              <button
+                className="quick-action-btn"
+                onClick={() => navigate(`/crm/${tenantSlug}/planes-pago?crear=true&solicitud_id=${solicitudId}&contacto_id=${solicitud?.contacto_id || ''}`)}
+              >
+                <span className="quick-action-icon plan-pago">{Icons.list}</span>
+                <span className="quick-action-label">Crear Plan de Pago</span>
+              </button>
+            </div>
+          </div>
         </div>
 
         {/* Columna derecha - PURGE primero, luego Actividades */}
@@ -1523,6 +1568,67 @@ const styles = `
     font-size: 0.9rem;
     cursor: pointer;
     text-decoration: underline;
+  }
+
+  /* Quick Actions Card */
+  .quick-actions-card {
+    background: linear-gradient(135deg, #fefce8 0%, #fef9c3 100%);
+    border-color: #fcd34d;
+  }
+
+  .quick-actions-card .card-header h3 svg {
+    color: #ca8a04;
+  }
+
+  .quick-actions-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 12px;
+    padding: 16px 20px;
+  }
+
+  .quick-action-btn {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 10px;
+    padding: 16px 12px;
+    background: white;
+    border: 1px solid #e2e8f0;
+    border-radius: 10px;
+    cursor: pointer;
+    transition: all 0.2s ease;
+  }
+
+  .quick-action-btn:hover {
+    border-color: #cbd5e1;
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.08);
+    transform: translateY(-2px);
+  }
+
+  .quick-action-icon {
+    width: 40px;
+    height: 40px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    border-radius: 10px;
+    color: white;
+  }
+
+  .quick-action-icon.propuesta {
+    background: linear-gradient(135deg, #7c3aed, #8b5cf6);
+  }
+
+  .quick-action-icon.plan-pago {
+    background: linear-gradient(135deg, #0ea5e9, #38bdf8);
+  }
+
+  .quick-action-label {
+    font-size: 0.85rem;
+    font-weight: 500;
+    color: #334155;
+    text-align: center;
   }
 
   /* Actividades Timeline */

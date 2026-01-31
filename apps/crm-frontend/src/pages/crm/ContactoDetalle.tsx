@@ -24,6 +24,7 @@ import {
   deleteRelacionContacto,
   getSolicitudes,
   getPropuestas,
+  getPlanesPago,
   getActividadesByContacto,
   createActividad,
   completarActividad,
@@ -33,6 +34,7 @@ import {
   Solicitud,
   Propuesta,
   Actividad,
+  PlanPago,
 } from '../../services/api';
 
 // Extensiones/Tipos disponibles para un contacto
@@ -249,7 +251,7 @@ export default function ContactoDetalle() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
-  const [activeTab, setActiveTab] = useState<'info' | 'extensiones' | 'relaciones' | 'actividad' | 'solicitudes' | 'propuestas'>('info');
+  const [activeTab, setActiveTab] = useState<'info' | 'extensiones' | 'relaciones' | 'actividad' | 'solicitudes' | 'propuestas' | 'planes-pago'>('info');
   const [isEditing, setIsEditing] = useState(false);
   const [editData, setEditData] = useState<Partial<Contacto>>({});
   const [showAddExtensionModal, setShowAddExtensionModal] = useState(false);
@@ -270,6 +272,8 @@ export default function ContactoDetalle() {
   const [loadingSolicitudes, setLoadingSolicitudes] = useState(false);
   const [propuestas, setPropuestas] = useState<Propuesta[]>([]);
   const [loadingPropuestas, setLoadingPropuestas] = useState(false);
+  const [planesPago, setPlanesPago] = useState<PlanPago[]>([]);
+  const [loadingPlanesPago, setLoadingPlanesPago] = useState(false);
   const [actividades, setActividades] = useState<Actividad[]>([]);
   const [loadingActividades, setLoadingActividades] = useState(false);
   const [showCreateActividadModal, setShowCreateActividadModal] = useState(false);
@@ -401,6 +405,27 @@ export default function ContactoDetalle() {
       cargarPropuestas();
     }
   }, [activeTab, cargarPropuestas]);
+
+  // Cargar planes de pago del contacto
+  const cargarPlanesPago = useCallback(async () => {
+    if (!tenantActual?.id || !contactoId) return;
+
+    try {
+      setLoadingPlanesPago(true);
+      const response = await getPlanesPago(tenantActual.id, { contacto_id: contactoId });
+      setPlanesPago(response.data);
+    } catch (err: any) {
+      console.error('Error cargando planes de pago:', err);
+    } finally {
+      setLoadingPlanesPago(false);
+    }
+  }, [tenantActual?.id, contactoId]);
+
+  useEffect(() => {
+    if (activeTab === 'planes-pago') {
+      cargarPlanesPago();
+    }
+  }, [activeTab, cargarPlanesPago]);
 
   // Cargar actividades del contacto
   const cargarActividades = useCallback(async () => {
@@ -597,6 +622,9 @@ export default function ContactoDetalle() {
           </button>
           <button className={`tab ${activeTab === 'propuestas' ? 'active' : ''}`} onClick={() => setActiveTab('propuestas')}>
             Propuestas {propuestas.length ? `(${propuestas.length})` : ''}
+          </button>
+          <button className={`tab ${activeTab === 'planes-pago' ? 'active' : ''}`} onClick={() => setActiveTab('planes-pago')}>
+            Planes de Pago {planesPago.length ? `(${planesPago.length})` : ''}
           </button>
         </div>
       </div>
@@ -1111,6 +1139,72 @@ export default function ContactoDetalle() {
                     </div>
                     {propuesta.descripcion && (
                       <p className="propuesta-descripcion">{propuesta.descripcion}</p>
+                    )}
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
+        )}
+
+        {/* Tab Planes de Pago */}
+        {activeTab === 'planes-pago' && (
+          <div className="tab-panel">
+            <div className="section-header">
+              <span>Planes de Pago del contacto</span>
+              <button
+                className="btn-primary btn-sm"
+                onClick={() => navigate(`/crm/${tenantSlug}/planes-pago?crear=true&contacto_id=${contactoId}`)}
+              >
+                {Icons.plus} Nuevo Plan
+              </button>
+            </div>
+            {loadingPlanesPago ? (
+              <div className="loading-state">
+                <div className="spinner"></div>
+                <span>Cargando planes de pago...</span>
+              </div>
+            ) : planesPago.length === 0 ? (
+              <div className="empty-state">
+                <p>Este contacto no tiene planes de pago registrados.</p>
+                <button
+                  className="btn-primary btn-sm"
+                  onClick={() => navigate(`/crm/${tenantSlug}/planes-pago?crear=true&contacto_id=${contactoId}`)}
+                >
+                  {Icons.plus} Crear primer plan de pago
+                </button>
+              </div>
+            ) : (
+              <div className="planes-pago-list">
+                {planesPago.map((plan) => (
+                  <div
+                    key={plan.id}
+                    className="plan-pago-card"
+                    onClick={() => navigate(`/crm/${tenantSlug}/planes-pago/${plan.id}`)}
+                  >
+                    <div className="plan-pago-card-header">
+                      <span className="plan-pago-titulo">{plan.titulo}</span>
+                      <span className={`badge badge-plan-${plan.estado}`}>
+                        {plan.estado}
+                      </span>
+                    </div>
+                    <div className="plan-pago-card-meta">
+                      {plan.precio_total && (
+                        <span className="plan-pago-monto">
+                          {plan.moneda || 'USD'} ${plan.precio_total.toLocaleString()}
+                        </span>
+                      )}
+                      {plan.propiedad && (
+                        <span className="plan-pago-propiedad">
+                          {plan.propiedad.titulo || plan.propiedad.nombre}
+                        </span>
+                      )}
+                      <span className="plan-pago-fecha">
+                        {new Date(plan.created_at).toLocaleDateString()}
+                      </span>
+                    </div>
+                    {plan.descripcion && (
+                      <p className="plan-pago-descripcion">{plan.descripcion}</p>
                     )}
                   </div>
                 ))}
@@ -2811,6 +2905,84 @@ const styles = `
   .badge-propuesta-aceptada { background: #dcfce7; color: #16a34a; }
   .badge-propuesta-rechazada { background: #fee2e2; color: #dc2626; }
   .badge-propuesta-expirada { background: #fef3c7; color: #b45309; }
+
+  /* Planes de Pago List */
+  .planes-pago-list {
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+  }
+
+  .plan-pago-card {
+    background: white;
+    border: 1px solid #e2e8f0;
+    border-radius: 10px;
+    padding: 16px;
+    cursor: pointer;
+    transition: all 0.15s ease;
+  }
+
+  .plan-pago-card:hover {
+    border-color: #cbd5e1;
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.06);
+  }
+
+  .plan-pago-card-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 12px;
+    margin-bottom: 8px;
+  }
+
+  .plan-pago-titulo {
+    font-weight: 600;
+    font-size: 0.95rem;
+    color: #0f172a;
+  }
+
+  .plan-pago-card-meta {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    flex-wrap: wrap;
+  }
+
+  .plan-pago-monto {
+    font-weight: 600;
+    font-size: 0.9rem;
+    color: #16a34a;
+  }
+
+  .plan-pago-propiedad {
+    font-size: 0.8rem;
+    color: #64748b;
+    background: #f1f5f9;
+    padding: 2px 8px;
+    border-radius: 4px;
+  }
+
+  .plan-pago-fecha {
+    font-size: 0.75rem;
+    color: #94a3b8;
+  }
+
+  .plan-pago-descripcion {
+    margin: 10px 0 0 0;
+    font-size: 0.85rem;
+    color: #64748b;
+    line-height: 1.4;
+    display: -webkit-box;
+    -webkit-line-clamp: 2;
+    -webkit-box-orient: vertical;
+    overflow: hidden;
+  }
+
+  .badge-plan-borrador { background: #f1f5f9; color: #475569; }
+  .badge-plan-enviado { background: #dbeafe; color: #1d4ed8; }
+  .badge-plan-visto { background: #e0e7ff; color: #4338ca; }
+  .badge-plan-aceptado { background: #dcfce7; color: #16a34a; }
+  .badge-plan-rechazado { background: #fee2e2; color: #dc2626; }
 
   @media (max-width: 768px) {
     .header-contact { flex-direction: column; text-align: center; }

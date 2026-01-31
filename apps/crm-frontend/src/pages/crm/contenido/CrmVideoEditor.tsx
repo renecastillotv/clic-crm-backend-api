@@ -174,6 +174,22 @@ export default function CrmVideoEditor() {
     setFormData(prev => ({ ...prev, duracionSegundos: segundos }));
   }, [duracion]);
 
+  // Handle YouTube import from URL parameter
+  useEffect(() => {
+    const youtubeId = searchParams.get('youtube');
+    if (youtubeId && !isEditing) {
+      // Pre-fill form with YouTube video data
+      const youtubeUrl = `https://www.youtube.com/watch?v=${youtubeId}`;
+      setFormData(prev => ({
+        ...prev,
+        tipoVideo: 'youtube',
+        videoUrl: youtubeUrl,
+        videoId: youtubeId,
+        thumbnail: `https://img.youtube.com/vi/${youtubeId}/maxresdefault.jpg`,
+      }));
+    }
+  }, [searchParams, isEditing]);
+
   const loadInitialData = async () => {
     if (!tenantActual?.id) return;
     setLoading(true);

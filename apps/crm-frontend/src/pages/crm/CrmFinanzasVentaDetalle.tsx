@@ -83,7 +83,7 @@ export default function CrmFinanzasVentaDetalle() {
             </div>
           </div>
         ),
-        subtitle: venta.propiedad?.titulo || venta.nombre_propiedad_externa || 'Sin propiedad asociada',
+        subtitle: venta.propiedad?.titulo || venta.propiedad_nombre || venta.nombre_propiedad_externa || 'Sin propiedad asociada',
         backButton: {
           label: 'Volver',
           onClick: () => navigate(-1),

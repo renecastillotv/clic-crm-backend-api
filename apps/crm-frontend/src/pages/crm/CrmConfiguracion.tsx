@@ -242,6 +242,28 @@ export default function CrmConfiguracion() {
           <span className="card-status">Próximamente</span>
         </div>
 
+        <div
+          className="settings-card settings-card-active"
+          onClick={() => navigate('contenido-permisos')}
+        >
+          <div className="card-header">
+            <div className="card-icon card-icon-orange">
+              <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/>
+                <polyline points="14 2 14 8 20 8"/>
+                <line x1="16" y1="13" x2="8" y2="13"/>
+                <line x1="16" y1="17" x2="8" y2="17"/>
+              </svg>
+            </div>
+            <h3>Permisos de Contenido</h3>
+          </div>
+          <p className="card-desc">Controla qué tipos de contenido pueden crear los usuarios</p>
+          <div className="card-action">
+            <span>Configurar</span>
+            <ChevronRight size={18} />
+          </div>
+        </div>
+
         <div className="settings-card">
           <div className="card-header">
             <div className="card-icon">

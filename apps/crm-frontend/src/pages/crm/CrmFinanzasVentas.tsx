@@ -1689,13 +1689,33 @@ export default function CrmFinanzasVentas() {
                     )}
                   </td>
                   <td style={{ padding: '12px 8px' }}>
-                    {venta.completada ? (
-                      <span className="badge badge-success font-medium">Completada</span>
-                    ) : venta.cancelada ? (
-                      <span className="badge badge-error font-medium">Cancelada</span>
-                    ) : (
-                      <span className="badge badge-warning font-medium">Pendiente</span>
-                    )}
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: '4px', alignItems: 'flex-start' }}>
+                      {venta.completada ? (
+                        <span className="badge badge-success font-medium">Completada</span>
+                      ) : venta.cancelada ? (
+                        <span className="badge badge-error font-medium">Cancelada</span>
+                      ) : (
+                        <span className="badge badge-warning font-medium">Pendiente</span>
+                      )}
+                      {/* Estado de cobro */}
+                      {!venta.cancelada && (
+                        <span style={{
+                          fontSize: '0.6875rem',
+                          fontWeight: 500,
+                          padding: '2px 6px',
+                          borderRadius: '4px',
+                          background: venta.estado_cobro === 'cobrado' ? '#dcfce7' :
+                                     venta.estado_cobro === 'parcial' ? '#fef3c7' : '#f1f5f9',
+                          color: venta.estado_cobro === 'cobrado' ? '#166534' :
+                                venta.estado_cobro === 'parcial' ? '#92400e' : '#475569',
+                          whiteSpace: 'nowrap'
+                        }}>
+                          {venta.estado_cobro === 'cobrado' ? '✓ Cobrado' :
+                           venta.estado_cobro === 'parcial' ? `Cobro Parcial ${venta.cache_porcentaje_cobrado || 0}%` :
+                           'Sin Cobrar'}
+                        </span>
+                      )}
+                    </div>
                   </td>
                   <td style={{ padding: '12px 8px' }}>
                     <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>

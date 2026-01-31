@@ -63,6 +63,7 @@ import CrmActividades from './pages/crm/CrmActividades';
 import CrmMetas from './pages/crm/CrmMetas';
 import CrmEquipo from './pages/crm/CrmEquipo';
 import CrmConfiguracion from './pages/crm/CrmConfiguracion';
+import CrmContenidoPermisosConfiguracion from './pages/crm/CrmContenidoPermisosConfiguracion';
 import { CrmWebPaginas, CrmWebSecciones, CrmWebSeccionEditar, CrmWebTema, CrmWebPaginaEditar } from './pages/crm/web';
 
 // Páginas de Finanzas
@@ -452,6 +453,7 @@ function AppRoutes() {
         <Route path="configuracion/amenidades" element={<CrmAmenidadesConfig />} />
         <Route path="configuracion/fuentes-lead" element={<CrmFuentesLeadConfig />} />
         <Route path="configuracion/extensiones-contacto" element={<CrmExtensionesContactoConfig />} />
+        <Route path="configuracion/contenido-permisos" element={<CrmContenidoPermisosConfiguracion />} />
 
         {/* Contenido editores */}
         <Route path="contenido/articulos/nuevo" element={<CrmArticuloEditor />} />
