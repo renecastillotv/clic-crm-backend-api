@@ -39,6 +39,7 @@ import {
   getUnidadesProyecto,
   getSolicitudes,
   getPropuestas,
+  registrarCobroEmpresa,
   Venta,
   VentaFiltros,
   EstadoVenta,
@@ -1479,14 +1480,13 @@ export default function CrmFinanzasVentas() {
           <table className="data-table">
             <thead>
               <tr>
-                <th style={{ width: '80px', minWidth: '80px' }}>Número</th>
+                <th style={{ width: '100px', minWidth: '100px' }}>Cierre</th>
                 <th style={{ width: '80px', minWidth: '80px', maxWidth: '80px' }}>Imagen</th>
                 <th>Propiedad</th>
                 <th>Cliente</th>
                 <th>Asesor</th>
                 <th style={{ width: '180px', minWidth: '180px' }}>Valor</th>
-                <th style={{ width: '180px', minWidth: '180px' }}>Comisión</th>
-                <th style={{ width: '130px', minWidth: '130px' }}>Fecha Cierre</th>
+                <th style={{ width: '200px', minWidth: '200px' }}>Comisión</th>
                 <th style={{ width: '110px', minWidth: '110px' }}>Estado</th>
                 <th style={{ width: '100px', minWidth: '100px' }}>Acciones</th>
               </tr>
@@ -1506,16 +1506,21 @@ export default function CrmFinanzasVentas() {
                   }}
                 >
                   <td style={{ padding: '12px 8px' }}>
-                    <div className="flex items-center">
-                      <span 
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
+                      <span
                         className="font-bold text-orange-600 text-lg"
-                        style={{ 
+                        style={{
                           fontFamily: 'monospace',
                           letterSpacing: '0.5px'
                         }}
                       >
                         #{venta.numero_venta || 'N/A'}
                       </span>
+                      {venta.fecha_cierre && (
+                        <span style={{ fontSize: '0.75rem', color: '#64748b', fontWeight: 500 }}>
+                          {new Date(venta.fecha_cierre).toLocaleDateString('es-DO', { day: '2-digit', month: '2-digit', year: 'numeric' })}
+                        </span>
+                      )}
                     </div>
                   </td>
                   <td style={{ width: '80px', minWidth: '80px', maxWidth: '80px', padding: '8px' }}>
@@ -1641,7 +1646,7 @@ export default function CrmFinanzasVentas() {
                       );
                     })()}
                   </td>
-                  <td style={{ padding: '12px 8px', width: '180px', minWidth: '180px' }}>
+                  <td style={{ padding: '12px 8px', width: '200px', minWidth: '200px' }}>
                     {venta.monto_comision ? (() => {
                       const comision = typeof venta.monto_comision === 'number' ? venta.monto_comision : parseFloat(venta.monto_comision || '0') || 0;
                       const moneda = venta.moneda || 'USD';
@@ -1649,8 +1654,8 @@ export default function CrmFinanzasVentas() {
                       const mostrarOriginal = moneda !== 'USD';
                       return (
                       <div style={{ minWidth: 0 }}>
-                          <div style={{ 
-                            fontWeight: 700, 
+                          <div style={{
+                            fontWeight: 700,
                             fontSize: '0.9375rem',
                             color: '#d97706',
                             display: 'flex',
@@ -1673,18 +1678,29 @@ export default function CrmFinanzasVentas() {
                               {venta.porcentaje_comision}%
                             </div>
                         )}
+                        {/* Estado de cobro */}
+                        {!venta.cancelada && (
+                          <span style={{
+                            display: 'inline-block',
+                            marginTop: '6px',
+                            fontSize: '0.6875rem',
+                            fontWeight: 600,
+                            padding: '3px 8px',
+                            borderRadius: '4px',
+                            background: venta.estado_cobro === 'cobrado' ? '#dcfce7' :
+                                       venta.estado_cobro === 'parcial' ? '#fef3c7' : '#fee2e2',
+                            color: venta.estado_cobro === 'cobrado' ? '#166534' :
+                                  venta.estado_cobro === 'parcial' ? '#92400e' : '#991b1b',
+                            whiteSpace: 'nowrap'
+                          }}>
+                            {venta.estado_cobro === 'cobrado' ? '✓ Cobrado' :
+                             venta.estado_cobro === 'parcial' ? `Cobro ${venta.cache_porcentaje_cobrado || 0}%` :
+                             'Sin Cobrar'}
+                          </span>
+                        )}
                       </div>
                       );
                     })() : (
-                      <span className="text-gray-400">-</span>
-                    )}
-                  </td>
-                  <td style={{ padding: '12px 8px' }}>
-                    {venta.fecha_cierre ? (
-                      <div style={{ fontSize: '0.875rem', color: '#475569', fontWeight: 500 }}>
-                        {new Date(venta.fecha_cierre).toLocaleDateString('es-DO', { day: '2-digit', month: '2-digit', year: 'numeric' })}
-                      </div>
-                    ) : (
                       <span className="text-gray-400">-</span>
                     )}
                   </td>
@@ -1696,24 +1712,6 @@ export default function CrmFinanzasVentas() {
                         <span className="badge badge-error font-medium">Cancelada</span>
                       ) : (
                         <span className="badge badge-warning font-medium">Pendiente</span>
-                      )}
-                      {/* Estado de cobro */}
-                      {!venta.cancelada && (
-                        <span style={{
-                          fontSize: '0.6875rem',
-                          fontWeight: 500,
-                          padding: '2px 6px',
-                          borderRadius: '4px',
-                          background: venta.estado_cobro === 'cobrado' ? '#dcfce7' :
-                                     venta.estado_cobro === 'parcial' ? '#fef3c7' : '#f1f5f9',
-                          color: venta.estado_cobro === 'cobrado' ? '#166534' :
-                                venta.estado_cobro === 'parcial' ? '#92400e' : '#475569',
-                          whiteSpace: 'nowrap'
-                        }}>
-                          {venta.estado_cobro === 'cobrado' ? '✓ Cobrado' :
-                           venta.estado_cobro === 'parcial' ? `Cobro Parcial ${venta.cache_porcentaje_cobrado || 0}%` :
-                           'Sin Cobrar'}
-                        </span>
                       )}
                     </div>
                   </td>
@@ -1806,46 +1804,25 @@ export default function CrmFinanzasVentas() {
                             transition: 'all 0.2s',
                             boxShadow: '0 2px 4px rgba(102, 126, 234, 0.2)'
                           }}
-                          onClick={async (e) => {
+                          onClick={(e) => {
                             e.stopPropagation();
                             e.preventDefault();
                             setVentaParaPago(venta);
-                            setLoadingComision(true);
-                            setComisionData(null);
 
-                            // Cargar datos de comisión
-                            if (tenantActual?.id) {
-                              try {
-                                const comisiones = await getComisiones(tenantActual.id, { ventaId: venta.id });
-                                if (comisiones.length > 0) {
-                                  const comision = comisiones[0];
-                                  setComisionData({
-                                    montoTotal: Number(comision.monto || 0),
-                                    montoPagado: Number(comision.monto_pagado || 0)
-                                  });
-                                } else {
-                                  const montoComision = typeof venta.monto_comision === 'number'
-                                    ? venta.monto_comision
-                                    : parseFloat(venta.monto_comision || '0') || 0;
-                                  setComisionData({
-                                    montoTotal: montoComision,
-                                    montoPagado: 0
-                                  });
-                                }
-                              } catch (error) {
-                                console.error('Error cargando comisión:', error);
-                                const montoComision = typeof venta.monto_comision === 'number'
-                                  ? venta.monto_comision
-                                  : parseFloat(venta.monto_comision || '0') || 0;
-                                setComisionData({
-                                  montoTotal: montoComision,
-                                  montoPagado: 0
-                                });
-                              } finally {
-                                setLoadingComision(false);
-                              }
-                            }
+                            // Usar datos de cobro de empresa directamente de la venta
+                            // (cache_monto_cobrado = lo que la empresa ya cobró al cliente)
+                            const montoComision = typeof venta.monto_comision === 'number'
+                              ? venta.monto_comision
+                              : parseFloat(venta.monto_comision || '0') || 0;
+                            const montoCobrado = typeof venta.cache_monto_cobrado === 'number'
+                              ? venta.cache_monto_cobrado
+                              : parseFloat(String(venta.cache_monto_cobrado || '0')) || 0;
 
+                            setComisionData({
+                              montoTotal: montoComision,
+                              montoPagado: montoCobrado
+                            });
+                            setLoadingComision(false);
                             setShowAplicarPagoModal(true);
                           }}
                           onMouseEnter={(e) => {
@@ -2460,56 +2437,17 @@ export default function CrmFinanzasVentas() {
           notas?: string;
           recibo?: File;
         }) => {
-          if (!tenantActual?.id || !ventaParaPago) return;
+          if (!tenantActual?.id || !ventaParaPago || !user?.id) return;
 
           try {
-            // Obtener o crear comisión
-            let comisiones = await getComisiones(tenantActual.id, { ventaId: ventaParaPago.id });
-            let comision = comisiones.length > 0 ? comisiones[0] : null;
-
-            if (!comision) {
-              const usuarioId = ventaParaPago.usuario_cerrador_id || ventaParaPago.asesor_id || user?.id;
-              if (!usuarioId) {
-                throw new Error('No se pudo determinar el usuario de la comisión');
-              }
-
-              const montoComision = typeof ventaParaPago.monto_comision === 'number' 
-                ? ventaParaPago.monto_comision 
-                : parseFloat(ventaParaPago.monto_comision || '0') || 0;
-
-              comision = await createComision(tenantActual.id, {
-                venta_id: ventaParaPago.id,
-                usuario_id: usuarioId,
-                monto: montoComision,
-                moneda: ventaParaPago.moneda || 'USD',
-                porcentaje: ventaParaPago.porcentaje_comision || 0,
-                estado: 'pendiente',
-                monto_pagado: 0,
-                tipo: 'general',
-              });
-            }
-
-            const montoTotal = Number(comision.monto || 0);
-            const montoPagadoActual = Number(comision.monto_pagado || 0);
-            const montoAplicar = Number(data.monto);
-            const nuevoMontoPagado = Number((montoPagadoActual + montoAplicar).toFixed(2));
-
-            let nuevoEstado = 'parcial';
-            if (nuevoMontoPagado >= montoTotal) {
-              nuevoEstado = 'pagado';
-            } else if (nuevoMontoPagado === 0) {
-              nuevoEstado = 'pendiente';
-            }
-
             // Subir recibo si existe
             let reciboUrl: string | null = null;
             if (data.recibo) {
               const formData = new FormData();
               formData.append('file', data.recibo);
-              formData.append('folder', `comisiones/${comision.venta_id}/recibos`);
+              formData.append('folder', `ventas/${ventaParaPago.id}/cobros`);
 
               const token = await getToken();
-              // Usar endpoint de upload del tenant
               const uploadResponse = await fetch(
                 `${import.meta.env.VITE_API_URL || 'http://localhost:3001/api'}/tenants/${tenantActual.id}/upload/file`,
                 {
@@ -2527,37 +2465,31 @@ export default function CrmFinanzasVentas() {
               }
             }
 
-            // Actualizar comisión
-            const datosExtra = comision.datos_extra || {};
-            if (!datosExtra.historialPagos) {
-              datosExtra.historialPagos = [];
-            }
+            // Registrar cobro de empresa (lo que la empresa cobra al cliente)
+            const token = await getToken();
+            await registrarCobroEmpresa(
+              tenantActual.id,
+              ventaParaPago.id,
+              {
+                monto: data.monto,
+                moneda: ventaParaPago.moneda || 'USD',
+                fecha_cobro: data.fechaPago || new Date().toISOString().split('T')[0],
+                notas: data.notas || undefined,
+                recibo_url: reciboUrl || undefined,
+                registrado_por_id: user.id,
+              },
+              token
+            );
 
-            datosExtra.historialPagos.push({
-              fecha: data.fechaPago || new Date().toISOString().split('T')[0],
-              monto: data.monto,
-              tipoPago: data.tipoPago,
-              notas: data.notas || null,
-              reciboUrl: reciboUrl || null,
-              fechaRegistro: new Date().toISOString()
-            });
-
-            await updateComision(tenantActual.id, comision.venta_id, comision.id, {
-              monto_pagado: nuevoMontoPagado,
-              fecha_pago: data.fechaPago || new Date().toISOString().split('T')[0],
-              estado: nuevoEstado,
-              notas: data.notas || comision.notas || null,
-              datos_extra: Object.keys(datosExtra).length > 0 ? datosExtra : undefined,
-            });
-
-            // Recargar ventas
+            // Recargar ventas para actualizar los caches
             await cargarVentas();
-            
+
             setShowAplicarPagoModal(false);
             setVentaParaPago(null);
+            setComisionData(null);
           } catch (error: any) {
-            console.error('Error aplicando pago:', error);
-            alert(error.message || 'Error al aplicar el pago');
+            console.error('Error registrando cobro:', error);
+            alert(error.message || 'Error al registrar el cobro');
           }
         };
 

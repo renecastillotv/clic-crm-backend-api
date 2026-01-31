@@ -514,3 +514,98 @@ export async function deleteDocumentoSubido(
 
 // Alias para compatibilidad
 export const deleteItemExpediente = deleteDocumentoSubido;
+
+// ============================================================
+// FUNCIONES PARA ACTUALIZACIÓN DE ESTADO DE VENTA
+// ============================================================
+
+/**
+ * Verifica si todos los documentos obligatorios de una venta están completos
+ * y actualiza el campo completada de la venta
+ */
+export async function verificarYActualizarEstadoExpediente(
+  tenantId: string,
+  ventaId: string
+): Promise<{ expedienteCompleto: boolean; ventaActualizada: boolean }> {
+  // 1. Obtener la venta para saber su categoría
+  const ventaSql = `
+    SELECT v.id, v.completada, v.propiedad_id, v.es_propiedad_externa,
+           p.tipo_operacion, p.categoria as categoria_propiedad
+    FROM ventas v
+    LEFT JOIN propiedades p ON v.propiedad_id = p.id
+    WHERE v.id = $1 AND v.tenant_id = $2
+  `;
+  const ventaResult = await query(ventaSql, [ventaId, tenantId]);
+
+  if (ventaResult.rows.length === 0) {
+    return { expedienteCompleto: false, ventaActualizada: false };
+  }
+
+  const venta = ventaResult.rows[0];
+
+  // 2. Determinar la categoría de documentos según el tipo de venta
+  let categoria: CategoriaDocumento = 'cierre_venta_lista';
+  const tipoOperacion = venta.tipo_operacion?.toLowerCase() || '';
+  const categoriaPropiedad = venta.categoria_propiedad?.toLowerCase() || '';
+
+  if (tipoOperacion.includes('alquiler') || tipoOperacion.includes('renta')) {
+    categoria = 'cierre_alquiler';
+  } else if (categoriaPropiedad.includes('proyecto')) {
+    categoria = 'cierre_venta_proyecto';
+  }
+
+  // 3. Obtener todos los requerimientos obligatorios de esta categoría
+  const requerimientosSql = `
+    SELECT id
+    FROM documentos_requeridos
+    WHERE tenant_id = $1
+      AND categoria = $2
+      AND es_obligatorio = true
+      AND activo = true
+  `;
+  const requerimientosResult = await query(requerimientosSql, [tenantId, categoria]);
+  const requerimientosObligatorios = requerimientosResult.rows;
+
+  // Si no hay requerimientos obligatorios, el expediente está completo
+  if (requerimientosObligatorios.length === 0) {
+    return { expedienteCompleto: true, ventaActualizada: false };
+  }
+
+  // 4. Obtener los documentos subidos para esta venta que tienen url_documento
+  const subidosSql = `
+    SELECT requerimiento_id
+    FROM documentos_subidos
+    WHERE venta_id = $1
+      AND tenant_id = $2
+      AND url_documento IS NOT NULL
+      AND url_documento != ''
+  `;
+  const subidosResult = await query(subidosSql, [ventaId, tenantId]);
+  const subidos = new Set(subidosResult.rows.map(r => r.requerimiento_id));
+
+  // 5. Verificar si todos los obligatorios están subidos
+  const expedienteCompleto = requerimientosObligatorios.every(req => subidos.has(req.id));
+
+  // 6. Actualizar la venta si el estado cambió
+  let ventaActualizada = false;
+
+  if (expedienteCompleto && !venta.completada) {
+    // Marcar como completada
+    await query(
+      `UPDATE ventas SET completada = true, updated_at = NOW() WHERE id = $1 AND tenant_id = $2`,
+      [ventaId, tenantId]
+    );
+    ventaActualizada = true;
+    console.log(`✅ Venta ${ventaId} marcada como completada (expediente completo)`);
+  } else if (!expedienteCompleto && venta.completada) {
+    // Si se eliminó un documento obligatorio, desmarcar
+    await query(
+      `UPDATE ventas SET completada = false, updated_at = NOW() WHERE id = $1 AND tenant_id = $2`,
+      [ventaId, tenantId]
+    );
+    ventaActualizada = true;
+    console.log(`⚠️ Venta ${ventaId} marcada como pendiente (faltan documentos obligatorios)`);
+  }
+
+  return { expedienteCompleto, ventaActualizada };
+}

@@ -13,6 +13,7 @@ import {
   getItemsExpediente,
   upsertItemExpediente,
   deleteItemExpediente,
+  verificarYActualizarEstadoExpediente,
 } from '../../services/expedienteService.js';
 import { calcularYCrearComisiones, modificarDistribucion, getMisComisiones } from '../../services/comisionesService.js';
 import * as ventasCobrosService from '../../services/ventasCobrosService.js';
@@ -1564,7 +1565,14 @@ router.post('/:ventaId/expediente/items', async (req: Request<VentaParams>, res:
       subido_por_id
     });
 
-    res.status(201).json(item);
+    // Verificar y actualizar estado de la venta si el expediente está completo
+    const { expedienteCompleto, ventaActualizada } = await verificarYActualizarEstadoExpediente(tenantId, ventaId);
+
+    res.status(201).json({
+      ...item,
+      expediente_completo: expedienteCompleto,
+      venta_actualizada: ventaActualizada
+    });
   } catch (error: any) {
     if (error.message === 'Requerimiento no encontrado') {
       return res.status(404).json({ error: error.message });
@@ -1579,11 +1587,19 @@ router.post('/:ventaId/expediente/items', async (req: Request<VentaParams>, res:
  */
 router.delete('/:ventaId/expediente/items/:itemId', async (req: Request<ItemParams>, res: Response, next: NextFunction) => {
   try {
-    const { tenantId, itemId } = req.params;
+    const { tenantId, ventaId, itemId } = req.params;
 
     await deleteItemExpediente(tenantId, itemId);
 
-    res.json({ success: true, message: 'Documento eliminado correctamente' });
+    // Verificar y actualizar estado de la venta (puede marcarse como incompleta)
+    const { expedienteCompleto, ventaActualizada } = await verificarYActualizarEstadoExpediente(tenantId, ventaId);
+
+    res.json({
+      success: true,
+      message: 'Documento eliminado correctamente',
+      expediente_completo: expedienteCompleto,
+      venta_actualizada: ventaActualizada
+    });
   } catch (error) {
     next(error);
   }

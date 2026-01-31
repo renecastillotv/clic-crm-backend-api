@@ -4029,6 +4029,98 @@ export async function getVenta(tenantId: string, ventaId: string, token?: string
   return data.venta || data;
 }
 
+// ============================================
+// COBROS DE EMPRESA (Cobros al cliente)
+// ============================================
+
+export interface VentaCobro {
+  id: string;
+  tenant_id: string;
+  venta_id: string;
+  monto: number;
+  moneda: string;
+  fecha_cobro: string;
+  metodo_pago?: string;
+  referencia?: string;
+  banco?: string;
+  recibo_url?: string;
+  notas?: string;
+  registrado_por_id?: string;
+  registrado_por_nombre?: string;
+  registrado_por_apellido?: string;
+  fecha_registro: string;
+  activo: boolean;
+}
+
+/**
+ * Registra un cobro de la empresa (lo que la empresa cobra al cliente)
+ * @param tenantId - ID del tenant
+ * @param ventaId - ID de la venta
+ * @param datos - Datos del cobro
+ * @param token - Token de autenticación opcional
+ */
+export async function registrarCobroEmpresa(
+  tenantId: string,
+  ventaId: string,
+  datos: {
+    monto: number;
+    moneda?: string;
+    fecha_cobro: string;
+    metodo_pago?: string;
+    referencia?: string;
+    banco?: string;
+    recibo_url?: string;
+    notas?: string;
+    registrado_por_id: string;
+  },
+  token?: string | null
+): Promise<VentaCobro> {
+  const response = await apiFetch(`/tenants/${tenantId}/ventas/${ventaId}/cobros`, {
+    method: 'POST',
+    body: JSON.stringify(datos),
+  }, token);
+  const data = await response.json();
+  return data.cobro || data;
+}
+
+/**
+ * Obtiene los cobros de una venta
+ * @param tenantId - ID del tenant
+ * @param ventaId - ID de la venta
+ * @param token - Token de autenticación opcional
+ */
+export async function getCobrosVenta(
+  tenantId: string,
+  ventaId: string,
+  token?: string | null
+): Promise<VentaCobro[]> {
+  const response = await apiFetch(`/tenants/${tenantId}/ventas/${ventaId}/cobros`, {}, token);
+  const data = await response.json();
+  return data.cobros || data || [];
+}
+
+/**
+ * Obtiene el resumen de cobros de una venta
+ * @param tenantId - ID del tenant
+ * @param ventaId - ID de la venta
+ * @param token - Token de autenticación opcional
+ */
+export async function getResumenCobrosVenta(
+  tenantId: string,
+  ventaId: string,
+  token?: string | null
+): Promise<{
+  totalComision: number;
+  totalCobrado: number;
+  porcentajeCobrado: number;
+  pendienteCobrar: number;
+  estadoCobro: string;
+  cantidadCobros: number;
+}> {
+  const response = await apiFetch(`/tenants/${tenantId}/ventas/${ventaId}/cobros/resumen`, {}, token);
+  return await response.json();
+}
+
 /**
  * Recalcula las comisiones de una venta
  * Elimina las comisiones existentes y crea nuevas basadas en los participantes actuales

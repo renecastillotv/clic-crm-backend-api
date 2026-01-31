@@ -83,7 +83,7 @@ export default function CrmFinanzasVentaDetalle() {
             </div>
           </div>
         ),
-        subtitle: venta.propiedad?.titulo || venta.propiedad_nombre || venta.nombre_propiedad_externa || 'Sin propiedad asociada',
+        subtitle: venta.descripcion || `Cierre: ${venta.fecha_cierre ? new Date(venta.fecha_cierre).toLocaleDateString('es-DO') : 'Sin fecha'}`,
         backButton: {
           label: 'Volver',
           onClick: () => navigate(-1),
