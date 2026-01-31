@@ -100,12 +100,13 @@ export default function CrmMetas() {
   // Estado
   const [metas, setMetas] = useState<Meta[]>([]);
   const [misMetas, setMisMetas] = useState<Meta[]>([]);
-  const [metasEquipo, setMetasEquipo] = useState<Meta[]>([]);
+  const [metasAsesores, setMetasAsesores] = useState<Meta[]>([]);
+  const [metasEmpresa, setMetasEmpresa] = useState<Meta[]>([]);
   const [resumen, setResumen] = useState<MetasResumen | null>(null);
   const [miResumen, setMiResumen] = useState<MetasResumen | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
-  const [vistaActiva, setVistaActiva] = useState<'mis-metas' | 'equipo'>('mis-metas');
+  const [vistaActiva, setVistaActiva] = useState<'mis-metas' | 'asesores' | 'empresa'>('mis-metas');
   const [estadoFiltro, setEstadoFiltro] = useState<string>('');
   const [tipoFiltro, setTipoFiltro] = useState<string>('');
   const [deleteConfirm, setDeleteConfirm] = useState<string | null>(null);
@@ -173,21 +174,32 @@ export default function CrmMetas() {
       setMisMetas(misMetasResponse.data);
       setMiResumen(miResumenResponse);
 
-      // Si es admin, cargar también las metas del equipo y lista de usuarios
+      // Si es admin, cargar metas de asesores (asignadas), metas empresa, y lista de usuarios
       if (isTenantAdmin) {
-        const equipoFiltros: MetaFiltros = {
+        const todosFiltros: MetaFiltros = {
           estado: estadoFiltro || undefined,
           tipo_meta: tipoFiltro || undefined,
           limit: 100,
         };
 
-        const [equipoResponse, resumenTotalResponse, usuariosResponse] = await Promise.all([
-          getMetas(tenantActual.id, equipoFiltros),
+        const [todasResponse, resumenTotalResponse, usuariosResponse] = await Promise.all([
+          getMetas(tenantActual.id, todosFiltros),
           getMetasResumen(tenantActual.id),
           getUsuariosTenant(tenantActual.id),
         ]);
 
-        setMetasEquipo(equipoResponse.data);
+        // Separar metas por tipo:
+        // - Asesores: metas asignadas a usuarios específicos (excluyendo mis propias metas personales)
+        const asesores = todasResponse.data.filter(m =>
+          m.origen === 'asignada' ||
+          (m.usuario_id && m.usuario_id !== user.id && m.origen !== 'empresa')
+        );
+
+        // - Empresa: metas globales sin usuario específico
+        const empresa = todasResponse.data.filter(m => m.origen === 'empresa');
+
+        setMetasAsesores(asesores);
+        setMetasEmpresa(empresa);
         setResumen(resumenTotalResponse);
         setUsuarios(usuariosResponse.filter(u => u.activo));
       }
@@ -375,7 +387,10 @@ export default function CrmMetas() {
   };
 
   // Datos a mostrar según la vista
-  const metasAMostrar = vistaActiva === 'mis-metas' ? misMetas : metasEquipo;
+  const metasAMostrar =
+    vistaActiva === 'mis-metas' ? misMetas :
+    vistaActiva === 'asesores' ? metasAsesores :
+    metasEmpresa;
   const resumenAMostrar = vistaActiva === 'mis-metas' ? miResumen : resumen;
 
   if (loading && metas.length === 0) {
@@ -415,13 +430,29 @@ export default function CrmMetas() {
           >
             <User className="w-4 h-4" />
             Mis Metas
+            {misMetas.filter(m => m.estado === 'activa').length > 0 && (
+              <span className="tab-badge">{misMetas.filter(m => m.estado === 'activa').length}</span>
+            )}
           </button>
           <button
-            className={`tab ${vistaActiva === 'equipo' ? 'active' : ''}`}
-            onClick={() => setVistaActiva('equipo')}
+            className={`tab ${vistaActiva === 'asesores' ? 'active' : ''}`}
+            onClick={() => setVistaActiva('asesores')}
           >
             <Users className="w-4 h-4" />
-            Metas del Equipo
+            Asesores
+            {metasAsesores.filter(m => m.estado === 'activa').length > 0 && (
+              <span className="tab-badge">{metasAsesores.filter(m => m.estado === 'activa').length}</span>
+            )}
+          </button>
+          <button
+            className={`tab ${vistaActiva === 'empresa' ? 'active' : ''}`}
+            onClick={() => setVistaActiva('empresa')}
+          >
+            <Building2 className="w-4 h-4" />
+            Empresa
+            {metasEmpresa.filter(m => m.estado === 'activa').length > 0 && (
+              <span className="tab-badge empresa">{metasEmpresa.filter(m => m.estado === 'activa').length}</span>
+            )}
           </button>
         </div>
       )}
@@ -518,18 +549,24 @@ export default function CrmMetas() {
           <div className="empty-icon">
             <Target className="w-16 h-16" />
           </div>
-          <h3>No hay metas {vistaActiva === 'mis-metas' ? 'personales' : 'del equipo'}</h3>
+          <h3>
+            {vistaActiva === 'mis-metas' ? 'No hay metas personales' :
+             vistaActiva === 'asesores' ? 'No hay metas asignadas a asesores' :
+             'No hay metas de empresa'}
+          </h3>
           <p>
             {estadoFiltro || tipoFiltro
               ? 'No se encontraron metas con los filtros aplicados'
               : vistaActiva === 'mis-metas'
                 ? 'Crea tu primera meta personal para comenzar a trackear tu progreso'
-                : 'Asigna metas a tu equipo para motivarlos a alcanzar sus objetivos'
+                : vistaActiva === 'asesores'
+                  ? 'Asigna metas a tus asesores para motivarlos a alcanzar sus objetivos'
+                  : 'Crea metas de empresa para trackear objetivos globales del equipo'
             }
           </p>
           <button className="btn-primary" onClick={() => openModal()}>
             <Plus className="w-4 h-4" />
-            Crear Primera Meta
+            {vistaActiva === 'empresa' ? 'Crear Meta de Empresa' : 'Crear Meta'}
           </button>
         </div>
       ) : (
@@ -550,7 +587,7 @@ export default function CrmMetas() {
             return (
               <div
                 key={meta.id}
-                className={`meta-card-v2 ${completada ? 'completed' : ''} ${vencida ? 'overdue' : ''}`}
+                className={`meta-card-v2 ${completada ? 'completed' : ''} ${vencida ? 'overdue' : ''} ${meta.origen === 'asignada' ? 'asignada-card' : ''} ${meta.origen === 'empresa' ? 'empresa-card' : ''}`}
               >
                 {/* Header con gradiente según tipo */}
                 <div className="meta-card-header" style={{ background: `linear-gradient(135deg, ${tipo.color}15 0%, ${tipo.color}08 100%)` }}>
@@ -573,8 +610,21 @@ export default function CrmMetas() {
                     ) : (
                       <Crown className="w-3 h-3" />
                     )}
-                    <span>{meta.origen === 'personal' ? 'Personal' : meta.origen === 'empresa' ? 'Empresa' : 'Asignada'}</span>
+                    <span>
+                      {meta.origen === 'personal' ? 'Personal' :
+                       meta.origen === 'empresa' ? 'Empresa' :
+                       // Para metas asignadas, mostrar "Administrativa" si no soy admin
+                       !isTenantAdmin ? 'Administrativa' : 'Asignada'}
+                    </span>
                   </div>
+
+                  {/* Mostrar usuario asignado para admin en tab asesores */}
+                  {isTenantAdmin && vistaActiva === 'asesores' && meta.usuario_nombre && (
+                    <div className="meta-usuario-badge">
+                      <User className="w-3 h-3" />
+                      <span>{meta.usuario_nombre} {meta.usuario_apellido}</span>
+                    </div>
+                  )}
                 </div>
 
                 {/* Cuerpo con círculo de progreso */}
@@ -641,6 +691,21 @@ export default function CrmMetas() {
                       <span className="auto-sync-badge">
                         <RefreshCw className="w-3 h-3" />
                         Sincronizado
+                      </span>
+                    )}
+
+                    {/* Badge de recompensa */}
+                    {meta.tipo_recompensa && (
+                      <span className="reward-badge" title={meta.descripcion_recompensa || meta.tipo_recompensa}>
+                        <Gift className="w-3 h-3" />
+                        {meta.tipo_recompensa === 'bono' ? '💰' :
+                         meta.tipo_recompensa === 'dia_libre' ? '🏖️' :
+                         meta.tipo_recompensa === 'cena' ? '🍽️' :
+                         meta.tipo_recompensa === 'viaje' ? '✈️' :
+                         meta.tipo_recompensa === 'regalo' ? '🎁' : '⭐'}
+                        {meta.monto_recompensa && meta.monto_recompensa > 0 && (
+                          <span className="reward-amount">${meta.monto_recompensa.toLocaleString()}</span>
+                        )}
                       </span>
                     )}
 
@@ -960,33 +1025,75 @@ export default function CrmMetas() {
                 </div>
               )}
 
-              {/* Sección de recompensa */}
-              <div className="form-section">
+              {/* Sección de recompensa mejorada */}
+              <div className="form-section recompensa-section">
                 <div className="form-section-header">
                   <Gift className="w-4 h-4" />
                   <h4>Recompensa (opcional)</h4>
                 </div>
-                <div className="form-row">
-                  <div className="form-group">
-                    <label>Tipo de recompensa</label>
-                    <input
-                      type="text"
-                      value={form.tipo_recompensa}
-                      onChange={(e) => setForm(prev => ({ ...prev, tipo_recompensa: e.target.value }))}
-                      placeholder="Ej: Bono, Día libre, Reconocimiento"
-                    />
-                  </div>
-                  <div className="form-group">
-                    <label>Monto ($)</label>
-                    <input
-                      type="number"
-                      value={form.monto_recompensa}
-                      onChange={(e) => setForm(prev => ({ ...prev, monto_recompensa: e.target.value }))}
-                      placeholder="0"
-                      min="0"
-                    />
-                  </div>
+
+                {/* Tipos de recompensa predefinidos */}
+                <div className="recompensa-tipos">
+                  {[
+                    { tipo: '', label: 'Sin recompensa', icon: '❌' },
+                    { tipo: 'bono', label: 'Bono', icon: '💰' },
+                    { tipo: 'dia_libre', label: 'Día Libre', icon: '🏖️' },
+                    { tipo: 'cena', label: 'Cena', icon: '🍽️' },
+                    { tipo: 'viaje', label: 'Viaje', icon: '✈️' },
+                    { tipo: 'regalo', label: 'Regalo', icon: '🎁' },
+                    { tipo: 'otro', label: 'Otro', icon: '⭐' },
+                  ].map(r => (
+                    <button
+                      type="button"
+                      key={r.tipo}
+                      className={`recompensa-tipo-btn ${form.tipo_recompensa === r.tipo ? 'selected' : ''}`}
+                      onClick={() => setForm(prev => ({
+                        ...prev,
+                        tipo_recompensa: r.tipo,
+                        monto_recompensa: r.tipo === '' ? '' : prev.monto_recompensa
+                      }))}
+                    >
+                      <span className="recompensa-emoji">{r.icon}</span>
+                      <span>{r.label}</span>
+                    </button>
+                  ))}
                 </div>
+
+                {/* Campos adicionales si hay recompensa */}
+                {form.tipo_recompensa && (
+                  <div className="recompensa-detalles">
+                    <div className="form-row">
+                      <div className="form-group">
+                        <label>Descripción de la recompensa</label>
+                        <input
+                          type="text"
+                          value={form.descripcion_recompensa}
+                          onChange={(e) => setForm(prev => ({ ...prev, descripcion_recompensa: e.target.value }))}
+                          placeholder={
+                            form.tipo_recompensa === 'bono' ? 'Ej: Bono de productividad' :
+                            form.tipo_recompensa === 'dia_libre' ? 'Ej: Viernes libre' :
+                            form.tipo_recompensa === 'cena' ? 'Ej: Cena en restaurante premium' :
+                            form.tipo_recompensa === 'viaje' ? 'Ej: Viaje a Punta Cana' :
+                            form.tipo_recompensa === 'regalo' ? 'Ej: iPhone 15' :
+                            'Describe la recompensa...'
+                          }
+                        />
+                      </div>
+                      {(form.tipo_recompensa === 'bono' || form.tipo_recompensa === 'regalo' || form.tipo_recompensa === 'viaje') && (
+                        <div className="form-group" style={{ maxWidth: '140px' }}>
+                          <label>Valor estimado ($)</label>
+                          <input
+                            type="number"
+                            value={form.monto_recompensa}
+                            onChange={(e) => setForm(prev => ({ ...prev, monto_recompensa: e.target.value }))}
+                            placeholder="0"
+                            min="0"
+                          />
+                        </div>
+                      )}
+                    </div>
+                  </div>
+                )}
               </div>
 
               <div className="modal-actions">
@@ -1136,6 +1243,25 @@ const styles = `
     background: white;
     color: #0f172a;
     box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
+  }
+
+  .tab-badge {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    min-width: 20px;
+    height: 20px;
+    padding: 0 6px;
+    background: #6366f1;
+    color: white;
+    border-radius: 10px;
+    font-size: 0.7rem;
+    font-weight: 600;
+    margin-left: 4px;
+  }
+
+  .tab-badge.empresa {
+    background: #f59e0b;
   }
 
   /* Stats Dashboard */
@@ -1468,6 +1594,45 @@ const styles = `
     height: 10px;
   }
 
+  /* Badge de usuario asignado */
+  .meta-usuario-badge {
+    position: absolute;
+    top: 44px;
+    right: 16px;
+    display: flex;
+    align-items: center;
+    gap: 4px;
+    padding: 4px 10px;
+    background: #e0e7ff;
+    color: #4338ca;
+    border-radius: 20px;
+    font-size: 0.6rem;
+    font-weight: 600;
+  }
+
+  .meta-usuario-badge svg {
+    width: 10px;
+    height: 10px;
+  }
+
+  /* Estilo diferenciado para metas asignadas (administrativas) */
+  .meta-card-v2.asignada-card {
+    border-left: 4px solid #8b5cf6;
+  }
+
+  .meta-card-v2.asignada-card .meta-card-header {
+    background: linear-gradient(135deg, #8b5cf615 0%, #6366f108 100%) !important;
+  }
+
+  /* Estilo para metas de empresa */
+  .meta-card-v2.empresa-card {
+    border-left: 4px solid #f59e0b;
+  }
+
+  .meta-card-v2.empresa-card .meta-card-header {
+    background: linear-gradient(135deg, #f59e0b15 0%, #fbbf2408 100%) !important;
+  }
+
   /* Card Body */
   .meta-card-body {
     padding: 0 20px 20px;
@@ -1646,6 +1811,29 @@ const styles = `
   .completed-badge svg {
     width: 10px;
     height: 10px;
+  }
+
+  .reward-badge {
+    display: flex;
+    align-items: center;
+    gap: 4px;
+    padding: 4px 10px;
+    background: linear-gradient(135deg, #fef3c7 0%, #fde68a 100%);
+    color: #92400e;
+    border-radius: 20px;
+    font-size: 0.65rem;
+    font-weight: 600;
+    cursor: help;
+  }
+
+  .reward-badge svg {
+    width: 10px;
+    height: 10px;
+  }
+
+  .reward-amount {
+    font-weight: 700;
+    color: #166534;
   }
 
   /* Actions V2 */
@@ -2056,6 +2244,62 @@ const styles = `
   .empresa-note svg {
     flex-shrink: 0;
     margin-top: 2px;
+  }
+
+  /* Recompensa section */
+  .recompensa-section {
+    background: #f0fdf4 !important;
+  }
+
+  .recompensa-section .form-section-header {
+    color: #166534 !important;
+  }
+
+  .recompensa-tipos {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px;
+    margin-bottom: 12px;
+  }
+
+  .recompensa-tipo-btn {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    padding: 8px 14px;
+    background: white;
+    border: 2px solid #e2e8f0;
+    border-radius: 20px;
+    cursor: pointer;
+    transition: all 0.2s;
+    font-size: 0.8rem;
+    font-weight: 500;
+    color: #64748b;
+  }
+
+  .recompensa-tipo-btn:hover {
+    border-color: #16a34a;
+    color: #0f172a;
+  }
+
+  .recompensa-tipo-btn.selected {
+    border-color: #16a34a;
+    background: #dcfce7;
+    color: #166534;
+  }
+
+  .recompensa-emoji {
+    font-size: 1rem;
+  }
+
+  .recompensa-detalles {
+    margin-top: 16px;
+    padding-top: 16px;
+    border-top: 1px dashed #bbf7d0;
+  }
+
+  .recompensa-detalles .form-group input {
+    background: white;
   }
 
   .btn-cancel {
