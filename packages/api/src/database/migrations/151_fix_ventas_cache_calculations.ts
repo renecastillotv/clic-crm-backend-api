@@ -26,10 +26,11 @@ export async function up(knex: Knex): Promise<void> {
   `);
 
   // 2. Crear función de recálculo
+  // Nota: Usamos $$ para evitar conflictos con los placeholders de knex
   console.log('➕ Creando función recalcular_caches_venta...');
   await knex.raw(`
     CREATE OR REPLACE FUNCTION recalcular_caches_venta(p_venta_id UUID)
-    RETURNS void AS $$
+    RETURNS void AS $func$
     DECLARE
       v_valor_cierre DECIMAL(15,2);
       v_monto_comision DECIMAL(15,2);
@@ -113,7 +114,7 @@ export async function up(knex: Knex): Promise<void> {
         AND (activo = true OR activo IS NULL);
 
     END;
-    $$ LANGUAGE plpgsql;
+    $func$ LANGUAGE plpgsql;
   `);
 
   // 3. Corregir datos existentes
@@ -130,7 +131,7 @@ export async function up(knex: Knex): Promise<void> {
 
   let corregidas = 0;
   for (const row of ventasConCobros.rows) {
-    await knex.raw('SELECT recalcular_caches_venta($1)', [row.id]);
+    await knex.raw('SELECT recalcular_caches_venta(?)', [row.id]);
     corregidas++;
   }
 
