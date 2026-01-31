@@ -1727,7 +1727,7 @@ interface CobroParams extends VentaParams { cobroId: string }
 router.get('/:ventaId/cobros', async (req: Request<VentaParams>, res: Response, next: NextFunction) => {
   try {
     const { tenantId, ventaId } = req.params;
-    const cobros = await ventasCobrosService.listarCobros(tenantId, ventaId);
+    const cobros = await ventasCobrosService.getCobrosVenta(tenantId, ventaId);
     res.json({ cobros });
   } catch (error) {
     next(error);
@@ -1830,12 +1830,17 @@ router.put('/:ventaId/cobros/:cobroId', async (req: Request<CobroParams>, res: R
 router.delete('/:ventaId/cobros/:cobroId', async (req: Request<CobroParams>, res: Response, next: NextFunction) => {
   try {
     const { tenantId, cobroId } = req.params;
-    const { usuario_id } = req.body;
+    const { usuario_id, razon } = req.body;
 
-    await ventasCobrosService.eliminarCobro(tenantId, cobroId, usuario_id);
+    await ventasCobrosService.eliminarCobro({
+      tenantId,
+      cobroId,
+      usuarioId: usuario_id,
+      razon
+    });
     res.json({ success: true, message: 'Cobro eliminado correctamente' });
   } catch (error: any) {
-    if (error.message === 'Cobro no encontrado') {
+    if (error.message === 'Cobro no encontrado' || error.message === 'Cobro no encontrado o ya eliminado') {
       return res.status(404).json({ error: error.message });
     }
     next(error);
