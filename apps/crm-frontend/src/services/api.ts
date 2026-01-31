@@ -3796,6 +3796,9 @@ export interface Venta {
   nombre_propiedad_externa?: string | null;
   codigo_propiedad_externa?: string | null;
   fecha_cancelacion?: string | null;
+  // Conteo de documentos del expediente
+  docs_obligatorios?: number;
+  docs_subidos?: number;
 }
 
 /**

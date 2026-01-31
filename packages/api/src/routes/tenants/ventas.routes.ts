@@ -178,9 +178,41 @@ router.get('/', async (req: Request<TenantParams>, res: Response, next: NextFunc
         p.titulo as propiedad_nombre,
         p.codigo as propiedad_codigo,
         p.imagen_principal as propiedad_imagen,
+        p.operacion as propiedad_operacion,
+        p.tipo as propiedad_tipo,
         u.nombre as usuario_cerrador_nombre,
         u.apellido as usuario_cerrador_apellido,
-        u.avatar_url as usuario_cerrador_avatar
+        u.avatar_url as usuario_cerrador_avatar,
+        -- Conteo de documentos del expediente
+        (SELECT COUNT(*) FROM documentos_requeridos dr
+         WHERE dr.tenant_id = v.tenant_id
+           AND dr.es_obligatorio = true
+           AND dr.activo = true
+           AND dr.categoria IN (
+             CASE
+               WHEN p.operacion ILIKE '%alquiler%' OR p.operacion ILIKE '%renta%' THEN 'cierre_alquiler'
+               WHEN p.tipo ILIKE '%proyecto%' THEN 'cierre_venta_proyecto'
+               ELSE 'cierre_venta_lista'
+             END,
+             CASE
+               WHEN p.operacion ILIKE '%alquiler%' OR p.operacion ILIKE '%renta%' THEN 'cierre_renta'
+               WHEN p.tipo ILIKE '%proyecto%' THEN 'cierre_venta_proyecto'
+               ELSE 'cierre_venta'
+             END
+           )
+        ) as docs_obligatorios,
+        (SELECT COUNT(*) FROM documentos_subidos ds
+         WHERE ds.venta_id = v.id
+           AND ds.tenant_id = v.tenant_id
+           AND ds.url_documento IS NOT NULL
+           AND ds.url_documento != ''
+           AND ds.requerimiento_id IN (
+             SELECT dr2.id FROM documentos_requeridos dr2
+             WHERE dr2.tenant_id = v.tenant_id
+               AND dr2.es_obligatorio = true
+               AND dr2.activo = true
+           )
+        ) as docs_subidos
       FROM ventas v
       LEFT JOIN estados_venta ev ON v.estado_venta_id = ev.id
       LEFT JOIN contactos c ON v.contacto_id = c.id

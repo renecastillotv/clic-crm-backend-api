@@ -1695,9 +1695,13 @@ export default function CrmFinanzasVentas() {
                       {venta.cancelada ? (
                         <span className="badge badge-error font-medium">Cancelada</span>
                       ) : venta.completada ? (
-                        <span className="badge badge-success font-medium">Completo</span>
+                        <span className="badge badge-success font-medium">
+                          {venta.docs_obligatorios ? `${venta.docs_subidos || 0}/${venta.docs_obligatorios}` : 'Completo'}
+                        </span>
                       ) : (
-                        <span className="badge badge-warning font-medium">Pendiente</span>
+                        <span className="badge badge-warning font-medium">
+                          {venta.docs_obligatorios ? `${venta.docs_subidos || 0}/${venta.docs_obligatorios}` : 'Pendiente'}
+                        </span>
                       )}
                     </div>
                   </td>
