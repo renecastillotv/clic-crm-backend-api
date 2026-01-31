@@ -24,6 +24,9 @@ import {
   createPagoComision,
   PagoComision,
   recalcularComisionesVenta,
+  getCobrosVenta,
+  registrarCobroEmpresa,
+  VentaCobro,
 } from '../../services/api';
 import ModalAplicarPago from '../../components/ModalAplicarPago';
 import { useAuth as useClerkAuth } from '@clerk/clerk-react';
@@ -59,6 +62,7 @@ const CrmFinanzasVentaComisiones: React.FC<CrmFinanzasVentaComisionesProps> = ({
   const esAdmin = isPlatformAdmin || tieneAcceso('finanzas-config');
   const [comisiones, setComisiones] = useState<Comision[]>([]);
   const [pagos, setPagos] = useState<PagoComision[]>([]);
+  const [cobros, setCobros] = useState<VentaCobro[]>([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
@@ -76,6 +80,7 @@ const CrmFinanzasVentaComisiones: React.FC<CrmFinanzasVentaComisionesProps> = ({
     if (ventaId && tenantActual?.id) {
       loadComisiones();
       loadPagos();
+      loadCobros();
     }
   }, [ventaId, tenantActual?.id]);
   const loadComisiones = async () => {
@@ -101,6 +106,16 @@ const CrmFinanzasVentaComisiones: React.FC<CrmFinanzasVentaComisionesProps> = ({
       setPagos(data);
     } catch (err: any) {
       console.error('Error cargando pagos:', err);
+    }
+  };
+
+  const loadCobros = async () => {
+    if (!tenantActual?.id || !ventaId) return;
+    try {
+      const data = await getCobrosVenta(tenantActual.id, ventaId);
+      setCobros(data);
+    } catch (err: any) {
+      console.error('Error cargando cobros:', err);
     }
   };
   // Sincronizar comisiones del servidor con estado local editable
@@ -137,10 +152,8 @@ const CrmFinanzasVentaComisiones: React.FC<CrmFinanzasVentaComisionesProps> = ({
   const porcentajeComision = Number(venta.porcentaje_comision) || 0;
   const porcentajeTotal = distribucionLocal.reduce((sum, d) => sum + d.porcentaje, 0);
   const totalPagadoAParticipantes = comisiones.reduce((sum, c) => sum + (Number(c.monto_pagado) || 0), 0);
-  // Total cobrado del cliente (suma de todos los cobros registrados)
-  const totalCobradoDelCliente = pagos
-    .filter((p: any) => p.tipo_movimiento === 'cobro' || !p.tipo_movimiento) // Por ahora asumimos los pagos existentes son cobros
-    .reduce((sum, p: any) => sum + (Number(p.monto) || 0), 0);
+  // Total cobrado del cliente (suma de cobros en ventas_cobros)
+  const totalCobradoDelCliente = cobros.reduce((sum, c) => sum + (Number(c.monto) || 0), 0);
   const totalPendienteCobrar = montoComisionTotal - totalCobradoDelCliente;
   const totalPendientePagar = totalCobradoDelCliente - totalPagadoAParticipantes;
   // Manejar cambio de porcentaje
@@ -274,20 +287,32 @@ const CrmFinanzasVentaComisiones: React.FC<CrmFinanzasVentaComisionesProps> = ({
         const uploadData = await uploadResponse.json();
         reciboUrl = uploadData.url;
       }
-      // Crear pago con tipo de movimiento
-      await createPagoComision(tenantActual.id, ventaId, {
-        comision_id: comisionParaPago.id,
-        monto: data.monto,
-        moneda: venta.moneda,
-        tipo_pago: data.tipoPago,
-        fecha_pago: data.fechaPago,
-        notas: data.notas || null,
-        recibo_url: reciboUrl,
-        registrado_por_id: user?.id || null,
-        tipo_movimiento: modalTipo, // 'cobro' (entrada) o 'pago' (salida)
-      });
-      // Solo actualizar monto_pagado de la comisión si es un PAGO (salida a participante)
-      if (modalTipo === 'pago') {
+      if (modalTipo === 'cobro') {
+        // Registrar cobro de empresa (entrada de dinero del cliente) en ventas_cobros
+        const token = await getToken();
+        await registrarCobroEmpresa(tenantActual.id, ventaId, {
+          monto: data.monto,
+          moneda: venta.moneda,
+          fecha_cobro: data.fechaPago,
+          notas: data.notas || undefined,
+          recibo_url: reciboUrl || undefined,
+          registrado_por_id: user?.id || '',
+        }, token);
+      } else {
+        // Registrar pago a participante (salida de dinero) en pagos_comisiones
+        await createPagoComision(tenantActual.id, ventaId, {
+          comision_id: comisionParaPago.id,
+          monto: data.monto,
+          moneda: venta.moneda,
+          tipo_pago: data.tipoPago,
+          fecha_pago: data.fechaPago,
+          notas: data.notas || null,
+          recibo_url: reciboUrl,
+          registrado_por_id: user?.id || null,
+          tipo_movimiento: 'pago',
+        });
+
+        // Actualizar monto_pagado de la comisión
         const nuevoMontoPagado = (Number(comisionParaPago.monto_pagado) || 0) + data.monto;
         const montoTotal = Number(comisionParaPago.monto) || 0;
         let nuevoEstado = 'parcial';
@@ -302,8 +327,11 @@ const CrmFinanzasVentaComisiones: React.FC<CrmFinanzasVentaComisionesProps> = ({
           estado: nuevoEstado,
         });
       }
+
+      // Recargar todos los datos
       await loadComisiones();
       await loadPagos();
+      await loadCobros();
       setShowAplicarPagoModal(false);
       setComisionParaPago(null);
     } catch (err: any) {
@@ -345,44 +373,49 @@ const CrmFinanzasVentaComisiones: React.FC<CrmFinanzasVentaComisionesProps> = ({
     };
     return colors[tipo] || colors.vendedor;
   };
-  // Consolidar historial separando cobros y pagos
+  // Consolidar historial separando cobros (ventas_cobros) y pagos a participantes (pagos_comisiones)
   const consolidarHistorialPagos = useCallback(() => {
-    const cobros: any[] = [];
-    const pagosSalida: any[] = [];
-    pagos.forEach((pago: any) => {
-      const fechaRegistro = pago.fecha_registro
-        ? new Date(pago.fecha_registro).toISOString()
-        : new Date().toISOString();
-      const fechaPago = pago.fecha_pago
-        ? new Date(pago.fecha_pago).toISOString().split('T')[0]
-        : '';
-      const item = {
+    // Cobros de la tabla ventas_cobros
+    const cobrosHistorial: any[] = cobros.map((cobro: VentaCobro) => ({
+      id: cobro.id,
+      fecha: cobro.fecha_cobro ? new Date(cobro.fecha_cobro).toISOString().split('T')[0] : '',
+      monto: Number(cobro.monto),
+      tipoPago: 'cobro',
+      tipoMovimiento: 'cobro',
+      notas: cobro.notas || null,
+      reciboUrl: cobro.recibo_url || null,
+      fechaRegistro: cobro.created_at ? new Date(cobro.created_at).toISOString() : new Date().toISOString(),
+      participante: null,
+      metodo_pago: cobro.metodo_pago,
+      banco: cobro.banco,
+      referencia: cobro.referencia,
+    }));
+
+    // Pagos a participantes de la tabla pagos_comisiones (solo tipo_movimiento = 'pago')
+    const pagosSalida: any[] = pagos
+      .filter((pago: any) => pago.tipo_movimiento === 'pago')
+      .map((pago: any) => ({
         id: pago.id,
-        fecha: fechaPago,
+        fecha: pago.fecha_pago ? new Date(pago.fecha_pago).toISOString().split('T')[0] : '',
         monto: Number(pago.monto),
         tipoPago: pago.tipo_pago || 'parcial',
-        tipoMovimiento: pago.tipo_movimiento || 'cobro', // Por defecto asumimos cobro para registros viejos
+        tipoMovimiento: 'pago',
         notas: pago.notas || null,
         reciboUrl: pago.recibo_url || null,
-        fechaRegistro: fechaRegistro,
+        fechaRegistro: pago.fecha_registro ? new Date(pago.fecha_registro).toISOString() : new Date().toISOString(),
         participante: pago.participante_nombre || null,
-      };
-      // Separar por tipo de movimiento
-      if (pago.tipo_movimiento === 'pago') {
-        pagosSalida.push(item);
-      } else {
-        cobros.push(item);
-      }
-    });
+      }));
+
     // Ordenar por fecha más reciente primero
     const sortByDate = (a: any, b: any) =>
       new Date(b.fechaRegistro).getTime() - new Date(a.fechaRegistro).getTime();
+
     return {
-      cobros: cobros.sort(sortByDate),
+      cobros: cobrosHistorial.sort(sortByDate),
       pagos: pagosSalida.sort(sortByDate),
-      todos: [...cobros, ...pagosSalida].sort(sortByDate)
+      todos: [...cobrosHistorial, ...pagosSalida].sort(sortByDate)
     };
-  }, [pagos]);
+  }, [cobros, pagos]);
   const historial = consolidarHistorialPagos();
   // Función para descargar archivo desde URL externa
   const handleDescargarRecibo = async (url: string, nombreArchivo?: string) => {
@@ -997,7 +1030,7 @@ const CrmFinanzasVentaComisiones: React.FC<CrmFinanzasVentaComisionesProps> = ({
                           </div>
                           {/* Columna 7: Acción - solo visible para admin */}
                           <div style={{ textAlign: 'center' }}>
-                            {esAdmin && comisionOriginal && montoPendiente > 0 ? (
+                            {esAdmin && comisionOriginal && montoPendiente > 0 && totalCobradoDelCliente > 0 ? (
                               <button
                                 onClick={() => handleAbrirPago(comisionOriginal)}
                                 style={{
@@ -1013,6 +1046,16 @@ const CrmFinanzasVentaComisiones: React.FC<CrmFinanzasVentaComisionesProps> = ({
                               >
                                 Pagar
                               </button>
+                            ) : esAdmin && comisionOriginal && montoPendiente > 0 && totalCobradoDelCliente === 0 ? (
+                              <span
+                                title="Registre un cobro primero para habilitar pagos"
+                                style={{
+                                  fontSize: '0.625rem',
+                                  color: '#94a3b8'
+                                }}
+                              >
+                                Sin cobro
+                              </span>
                             ) : null}
                           </div>
                         </>
