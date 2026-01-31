@@ -1,5 +1,18 @@
 /**
  * Servicio para gestionar metas del CRM (gamificación)
+ *
+ * Tipos de meta por origen:
+ * - 'personal': Creada por el usuario para sí mismo
+ * - 'asignada': Creada por admin para un usuario específico
+ * - 'empresa': Sin usuario_id, aplica a todo el equipo (usuario_id = NULL)
+ *
+ * El progreso se calcula automáticamente basándose en tipo_meta:
+ * - ventas: Cuenta ventas completadas en el período
+ * - contactos: Cuenta contactos creados en el período
+ * - actividades: Cuenta actividades completadas en el período
+ * - cierres: Similar a ventas
+ * - propuestas: Cuenta propuestas creadas en el período
+ * - propiedades: Cuenta propiedades captadas en el período
  */
 
 import { query } from '../utils/db.js';
@@ -7,7 +20,7 @@ import { query } from '../utils/db.js';
 export interface Meta {
   id: string;
   tenant_id: string;
-  usuario_id?: string;
+  usuario_id?: string | null; // NULL = meta de empresa/equipo
   creado_por_id?: string;
   titulo: string;
   descripcion?: string;
@@ -19,7 +32,7 @@ export interface Meta {
   fecha_inicio: string;
   fecha_fin: string;
   estado: 'activa' | 'completada' | 'fallida' | 'cancelada';
-  origen: 'personal' | 'asignada';
+  origen: 'personal' | 'asignada' | 'empresa';
   tipo_recompensa?: string;
   descripcion_recompensa?: string;
   monto_recompensa?: number;
@@ -35,6 +48,112 @@ export interface Meta {
   creador_apellido?: string;
   // Calculado
   porcentaje_avance?: number;
+  // Indica si el progreso es calculado automáticamente
+  progreso_automatico?: boolean;
+}
+
+/**
+ * Calcula el progreso automático de una meta basándose en tipo_meta
+ * Consulta las tablas originales en tiempo real (similar a productividad)
+ */
+async function calcularProgresoAutomatico(
+  tenantId: string,
+  tipoMeta: string,
+  metrica: string,
+  fechaInicio: string,
+  fechaFin: string,
+  usuarioId?: string | null
+): Promise<number> {
+  const fechaInicioDate = new Date(fechaInicio);
+  const fechaFinDate = new Date(fechaFin);
+  // Ajustar fecha fin para incluir todo el día
+  fechaFinDate.setHours(23, 59, 59, 999);
+
+  let sql = '';
+  const params: any[] = [tenantId, fechaInicioDate.toISOString(), fechaFinDate.toISOString()];
+
+  // Si hay usuario_id, filtrar por ese usuario; si no, contar todos (meta de empresa)
+  const usuarioFilter = usuarioId ? ` AND {USER_FIELD} = $4` : '';
+  if (usuarioId) {
+    params.push(usuarioId);
+  }
+
+  switch (tipoMeta) {
+    case 'ventas':
+    case 'cierres':
+      if (metrica === 'monto') {
+        sql = `
+          SELECT COALESCE(SUM(valor_cierre), 0) as total
+          FROM ventas
+          WHERE tenant_id = $1
+            AND fecha_cierre >= $2 AND fecha_cierre <= $3
+            AND completada = true AND cancelada = false
+            ${usuarioFilter.replace('{USER_FIELD}', 'usuario_cerrador_id')}
+        `;
+      } else {
+        sql = `
+          SELECT COUNT(*) as total
+          FROM ventas
+          WHERE tenant_id = $1
+            AND fecha_cierre >= $2 AND fecha_cierre <= $3
+            AND completada = true AND cancelada = false
+            ${usuarioFilter.replace('{USER_FIELD}', 'usuario_cerrador_id')}
+        `;
+      }
+      break;
+
+    case 'contactos':
+      sql = `
+        SELECT COUNT(*) as total
+        FROM contactos
+        WHERE tenant_id = $1
+          AND created_at >= $2 AND created_at <= $3
+          ${usuarioFilter.replace('{USER_FIELD}', 'usuario_asignado_id')}
+      `;
+      break;
+
+    case 'actividades':
+      sql = `
+        SELECT COUNT(*) as total
+        FROM actividades_crm
+        WHERE tenant_id = $1
+          AND created_at >= $2 AND created_at <= $3
+          AND completada = true
+          ${usuarioFilter.replace('{USER_FIELD}', 'usuario_id')}
+      `;
+      break;
+
+    case 'propuestas':
+      sql = `
+        SELECT COUNT(*) as total
+        FROM propuestas
+        WHERE tenant_id = $1
+          AND created_at >= $2 AND created_at <= $3
+          ${usuarioFilter.replace('{USER_FIELD}', 'usuario_creador_id')}
+      `;
+      break;
+
+    case 'propiedades':
+      sql = `
+        SELECT COUNT(*) as total
+        FROM propiedades
+        WHERE tenant_id = $1
+          AND created_at >= $2 AND created_at <= $3
+          ${usuarioFilter.replace('{USER_FIELD}', 'captador_id')}
+      `;
+      break;
+
+    default:
+      return 0;
+  }
+
+  try {
+    const result = await query(sql, params);
+    return parseFloat(result.rows[0]?.total || 0);
+  } catch (error) {
+    console.error('Error calculando progreso automático:', error);
+    return 0;
+  }
 }
 
 export interface MetaFiltros {
@@ -92,7 +211,8 @@ export async function getMetas(
   }
 
   if (usuario_id) {
-    whereClause += ` AND m.usuario_id = $${paramIndex}`;
+    // Include metas assigned to this user OR empresa metas (visible to all)
+    whereClause += ` AND (m.usuario_id = $${paramIndex} OR m.origen = 'empresa')`;
     params.push(usuario_id);
     paramIndex++;
   }
@@ -135,8 +255,34 @@ export async function getMetas(
 
   const result = await query(dataSql, params);
 
+  // Para metas activas, calcular el progreso automáticamente en tiempo real
+  const metasConProgreso = await Promise.all(
+    result.rows.map(async (meta: Meta) => {
+      if (meta.estado === 'activa') {
+        const progresoCalculado = await calcularProgresoAutomatico(
+          tenantId,
+          meta.tipo_meta,
+          meta.metrica,
+          meta.fecha_inicio,
+          meta.fecha_fin,
+          meta.usuario_id
+        );
+
+        return {
+          ...meta,
+          valor_actual: progresoCalculado,
+          porcentaje_avance: meta.valor_objetivo > 0
+            ? Math.round((progresoCalculado / meta.valor_objetivo) * 1000) / 10
+            : 0,
+          progreso_automatico: true,
+        };
+      }
+      return { ...meta, progreso_automatico: false };
+    })
+  );
+
   return {
-    data: result.rows,
+    data: metasConProgreso,
     total,
     page,
     limit,
@@ -167,7 +313,32 @@ export async function getMetaById(
   `;
 
   const result = await query(sql, [metaId, tenantId]);
-  return result.rows[0] || null;
+  const meta = result.rows[0] || null;
+
+  if (!meta) return null;
+
+  // Para metas activas, calcular el progreso automáticamente
+  if (meta.estado === 'activa') {
+    const progresoCalculado = await calcularProgresoAutomatico(
+      tenantId,
+      meta.tipo_meta,
+      meta.metrica,
+      meta.fecha_inicio,
+      meta.fecha_fin,
+      meta.usuario_id
+    );
+
+    return {
+      ...meta,
+      valor_actual: progresoCalculado,
+      porcentaje_avance: meta.valor_objetivo > 0
+        ? Math.round((progresoCalculado / meta.valor_objetivo) * 1000) / 10
+        : 0,
+      progreso_automatico: true,
+    };
+  }
+
+  return { ...meta, progreso_automatico: false };
 }
 
 /**

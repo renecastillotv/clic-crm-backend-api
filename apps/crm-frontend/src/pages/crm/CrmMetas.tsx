@@ -20,9 +20,11 @@ import {
   deleteMeta,
   actualizarProgresoMeta,
   getMetasResumen,
+  getUsuariosTenant,
   Meta,
   MetaFiltros,
   MetasResumen,
+  UsuarioTenant,
 } from '../../services/api';
 import {
   Target,
@@ -49,6 +51,8 @@ import {
   Loader2,
   X,
   Sparkles,
+  Building2,
+  RefreshCw,
 } from 'lucide-react';
 
 // Tipos de meta
@@ -112,6 +116,7 @@ export default function CrmMetas() {
   const [nuevoProgreso, setNuevoProgreso] = useState('');
   const [notaProgreso, setNotaProgreso] = useState('');
   const [showCelebration, setShowCelebration] = useState(false);
+  const [usuarios, setUsuarios] = useState<UsuarioTenant[]>([]);
 
   // Formulario
   const [form, setForm] = useState({
@@ -126,6 +131,7 @@ export default function CrmMetas() {
     tipo_recompensa: '',
     descripcion_recompensa: '',
     monto_recompensa: '',
+    origen: 'personal' as 'personal' | 'asignada' | 'empresa',
     usuario_id: '', // Para asignar a un usuario específico
   });
 
@@ -167,7 +173,7 @@ export default function CrmMetas() {
       setMisMetas(misMetasResponse.data);
       setMiResumen(miResumenResponse);
 
-      // Si es admin, cargar también las metas del equipo
+      // Si es admin, cargar también las metas del equipo y lista de usuarios
       if (isTenantAdmin) {
         const equipoFiltros: MetaFiltros = {
           estado: estadoFiltro || undefined,
@@ -175,13 +181,15 @@ export default function CrmMetas() {
           limit: 100,
         };
 
-        const [equipoResponse, resumenTotalResponse] = await Promise.all([
+        const [equipoResponse, resumenTotalResponse, usuariosResponse] = await Promise.all([
           getMetas(tenantActual.id, equipoFiltros),
           getMetasResumen(tenantActual.id),
+          getUsuariosTenant(tenantActual.id),
         ]);
 
         setMetasEquipo(equipoResponse.data);
         setResumen(resumenTotalResponse);
+        setUsuarios(usuariosResponse.filter(u => u.activo));
       }
 
       setMetas(misMetasResponse.data);
@@ -213,6 +221,7 @@ export default function CrmMetas() {
         tipo_recompensa: meta.tipo_recompensa || '',
         descripcion_recompensa: meta.descripcion_recompensa || '',
         monto_recompensa: meta.monto_recompensa?.toString() || '',
+        origen: meta.origen || 'personal',
         usuario_id: meta.usuario_id || '',
       });
     } else {
@@ -231,6 +240,7 @@ export default function CrmMetas() {
         tipo_recompensa: '',
         descripcion_recompensa: '',
         monto_recompensa: '',
+        origen: 'personal',
         usuario_id: user?.id || '',
       });
     }
@@ -243,6 +253,23 @@ export default function CrmMetas() {
 
     try {
       setSaving(true);
+
+      // Determinar origen y usuario_id según la selección
+      let origen = form.origen;
+      let usuarioId: string | null = null;
+
+      if (form.origen === 'empresa') {
+        // Meta de empresa: sin usuario específico
+        usuarioId = null;
+      } else if (form.origen === 'asignada' && form.usuario_id) {
+        // Meta asignada a un usuario específico
+        usuarioId = form.usuario_id;
+      } else {
+        // Meta personal: para el usuario actual
+        origen = 'personal';
+        usuarioId = user?.id || null;
+      }
+
       const data = {
         titulo: form.titulo,
         descripcion: form.descripcion || undefined,
@@ -252,8 +279,8 @@ export default function CrmMetas() {
         periodo: form.periodo,
         fecha_inicio: form.fecha_inicio,
         fecha_fin: form.fecha_fin,
-        origen: form.usuario_id === user?.id ? 'personal' : 'asignada' as const,
-        usuario_id: form.usuario_id || user?.id,
+        origen: origen as 'personal' | 'asignada' | 'empresa',
+        usuario_id: usuarioId,
         creado_por_id: user?.id,
         tipo_recompensa: form.tipo_recompensa || undefined,
         descripcion_recompensa: form.descripcion_recompensa || undefined,
@@ -558,22 +585,31 @@ export default function CrmMetas() {
                   </div>
                 )}
 
-                {/* Indicador de meta personal vs asignada (solo en Mis Metas) */}
-                {vistaActiva === 'mis-metas' && (
-                  <div className={`meta-origen ${meta.origen === 'personal' ? 'personal' : 'asignada'}`}>
-                    {meta.origen === 'personal' ? (
-                      <>
-                        <User className="w-4 h-4" />
-                        <span>Meta personal</span>
-                      </>
-                    ) : (
-                      <>
-                        <Crown className="w-4 h-4" />
-                        <span>Asignada por {meta.creador_nombre || 'admin'}</span>
-                      </>
-                    )}
-                  </div>
-                )}
+                {/* Indicador de meta personal vs asignada vs empresa */}
+                <div className={`meta-origen ${meta.origen}`}>
+                  {meta.origen === 'personal' ? (
+                    <>
+                      <User className="w-4 h-4" />
+                      <span>Meta personal</span>
+                    </>
+                  ) : meta.origen === 'empresa' ? (
+                    <>
+                      <Building2 className="w-4 h-4" />
+                      <span>Meta de empresa</span>
+                    </>
+                  ) : (
+                    <>
+                      <Crown className="w-4 h-4" />
+                      <span>Asignada por {meta.creador_nombre || 'admin'}</span>
+                    </>
+                  )}
+                  {(meta as any).progreso_automatico && (
+                    <span className="auto-badge" title="Progreso calculado automáticamente">
+                      <RefreshCw className="w-3 h-3" />
+                      Auto
+                    </span>
+                  )}
+                </div>
 
                 {/* Progreso visual */}
                 <div className="meta-progreso">
@@ -645,8 +681,8 @@ export default function CrmMetas() {
 
                 {/* Acciones */}
                 <div className="meta-actions">
-                  {/* Actualizar progreso - el usuario siempre puede actualizar sus metas */}
-                  {meta.estado === 'activa' && (
+                  {/* Actualizar progreso manual - solo si NO tiene progreso automático */}
+                  {meta.estado === 'activa' && !(meta as any).progreso_automatico && (
                     <button
                       className="action-btn progress-btn"
                       onClick={() => {
@@ -872,6 +908,75 @@ export default function CrmMetas() {
                   rows={2}
                 />
               </div>
+
+              {/* Selector de tipo de asignación (solo para admin) */}
+              {isTenantAdmin && (
+                <div className="form-section asignacion-section">
+                  <div className="form-section-header">
+                    <Users className="w-4 h-4" />
+                    <h4>Asignación de meta</h4>
+                  </div>
+
+                  <div className="origen-selector">
+                    <label
+                      className={`origen-option ${form.origen === 'personal' ? 'selected' : ''}`}
+                      onClick={() => setForm(prev => ({ ...prev, origen: 'personal', usuario_id: user?.id || '' }))}
+                    >
+                      <User className="w-5 h-5" />
+                      <div>
+                        <strong>Personal</strong>
+                        <span>Meta para mí mismo</span>
+                      </div>
+                    </label>
+                    <label
+                      className={`origen-option ${form.origen === 'asignada' ? 'selected' : ''}`}
+                      onClick={() => setForm(prev => ({ ...prev, origen: 'asignada', usuario_id: '' }))}
+                    >
+                      <Crown className="w-5 h-5" />
+                      <div>
+                        <strong>Asignar a usuario</strong>
+                        <span>Para un miembro del equipo</span>
+                      </div>
+                    </label>
+                    <label
+                      className={`origen-option ${form.origen === 'empresa' ? 'selected' : ''}`}
+                      onClick={() => setForm(prev => ({ ...prev, origen: 'empresa', usuario_id: '' }))}
+                    >
+                      <Building2 className="w-5 h-5" />
+                      <div>
+                        <strong>Empresa</strong>
+                        <span>Meta global del equipo</span>
+                      </div>
+                    </label>
+                  </div>
+
+                  {/* Selector de usuario cuando es meta asignada */}
+                  {form.origen === 'asignada' && (
+                    <div className="form-group" style={{ marginTop: '16px', marginBottom: 0 }}>
+                      <label>Seleccionar usuario *</label>
+                      <select
+                        value={form.usuario_id}
+                        onChange={(e) => setForm(prev => ({ ...prev, usuario_id: e.target.value }))}
+                        required
+                      >
+                        <option value="">-- Selecciona un usuario --</option>
+                        {usuarios.map((u) => (
+                          <option key={u.id} value={u.id}>
+                            {u.nombre} {u.apellido}
+                          </option>
+                        ))}
+                      </select>
+                    </div>
+                  )}
+
+                  {form.origen === 'empresa' && (
+                    <div className="empresa-note">
+                      <Building2 className="w-4 h-4" />
+                      Esta meta será visible para todo el equipo y el progreso se calculará sumando las contribuciones de todos los usuarios.
+                    </div>
+                  )}
+                </div>
+              )}
 
               {/* Sección de recompensa */}
               <div className="form-section">
@@ -1405,6 +1510,12 @@ const styles = `
     border: 1px solid #93c5fd;
   }
 
+  .meta-origen.empresa {
+    background: linear-gradient(135deg, #fef3c7 0%, #fde68a 100%);
+    color: #92400e;
+    border: 1px solid #fcd34d;
+  }
+
   .meta-origen svg {
     width: 14px;
     height: 14px;
@@ -1412,6 +1523,23 @@ const styles = `
 
   .meta-origen span {
     font-weight: 500;
+  }
+
+  .meta-origen .auto-badge {
+    display: flex;
+    align-items: center;
+    gap: 3px;
+    margin-left: auto;
+    padding: 2px 6px;
+    background: rgba(0, 0, 0, 0.1);
+    border-radius: 4px;
+    font-size: 0.65rem;
+    font-weight: 600;
+  }
+
+  .meta-origen .auto-badge svg {
+    width: 10px;
+    height: 10px;
   }
 
   /* Progreso */
@@ -1796,6 +1924,14 @@ const styles = `
     border-radius: 12px;
   }
 
+  .form-section.asignacion-section {
+    background: #f1f5f9;
+  }
+
+  .form-section.asignacion-section .form-section-header {
+    color: #475569;
+  }
+
   .form-section-header {
     display: flex;
     align-items: center;
@@ -1810,8 +1946,81 @@ const styles = `
     font-weight: 600;
   }
 
-  .form-section .form-group input {
+  .form-section .form-group input,
+  .form-section .form-group select {
     background: white;
+  }
+
+  /* Origen selector */
+  .origen-selector {
+    display: flex;
+    gap: 8px;
+  }
+
+  .origen-option {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 6px;
+    padding: 12px 8px;
+    background: white;
+    border: 2px solid #e2e8f0;
+    border-radius: 10px;
+    cursor: pointer;
+    transition: all 0.2s;
+    text-align: center;
+  }
+
+  .origen-option:hover {
+    border-color: #94a3b8;
+  }
+
+  .origen-option.selected {
+    border-color: #6366f1;
+    background: #eef2ff;
+  }
+
+  .origen-option svg {
+    color: #64748b;
+  }
+
+  .origen-option.selected svg {
+    color: #6366f1;
+  }
+
+  .origen-option div {
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+  }
+
+  .origen-option strong {
+    font-size: 0.8rem;
+    color: #0f172a;
+  }
+
+  .origen-option span {
+    font-size: 0.65rem;
+    color: #64748b;
+  }
+
+  .empresa-note {
+    display: flex;
+    align-items: flex-start;
+    gap: 8px;
+    margin-top: 12px;
+    padding: 10px;
+    background: #fef3c7;
+    border-radius: 8px;
+    font-size: 0.75rem;
+    color: #92400e;
+    line-height: 1.4;
+  }
+
+  .empresa-note svg {
+    flex-shrink: 0;
+    margin-top: 2px;
   }
 
   .btn-cancel {
