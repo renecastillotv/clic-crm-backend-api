@@ -2458,7 +2458,7 @@ export default function CrmFinanzasVentas() {
 
             // Registrar cobro de empresa (lo que la empresa cobra al cliente)
             const token = await getToken();
-            await registrarCobroEmpresa(
+            const resultado = await registrarCobroEmpresa(
               tenantActual.id,
               ventaParaPago.id,
               {
@@ -2472,8 +2472,26 @@ export default function CrmFinanzasVentas() {
               token
             );
 
-            // Recargar ventas para actualizar los caches
-            await cargarVentas();
+            // Actualizar la venta específica con los caches actualizados (más eficiente que recargar todo)
+            if (resultado.venta_actualizada) {
+              setVentas(prev => prev.map(v => {
+                if (v.id === ventaParaPago.id) {
+                  return {
+                    ...v,
+                    cache_monto_cobrado: resultado.venta_actualizada.cache_monto_cobrado,
+                    cache_porcentaje_cobrado: resultado.venta_actualizada.cache_porcentaje_cobrado,
+                    cache_comision_disponible: resultado.venta_actualizada.cache_comision_disponible,
+                    cache_monto_pagado_asesores: resultado.venta_actualizada.cache_monto_pagado_asesores,
+                    estado_cobro: resultado.venta_actualizada.estado_cobro,
+                    estado_pagos: resultado.venta_actualizada.estado_pagos,
+                  };
+                }
+                return v;
+              }));
+            } else {
+              // Fallback: recargar todas las ventas si no tenemos los caches actualizados
+              await cargarVentas();
+            }
 
             setShowAplicarPagoModal(false);
             setVentaParaPago(null);

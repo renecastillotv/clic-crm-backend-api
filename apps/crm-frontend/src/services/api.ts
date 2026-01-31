@@ -4055,12 +4055,29 @@ export interface VentaCobro {
   activo: boolean;
 }
 
+// Caches actualizados de la venta después de un cobro
+export interface VentaCachesActualizados {
+  cache_monto_cobrado: number;
+  cache_porcentaje_cobrado: number;
+  cache_comision_disponible: number;
+  cache_monto_pagado_asesores: number;
+  estado_cobro: string;
+  estado_pagos: string;
+}
+
+// Resultado completo del registro de cobro
+export interface RegistrarCobroResult {
+  cobro: VentaCobro;
+  venta_actualizada: VentaCachesActualizados;
+}
+
 /**
  * Registra un cobro de la empresa (lo que la empresa cobra al cliente)
  * @param tenantId - ID del tenant
  * @param ventaId - ID de la venta
  * @param datos - Datos del cobro
  * @param token - Token de autenticación opcional
+ * @returns El cobro creado y los caches actualizados de la venta
  */
 export async function registrarCobroEmpresa(
   tenantId: string,
@@ -4077,13 +4094,29 @@ export async function registrarCobroEmpresa(
     registrado_por_id: string;
   },
   token?: string | null
-): Promise<VentaCobro> {
+): Promise<RegistrarCobroResult> {
   const response = await apiFetch(`/tenants/${tenantId}/ventas/${ventaId}/cobros`, {
     method: 'POST',
     body: JSON.stringify(datos),
   }, token);
   const data = await response.json();
-  return data.cobro || data;
+  // El backend ahora devuelve { cobro, venta_actualizada }
+  // Mantener compatibilidad con formato anterior si es necesario
+  if (data.cobro && data.venta_actualizada) {
+    return data as RegistrarCobroResult;
+  }
+  // Fallback para compatibilidad con API anterior
+  return {
+    cobro: data.cobro || data,
+    venta_actualizada: {
+      cache_monto_cobrado: 0,
+      cache_porcentaje_cobrado: 0,
+      cache_comision_disponible: 0,
+      cache_monto_pagado_asesores: 0,
+      estado_cobro: 'pendiente',
+      estado_pagos: 'pendiente'
+    }
+  };
 }
 
 /**

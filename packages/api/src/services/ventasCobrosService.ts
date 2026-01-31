@@ -1,13 +1,13 @@
 /**
  * Servicio de Cobros de Ventas
  *
- * Gestiona los cobros que hace la empresa al cliente.
+ * Gestiona los cobros que hace la empresa al cliente (sobre la COMISIÓN, no el valor de venta).
  * Cada cobro actualiza automáticamente:
- * - cache_monto_cobrado en ventas
- * - cache_porcentaje_cobrado (sobre valor_cierre, NO comisión)
- * - cache_comision_disponible (proporcional)
- * - monto_habilitado en cada comisión
- * - estado_cobro
+ * - cache_monto_cobrado en ventas (monto total cobrado de la comisión)
+ * - cache_porcentaje_cobrado (sobre monto_comision, NO valor_cierre)
+ * - cache_comision_disponible (igual a lo cobrado)
+ * - monto_habilitado en cada comisión (proporcional)
+ * - estado_cobro (pendiente/parcial/cobrado basado en monto_comision)
  */
 
 import { query } from '../utils/db.js';
@@ -58,17 +58,33 @@ export interface CobroVenta {
   created_at: string;
 }
 
+// Caches actualizados de la venta después de un cobro
+export interface VentaCachesActualizados {
+  cache_monto_cobrado: number;
+  cache_porcentaje_cobrado: number;
+  cache_comision_disponible: number;
+  cache_monto_pagado_asesores: number;
+  estado_cobro: string;
+  estado_pagos: string;
+}
+
+// Resultado completo del registro de cobro
+export interface RegistrarCobroResult {
+  cobro: CobroVenta;
+  venta_actualizada: VentaCachesActualizados;
+}
+
 /**
  * Recalcula todos los caches de una venta
- * IMPORTANTE: Usa valor_cierre (no monto_comision) para calcular porcentaje cobrado
+ * IMPORTANTE: Usa monto_comision para calcular porcentaje cobrado (lo que la empresa cobra)
+ * @returns Los valores de cache actualizados
  */
-async function recalcularCachesVentaInterno(ventaId: string): Promise<void> {
-  // Intentar usar la función SQL si existe
+async function recalcularCachesVentaInterno(ventaId: string): Promise<VentaCachesActualizados> {
+  // Intentar usar la función SQL si existe (para consistencia con triggers)
   try {
     await query('SELECT recalcular_caches_venta($1)', [ventaId]);
-    return;
   } catch (e) {
-    // Si la función no existe, hacerlo manualmente
+    // Si la función no existe, continuamos con el cálculo manual
   }
 
   // Obtener datos de la venta
@@ -76,10 +92,18 @@ async function recalcularCachesVentaInterno(ventaId: string): Promise<void> {
     SELECT valor_cierre, monto_comision FROM ventas WHERE id = $1
   `, [ventaId]);
 
-  if (ventaResult.rows.length === 0) return;
+  if (ventaResult.rows.length === 0) {
+    return {
+      cache_monto_cobrado: 0,
+      cache_porcentaje_cobrado: 0,
+      cache_comision_disponible: 0,
+      cache_monto_pagado_asesores: 0,
+      estado_cobro: 'pendiente',
+      estado_pagos: 'pendiente'
+    };
+  }
 
   const venta = ventaResult.rows[0];
-  const valorCierre = parseFloat(venta.valor_cierre) || 0;
   const montoComision = parseFloat(venta.monto_comision) || 0;
 
   // Calcular monto cobrado
@@ -120,8 +144,10 @@ async function recalcularCachesVentaInterno(ventaId: string): Promise<void> {
   const totalAsesores = parseFloat(totalAsesoresResult.rows[0].total) || 0;
 
   // Determinar estados
+  // IMPORTANTE: estadoCobro se basa en montoComision (lo que la empresa debe cobrar),
+  // NO en valorCierre (el valor total de la venta que va al propietario/desarrollador)
   const estadoCobro = montoCobrado === 0 ? 'pendiente'
-    : montoCobrado >= valorCierre ? 'cobrado' : 'parcial';
+    : montoCobrado >= montoComision ? 'cobrado' : 'parcial';
 
   const estadoPagos = montoPagado === 0 ? 'pendiente'
     : (totalAsesores > 0 && montoPagado >= totalAsesores) ? 'pagado' : 'parcial';
@@ -147,12 +173,23 @@ async function recalcularCachesVentaInterno(ventaId: string): Promise<void> {
     WHERE venta_id = $1
       AND (activo = true OR activo IS NULL)
   `, [ventaId, porcentajeCobrado]);
+
+  // Retornar los valores actualizados
+  return {
+    cache_monto_cobrado: montoCobrado,
+    cache_porcentaje_cobrado: porcentajeCobrado,
+    cache_comision_disponible: comisionDisponible,
+    cache_monto_pagado_asesores: montoPagado,
+    estado_cobro: estadoCobro,
+    estado_pagos: estadoPagos
+  };
 }
 
 /**
  * Registra un cobro de la empresa al cliente
+ * @returns El cobro creado y los valores de cache actualizados de la venta
  */
-export async function registrarCobro(params: RegistrarCobroParams): Promise<CobroVenta> {
+export async function registrarCobro(params: RegistrarCobroParams): Promise<RegistrarCobroResult> {
   const {
     tenantId,
     ventaId,
@@ -226,24 +263,25 @@ export async function registrarCobro(params: RegistrarCobroParams): Promise<Cobr
 
   const cobro = insertResult.rows[0];
 
-  // 4. Recalcular caches
-  await recalcularCachesVentaInterno(ventaId);
+  // 4. Recalcular caches y obtener valores actualizados
+  const cachesActualizados = await recalcularCachesVentaInterno(ventaId);
 
   // 5. Registrar en historial
-  const porcentajeNuevo = montoComision > 0
-    ? ((yaCobrado + monto) / montoComision * 100).toFixed(2)
-    : '0';
+  const porcentajeNuevo = cachesActualizados.cache_porcentaje_cobrado.toFixed(2);
 
   await registrarHistorial(tenantId, ventaId, 'cobro_registrado', {
     cobro_id: cobro.id,
     monto: monto,
-    nuevo_total_cobrado: yaCobrado + monto,
+    nuevo_total_cobrado: cachesActualizados.cache_monto_cobrado,
     porcentaje_cobrado: porcentajeNuevo
   }, registradoPorId || undefined);
 
   console.log(`✅ Cobro registrado: $${monto} (${porcentajeNuevo}% de comisión $${montoComision} cobrada)`);
 
-  return cobro;
+  return {
+    cobro,
+    venta_actualizada: cachesActualizados
+  };
 }
 
 /**
@@ -277,22 +315,22 @@ export async function editarCobro(params: EditarCobroParams): Promise<CobroVenta
   const cobroActual = cobroResult.rows[0];
   const ventaId = cobroActual.venta_id;
 
-  // 2. Si cambia el monto, validar
+  // 2. Si cambia el monto, validar contra la COMISIÓN (no valor_cierre)
   if (monto !== undefined && monto !== parseFloat(cobroActual.monto)) {
     const ventaResult = await query(`
-      SELECT valor_cierre, cache_monto_cobrado FROM ventas
+      SELECT monto_comision, cache_monto_cobrado FROM ventas
       WHERE id = $1 AND tenant_id = $2
     `, [ventaId, tenantId]);
 
     const venta = ventaResult.rows[0];
-    const valorCierre = parseFloat(venta.valor_cierre) || 0;
+    const montoComision = parseFloat(venta.monto_comision) || 0;
     const yaCobrado = parseFloat(venta.cache_monto_cobrado) || 0;
     const otrosCobros = yaCobrado - parseFloat(cobroActual.monto);
-    const pendiente = valorCierre - otrosCobros;
+    const pendiente = montoComision - otrosCobros;
 
     if (monto > pendiente + 0.01) {
       throw new Error(
-        `El nuevo monto (${monto}) excede el pendiente de cobro (${pendiente.toFixed(2)})`
+        `El nuevo monto (${monto}) excede la comisión pendiente de cobro (${pendiente.toFixed(2)})`
       );
     }
   }

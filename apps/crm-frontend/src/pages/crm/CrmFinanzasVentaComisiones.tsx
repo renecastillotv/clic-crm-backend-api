@@ -54,6 +54,7 @@ interface DistribucionLocal {
 const CrmFinanzasVentaComisiones: React.FC<CrmFinanzasVentaComisionesProps> = ({
   ventaId,
   venta,
+  onUpdate,
 }) => {
   const { tenantActual, user, tieneAcceso, isPlatformAdmin } = useAuth();
   const { getToken } = useClerkAuth();
@@ -290,7 +291,7 @@ const CrmFinanzasVentaComisiones: React.FC<CrmFinanzasVentaComisionesProps> = ({
       if (modalTipo === 'cobro') {
         // Registrar cobro de empresa (entrada de dinero del cliente) en ventas_cobros
         const token = await getToken();
-        await registrarCobroEmpresa(tenantActual.id, ventaId, {
+        const resultado = await registrarCobroEmpresa(tenantActual.id, ventaId, {
           monto: data.monto,
           moneda: venta.moneda,
           fecha_cobro: data.fechaPago,
@@ -298,6 +299,18 @@ const CrmFinanzasVentaComisiones: React.FC<CrmFinanzasVentaComisionesProps> = ({
           recibo_url: reciboUrl || undefined,
           registrado_por_id: user?.id || '',
         }, token);
+
+        // Actualizar el estado del padre con los caches actualizados
+        if (onUpdate && resultado.venta_actualizada) {
+          onUpdate({
+            cache_monto_cobrado: resultado.venta_actualizada.cache_monto_cobrado,
+            cache_porcentaje_cobrado: resultado.venta_actualizada.cache_porcentaje_cobrado,
+            cache_comision_disponible: resultado.venta_actualizada.cache_comision_disponible,
+            cache_monto_pagado_asesores: resultado.venta_actualizada.cache_monto_pagado_asesores,
+            estado_cobro: resultado.venta_actualizada.estado_cobro,
+            estado_pagos: resultado.venta_actualizada.estado_pagos,
+          });
+        }
       } else {
         // Registrar pago a participante (salida de dinero) en pagos_comisiones
         await createPagoComision(tenantActual.id, ventaId, {
