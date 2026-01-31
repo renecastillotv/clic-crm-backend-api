@@ -13,7 +13,7 @@ import React, { useState, useEffect, useCallback } from 'react';
 import {
   DollarSign, Percent, Loader2, AlertCircle,
   RefreshCw, Trash2, Save, X, Users, History, ArrowDownCircle, ArrowUpCircle,
-  Eye, Download, FileCheck, FileX
+  Eye, Download, FileCheck, FileX, Upload, Paperclip
 } from 'lucide-react';
 import { useAuth } from '../../contexts/AuthContext';
 import {
@@ -27,6 +27,9 @@ import {
   getCobrosVenta,
   registrarCobroEmpresa,
   VentaCobro,
+  agregarAdjuntoCobro,
+  getAdjuntosCobro,
+  CobroAdjunto,
 } from '../../services/api';
 import ModalAplicarPago from '../../components/ModalAplicarPago';
 import { useAuth as useClerkAuth } from '@clerk/clerk-react';
@@ -77,6 +80,10 @@ const CrmFinanzasVentaComisiones: React.FC<CrmFinanzasVentaComisionesProps> = ({
   const [modalTipo, setModalTipo] = useState<'cobro' | 'pago'>('pago'); // cobro=entrada, pago=salida
   // Tab activo: 'distribucion' | 'historial'
   const [tabActivo, setTabActivo] = useState<'distribucion' | 'historial'>('distribucion');
+  // Estados para subida de adjuntos a cobros
+  const [uploadingAdjunto, setUploadingAdjunto] = useState<string | null>(null); // ID del cobro que está subiendo
+  const [adjuntosPorCobro, setAdjuntosPorCobro] = useState<Record<string, CobroAdjunto[]>>({});
+
   useEffect(() => {
     if (ventaId && tenantActual?.id) {
       loadComisiones();
@@ -119,6 +126,61 @@ const CrmFinanzasVentaComisiones: React.FC<CrmFinanzasVentaComisionesProps> = ({
       console.error('Error cargando cobros:', err);
     }
   };
+
+  // Subir adjunto a un cobro existente
+  const handleUploadAdjuntoCobro = async (cobroId: string, file: File) => {
+    if (!tenantActual?.id || !user?.id) return;
+
+    setUploadingAdjunto(cobroId);
+    try {
+      // 1. Subir archivo
+      const formData = new FormData();
+      formData.append('file', file);
+      formData.append('folder', `ventas/${ventaId}/cobros/${cobroId}`);
+
+      const token = await getToken();
+      const uploadResponse = await fetch(
+        `${import.meta.env.VITE_API_URL || 'http://localhost:3001/api'}/tenants/${tenantActual.id}/upload/file`,
+        {
+          method: 'POST',
+          headers: {
+            ...(token ? { 'Authorization': `Bearer ${token}` } : {}),
+          },
+          body: formData,
+        }
+      );
+
+      if (!uploadResponse.ok) {
+        throw new Error('Error al subir archivo');
+      }
+
+      const uploadData = await uploadResponse.json();
+
+      // 2. Registrar adjunto en la base de datos
+      await agregarAdjuntoCobro(
+        tenantActual.id,
+        ventaId,
+        cobroId,
+        {
+          url: uploadData.url,
+          nombre_archivo: file.name,
+          tipo_archivo: file.type,
+          tamaño_bytes: file.size,
+          subido_por_id: user.id,
+        },
+        token
+      );
+
+      // 3. Recargar cobros para reflejar el cambio
+      await loadCobros();
+    } catch (err: any) {
+      console.error('Error subiendo adjunto:', err);
+      alert(err.message || 'Error al subir el archivo');
+    } finally {
+      setUploadingAdjunto(null);
+    }
+  };
+
   // Sincronizar comisiones del servidor con estado local editable
   const sincronizarDistribucionLocal = (comisionesData: Comision[]) => {
     const distribucion: DistribucionLocal[] = comisionesData.map(c => {
@@ -1349,22 +1411,101 @@ const CrmFinanzasVentaComisiones: React.FC<CrmFinanzasVentaComisionesProps> = ({
                           >
                             <Download className="w-3 h-3" />
                           </button>
+                          {esAdmin && (
+                            <label
+                              style={{
+                                padding: '4px 8px',
+                                borderRadius: '6px',
+                                border: '1px solid #86efac',
+                                background: '#ecfdf5',
+                                color: '#166534',
+                                fontSize: '0.6875rem',
+                                display: 'flex',
+                                alignItems: 'center',
+                                gap: '4px',
+                                cursor: uploadingAdjunto === item.id ? 'wait' : 'pointer',
+                                opacity: uploadingAdjunto === item.id ? 0.6 : 1
+                              }}
+                              title="Agregar más archivos"
+                            >
+                              {uploadingAdjunto === item.id ? (
+                                <Loader2 className="w-3 h-3 animate-spin" />
+                              ) : (
+                                <Paperclip className="w-3 h-3" />
+                              )}
+                              <input
+                                type="file"
+                                style={{ display: 'none' }}
+                                accept=".pdf,.jpg,.jpeg,.png,.gif,.webp"
+                                disabled={uploadingAdjunto === item.id}
+                                onChange={(e) => {
+                                  const file = e.target.files?.[0];
+                                  if (file && item.id) {
+                                    handleUploadAdjuntoCobro(item.id, file);
+                                  }
+                                  e.target.value = '';
+                                }}
+                              />
+                            </label>
+                          )}
                         </>
                       ) : (
-                        <span style={{
-                          padding: '2px 6px',
-                          borderRadius: '4px',
-                          background: '#f1f5f9',
-                          color: '#94a3b8',
-                          fontSize: '0.625rem',
-                          fontWeight: 500,
-                          display: 'flex',
-                          alignItems: 'center',
-                          gap: '3px'
-                        }}>
-                          <FileX className="w-2.5 h-2.5" />
-                          Sin adjunto
-                        </span>
+                        <>
+                          <span style={{
+                            padding: '2px 6px',
+                            borderRadius: '4px',
+                            background: '#f1f5f9',
+                            color: '#94a3b8',
+                            fontSize: '0.625rem',
+                            fontWeight: 500,
+                            display: 'flex',
+                            alignItems: 'center',
+                            gap: '3px'
+                          }}>
+                            <FileX className="w-2.5 h-2.5" />
+                            Sin adjunto
+                          </span>
+                          {esAdmin && (
+                            <label
+                              style={{
+                                padding: '4px 8px',
+                                borderRadius: '6px',
+                                border: '1px solid #667eea',
+                                background: '#eef2ff',
+                                color: '#4f46e5',
+                                fontSize: '0.6875rem',
+                                display: 'flex',
+                                alignItems: 'center',
+                                gap: '4px',
+                                cursor: uploadingAdjunto === item.id ? 'wait' : 'pointer',
+                                opacity: uploadingAdjunto === item.id ? 0.6 : 1
+                              }}
+                              title="Subir comprobante"
+                            >
+                              {uploadingAdjunto === item.id ? (
+                                <Loader2 className="w-3 h-3 animate-spin" />
+                              ) : (
+                                <>
+                                  <Upload className="w-3 h-3" />
+                                  Subir
+                                </>
+                              )}
+                              <input
+                                type="file"
+                                style={{ display: 'none' }}
+                                accept=".pdf,.jpg,.jpeg,.png,.gif,.webp"
+                                disabled={uploadingAdjunto === item.id}
+                                onChange={(e) => {
+                                  const file = e.target.files?.[0];
+                                  if (file && item.id) {
+                                    handleUploadAdjuntoCobro(item.id, file);
+                                  }
+                                  e.target.value = '';
+                                }}
+                              />
+                            </label>
+                          )}
+                        </>
                       )}
                     </div>
                   </div>

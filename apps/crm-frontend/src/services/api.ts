@@ -4157,6 +4157,91 @@ export async function getResumenCobrosVenta(
   return await response.json();
 }
 
+// ==================== ADJUNTOS DE COBROS ====================
+
+/**
+ * Interface para un adjunto de cobro
+ */
+export interface CobroAdjunto {
+  id: string;
+  tenant_id: string;
+  cobro_id: string;
+  url: string;
+  nombre_archivo: string | null;
+  tipo_archivo: string | null;
+  tamaño_bytes: number | null;
+  descripcion: string | null;
+  subido_por_id: string | null;
+  created_at: string;
+  subido_por_nombre?: string;
+}
+
+/**
+ * Obtiene los adjuntos de un cobro
+ */
+export async function getAdjuntosCobro(
+  tenantId: string,
+  ventaId: string,
+  cobroId: string,
+  token?: string | null
+): Promise<CobroAdjunto[]> {
+  const response = await apiFetch(
+    `/tenants/${tenantId}/ventas/${ventaId}/cobros/${cobroId}/adjuntos`,
+    {},
+    token
+  );
+  const data = await response.json();
+  return data.adjuntos || [];
+}
+
+/**
+ * Agrega un adjunto a un cobro existente
+ */
+export async function agregarAdjuntoCobro(
+  tenantId: string,
+  ventaId: string,
+  cobroId: string,
+  datos: {
+    url: string;
+    nombre_archivo?: string;
+    tipo_archivo?: string;
+    tamaño_bytes?: number;
+    descripcion?: string;
+    subido_por_id?: string;
+  },
+  token?: string | null
+): Promise<CobroAdjunto> {
+  const response = await apiFetch(
+    `/tenants/${tenantId}/ventas/${ventaId}/cobros/${cobroId}/adjuntos`,
+    {
+      method: 'POST',
+      body: JSON.stringify(datos),
+    },
+    token
+  );
+  const data = await response.json();
+  return data.adjunto;
+}
+
+/**
+ * Elimina un adjunto de un cobro
+ */
+export async function eliminarAdjuntoCobro(
+  tenantId: string,
+  ventaId: string,
+  cobroId: string,
+  adjuntoId: string,
+  token?: string | null
+): Promise<void> {
+  await apiFetch(
+    `/tenants/${tenantId}/ventas/${ventaId}/cobros/${cobroId}/adjuntos/${adjuntoId}`,
+    {
+      method: 'DELETE',
+    },
+    token
+  );
+}
+
 /**
  * Recalcula las comisiones de una venta
  * Elimina las comisiones existentes y crea nuevas basadas en los participantes actuales

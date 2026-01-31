@@ -125,6 +125,7 @@ export default function CrmFinanzasVentas() {
   const [ventaParaPago, setVentaParaPago] = useState<Venta | null>(null);
   const [comisionData, setComisionData] = useState<{ montoTotal: number; montoPagado: number } | null>(null);
   const [loadingComision, setLoadingComision] = useState(false);
+  const [loadingRegistroCobro, setLoadingRegistroCobro] = useState(false);
 
   // Estado para unidades de proyecto
   const [unidadesProyecto, setUnidadesProyecto] = useState<UnidadProyecto[]>([]);
@@ -2430,6 +2431,7 @@ export default function CrmFinanzasVentas() {
         }) => {
           if (!tenantActual?.id || !ventaParaPago || !user?.id) return;
 
+          setLoadingRegistroCobro(true);
           try {
             // Subir recibo si existe
             let reciboUrl: string | null = null;
@@ -2499,6 +2501,8 @@ export default function CrmFinanzasVentas() {
           } catch (error: any) {
             console.error('Error registrando cobro:', error);
             alert(error.message || 'Error al registrar el cobro');
+          } finally {
+            setLoadingRegistroCobro(false);
           }
         };
 
@@ -2524,6 +2528,7 @@ export default function CrmFinanzasVentas() {
           <ModalAplicarPago
             isOpen={showAplicarPagoModal}
             onClose={() => {
+              if (loadingRegistroCobro) return;
               setShowAplicarPagoModal(false);
               setVentaParaPago(null);
               setComisionData(null);
@@ -2532,6 +2537,9 @@ export default function CrmFinanzasVentas() {
             montoAdeudado={montoAdeudado}
             montoPagado={comisionData.montoPagado}
             moneda={ventaParaPago.moneda || 'USD'}
+            loading={loadingRegistroCobro}
+            titulo="Registrar Cobro"
+            descripcion="Registra el dinero recibido del cliente por concepto de comisión"
           />
         );
       })()}
