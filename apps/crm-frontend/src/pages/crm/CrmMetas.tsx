@@ -541,176 +541,158 @@ export default function CrmMetas() {
             const diasRestantes = getDiasRestantes(meta.fecha_fin);
             const completada = meta.estado === 'completada';
             const vencida = diasRestantes < 0 && meta.estado === 'activa';
-            const nivelLogro = getNivelLogro(porcentaje);
             const TipoIcon = tipo.icon;
-            const EstadoIcon = estado.icon;
+
+            // Calcular ángulo para el círculo de progreso
+            const circumference = 2 * Math.PI * 54;
+            const strokeDashoffset = circumference - (Math.min(porcentaje, 100) / 100) * circumference;
 
             return (
               <div
                 key={meta.id}
-                className={`meta-card ${completada ? 'completed' : ''} ${vencida ? 'overdue' : ''}`}
+                className={`meta-card-v2 ${completada ? 'completed' : ''} ${vencida ? 'overdue' : ''}`}
               >
-                {/* Badge de completado */}
-                {completada && (
-                  <div className="completion-badge">
-                    <Trophy className="w-5 h-5" />
+                {/* Header con gradiente según tipo */}
+                <div className="meta-card-header" style={{ background: `linear-gradient(135deg, ${tipo.color}15 0%, ${tipo.color}08 100%)` }}>
+                  <div className="meta-card-header-content">
+                    <div className="meta-tipo-badge" style={{ background: tipo.color }}>
+                      <TipoIcon className="w-4 h-4" />
+                    </div>
+                    <div className="meta-header-info">
+                      <span className="meta-tipo-label">{tipo.label}</span>
+                      <h3 className="meta-titulo-v2">{meta.titulo}</h3>
+                    </div>
                   </div>
-                )}
 
-                <div className="meta-header">
-                  <div className="meta-tipo" style={{ backgroundColor: tipo.bgColor, color: tipo.color }}>
-                    <TipoIcon className="w-4 h-4" />
-                    <span>{tipo.label}</span>
-                  </div>
-                  <div className="meta-estado" style={{ backgroundColor: estado.bgColor, color: estado.color }}>
-                    <EstadoIcon className="w-3 h-3" />
-                    <span>{estado.label}</span>
-                  </div>
-                </div>
-
-                <h3 className="meta-titulo">{meta.titulo}</h3>
-
-                {meta.descripcion && (
-                  <p className="meta-descripcion">{meta.descripcion}</p>
-                )}
-
-                {/* Usuario asignado (solo en vista equipo) */}
-                {vistaActiva === 'equipo' && meta.usuario_nombre && (
-                  <div className="meta-usuario">
-                    <User className="w-4 h-4" />
-                    <span>{meta.usuario_nombre} {meta.usuario_apellido || ''}</span>
-                    {meta.origen === 'asignada' && (
-                      <span className="badge-asignada">Asignada</span>
+                  {/* Badge de origen */}
+                  <div className={`meta-origen-badge ${meta.origen}`}>
+                    {meta.origen === 'personal' ? (
+                      <User className="w-3 h-3" />
+                    ) : meta.origen === 'empresa' ? (
+                      <Building2 className="w-3 h-3" />
+                    ) : (
+                      <Crown className="w-3 h-3" />
                     )}
+                    <span>{meta.origen === 'personal' ? 'Personal' : meta.origen === 'empresa' ? 'Empresa' : 'Asignada'}</span>
                   </div>
-                )}
-
-                {/* Indicador de meta personal vs asignada vs empresa */}
-                <div className={`meta-origen ${meta.origen}`}>
-                  {meta.origen === 'personal' ? (
-                    <>
-                      <User className="w-4 h-4" />
-                      <span>Meta personal</span>
-                    </>
-                  ) : meta.origen === 'empresa' ? (
-                    <>
-                      <Building2 className="w-4 h-4" />
-                      <span>Meta de empresa</span>
-                    </>
-                  ) : (
-                    <>
-                      <Crown className="w-4 h-4" />
-                      <span>Asignada por {meta.creador_nombre || 'admin'}</span>
-                    </>
-                  )}
-                  {(meta as any).progreso_automatico && (
-                    <span className="auto-badge" title="Progreso calculado automáticamente">
-                      <RefreshCw className="w-3 h-3" />
-                      Auto
-                    </span>
-                  )}
                 </div>
 
-                {/* Progreso visual */}
-                <div className="meta-progreso">
-                  <div className="progreso-header">
-                    <span className="progreso-emoji">{nivelLogro.emoji}</span>
-                    <span className="progreso-actual" style={{ color: nivelLogro.color }}>
-                      {formatValor(meta.valor_actual, meta.metrica)}
-                    </span>
-                    <span className="progreso-separator">/</span>
-                    <span className="progreso-objetivo">
-                      {formatValor(meta.valor_objetivo, meta.metrica)}
-                    </span>
-                  </div>
-
-                  <div className="progreso-bar-container">
-                    <div className="progreso-bar">
-                      <div
-                        className="progreso-fill"
+                {/* Cuerpo con círculo de progreso */}
+                <div className="meta-card-body">
+                  {/* Círculo de progreso */}
+                  <div className="progress-circle-container">
+                    <svg className="progress-circle" viewBox="0 0 120 120">
+                      {/* Fondo del círculo */}
+                      <circle
+                        className="progress-circle-bg"
+                        cx="60"
+                        cy="60"
+                        r="54"
+                        fill="none"
+                        strokeWidth="8"
+                      />
+                      {/* Progreso */}
+                      <circle
+                        className="progress-circle-fill"
+                        cx="60"
+                        cy="60"
+                        r="54"
+                        fill="none"
+                        strokeWidth="8"
+                        strokeLinecap="round"
                         style={{
-                          width: `${Math.min(porcentaje, 100)}%`,
-                          backgroundColor: completada ? '#16a34a' : tipo.color,
+                          stroke: completada ? '#10b981' : tipo.color,
+                          strokeDasharray: circumference,
+                          strokeDashoffset: strokeDashoffset,
                         }}
                       />
-                      {porcentaje > 0 && porcentaje < 100 && (
-                        <div
-                          className="progreso-marker"
-                          style={{ left: `${Math.min(porcentaje, 100)}%` }}
-                        />
+                    </svg>
+                    <div className="progress-circle-content">
+                      <span className="progress-value" style={{ color: completada ? '#10b981' : tipo.color }}>
+                        {Math.round(porcentaje)}%
+                      </span>
+                      {completada ? (
+                        <Trophy className="w-4 h-4" style={{ color: '#10b981' }} />
+                      ) : (
+                        <span className="progress-label">completado</span>
                       )}
                     </div>
                   </div>
 
-                  <div className="progreso-footer">
-                    <span className="progreso-porcentaje" style={{ color: nivelLogro.color }}>
-                      {porcentaje}% completado
-                    </span>
+                  {/* Métricas */}
+                  <div className="meta-metrics">
+                    <div className="metric-item">
+                      <span className="metric-value">{formatValor(meta.valor_actual, meta.metrica)}</span>
+                      <span className="metric-label">actual</span>
+                    </div>
+                    <div className="metric-divider"></div>
+                    <div className="metric-item">
+                      <span className="metric-value">{formatValor(meta.valor_objetivo, meta.metrica)}</span>
+                      <span className="metric-label">objetivo</span>
+                    </div>
+                  </div>
+                </div>
+
+                {/* Footer */}
+                <div className="meta-card-footer">
+                  <div className="meta-footer-info">
+                    {/* Auto badge si aplica */}
+                    {(meta as any).progreso_automatico && (
+                      <span className="auto-sync-badge">
+                        <RefreshCw className="w-3 h-3" />
+                        Sincronizado
+                      </span>
+                    )}
+
+                    {/* Tiempo restante */}
                     {meta.estado === 'activa' && (
-                      <span className={`progreso-dias ${diasRestantes <= 7 ? 'urgent' : ''}`}>
+                      <span className={`time-badge ${diasRestantes <= 7 ? 'urgent' : diasRestantes <= 14 ? 'warning' : ''}`}>
                         <Clock className="w-3 h-3" />
                         {diasRestantes > 0 ? `${diasRestantes} días` : 'Vencida'}
                       </span>
                     )}
+
+                    {completada && (
+                      <span className="completed-badge">
+                        <CheckCircle2 className="w-3 h-3" />
+                        Completada
+                      </span>
+                    )}
                   </div>
-                </div>
 
-                {/* Recompensa */}
-                {meta.tipo_recompensa && (
-                  <div className="meta-recompensa">
-                    <Gift className="w-4 h-4" />
-                    <div className="recompensa-content">
-                      <span className="recompensa-tipo">{meta.tipo_recompensa}</span>
-                      {meta.monto_recompensa && (
-                        <span className="recompensa-monto">
-                          ${meta.monto_recompensa.toLocaleString()}
-                        </span>
-                      )}
-                    </div>
+                  {/* Acciones */}
+                  <div className="meta-actions-v2">
+                    {meta.estado === 'activa' && !(meta as any).progreso_automatico && (
+                      <button
+                        className="action-btn-v2 primary"
+                        onClick={() => {
+                          setShowProgresoModal(meta);
+                          setNuevoProgreso(meta.valor_actual.toString());
+                        }}
+                        title="Actualizar progreso"
+                      >
+                        <TrendingUp className="w-4 h-4" />
+                      </button>
+                    )}
+                    {(isTenantAdmin || meta.origen === 'personal') && (
+                      <>
+                        <button
+                          className="action-btn-v2"
+                          onClick={() => openModal(meta)}
+                          title="Editar"
+                        >
+                          <Edit3 className="w-4 h-4" />
+                        </button>
+                        <button
+                          className="action-btn-v2 danger"
+                          onClick={() => setDeleteConfirm(meta.id)}
+                          title="Eliminar"
+                        >
+                          <Trash2 className="w-4 h-4" />
+                        </button>
+                      </>
+                    )}
                   </div>
-                )}
-
-                {/* Periodo */}
-                <div className="meta-periodo">
-                  <Calendar className="w-4 h-4" />
-                  <span>
-                    {PERIODOS[meta.periodo]?.short || meta.periodo} •
-                    Hasta {new Date(meta.fecha_fin).toLocaleDateString('es-MX', { day: 'numeric', month: 'short' })}
-                  </span>
-                </div>
-
-                {/* Acciones */}
-                <div className="meta-actions">
-                  {/* Actualizar progreso manual - solo si NO tiene progreso automático */}
-                  {meta.estado === 'activa' && !(meta as any).progreso_automatico && (
-                    <button
-                      className="action-btn progress-btn"
-                      onClick={() => {
-                        setShowProgresoModal(meta);
-                        setNuevoProgreso(meta.valor_actual.toString());
-                      }}
-                    >
-                      <TrendingUp className="w-4 h-4" />
-                      Actualizar
-                    </button>
-                  )}
-                  {/* Editar/Eliminar - solo admin o si es meta personal del usuario */}
-                  {(isTenantAdmin || meta.origen === 'personal') && (
-                    <>
-                      <button
-                        className="action-btn"
-                        onClick={() => openModal(meta)}
-                      >
-                        <Edit3 className="w-4 h-4" />
-                      </button>
-                      <button
-                        className="action-btn danger"
-                        onClick={() => setDeleteConfirm(meta.id)}
-                      >
-                        <Trash2 className="w-4 h-4" />
-                      </button>
-                    </>
-                  )}
                 </div>
               </div>
             );
@@ -1364,304 +1346,357 @@ const styles = `
     max-width: 360px;
   }
 
-  /* Metas Grid */
+  /* Metas Grid - New Premium Design */
   .metas-grid {
     display: grid;
-    grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
+    grid-template-columns: repeat(auto-fill, minmax(320px, 1fr));
+    gap: 20px;
+  }
+
+  /* Premium Card Design V2 */
+  .meta-card-v2 {
+    background: white;
+    border-radius: 20px;
+    overflow: hidden;
+    box-shadow: 0 4px 20px rgba(0, 0, 0, 0.06);
+    transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+    border: 1px solid rgba(0, 0, 0, 0.04);
+  }
+
+  .meta-card-v2:hover {
+    transform: translateY(-4px);
+    box-shadow: 0 12px 40px rgba(0, 0, 0, 0.12);
+  }
+
+  .meta-card-v2.completed {
+    border: 2px solid #10b981;
+  }
+
+  .meta-card-v2.overdue {
+    border: 2px solid #ef4444;
+  }
+
+  /* Card Header */
+  .meta-card-header {
+    padding: 20px 20px 16px;
+    position: relative;
+  }
+
+  .meta-card-header-content {
+    display: flex;
+    align-items: flex-start;
     gap: 14px;
   }
 
-  .meta-card {
-    background: white;
-    border: 1px solid #e2e8f0;
+  .meta-tipo-badge {
+    width: 44px;
+    height: 44px;
     border-radius: 12px;
-    padding: 14px;
-    transition: all 0.2s;
-    position: relative;
-    overflow: hidden;
-  }
-
-  .meta-card:hover {
-    box-shadow: 0 8px 24px rgba(0, 0, 0, 0.08);
-    transform: translateY(-2px);
-  }
-
-  .meta-card.completed {
-    border-color: #86efac;
-    background: linear-gradient(135deg, #f0fdf4 0%, #fff 30%);
-  }
-
-  .meta-card.overdue {
-    border-color: #fca5a5;
-    background: linear-gradient(135deg, #fef2f2 0%, #fff 30%);
-  }
-
-  .completion-badge {
-    position: absolute;
-    top: 12px;
-    right: 12px;
-    width: 28px;
-    height: 28px;
-    background: linear-gradient(135deg, #fef3c7 0%, #fcd34d 100%);
-    border-radius: 50%;
     display: flex;
     align-items: center;
     justify-content: center;
-    color: #f59e0b;
-    box-shadow: 0 2px 8px rgba(245, 158, 11, 0.3);
-    font-size: 0.9rem;
+    color: white;
+    flex-shrink: 0;
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
   }
 
-  .meta-header {
-    display: flex;
-    justify-content: space-between;
-    align-items: center;
-    margin-bottom: 10px;
-    gap: 8px;
+  .meta-tipo-badge svg {
+    width: 22px;
+    height: 22px;
   }
 
-  .meta-tipo {
-    display: flex;
-    align-items: center;
-    gap: 4px;
-    padding: 4px 8px;
-    border-radius: 6px;
+  .meta-header-info {
+    flex: 1;
+    min-width: 0;
+  }
+
+  .meta-tipo-label {
     font-size: 0.7rem;
     font-weight: 600;
-  }
-
-  .meta-tipo svg {
-    width: 12px;
-    height: 12px;
-  }
-
-  .meta-estado {
-    display: flex;
-    align-items: center;
-    gap: 3px;
-    padding: 3px 8px;
-    border-radius: 5px;
-    font-size: 0.7rem;
-    font-weight: 600;
-  }
-
-  .meta-estado svg {
-    width: 10px;
-    height: 10px;
-  }
-
-  .meta-titulo {
-    margin: 0 0 6px 0;
-    font-size: 0.95rem;
-    font-weight: 600;
-    color: #0f172a;
-    padding-right: 32px;
-  }
-
-  .meta-descripcion {
-    margin: 0 0 10px 0;
-    font-size: 0.8rem;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
     color: #64748b;
-    line-height: 1.4;
+    display: block;
+    margin-bottom: 4px;
   }
 
-  .meta-usuario {
-    display: flex;
-    align-items: center;
-    gap: 6px;
-    font-size: 0.75rem;
-    color: #64748b;
-    margin-bottom: 10px;
-    padding: 6px 10px;
-    background: #f8fafc;
-    border-radius: 6px;
-  }
-
-  .badge-asignada {
-    margin-left: auto;
-    padding: 2px 6px;
-    background: #dbeafe;
-    color: #2563eb;
-    border-radius: 3px;
-    font-size: 0.65rem;
-    font-weight: 600;
-  }
-
-  /* Indicador de origen de meta (personal vs asignada) */
-  .meta-origen {
-    display: flex;
-    align-items: center;
-    gap: 6px;
-    font-size: 0.75rem;
-    padding: 6px 10px;
-    border-radius: 6px;
-    margin-bottom: 10px;
-  }
-
-  .meta-origen.personal {
-    background: linear-gradient(135deg, #f0fdf4 0%, #dcfce7 100%);
-    color: #166534;
-    border: 1px solid #bbf7d0;
-  }
-
-  .meta-origen.asignada {
-    background: linear-gradient(135deg, #eff6ff 0%, #dbeafe 100%);
-    color: #1e40af;
-    border: 1px solid #93c5fd;
-  }
-
-  .meta-origen.empresa {
-    background: linear-gradient(135deg, #fef3c7 0%, #fde68a 100%);
-    color: #92400e;
-    border: 1px solid #fcd34d;
-  }
-
-  .meta-origen svg {
-    width: 14px;
-    height: 14px;
-  }
-
-  .meta-origen span {
-    font-weight: 500;
-  }
-
-  .meta-origen .auto-badge {
-    display: flex;
-    align-items: center;
-    gap: 3px;
-    margin-left: auto;
-    padding: 2px 6px;
-    background: rgba(0, 0, 0, 0.1);
-    border-radius: 4px;
-    font-size: 0.65rem;
-    font-weight: 600;
-  }
-
-  .meta-origen .auto-badge svg {
-    width: 10px;
-    height: 10px;
-  }
-
-  /* Progreso */
-  .meta-progreso {
-    margin-bottom: 10px;
-  }
-
-  .progreso-header {
-    display: flex;
-    align-items: baseline;
-    gap: 6px;
-    margin-bottom: 6px;
-  }
-
-  .progreso-emoji {
+  .meta-titulo-v2 {
+    margin: 0;
     font-size: 1rem;
-  }
-
-  .progreso-actual {
-    font-size: 1.2rem;
     font-weight: 700;
-  }
-
-  .progreso-separator {
-    color: #cbd5e1;
-  }
-
-  .progreso-objetivo {
-    font-size: 0.85rem;
-    color: #64748b;
-  }
-
-  .progreso-bar-container {
-    position: relative;
-  }
-
-  .progreso-bar {
-    height: 8px;
-    background: #e2e8f0;
-    border-radius: 4px;
+    color: #0f172a;
+    line-height: 1.3;
+    display: -webkit-box;
+    -webkit-line-clamp: 2;
+    -webkit-box-orient: vertical;
     overflow: hidden;
   }
 
-  .progreso-fill {
-    height: 100%;
-    border-radius: 4px;
-    transition: width 0.5s ease-out;
-    position: relative;
-  }
-
-  .progreso-marker {
+  /* Origen Badge */
+  .meta-origen-badge {
     position: absolute;
-    top: -3px;
-    width: 3px;
-    height: 14px;
-    background: white;
-    border: 1.5px solid currentColor;
-    border-radius: 2px;
-    transform: translateX(-50%);
-  }
-
-  .progreso-footer {
+    top: 16px;
+    right: 16px;
     display: flex;
-    justify-content: space-between;
     align-items: center;
-    margin-top: 6px;
-  }
-
-  .progreso-porcentaje {
+    gap: 4px;
+    padding: 4px 10px;
+    border-radius: 20px;
+    font-size: 0.65rem;
     font-weight: 600;
-    font-size: 0.75rem;
+    text-transform: uppercase;
+    letter-spacing: 0.3px;
   }
 
-  .progreso-dias {
-    display: flex;
-    align-items: center;
-    gap: 3px;
-    font-size: 0.7rem;
-    color: #64748b;
+  .meta-origen-badge.personal {
+    background: #dcfce7;
+    color: #166534;
   }
 
-  .progreso-dias svg {
-    width: 12px;
-    height: 12px;
+  .meta-origen-badge.asignada {
+    background: #dbeafe;
+    color: #1e40af;
   }
 
-  .progreso-dias.urgent {
-    color: #dc2626;
-    font-weight: 600;
-  }
-
-  /* Recompensa */
-  .meta-recompensa {
-    display: flex;
-    align-items: center;
-    gap: 8px;
-    padding: 8px 12px;
-    background: linear-gradient(135deg, #fef3c7 0%, #fef9c3 100%);
-    border-radius: 8px;
-    margin-bottom: 10px;
+  .meta-origen-badge.empresa {
+    background: #fef3c7;
     color: #92400e;
   }
 
-  .recompensa-content {
+  .meta-origen-badge svg {
+    width: 10px;
+    height: 10px;
+  }
+
+  /* Card Body */
+  .meta-card-body {
+    padding: 0 20px 20px;
+    display: flex;
+    align-items: center;
+    gap: 24px;
+  }
+
+  /* Progress Circle */
+  .progress-circle-container {
+    position: relative;
+    width: 120px;
+    height: 120px;
+    flex-shrink: 0;
+  }
+
+  .progress-circle {
+    transform: rotate(-90deg);
+    width: 100%;
+    height: 100%;
+  }
+
+  .progress-circle-bg {
+    stroke: #f1f5f9;
+  }
+
+  .progress-circle-fill {
+    transition: stroke-dashoffset 0.8s cubic-bezier(0.4, 0, 0.2, 1);
+  }
+
+  .progress-circle-content {
+    position: absolute;
+    top: 50%;
+    left: 50%;
+    transform: translate(-50%, -50%);
+    text-align: center;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 2px;
+  }
+
+  .progress-value {
+    font-size: 1.5rem;
+    font-weight: 800;
+    line-height: 1;
+  }
+
+  .progress-label {
+    font-size: 0.6rem;
+    color: #94a3b8;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+  }
+
+  /* Metrics */
+  .meta-metrics {
     flex: 1;
     display: flex;
-    justify-content: space-between;
-    align-items: center;
+    flex-direction: column;
+    gap: 16px;
   }
 
-  .recompensa-tipo {
-    font-weight: 600;
-    font-size: 0.75rem;
+  .metric-item {
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
   }
 
-  .recompensa-monto {
+  .metric-value {
+    font-size: 1.25rem;
     font-weight: 700;
-    font-size: 0.85rem;
-    color: #16a34a;
+    color: #0f172a;
+    line-height: 1;
   }
 
-  /* Periodo */
+  .metric-label {
+    font-size: 0.7rem;
+    color: #94a3b8;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+  }
+
+  .metric-divider {
+    width: 100%;
+    height: 1px;
+    background: linear-gradient(to right, transparent, #e2e8f0, transparent);
+  }
+
+  /* Card Footer */
+  .meta-card-footer {
+    padding: 16px 20px;
+    background: #f8fafc;
+    border-top: 1px solid #f1f5f9;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 12px;
+  }
+
+  .meta-footer-info {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    flex-wrap: wrap;
+  }
+
+  .auto-sync-badge {
+    display: flex;
+    align-items: center;
+    gap: 4px;
+    padding: 4px 10px;
+    background: linear-gradient(135deg, #dbeafe 0%, #e0e7ff 100%);
+    color: #3b82f6;
+    border-radius: 20px;
+    font-size: 0.65rem;
+    font-weight: 600;
+  }
+
+  .auto-sync-badge svg {
+    width: 10px;
+    height: 10px;
+    animation: spin 3s linear infinite;
+  }
+
+  @keyframes spin {
+    from { transform: rotate(0deg); }
+    to { transform: rotate(360deg); }
+  }
+
+  .time-badge {
+    display: flex;
+    align-items: center;
+    gap: 4px;
+    padding: 4px 10px;
+    background: #f1f5f9;
+    color: #64748b;
+    border-radius: 20px;
+    font-size: 0.65rem;
+    font-weight: 600;
+  }
+
+  .time-badge svg {
+    width: 10px;
+    height: 10px;
+  }
+
+  .time-badge.warning {
+    background: #fef3c7;
+    color: #d97706;
+  }
+
+  .time-badge.urgent {
+    background: #fee2e2;
+    color: #dc2626;
+    animation: pulse 2s infinite;
+  }
+
+  @keyframes pulse {
+    0%, 100% { opacity: 1; }
+    50% { opacity: 0.7; }
+  }
+
+  .completed-badge {
+    display: flex;
+    align-items: center;
+    gap: 4px;
+    padding: 4px 10px;
+    background: linear-gradient(135deg, #dcfce7 0%, #d1fae5 100%);
+    color: #059669;
+    border-radius: 20px;
+    font-size: 0.65rem;
+    font-weight: 600;
+  }
+
+  .completed-badge svg {
+    width: 10px;
+    height: 10px;
+  }
+
+  /* Actions V2 */
+  .meta-actions-v2 {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+  }
+
+  .action-btn-v2 {
+    width: 36px;
+    height: 36px;
+    border-radius: 10px;
+    border: none;
+    background: white;
+    color: #64748b;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    cursor: pointer;
+    transition: all 0.2s;
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.06);
+  }
+
+  .action-btn-v2:hover {
+    background: #f1f5f9;
+    color: #0f172a;
+    transform: scale(1.05);
+  }
+
+  .action-btn-v2.primary {
+    background: linear-gradient(135deg, #6366f1 0%, #8b5cf6 100%);
+    color: white;
+  }
+
+  .action-btn-v2.primary:hover {
+    transform: scale(1.08);
+    box-shadow: 0 4px 12px rgba(99, 102, 241, 0.4);
+  }
+
+  .action-btn-v2.danger:hover {
+    background: #fee2e2;
+    color: #dc2626;
+  }
+
+  .action-btn-v2 svg {
+    width: 16px;
+    height: 16px;
+  }
+
+  /* Periodo (legacy - kept for modal) */
   .meta-periodo {
     display: flex;
     align-items: center;

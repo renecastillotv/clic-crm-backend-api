@@ -81,13 +81,15 @@ async function calcularProgresoAutomatico(
   switch (tipoMeta) {
     case 'ventas':
     case 'cierres':
+      // Contar ventas con fecha_cierre en el período y no canceladas
+      // (ignoramos el campo completada porque las ventas registradas cuentan como completadas)
       if (metrica === 'monto') {
         sql = `
           SELECT COALESCE(SUM(valor_cierre), 0) as total
           FROM ventas
           WHERE tenant_id = $1
             AND fecha_cierre >= $2 AND fecha_cierre <= $3
-            AND completada = true AND cancelada = false
+            AND cancelada = false
             ${usuarioFilter.replace('{USER_FIELD}', 'usuario_cerrador_id')}
         `;
       } else {
@@ -96,7 +98,7 @@ async function calcularProgresoAutomatico(
           FROM ventas
           WHERE tenant_id = $1
             AND fecha_cierre >= $2 AND fecha_cierre <= $3
-            AND completada = true AND cancelada = false
+            AND cancelada = false
             ${usuarioFilter.replace('{USER_FIELD}', 'usuario_cerrador_id')}
         `;
       }
