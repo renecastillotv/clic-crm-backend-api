@@ -1487,7 +1487,7 @@ export default function CrmFinanzasVentas() {
                 <th>Asesor</th>
                 <th style={{ width: '180px', minWidth: '180px' }}>Valor</th>
                 <th style={{ width: '200px', minWidth: '200px' }}>Comisión</th>
-                <th style={{ width: '110px', minWidth: '110px' }}>Estado</th>
+                <th style={{ width: '110px', minWidth: '110px' }}>Exp.</th>
                 <th style={{ width: '100px', minWidth: '100px' }}>Acciones</th>
               </tr>
             </thead>
@@ -1633,14 +1633,7 @@ export default function CrmFinanzasVentas() {
                             flexWrap: 'wrap'
                           }}>
                             <DollarSign style={{ width: '16px', height: '16px', flexShrink: 0 }} />
-                            {mostrarOriginal ? (
-                              <div style={{ display: 'flex', flexDirection: 'column', gap: '2px', minWidth: 0 }}>
-                                <span style={{ whiteSpace: 'nowrap' }}>{moneda} {valor.toLocaleString('es-DO', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>
-                                <span style={{ fontSize: '0.75rem', color: '#64748b', fontWeight: 400, whiteSpace: 'nowrap' }}>≈ USD {valorUSD.toLocaleString('es-DO', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>
-                    </div>
-                            ) : (
-                              <span style={{ whiteSpace: 'nowrap' }}>USD {valor.toLocaleString('es-DO', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>
-                            )}
+                            <span style={{ whiteSpace: 'nowrap' }}>{moneda} {valor.toLocaleString('es-DO', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>
                           </div>
                         </div>
                       );
@@ -1664,14 +1657,7 @@ export default function CrmFinanzasVentas() {
                             flexWrap: 'wrap'
                           }}>
                             <DollarSign style={{ width: '16px', height: '16px', flexShrink: 0 }} />
-                            {mostrarOriginal ? (
-                              <div style={{ display: 'flex', flexDirection: 'column', gap: '2px', minWidth: 0 }}>
-                                <span style={{ whiteSpace: 'nowrap' }}>{moneda} {comision.toLocaleString('es-DO', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>
-                                <span style={{ fontSize: '0.75rem', color: '#64748b', fontWeight: 400, whiteSpace: 'nowrap' }}>≈ USD {comisionUSD.toLocaleString('es-DO', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>
-                              </div>
-                            ) : (
-                              <span style={{ whiteSpace: 'nowrap' }}>USD {comision.toLocaleString('es-DO', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>
-                            )}
+                            <span style={{ whiteSpace: 'nowrap' }}>{moneda} {comision.toLocaleString('es-DO', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>
                         </div>
                         {venta.porcentaje_comision && (
                             <div style={{ fontSize: '0.75rem', color: '#f59e0b', fontWeight: 600, marginTop: '2px', whiteSpace: 'nowrap' }}>
@@ -1705,11 +1691,11 @@ export default function CrmFinanzasVentas() {
                     )}
                   </td>
                   <td style={{ padding: '12px 8px' }}>
-                    <div style={{ display: 'flex', flexDirection: 'column', gap: '4px', alignItems: 'flex-start' }}>
-                      {venta.completada ? (
-                        <span className="badge badge-success font-medium">Completada</span>
-                      ) : venta.cancelada ? (
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: '4px', alignItems: 'center' }}>
+                      {venta.cancelada ? (
                         <span className="badge badge-error font-medium">Cancelada</span>
+                      ) : venta.completada ? (
+                        <span className="badge badge-success font-medium">Completo</span>
                       ) : (
                         <span className="badge badge-warning font-medium">Pendiente</span>
                       )}
