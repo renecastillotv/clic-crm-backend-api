@@ -1427,6 +1427,9 @@ export default function CrmLayout() {
             min-height: 100vh;
             background: var(--bg-main);
             color: var(--text-primary);
+            width: 100%;
+            max-width: 100vw;
+            overflow-x: hidden;
           }
 
           /* ========== SIDEBAR ========== */
@@ -1671,6 +1674,8 @@ export default function CrmLayout() {
             display: flex;
             flex-direction: column;
             min-height: 100vh;
+            max-width: calc(100vw - var(--sidebar-width));
+            overflow-x: hidden;
           }
 
           /* Header */
@@ -2064,6 +2069,8 @@ export default function CrmLayout() {
             /* Main content full width */
             .crm-main {
               margin-left: 0;
+              max-width: 100vw;
+              width: 100%;
             }
 
             /* Show overlay when sidebar is open */
