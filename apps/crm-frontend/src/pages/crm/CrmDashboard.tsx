@@ -20,6 +20,7 @@ import {
   type PropiedadesStats,
   type MetasResumen,
 } from '../../services/api';
+import './CrmDashboard.css';
 
 // Iconos SVG
 const Icons = {
@@ -309,8 +310,8 @@ export default function CrmDashboard() {
       </div>
 
       {/* Pipeline Visual */}
-      <div className="section">
-        <div className="section-header">
+      <div className="dashboard-section">
+        <div className="dashboard-section-header">
           <h2>Pipeline de Ventas</h2>
           <button className="section-action" onClick={() => navigate(`${basePath}/pipeline`)}>
             Ver todo {Icons.arrow}
@@ -339,8 +340,8 @@ export default function CrmDashboard() {
       {/* Grid de Metas y Actividades */}
       <div className="two-columns">
         {/* Metas Activas */}
-        <div className="section">
-          <div className="section-header">
+        <div className="dashboard-section">
+          <div className="dashboard-section-header">
             <h2>Metas Activas</h2>
             <button className="section-action" onClick={() => navigate(`${basePath}/metas`)}>
               Ver todo {Icons.arrow}
@@ -348,9 +349,9 @@ export default function CrmDashboard() {
           </div>
           <div className="metas-list">
             {loading ? (
-              <div className="empty-state small">Cargando...</div>
+              <div className="dashboard-empty-state small">Cargando...</div>
             ) : metasActivas.length === 0 ? (
-              <div className="empty-state small">
+              <div className="dashboard-empty-state small">
                 <p>No hay metas activas</p>
                 <button onClick={() => navigate(`${basePath}/metas`)}>Crear meta</button>
               </div>
@@ -399,8 +400,8 @@ export default function CrmDashboard() {
         </div>
 
         {/* Actividades Recientes */}
-        <div className="section">
-          <div className="section-header">
+        <div className="dashboard-section">
+          <div className="dashboard-section-header">
             <h2>Actividades Recientes</h2>
             <button className="section-action" onClick={() => navigate(`${basePath}/actividades`)}>
               Ver todo {Icons.arrow}
@@ -408,9 +409,9 @@ export default function CrmDashboard() {
           </div>
           <div className="actividades-list">
             {loading ? (
-              <div className="empty-state small">Cargando...</div>
+              <div className="dashboard-empty-state small">Cargando...</div>
             ) : actividadesRecientes.length === 0 ? (
-              <div className="empty-state small">
+              <div className="dashboard-empty-state small">
                 <p>No hay actividades recientes</p>
                 <span>Las actividades de tu equipo aparecerán aquí</span>
               </div>
@@ -454,8 +455,8 @@ export default function CrmDashboard() {
 
       {/* Resumen de Rendimiento */}
       {stats && !loading && (
-        <div className="section">
-          <div className="section-header">
+        <div className="dashboard-section">
+          <div className="dashboard-section-header">
             <h2>Resumen de Rendimiento</h2>
           </div>
           <div className="stats-summary">
@@ -507,447 +508,6 @@ export default function CrmDashboard() {
           </div>
         </div>
       )}
-
-      <style>{`
-        .dashboard {
-          width: 100%;
-        }
-
-        /* KPI Grid */
-        .kpi-grid {
-          display: grid;
-          grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
-          gap: 20px;
-          margin-bottom: 32px;
-        }
-
-        .kpi-card {
-          display: flex;
-          align-items: center;
-          gap: 16px;
-          padding: 20px;
-          background: white;
-          border-radius: 12px;
-          border: 1px solid #e2e8f0;
-          position: relative;
-          cursor: pointer;
-          transition: all 0.2s ease;
-        }
-
-        .kpi-card:hover {
-          border-color: #cbd5e1;
-          box-shadow: 0 4px 12px rgba(0, 0, 0, 0.05);
-          transform: translateY(-2px);
-        }
-
-        .kpi-icon {
-          width: 48px;
-          height: 48px;
-          border-radius: 10px;
-          display: flex;
-          align-items: center;
-          justify-content: center;
-          flex-shrink: 0;
-        }
-
-        .kpi-content {
-          display: flex;
-          flex-direction: column;
-        }
-
-        .kpi-value {
-          font-size: 1.75rem;
-          font-weight: 700;
-          color: #0f172a;
-          line-height: 1;
-        }
-
-        .kpi-label {
-          font-size: 0.875rem;
-          color: #64748b;
-          margin-top: 4px;
-        }
-
-        .kpi-meta {
-          position: absolute;
-          top: 12px;
-          right: 12px;
-        }
-
-        .kpi-badge {
-          padding: 4px 10px;
-          background: #f1f5f9;
-          border-radius: 20px;
-          font-size: 0.75rem;
-          color: #64748b;
-          font-weight: 500;
-        }
-
-        .kpi-badge.success {
-          background: #dcfce7;
-          color: #16a34a;
-        }
-
-        .kpi-badge.warning {
-          background: #fef3c7;
-          color: #d97706;
-        }
-
-        .kpi-badge.purple {
-          background: #f3e8ff;
-          color: #7c3aed;
-        }
-
-        /* Sections */
-        .section {
-          margin-bottom: 32px;
-          background: white;
-          border-radius: 12px;
-          border: 1px solid #e2e8f0;
-          padding: 24px;
-        }
-
-        .section-header {
-          display: flex;
-          justify-content: space-between;
-          align-items: center;
-          margin-bottom: 20px;
-        }
-
-        .section-header h2 {
-          margin: 0;
-          font-size: 1.125rem;
-          font-weight: 600;
-          color: #0f172a;
-        }
-
-        .section-action {
-          display: flex;
-          align-items: center;
-          gap: 6px;
-          padding: 6px 12px;
-          background: none;
-          border: none;
-          color: #2563eb;
-          font-size: 0.875rem;
-          font-weight: 500;
-          cursor: pointer;
-          transition: all 0.15s ease;
-        }
-
-        .section-action:hover {
-          color: #1d4ed8;
-        }
-
-        .section-action svg {
-          transition: transform 0.2s ease;
-        }
-
-        .section-action:hover svg {
-          transform: translateX(4px);
-        }
-
-        /* Pipeline Visual */
-        .pipeline-container {
-          display: flex;
-          justify-content: space-between;
-          align-items: flex-end;
-          height: 180px;
-          padding: 20px 0;
-          gap: 12px;
-        }
-
-        .pipeline-stage {
-          flex: 1;
-          display: flex;
-          flex-direction: column;
-          align-items: center;
-          gap: 8px;
-        }
-
-        .pipeline-bar-container {
-          width: 100%;
-          height: 120px;
-          display: flex;
-          align-items: flex-end;
-          justify-content: center;
-        }
-
-        .pipeline-bar {
-          width: 80%;
-          max-width: 60px;
-          border-radius: 6px 6px 0 0;
-          transition: height 0.5s ease;
-        }
-
-        .pipeline-value {
-          font-size: 1.25rem;
-          font-weight: 700;
-          color: #0f172a;
-        }
-
-        .pipeline-label {
-          font-size: 0.75rem;
-          color: #64748b;
-          text-align: center;
-        }
-
-        /* Two Columns */
-        .two-columns {
-          display: grid;
-          grid-template-columns: repeat(auto-fit, minmax(350px, 1fr));
-          gap: 24px;
-        }
-
-        .two-columns .section {
-          margin-bottom: 0;
-        }
-
-        /* Metas List */
-        .metas-list {
-          display: flex;
-          flex-direction: column;
-          gap: 16px;
-        }
-
-        .meta-card {
-          padding: 16px;
-          background: #f8fafc;
-          border-radius: 10px;
-          border: 1px solid #e2e8f0;
-        }
-
-        .meta-header {
-          display: flex;
-          justify-content: space-between;
-          align-items: center;
-          margin-bottom: 12px;
-        }
-
-        .meta-title {
-          font-weight: 600;
-          color: #0f172a;
-          font-size: 0.95rem;
-        }
-
-        .meta-reward {
-          color: #f59e0b;
-          display: flex;
-          align-items: center;
-        }
-
-        .meta-progress {
-          display: flex;
-          align-items: center;
-          gap: 12px;
-          margin-bottom: 8px;
-        }
-
-        .progress-bar {
-          flex: 1;
-          height: 8px;
-          background: #e2e8f0;
-          border-radius: 4px;
-          overflow: hidden;
-        }
-
-        .progress-fill {
-          height: 100%;
-          border-radius: 4px;
-          transition: width 0.5s ease;
-        }
-
-        .progress-text {
-          font-size: 0.875rem;
-          font-weight: 600;
-          color: #0f172a;
-          min-width: 40px;
-          text-align: right;
-        }
-
-        .meta-footer {
-          display: flex;
-          justify-content: space-between;
-          align-items: center;
-        }
-
-        .meta-values {
-          font-size: 0.8rem;
-          color: #64748b;
-        }
-
-        .meta-days {
-          font-size: 0.75rem;
-          padding: 2px 8px;
-          background: #f1f5f9;
-          border-radius: 10px;
-          color: #64748b;
-        }
-
-        .meta-days.urgent {
-          background: #fef2f2;
-          color: #dc2626;
-        }
-
-        /* Actividades List */
-        .actividades-list {
-          display: flex;
-          flex-direction: column;
-          gap: 12px;
-        }
-
-        .actividad-item {
-          display: flex;
-          align-items: center;
-          gap: 12px;
-          padding: 12px;
-          background: #f8fafc;
-          border-radius: 10px;
-          border: 1px solid #e2e8f0;
-        }
-
-        .actividad-item.completada {
-          opacity: 0.7;
-        }
-
-        .actividad-tipo {
-          width: 36px;
-          height: 36px;
-          border-radius: 8px;
-          display: flex;
-          align-items: center;
-          justify-content: center;
-          font-size: 1.125rem;
-          background: #eff6ff;
-        }
-
-        .actividad-content {
-          flex: 1;
-          display: flex;
-          flex-direction: column;
-          gap: 2px;
-        }
-
-        .actividad-titulo {
-          font-weight: 500;
-          color: #0f172a;
-          font-size: 0.9rem;
-        }
-
-        .actividad-meta {
-          display: flex;
-          gap: 8px;
-          font-size: 0.8rem;
-          color: #64748b;
-        }
-
-        .actividad-contacto {
-          color: #2563eb;
-        }
-
-        .actividad-check {
-          color: #22c55e;
-        }
-
-        /* Stats Summary */
-        .stats-summary {
-          display: flex;
-          flex-direction: column;
-          gap: 20px;
-        }
-
-        .summary-item {
-          display: flex;
-          align-items: center;
-          gap: 16px;
-        }
-
-        .summary-label {
-          width: 200px;
-          font-size: 0.875rem;
-          color: #64748b;
-          flex-shrink: 0;
-        }
-
-        .summary-bar-container {
-          flex: 1;
-          height: 10px;
-          background: #f1f5f9;
-          border-radius: 5px;
-          overflow: hidden;
-        }
-
-        .summary-bar {
-          height: 100%;
-          border-radius: 5px;
-          transition: width 0.5s ease;
-        }
-
-        .summary-value {
-          min-width: 80px;
-          text-align: right;
-          font-weight: 600;
-          color: #0f172a;
-          font-size: 0.9rem;
-        }
-
-        /* Empty State */
-        .empty-state {
-          padding: 48px 24px;
-          text-align: center;
-        }
-
-        .empty-state.small {
-          padding: 32px 16px;
-        }
-
-        .empty-state p {
-          margin: 0 0 8px 0;
-          color: #64748b;
-          font-weight: 500;
-        }
-
-        .empty-state span {
-          font-size: 0.85rem;
-          color: #94a3b8;
-        }
-
-        .empty-state button {
-          margin-top: 12px;
-          padding: 8px 16px;
-          background: #2563eb;
-          color: white;
-          border: none;
-          border-radius: 6px;
-          font-size: 0.875rem;
-          cursor: pointer;
-          transition: background 0.2s ease;
-        }
-
-        .empty-state button:hover {
-          background: #1d4ed8;
-        }
-
-        /* Responsive */
-        @media (max-width: 768px) {
-          .two-columns {
-            grid-template-columns: 1fr;
-          }
-
-          .pipeline-container {
-            height: 140px;
-          }
-
-          .summary-item {
-            flex-wrap: wrap;
-          }
-
-          .summary-label {
-            width: 100%;
-            margin-bottom: 4px;
-          }
-        }
-      `}</style>
     </div>
   );
 }
