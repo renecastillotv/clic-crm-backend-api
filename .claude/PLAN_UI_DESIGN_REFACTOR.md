@@ -10,7 +10,7 @@
 | Fase | Estado | Commit | Fecha | Notas |
 |------|--------|--------|-------|-------|
 | **Fase 1: Fundación CSS** | ✅ LISTO PARA PRUEBAS | `56add66` | 2026-02-01 | Tag: `ui-fase-1`, Deployed |
-| **Fase 2: Layout Responsive** | 🔄 EN PROGRESO | - | 2026-02-01 | Implementando mobile toggle |
+| **Fase 2: Layout Responsive** | ✅ LISTO PARA PRUEBAS | `4d79f48` | 2026-02-01 | Tag: `ui-fase-2`, Deployed |
 | Fase 3: Componentes | ⏳ Pendiente | - | - | - |
 | Fase 4: Migración | ⏳ Pendiente | - | - | - |
 | Fase 5: Polish Premium | ⏳ Pendiente | - | - | - |
@@ -23,7 +23,14 @@
 - [x] 2.5 Botón cerrar en sidebar (visible en mobile)
 - [x] 2.6 Media queries para 1024px y 640px
 - [x] 2.7 Z-index actualizados a variables CSS
-- [ ] 2.8 Commit y deploy para pruebas
+- [x] 2.8 Commit (`4d79f48`) y deploy a Vercel completado
+
+#### Para revertir Fase 2 (si hay problemas):
+```bash
+git revert 4d79f48
+# O usar el tag anterior
+git checkout ui-fase-1 -- apps/crm-frontend/src/layouts/CrmLayout.tsx
+```
 
 ### Detalle Fase 1
 - [x] 1.1 Variables CSS en theme-clic.css (z-index, spacing, shadows, transitions)
