@@ -9,7 +9,7 @@
 
 | Fase | Estado | Commit | Fecha | Notas |
 |------|--------|--------|-------|-------|
-| **Fase 1: Fundación CSS** | 🔄 EN PROGRESO | - | 2026-02-01 | 1.1✅ 1.2✅ 1.3✅ 1.4 commit/deploy |
+| **Fase 1: Fundación CSS** | ✅ LISTO PARA PRUEBAS | `56add66` | 2026-02-01 | Tag: `ui-fase-1`, Deployed |
 | Fase 2: Layout Responsive | ⏳ Pendiente | - | - | - |
 | Fase 3: Componentes | ⏳ Pendiente | - | - | - |
 | Fase 4: Migración | ⏳ Pendiente | - | - | - |
@@ -19,7 +19,14 @@
 - [x] 1.1 Variables CSS en theme-clic.css (z-index, spacing, shadows, transitions)
 - [x] 1.2 Sistema de botones consolidado en crm-common.css (primary, secondary, danger, ghost, success, sizes)
 - [x] 1.3 Z-index hierarchy aplicado a Modal.css, ComponenteConfigModal.css, layouts, páginas
-- [ ] 1.4 Commit y deploy para pruebas de usuario
+- [x] 1.4 Commit (`56add66`) y deploy a Vercel completado
+
+#### Para revertir Fase 1 (si hay problemas):
+```bash
+git revert 56add66
+# O usar el tag
+git checkout pre-ui-refactor -- apps/crm-frontend/src/styles/
+```
 
 ### Instrucciones para Retomar
 Si pierdes contexto, lee este archivo. El estado actual está arriba.
