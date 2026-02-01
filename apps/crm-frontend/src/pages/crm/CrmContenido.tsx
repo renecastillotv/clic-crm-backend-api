@@ -37,6 +37,12 @@ import {
   updateSeoStat,
   getPropiedadesCrm,
   syncYouTubeStats,
+  generateArticleAI,
+  generateFAQsAI,
+  generateSeoStatAI,
+  createArticulo,
+  createFaq,
+  createSeoStat,
   Articulo,
   Video,
   FAQ,
@@ -45,6 +51,12 @@ import {
   CategoriaContenido,
   ContenidoRelacion,
   Propiedad,
+  AIArticlePrompt,
+  AIFAQPrompt,
+  AISeoStatPrompt,
+  GeneratedArticle,
+  GeneratedFAQ,
+  GeneratedSeoStat,
 } from '../../services/api';
 import { contenidoStyles } from './contenido/sharedStyles';
 import { stripHtml } from './contenido/utils';
@@ -265,6 +277,26 @@ export default function CrmContenido() {
   const [iconSearch, setIconSearch] = useState('');
   const [saving, setSaving] = useState(false);
 
+  // Modal de generación con IA
+  const [showAIModal, setShowAIModal] = useState<'articulo' | 'faq' | 'seo-stat' | null>(null);
+  const [aiGenerating, setAIGenerating] = useState(false);
+  const [aiError, setAIError] = useState<string | null>(null);
+  const [aiGenerated, setAIGenerated] = useState<GeneratedArticle | GeneratedFAQ[] | GeneratedSeoStat | null>(null);
+  const [aiForm, setAIForm] = useState({
+    tema: '',
+    contexto: '',
+    tipoPropiedad: '',
+    operacion: '',
+    ubicacion: '',
+    tono: 'profesional' as 'profesional' | 'casual' | 'informativo',
+    longitud: 'medio' as 'corto' | 'medio' | 'largo',
+    cantidad: 5,
+    operaciones: [] as string[],
+    nombreUbicacion: '',
+    nombreTipoPropiedad: '',
+  });
+  const [aiSaving, setAISaving] = useState(false);
+
   // Relacionar contenido - nuevo diseño ágil
   type TipoOrigen = 'articulo' | 'video' | 'testimonio' | 'faq' | 'seo_stat';
   type TipoDestino = 'articulo' | 'video' | 'testimonio' | 'faq' | 'seo_stat' | 'propiedad';
@@ -358,10 +390,22 @@ export default function CrmContenido() {
           title: 'Artículos',
           subtitle: 'Gestiona los artículos de tu blog',
           action: canCreate ? (
-            <button onClick={() => navigate(`/crm/${tenantSlug}/contenido/articulos/nuevo`)} className="btn-primary">
-              <span className="icon">{Icons.plus}</span>
-              Nuevo Artículo
-            </button>
+            <div style={{ display: 'flex', gap: '10px' }}>
+              {esAdmin && (
+                <button
+                  onClick={() => { setShowAIModal('articulo'); setAIGenerated(null); setAIError(null); }}
+                  className="btn-secondary"
+                  style={{ display: 'flex', alignItems: 'center', gap: '6px' }}
+                >
+                  <LucideIcons.Sparkles size={16} />
+                  Crear con IA
+                </button>
+              )}
+              <button onClick={() => navigate(`/crm/${tenantSlug}/contenido/articulos/nuevo`)} className="btn-primary">
+                <span className="icon">{Icons.plus}</span>
+                Nuevo Artículo
+              </button>
+            </div>
           ) : undefined,
         },
         videos: {
@@ -388,10 +432,22 @@ export default function CrmContenido() {
           title: 'FAQs',
           subtitle: 'Gestiona las preguntas frecuentes',
           action: canCreate ? (
-            <button onClick={() => navigate(`/crm/${tenantSlug}/contenido/faqs/nuevo`)} className="btn-primary">
-              <span className="icon">{Icons.plus}</span>
-              Nueva FAQ
-            </button>
+            <div style={{ display: 'flex', gap: '10px' }}>
+              {esAdmin && (
+                <button
+                  onClick={() => { setShowAIModal('faq'); setAIGenerated(null); setAIError(null); }}
+                  className="btn-secondary"
+                  style={{ display: 'flex', alignItems: 'center', gap: '6px' }}
+                >
+                  <LucideIcons.Sparkles size={16} />
+                  Crear con IA
+                </button>
+              )}
+              <button onClick={() => navigate(`/crm/${tenantSlug}/contenido/faqs/nuevo`)} className="btn-primary">
+                <span className="icon">{Icons.plus}</span>
+                Nueva FAQ
+              </button>
+            </div>
           ) : undefined,
         },
         testimonios: {
@@ -408,10 +464,22 @@ export default function CrmContenido() {
           title: 'SEO Stats',
           subtitle: 'Contenido enriquecido para SEO',
           action: canCreate ? (
-            <button onClick={() => navigate(`/crm/${tenantSlug}/contenido/seo-stats/nuevo`)} className="btn-primary">
-              <span className="icon">{Icons.plus}</span>
-              Nuevo SEO Stat
-            </button>
+            <div style={{ display: 'flex', gap: '10px' }}>
+              {esAdmin && (
+                <button
+                  onClick={() => { setShowAIModal('seo-stat'); setAIGenerated(null); setAIError(null); }}
+                  className="btn-secondary"
+                  style={{ display: 'flex', alignItems: 'center', gap: '6px' }}
+                >
+                  <LucideIcons.Sparkles size={16} />
+                  Crear con IA
+                </button>
+              )}
+              <button onClick={() => navigate(`/crm/${tenantSlug}/contenido/seo-stats/nuevo`)} className="btn-primary">
+                <span className="icon">{Icons.plus}</span>
+                Nuevo SEO Stat
+              </button>
+            </div>
           ) : undefined,
         },
         categorias: {
@@ -438,7 +506,7 @@ export default function CrmContenido() {
       subtitle: config.subtitle,
       actions: config.action,
     });
-  }, [activeTab, setPageHeader, navigate, tenantSlug, canCreate]);
+  }, [activeTab, setPageHeader, navigate, tenantSlug, canCreate, esAdmin]);
 
   // Resetear paginación cuando cambian los filtros
   useEffect(() => {
@@ -3908,6 +3976,513 @@ export default function CrmContenido() {
                     <><LucideIcons.Download size={16} /> Importar {selectedVideoIds.size} Videos</>
                   )}
                 </button>
+              )}
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Modal de Generación con IA */}
+      {showAIModal && (
+        <div className="modal-overlay" onClick={() => !aiGenerating && !aiSaving && setShowAIModal(null)}>
+          <div
+            className="modal-content"
+            onClick={(e) => e.stopPropagation()}
+            style={{ maxWidth: '700px', maxHeight: '90vh', overflow: 'auto' }}
+          >
+            <div className="modal-header">
+              <h2 style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+                <LucideIcons.Sparkles size={24} color="#8b5cf6" />
+                {showAIModal === 'articulo' && 'Crear Artículo con IA'}
+                {showAIModal === 'faq' && 'Crear FAQs con IA'}
+                {showAIModal === 'seo-stat' && 'Crear SEO Stat con IA'}
+              </h2>
+              <button
+                onClick={() => setShowAIModal(null)}
+                className="modal-close"
+                disabled={aiGenerating || aiSaving}
+              >
+                {Icons.x}
+              </button>
+            </div>
+
+            <div className="modal-body">
+              {/* Formulario para Artículos */}
+              {showAIModal === 'articulo' && !aiGenerated && (
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
+                  <div className="form-group">
+                    <label style={{ fontWeight: 600 }}>Tema del Artículo *</label>
+                    <input
+                      type="text"
+                      value={aiForm.tema}
+                      onChange={(e) => setAIForm({ ...aiForm, tema: e.target.value })}
+                      placeholder="Ej: Guía para comprar tu primera casa en Santo Domingo"
+                      style={{ width: '100%', padding: '10px 12px', border: '1px solid #e2e8f0', borderRadius: '8px' }}
+                    />
+                  </div>
+                  <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '16px' }}>
+                    <div className="form-group">
+                      <label>Tipo de Propiedad (opcional)</label>
+                      <input
+                        type="text"
+                        value={aiForm.tipoPropiedad}
+                        onChange={(e) => setAIForm({ ...aiForm, tipoPropiedad: e.target.value })}
+                        placeholder="Ej: Apartamento, Casa, Local"
+                        style={{ width: '100%', padding: '10px 12px', border: '1px solid #e2e8f0', borderRadius: '8px' }}
+                      />
+                    </div>
+                    <div className="form-group">
+                      <label>Operación (opcional)</label>
+                      <select
+                        value={aiForm.operacion}
+                        onChange={(e) => setAIForm({ ...aiForm, operacion: e.target.value })}
+                        style={{ width: '100%', padding: '10px 12px', border: '1px solid #e2e8f0', borderRadius: '8px' }}
+                      >
+                        <option value="">Cualquiera</option>
+                        <option value="comprar">Comprar</option>
+                        <option value="alquilar">Alquilar</option>
+                      </select>
+                    </div>
+                  </div>
+                  <div className="form-group">
+                    <label>Ubicación (opcional)</label>
+                    <input
+                      type="text"
+                      value={aiForm.ubicacion}
+                      onChange={(e) => setAIForm({ ...aiForm, ubicacion: e.target.value })}
+                      placeholder="Ej: Naco, Santo Domingo"
+                      style={{ width: '100%', padding: '10px 12px', border: '1px solid #e2e8f0', borderRadius: '8px' }}
+                    />
+                  </div>
+                  <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '16px' }}>
+                    <div className="form-group">
+                      <label>Tono</label>
+                      <select
+                        value={aiForm.tono}
+                        onChange={(e) => setAIForm({ ...aiForm, tono: e.target.value as any })}
+                        style={{ width: '100%', padding: '10px 12px', border: '1px solid #e2e8f0', borderRadius: '8px' }}
+                      >
+                        <option value="profesional">Profesional</option>
+                        <option value="casual">Casual</option>
+                        <option value="informativo">Informativo</option>
+                      </select>
+                    </div>
+                    <div className="form-group">
+                      <label>Longitud</label>
+                      <select
+                        value={aiForm.longitud}
+                        onChange={(e) => setAIForm({ ...aiForm, longitud: e.target.value as any })}
+                        style={{ width: '100%', padding: '10px 12px', border: '1px solid #e2e8f0', borderRadius: '8px' }}
+                      >
+                        <option value="corto">Corto (~500 palabras)</option>
+                        <option value="medio">Medio (~1000 palabras)</option>
+                        <option value="largo">Largo (~1500 palabras)</option>
+                      </select>
+                    </div>
+                  </div>
+                </div>
+              )}
+
+              {/* Formulario para FAQs */}
+              {showAIModal === 'faq' && !aiGenerated && (
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
+                  <div className="form-group">
+                    <label style={{ fontWeight: 600 }}>Contexto/Tema *</label>
+                    <input
+                      type="text"
+                      value={aiForm.contexto}
+                      onChange={(e) => setAIForm({ ...aiForm, contexto: e.target.value })}
+                      placeholder="Ej: Proceso de compra de inmuebles en República Dominicana"
+                      style={{ width: '100%', padding: '10px 12px', border: '1px solid #e2e8f0', borderRadius: '8px' }}
+                    />
+                  </div>
+                  <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '16px' }}>
+                    <div className="form-group">
+                      <label>Tipo de Propiedad (opcional)</label>
+                      <input
+                        type="text"
+                        value={aiForm.tipoPropiedad}
+                        onChange={(e) => setAIForm({ ...aiForm, tipoPropiedad: e.target.value })}
+                        placeholder="Ej: Apartamento"
+                        style={{ width: '100%', padding: '10px 12px', border: '1px solid #e2e8f0', borderRadius: '8px' }}
+                      />
+                    </div>
+                    <div className="form-group">
+                      <label>Operación (opcional)</label>
+                      <select
+                        value={aiForm.operacion}
+                        onChange={(e) => setAIForm({ ...aiForm, operacion: e.target.value })}
+                        style={{ width: '100%', padding: '10px 12px', border: '1px solid #e2e8f0', borderRadius: '8px' }}
+                      >
+                        <option value="">Cualquiera</option>
+                        <option value="comprar">Comprar</option>
+                        <option value="alquilar">Alquilar</option>
+                      </select>
+                    </div>
+                  </div>
+                  <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '16px' }}>
+                    <div className="form-group">
+                      <label>Ubicación (opcional)</label>
+                      <input
+                        type="text"
+                        value={aiForm.ubicacion}
+                        onChange={(e) => setAIForm({ ...aiForm, ubicacion: e.target.value })}
+                        placeholder="Ej: Santo Domingo"
+                        style={{ width: '100%', padding: '10px 12px', border: '1px solid #e2e8f0', borderRadius: '8px' }}
+                      />
+                    </div>
+                    <div className="form-group">
+                      <label>Cantidad de FAQs</label>
+                      <select
+                        value={aiForm.cantidad}
+                        onChange={(e) => setAIForm({ ...aiForm, cantidad: parseInt(e.target.value) })}
+                        style={{ width: '100%', padding: '10px 12px', border: '1px solid #e2e8f0', borderRadius: '8px' }}
+                      >
+                        <option value={3}>3 preguntas</option>
+                        <option value={5}>5 preguntas</option>
+                        <option value={7}>7 preguntas</option>
+                        <option value={10}>10 preguntas</option>
+                      </select>
+                    </div>
+                  </div>
+                </div>
+              )}
+
+              {/* Formulario para SEO Stats */}
+              {showAIModal === 'seo-stat' && !aiGenerated && (
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
+                  <div className="form-group">
+                    <label style={{ fontWeight: 600 }}>Operación *</label>
+                    <div style={{ display: 'flex', gap: '16px' }}>
+                      <label style={{ display: 'flex', alignItems: 'center', gap: '6px', cursor: 'pointer' }}>
+                        <input
+                          type="checkbox"
+                          checked={aiForm.operaciones.includes('comprar')}
+                          onChange={(e) => {
+                            const ops = e.target.checked
+                              ? [...aiForm.operaciones, 'comprar']
+                              : aiForm.operaciones.filter(o => o !== 'comprar');
+                            setAIForm({ ...aiForm, operaciones: ops });
+                          }}
+                        />
+                        Comprar
+                      </label>
+                      <label style={{ display: 'flex', alignItems: 'center', gap: '6px', cursor: 'pointer' }}>
+                        <input
+                          type="checkbox"
+                          checked={aiForm.operaciones.includes('alquilar')}
+                          onChange={(e) => {
+                            const ops = e.target.checked
+                              ? [...aiForm.operaciones, 'alquilar']
+                              : aiForm.operaciones.filter(o => o !== 'alquilar');
+                            setAIForm({ ...aiForm, operaciones: ops });
+                          }}
+                        />
+                        Alquilar
+                      </label>
+                    </div>
+                  </div>
+                  <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '16px' }}>
+                    <div className="form-group">
+                      <label>Tipo de Propiedad</label>
+                      <input
+                        type="text"
+                        value={aiForm.nombreTipoPropiedad}
+                        onChange={(e) => setAIForm({ ...aiForm, nombreTipoPropiedad: e.target.value })}
+                        placeholder="Ej: Apartamento, Casa, Local"
+                        style={{ width: '100%', padding: '10px 12px', border: '1px solid #e2e8f0', borderRadius: '8px' }}
+                      />
+                    </div>
+                    <div className="form-group">
+                      <label>Ubicación</label>
+                      <input
+                        type="text"
+                        value={aiForm.nombreUbicacion}
+                        onChange={(e) => setAIForm({ ...aiForm, nombreUbicacion: e.target.value })}
+                        placeholder="Ej: Naco, Santo Domingo"
+                        style={{ width: '100%', padding: '10px 12px', border: '1px solid #e2e8f0', borderRadius: '8px' }}
+                      />
+                    </div>
+                  </div>
+                  <p style={{ fontSize: '0.85rem', color: '#64748b', margin: 0 }}>
+                    El contenido SEO generado ayudará a posicionar las páginas de resultados para búsquedas como
+                    "{aiForm.operaciones.length > 0 ? aiForm.operaciones.join(' y ') : 'comprar/alquilar'} {aiForm.nombreTipoPropiedad || 'propiedades'} en {aiForm.nombreUbicacion || 'tu zona'}".
+                  </p>
+                </div>
+              )}
+
+              {/* Error */}
+              {aiError && (
+                <div style={{ padding: '12px 16px', background: '#fef2f2', border: '1px solid #fecaca', borderRadius: '8px', marginTop: '16px' }}>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '8px', color: '#dc2626' }}>
+                    <LucideIcons.AlertCircle size={18} />
+                    <span>{aiError}</span>
+                  </div>
+                </div>
+              )}
+
+              {/* Preview de Artículo Generado */}
+              {showAIModal === 'articulo' && aiGenerated && 'titulo' in aiGenerated && !('operaciones' in aiGenerated) && (
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
+                  <div style={{ padding: '16px', background: '#f0fdf4', border: '1px solid #bbf7d0', borderRadius: '8px' }}>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '8px', color: '#16a34a', marginBottom: '8px' }}>
+                      <LucideIcons.CheckCircle size={18} />
+                      <span style={{ fontWeight: 600 }}>Artículo generado exitosamente</span>
+                    </div>
+                  </div>
+                  <div className="form-group">
+                    <label style={{ fontWeight: 600 }}>Título</label>
+                    <p style={{ margin: 0, padding: '10px 12px', background: '#f8fafc', borderRadius: '6px' }}>{(aiGenerated as GeneratedArticle).titulo}</p>
+                  </div>
+                  <div className="form-group">
+                    <label style={{ fontWeight: 600 }}>Extracto</label>
+                    <p style={{ margin: 0, padding: '10px 12px', background: '#f8fafc', borderRadius: '6px', fontSize: '0.9rem' }}>{(aiGenerated as GeneratedArticle).extracto}</p>
+                  </div>
+                  <div className="form-group">
+                    <label style={{ fontWeight: 600 }}>Contenido (Preview)</label>
+                    <div
+                      style={{ padding: '16px', background: '#f8fafc', borderRadius: '6px', maxHeight: '200px', overflow: 'auto', fontSize: '0.9rem' }}
+                      dangerouslySetInnerHTML={{ __html: (aiGenerated as GeneratedArticle).contenido }}
+                    />
+                  </div>
+                  <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '16px' }}>
+                    <div className="form-group">
+                      <label>Meta Título</label>
+                      <p style={{ margin: 0, padding: '8px 12px', background: '#f8fafc', borderRadius: '6px', fontSize: '0.85rem' }}>{(aiGenerated as GeneratedArticle).metaTitulo}</p>
+                    </div>
+                    <div className="form-group">
+                      <label>Tags</label>
+                      <div style={{ display: 'flex', gap: '6px', flexWrap: 'wrap' }}>
+                        {(aiGenerated as GeneratedArticle).tags.map((tag, i) => (
+                          <span key={i} style={{ padding: '4px 8px', background: '#e0e7ff', color: '#4338ca', borderRadius: '12px', fontSize: '0.8rem' }}>{tag}</span>
+                        ))}
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              )}
+
+              {/* Preview de FAQs Generadas */}
+              {showAIModal === 'faq' && aiGenerated && Array.isArray(aiGenerated) && (
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
+                  <div style={{ padding: '16px', background: '#f0fdf4', border: '1px solid #bbf7d0', borderRadius: '8px' }}>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '8px', color: '#16a34a' }}>
+                      <LucideIcons.CheckCircle size={18} />
+                      <span style={{ fontWeight: 600 }}>{(aiGenerated as GeneratedFAQ[]).length} FAQs generadas exitosamente</span>
+                    </div>
+                  </div>
+                  <div style={{ maxHeight: '400px', overflow: 'auto' }}>
+                    {(aiGenerated as GeneratedFAQ[]).map((faq, i) => (
+                      <div key={i} style={{ padding: '12px', background: '#f8fafc', borderRadius: '8px', marginBottom: '8px' }}>
+                        <p style={{ margin: '0 0 8px 0', fontWeight: 600, color: '#1e293b' }}>{faq.pregunta}</p>
+                        <p style={{ margin: 0, fontSize: '0.9rem', color: '#475569' }}>{faq.respuesta}</p>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
+
+              {/* Preview de SEO Stat Generado */}
+              {showAIModal === 'seo-stat' && aiGenerated && 'operaciones' in aiGenerated && (
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
+                  <div style={{ padding: '16px', background: '#f0fdf4', border: '1px solid #bbf7d0', borderRadius: '8px' }}>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '8px', color: '#16a34a' }}>
+                      <LucideIcons.CheckCircle size={18} />
+                      <span style={{ fontWeight: 600 }}>SEO Stat generado exitosamente</span>
+                    </div>
+                  </div>
+                  <div className="form-group">
+                    <label style={{ fontWeight: 600 }}>Título</label>
+                    <p style={{ margin: 0, padding: '10px 12px', background: '#f8fafc', borderRadius: '6px' }}>{(aiGenerated as GeneratedSeoStat).titulo}</p>
+                  </div>
+                  <div className="form-group">
+                    <label style={{ fontWeight: 600 }}>Descripción</label>
+                    <p style={{ margin: 0, padding: '10px 12px', background: '#f8fafc', borderRadius: '6px', fontSize: '0.9rem' }}>{(aiGenerated as GeneratedSeoStat).descripcion}</p>
+                  </div>
+                  <div className="form-group">
+                    <label style={{ fontWeight: 600 }}>Contenido (Preview)</label>
+                    <div
+                      style={{ padding: '16px', background: '#f8fafc', borderRadius: '6px', maxHeight: '200px', overflow: 'auto', fontSize: '0.9rem' }}
+                      dangerouslySetInnerHTML={{ __html: (aiGenerated as GeneratedSeoStat).contenido }}
+                    />
+                  </div>
+                  <div className="form-group">
+                    <label>Keywords</label>
+                    <div style={{ display: 'flex', gap: '6px', flexWrap: 'wrap' }}>
+                      {(aiGenerated as GeneratedSeoStat).keywords.map((kw, i) => (
+                        <span key={i} style={{ padding: '4px 8px', background: '#fef3c7', color: '#92400e', borderRadius: '12px', fontSize: '0.8rem' }}>{kw}</span>
+                      ))}
+                    </div>
+                  </div>
+                </div>
+              )}
+            </div>
+
+            <div className="modal-footer" style={{ display: 'flex', justifyContent: 'space-between', gap: '12px' }}>
+              {!aiGenerated ? (
+                <>
+                  <button
+                    onClick={() => setShowAIModal(null)}
+                    className="btn-secondary"
+                    disabled={aiGenerating}
+                  >
+                    Cancelar
+                  </button>
+                  <button
+                    onClick={async () => {
+                      if (!tenantActual?.id) return;
+                      setAIGenerating(true);
+                      setAIError(null);
+                      try {
+                        const token = await getToken();
+                        if (showAIModal === 'articulo') {
+                          if (!aiForm.tema.trim()) {
+                            setAIError('El tema es requerido');
+                            setAIGenerating(false);
+                            return;
+                          }
+                          const result = await generateArticleAI(tenantActual.id, {
+                            tema: aiForm.tema,
+                            tipoPropiedad: aiForm.tipoPropiedad || undefined,
+                            operacion: aiForm.operacion || undefined,
+                            ubicacion: aiForm.ubicacion || undefined,
+                            tono: aiForm.tono,
+                            longitud: aiForm.longitud,
+                          }, token);
+                          setAIGenerated(result);
+                        } else if (showAIModal === 'faq') {
+                          if (!aiForm.contexto.trim()) {
+                            setAIError('El contexto es requerido');
+                            setAIGenerating(false);
+                            return;
+                          }
+                          const result = await generateFAQsAI(tenantActual.id, {
+                            contexto: aiForm.contexto,
+                            tipoPropiedad: aiForm.tipoPropiedad || undefined,
+                            operacion: aiForm.operacion || undefined,
+                            ubicacion: aiForm.ubicacion || undefined,
+                            cantidad: aiForm.cantidad,
+                          }, token);
+                          setAIGenerated(result.faqs);
+                        } else if (showAIModal === 'seo-stat') {
+                          if (aiForm.operaciones.length === 0) {
+                            setAIError('Selecciona al menos una operación');
+                            setAIGenerating(false);
+                            return;
+                          }
+                          const result = await generateSeoStatAI(tenantActual.id, {
+                            operaciones: aiForm.operaciones,
+                            nombreUbicacion: aiForm.nombreUbicacion || undefined,
+                            nombreTipoPropiedad: aiForm.nombreTipoPropiedad || undefined,
+                          }, token);
+                          setAIGenerated(result);
+                        }
+                      } catch (err: any) {
+                        setAIError(err.message || 'Error al generar contenido');
+                      } finally {
+                        setAIGenerating(false);
+                      }
+                    }}
+                    className="btn-primary"
+                    disabled={aiGenerating}
+                    style={{ display: 'flex', alignItems: 'center', gap: '8px' }}
+                  >
+                    {aiGenerating ? (
+                      <><LucideIcons.Loader2 size={16} className="animate-spin" /> Generando...</>
+                    ) : (
+                      <><LucideIcons.Sparkles size={16} /> Generar con IA</>
+                    )}
+                  </button>
+                </>
+              ) : (
+                <>
+                  <button
+                    onClick={() => setAIGenerated(null)}
+                    className="btn-secondary"
+                    disabled={aiSaving}
+                  >
+                    <LucideIcons.RefreshCw size={16} style={{ marginRight: '6px' }} />
+                    Regenerar
+                  </button>
+                  <button
+                    onClick={async () => {
+                      if (!tenantActual?.id || !aiGenerated) return;
+                      setAISaving(true);
+                      try {
+                        const token = await getToken();
+                        if (showAIModal === 'articulo' && 'titulo' in aiGenerated && !('operaciones' in aiGenerated)) {
+                          const article = aiGenerated as GeneratedArticle;
+                          await createArticulo(tenantActual.id, {
+                            titulo: article.titulo,
+                            slug: article.slug,
+                            extracto: article.extracto,
+                            contenido: article.contenido,
+                            meta_titulo: article.metaTitulo,
+                            meta_descripcion: article.metaDescripcion,
+                            tags: article.tags,
+                            publicado: false,
+                          }, token);
+                          setSuccessMessage('Artículo guardado como borrador');
+                          loadData();
+                        } else if (showAIModal === 'faq' && Array.isArray(aiGenerated)) {
+                          const faqs = aiGenerated as GeneratedFAQ[];
+                          for (const faq of faqs) {
+                            await createFaq(tenantActual.id, {
+                              pregunta: faq.pregunta,
+                              respuesta: faq.respuesta,
+                              publicado: false,
+                            }, token);
+                          }
+                          setSuccessMessage(`${faqs.length} FAQs guardadas como borrador`);
+                          loadData();
+                        } else if (showAIModal === 'seo-stat' && 'operaciones' in aiGenerated) {
+                          const seoStat = aiGenerated as GeneratedSeoStat;
+                          await createSeoStat(tenantActual.id, {
+                            titulo: seoStat.titulo,
+                            descripcion: seoStat.descripcion,
+                            contenido: seoStat.contenido,
+                            slug: seoStat.slug,
+                            meta_titulo: seoStat.metaTitulo,
+                            meta_descripcion: seoStat.metaDescripcion,
+                            keywords: seoStat.keywords,
+                            operaciones: seoStat.operaciones,
+                            publicado: false,
+                          }, token);
+                          setSuccessMessage('SEO Stat guardado como borrador');
+                          loadData();
+                        }
+                        setShowAIModal(null);
+                        setAIGenerated(null);
+                        setAIForm({
+                          tema: '',
+                          contexto: '',
+                          tipoPropiedad: '',
+                          operacion: '',
+                          ubicacion: '',
+                          tono: 'profesional',
+                          longitud: 'medio',
+                          cantidad: 5,
+                          operaciones: [],
+                          nombreUbicacion: '',
+                          nombreTipoPropiedad: '',
+                        });
+                      } catch (err: any) {
+                        setAIError(err.message || 'Error al guardar');
+                      } finally {
+                        setAISaving(false);
+                      }
+                    }}
+                    className="btn-primary"
+                    disabled={aiSaving}
+                    style={{ display: 'flex', alignItems: 'center', gap: '8px' }}
+                  >
+                    {aiSaving ? (
+                      <><LucideIcons.Loader2 size={16} className="animate-spin" /> Guardando...</>
+                    ) : (
+                      <><LucideIcons.Save size={16} /> Guardar como Borrador</>
+                    )}
+                  </button>
+                </>
               )}
             </div>
           </div>

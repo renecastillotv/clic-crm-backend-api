@@ -8736,3 +8736,108 @@ export async function getResumenFacturacion(filtros?: {
   return response.json();
 }
 
+// ==========================================
+// Generación de Contenido con IA
+// ==========================================
+
+export interface AIArticlePrompt {
+  tema: string;
+  tipoPropiedad?: string;
+  operacion?: string;
+  ubicacion?: string;
+  palabrasClave?: string[];
+  tono?: 'profesional' | 'casual' | 'informativo';
+  longitud?: 'corto' | 'medio' | 'largo';
+}
+
+export interface GeneratedArticle {
+  titulo: string;
+  slug: string;
+  extracto: string;
+  contenido: string;
+  metaTitulo: string;
+  metaDescripcion: string;
+  tags: string[];
+}
+
+export interface AIFAQPrompt {
+  contexto: string;
+  tipoPropiedad?: string;
+  operacion?: string;
+  ubicacion?: string;
+  cantidad?: number;
+}
+
+export interface GeneratedFAQ {
+  pregunta: string;
+  respuesta: string;
+}
+
+export interface AISeoStatPrompt {
+  operaciones: string[];
+  nombreUbicacion?: string;
+  nombreTipoPropiedad?: string;
+  tipoPropiedadIds?: string[];
+  ubicacionIds?: string[];
+  precioPromedio?: number;
+  propiedadesDisponibles?: number;
+}
+
+export interface GeneratedSeoStat {
+  titulo: string;
+  descripcion: string;
+  contenido: string;
+  slug: string;
+  metaTitulo: string;
+  metaDescripcion: string;
+  keywords: string[];
+  operaciones: string[];
+  tipoPropiedadIds: string[];
+  ubicacionIds: string[];
+}
+
+/**
+ * Genera un artículo usando IA
+ */
+export async function generateArticleAI(
+  tenantId: string,
+  params: AIArticlePrompt,
+  token?: string | null
+): Promise<GeneratedArticle> {
+  const response = await apiFetch(`/tenants/${tenantId}/contenido/ai/generate-article`, {
+    method: 'POST',
+    body: JSON.stringify(params),
+  }, token);
+  return response.json();
+}
+
+/**
+ * Genera FAQs usando IA
+ */
+export async function generateFAQsAI(
+  tenantId: string,
+  params: AIFAQPrompt,
+  token?: string | null
+): Promise<{ faqs: GeneratedFAQ[] }> {
+  const response = await apiFetch(`/tenants/${tenantId}/contenido/ai/generate-faqs`, {
+    method: 'POST',
+    body: JSON.stringify(params),
+  }, token);
+  return response.json();
+}
+
+/**
+ * Genera un SEO Stat usando IA
+ */
+export async function generateSeoStatAI(
+  tenantId: string,
+  params: AISeoStatPrompt,
+  token?: string | null
+): Promise<GeneratedSeoStat> {
+  const response = await apiFetch(`/tenants/${tenantId}/contenido/ai/generate-seo-stat`, {
+    method: 'POST',
+    body: JSON.stringify(params),
+  }, token);
+  return response.json();
+}
+
