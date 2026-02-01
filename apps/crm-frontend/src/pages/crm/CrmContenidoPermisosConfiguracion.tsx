@@ -9,6 +9,7 @@ import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../../contexts/AuthContext';
 import { usePageHeader } from '../../layouts/CrmLayout';
 import { ArrowLeft, FileText, Video, MessageSquare, HelpCircle, BarChart, Tag, Link2, Check, X, Loader2 } from 'lucide-react';
+import { useAuth as useClerkAuth } from '@clerk/clerk-react';
 
 interface PermisosContenido {
   articulos: boolean;
@@ -34,6 +35,7 @@ export default function CrmContenidoPermisosConfiguracion() {
   const navigate = useNavigate();
   const { tenantActual } = useAuth();
   const { setPageHeader } = usePageHeader();
+  const { getToken } = useClerkAuth();
 
   const [permisos, setPermisos] = useState<PermisosContenido>({
     articulos: true,
@@ -64,9 +66,23 @@ export default function CrmContenidoPermisosConfiguracion() {
     if (!tenantActual?.id) return;
     setLoading(true);
     try {
-      // TODO: Implementar API para obtener permisos de contenido del tenant
-      // Por ahora usar valores por defecto
-      await new Promise(resolve => setTimeout(resolve, 500)); // Simular carga
+      const token = await getToken();
+      const response = await fetch(
+        `${import.meta.env.VITE_API_URL || 'http://localhost:3001/api'}/tenants/${tenantActual.id}/configuracion/permisos-contenido`,
+        {
+          headers: {
+            ...(token ? { 'Authorization': `Bearer ${token}` } : {}),
+          },
+        }
+      );
+
+      if (response.ok) {
+        const data = await response.json();
+        setPermisos(prev => ({
+          ...prev,
+          ...data,
+        }));
+      }
     } catch (error) {
       console.error('Error cargando permisos:', error);
     } finally {
@@ -86,8 +102,23 @@ export default function CrmContenidoPermisosConfiguracion() {
     if (!tenantActual?.id) return;
     setSaving(true);
     try {
-      // TODO: Implementar API para guardar permisos de contenido del tenant
-      await new Promise(resolve => setTimeout(resolve, 800)); // Simular guardado
+      const token = await getToken();
+      const response = await fetch(
+        `${import.meta.env.VITE_API_URL || 'http://localhost:3001/api'}/tenants/${tenantActual.id}/configuracion/permisos-contenido`,
+        {
+          method: 'PUT',
+          headers: {
+            'Content-Type': 'application/json',
+            ...(token ? { 'Authorization': `Bearer ${token}` } : {}),
+          },
+          body: JSON.stringify({ permisos }),
+        }
+      );
+
+      if (!response.ok) {
+        throw new Error('Error al guardar');
+      }
+
       setHasChanges(false);
       alert('Permisos guardados exitosamente');
     } catch (error) {

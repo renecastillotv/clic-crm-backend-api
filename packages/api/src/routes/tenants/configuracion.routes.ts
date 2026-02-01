@@ -285,4 +285,73 @@ router.put('/idiomas', async (req, res, next) => {
   }
 });
 
+// ==================== PERMISOS DE CONTENIDO ====================
+
+/**
+ * GET /api/tenants/:tenantId/configuracion/permisos-contenido
+ * Obtiene los permisos de contenido del tenant
+ */
+router.get('/permisos-contenido', async (req, res, next) => {
+  try {
+    const { tenantId } = req.params as RouteParams;
+
+    const result = await query(
+      `SELECT configuracion->'permisos_contenido' as permisos
+       FROM tenants WHERE id = $1`,
+      [tenantId]
+    );
+
+    if (result.rows.length === 0) {
+      return res.status(404).json({ error: 'Tenant no encontrado' });
+    }
+
+    // Valores por defecto si no existen
+    const defaultPermisos = {
+      articulos: true,
+      videos: true,
+      testimonios: true,
+      faqs: true,
+      seo_stats: true,
+      categorias: false,
+      relaciones: false,
+    };
+
+    res.json(result.rows[0].permisos || defaultPermisos);
+  } catch (error) {
+    next(error);
+  }
+});
+
+/**
+ * PUT /api/tenants/:tenantId/configuracion/permisos-contenido
+ * Actualiza los permisos de contenido del tenant
+ */
+router.put('/permisos-contenido', async (req, res, next) => {
+  try {
+    const { tenantId } = req.params as RouteParams;
+    const { permisos } = req.body;
+
+    if (!permisos || typeof permisos !== 'object') {
+      return res.status(400).json({ error: 'Se requiere un objeto de permisos' });
+    }
+
+    const result = await query(
+      `UPDATE tenants SET
+        configuracion = jsonb_set(COALESCE(configuracion, '{}'::jsonb), '{permisos_contenido}', $2::jsonb),
+        updated_at = NOW()
+       WHERE id = $1
+       RETURNING configuracion->'permisos_contenido' as permisos`,
+      [tenantId, JSON.stringify(permisos)]
+    );
+
+    if (result.rows.length === 0) {
+      return res.status(404).json({ error: 'Tenant no encontrado' });
+    }
+
+    res.json(result.rows[0].permisos);
+  } catch (error) {
+    next(error);
+  }
+});
+
 export default router;
