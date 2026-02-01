@@ -9,6 +9,7 @@
 import express, { Request, Response, NextFunction } from 'express';
 import { query } from '../../utils/db.js';
 import { resolveUserScope, requirePermission } from '../../middleware/scopeResolver.js';
+import { getVideoInfo, getChannelInfo, getChannelVideos, mapYouTubeVideoToContent } from '../../services/youtubeImportService.js';
 
 const router = express.Router({ mergeParams: true });
 router.use(resolveUserScope);
@@ -1397,6 +1398,307 @@ router.delete('/relaciones/:relacionId', requirePermission('contenido', 'elimina
     }
     res.json({ success: true, message: 'Relación eliminada correctamente' });
   } catch (error) {
+    next(error);
+  }
+});
+
+// ==================== RUTAS: IMPORTACIÓN DE YOUTUBE ====================
+
+/**
+ * GET /api/tenants/:tenantId/contenido/youtube/video-info
+ * Obtiene información de un video de YouTube
+ * Query params: url (URL o ID del video)
+ */
+router.get('/youtube/video-info', async (req: Request<TenantParams>, res: Response, next: NextFunction) => {
+  try {
+    const { url } = req.query;
+
+    if (!url || typeof url !== 'string') {
+      return res.status(400).json({ error: 'Se requiere el parámetro url' });
+    }
+
+    const videoInfo = await getVideoInfo(url);
+    const mappedData = mapYouTubeVideoToContent(videoInfo);
+
+    res.json({
+      youtube: videoInfo,
+      mapped: mappedData,
+    });
+  } catch (error: any) {
+    if (error.message?.includes('YOUTUBE_API_KEY')) {
+      return res.status(503).json({
+        error: 'Servicio no disponible',
+        message: 'La API de YouTube no está configurada'
+      });
+    }
+    if (error.message?.includes('no encontrado')) {
+      return res.status(404).json({ error: error.message });
+    }
+    next(error);
+  }
+});
+
+/**
+ * GET /api/tenants/:tenantId/contenido/youtube/channel-info
+ * Obtiene información de un canal de YouTube
+ * Query params: url (URL o ID del canal)
+ */
+router.get('/youtube/channel-info', async (req: Request<TenantParams>, res: Response, next: NextFunction) => {
+  try {
+    const { url } = req.query;
+
+    if (!url || typeof url !== 'string') {
+      return res.status(400).json({ error: 'Se requiere el parámetro url' });
+    }
+
+    const channelInfo = await getChannelInfo(url);
+
+    res.json(channelInfo);
+  } catch (error: any) {
+    if (error.message?.includes('YOUTUBE_API_KEY')) {
+      return res.status(503).json({
+        error: 'Servicio no disponible',
+        message: 'La API de YouTube no está configurada'
+      });
+    }
+    if (error.message?.includes('no encontrado')) {
+      return res.status(404).json({ error: error.message });
+    }
+    next(error);
+  }
+});
+
+/**
+ * GET /api/tenants/:tenantId/contenido/youtube/channel-videos
+ * Obtiene los videos de un canal de YouTube
+ * Query params:
+ *   - url: URL o ID del canal
+ *   - maxResults: número máximo de videos (default 50, max 50)
+ *   - pageToken: token para paginación
+ */
+router.get('/youtube/channel-videos', async (req: Request<TenantParams>, res: Response, next: NextFunction) => {
+  try {
+    const { url, maxResults, pageToken } = req.query;
+
+    if (!url || typeof url !== 'string') {
+      return res.status(400).json({ error: 'Se requiere el parámetro url' });
+    }
+
+    const max = maxResults ? Math.min(parseInt(maxResults as string), 50) : 50;
+    const token = typeof pageToken === 'string' ? pageToken : undefined;
+
+    const result = await getChannelVideos(url, max, token);
+
+    res.json(result);
+  } catch (error: any) {
+    if (error.message?.includes('YOUTUBE_API_KEY')) {
+      return res.status(503).json({
+        error: 'Servicio no disponible',
+        message: 'La API de YouTube no está configurada'
+      });
+    }
+    if (error.message?.includes('no encontrado')) {
+      return res.status(404).json({ error: error.message });
+    }
+    next(error);
+  }
+});
+
+/**
+ * POST /api/tenants/:tenantId/contenido/youtube/import-video
+ * Importa un video de YouTube creando un registro de video
+ * Body: { url: string, categoria_id?: string, publicado?: boolean }
+ */
+router.post('/youtube/import-video', requirePermission('contenido', 'crear'), async (req: Request<TenantParams>, res: Response, next: NextFunction) => {
+  try {
+    const { tenantId } = req.params;
+    const { url, categoria_id, publicado, destacado } = req.body;
+
+    if (!url) {
+      return res.status(400).json({ error: 'Se requiere la URL del video' });
+    }
+
+    // Obtener info del video
+    const videoInfo = await getVideoInfo(url);
+    const mappedData = mapYouTubeVideoToContent(videoInfo);
+
+    // Generar slug único
+    const slugBase = mappedData.titulo
+      .toLowerCase()
+      .normalize('NFD').replace(/[\u0300-\u036f]/g, '')
+      .replace(/[^a-z0-9]+/g, '-')
+      .replace(/^-|-$/g, '')
+      .substring(0, 80);
+
+    // Verificar si ya existe un video con este youtube_id
+    const existing = await query(
+      'SELECT id FROM videos WHERE tenant_id = $1 AND video_id = $2',
+      [tenantId, mappedData.youtube_id]
+    );
+
+    if (existing.rows.length > 0) {
+      return res.status(409).json({
+        error: 'Video duplicado',
+        message: 'Este video ya ha sido importado',
+        videoId: existing.rows[0].id
+      });
+    }
+
+    // Insertar el video
+    const sql = `
+      INSERT INTO videos (
+        tenant_id, slug, titulo, descripcion, video_url, tipo_video, video_id,
+        thumbnail, duracion_segundos, categoria_id, publicado, destacado, idioma
+      ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, 'es')
+      RETURNING *
+    `;
+
+    const result = await query(sql, [
+      tenantId,
+      slugBase,
+      mappedData.titulo,
+      mappedData.descripcion,
+      mappedData.url,
+      'youtube',
+      mappedData.youtube_id,
+      mappedData.thumbnail_url,
+      mappedData.duracion,
+      categoria_id || null,
+      publicado ?? true,
+      destacado ?? false
+    ]);
+
+    res.status(201).json({
+      success: true,
+      video: result.rows[0],
+      youtubeInfo: videoInfo
+    });
+  } catch (error: any) {
+    if (error.message?.includes('YOUTUBE_API_KEY')) {
+      return res.status(503).json({
+        error: 'Servicio no disponible',
+        message: 'La API de YouTube no está configurada'
+      });
+    }
+    if (error.message?.includes('no encontrado')) {
+      return res.status(404).json({ error: error.message });
+    }
+    next(error);
+  }
+});
+
+/**
+ * POST /api/tenants/:tenantId/contenido/youtube/import-channel
+ * Importa todos los videos de un canal de YouTube
+ * Body: { url: string, categoria_id?: string, publicado?: boolean, maxVideos?: number }
+ */
+router.post('/youtube/import-channel', requirePermission('contenido', 'crear'), async (req: Request<TenantParams>, res: Response, next: NextFunction) => {
+  try {
+    const { tenantId } = req.params;
+    const { url, categoria_id, publicado, maxVideos } = req.body;
+
+    if (!url) {
+      return res.status(400).json({ error: 'Se requiere la URL del canal' });
+    }
+
+    // Obtener info del canal
+    const channelInfo = await getChannelInfo(url);
+
+    // Obtener videos del canal (hasta maxVideos o todos)
+    const limit = maxVideos ? Math.min(parseInt(maxVideos), 200) : 200;
+    let allVideos: any[] = [];
+    let pageToken: string | undefined;
+
+    // Paginar para obtener todos los videos
+    while (allVideos.length < limit) {
+      const result = await getChannelVideos(url, Math.min(50, limit - allVideos.length), pageToken);
+      allVideos = [...allVideos, ...result.videos];
+      pageToken = result.nextPageToken;
+      if (!pageToken) break;
+    }
+
+    // Importar cada video
+    const importedVideos: any[] = [];
+    const skippedVideos: any[] = [];
+    const errors: any[] = [];
+
+    for (const video of allVideos) {
+      try {
+        // Verificar si ya existe
+        const existing = await query(
+          'SELECT id FROM videos WHERE tenant_id = $1 AND video_id = $2',
+          [tenantId, video.videoId]
+        );
+
+        if (existing.rows.length > 0) {
+          skippedVideos.push({ videoId: video.videoId, reason: 'already_exists' });
+          continue;
+        }
+
+        // Obtener info completa del video
+        const videoInfo = await getVideoInfo(video.videoId);
+        const mappedData = mapYouTubeVideoToContent(videoInfo);
+
+        // Generar slug
+        const slugBase = mappedData.titulo
+          .toLowerCase()
+          .normalize('NFD').replace(/[\u0300-\u036f]/g, '')
+          .replace(/[^a-z0-9]+/g, '-')
+          .replace(/^-|-$/g, '')
+          .substring(0, 80);
+
+        // Insertar el video
+        const sql = `
+          INSERT INTO videos (
+            tenant_id, slug, titulo, descripcion, video_url, tipo_video, video_id,
+            thumbnail, duracion_segundos, categoria_id, publicado, destacado, idioma
+          ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, false, 'es')
+          RETURNING id, titulo
+        `;
+
+        const result = await query(sql, [
+          tenantId,
+          slugBase,
+          mappedData.titulo,
+          mappedData.descripcion,
+          mappedData.url,
+          'youtube',
+          mappedData.youtube_id,
+          mappedData.thumbnail_url,
+          mappedData.duracion,
+          categoria_id || null,
+          publicado ?? false
+        ]);
+
+        importedVideos.push(result.rows[0]);
+      } catch (err: any) {
+        errors.push({ videoId: video.videoId, error: err.message });
+      }
+    }
+
+    res.status(201).json({
+      success: true,
+      channel: channelInfo,
+      summary: {
+        totalFound: allVideos.length,
+        imported: importedVideos.length,
+        skipped: skippedVideos.length,
+        errors: errors.length
+      },
+      imported: importedVideos,
+      skipped: skippedVideos,
+      errors: errors
+    });
+  } catch (error: any) {
+    if (error.message?.includes('YOUTUBE_API_KEY')) {
+      return res.status(503).json({
+        error: 'Servicio no disponible',
+        message: 'La API de YouTube no está configurada'
+      });
+    }
+    if (error.message?.includes('no encontrado')) {
+      return res.status(404).json({ error: error.message });
+    }
     next(error);
   }
 });

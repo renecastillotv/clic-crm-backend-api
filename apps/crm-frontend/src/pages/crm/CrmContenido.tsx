@@ -48,6 +48,18 @@ import {
 import { contenidoStyles } from './contenido/sharedStyles';
 import { stripHtml } from './contenido/utils';
 import { useIdiomas } from '../../services/idiomas';
+import { useAuth as useClerkAuth } from '@clerk/clerk-react';
+
+// Interface para permisos de contenido
+interface PermisosContenido {
+  articulos: boolean;
+  videos: boolean;
+  testimonios: boolean;
+  faqs: boolean;
+  seo_stats: boolean;
+  categorias: boolean;
+  relaciones: boolean;
+}
 
 type TabType = 'articulos' | 'videos' | 'faqs' | 'testimonios' | 'seo' | 'categorias' | 'relacionar';
 
@@ -127,11 +139,26 @@ export default function CrmContenido() {
   const { tenantSlug } = useParams<{ tenantSlug: string }>();
   const navigate = useNavigate();
   const [searchParams, setSearchParams] = useSearchParams();
-  const { tenantActual, puedeCrear, puedeEditar, puedeEliminar } = useAuth();
+  const { tenantActual, puedeCrear, puedeEditar, puedeEliminar, tieneAcceso, isPlatformAdmin } = useAuth();
+  const { getToken } = useClerkAuth();
   const canCreate = puedeCrear('contenido');
   const canEdit = puedeEditar('contenido');
   const canDelete = puedeEliminar('contenido');
   const { setPageHeader } = usePageHeader();
+
+  // Es admin si tiene acceso a contenido-config o es platform admin
+  const esAdmin = isPlatformAdmin || tieneAcceso('contenido-config');
+
+  // Permisos de contenido para usuarios no-admin
+  const [permisosContenido, setPermisosContenido] = useState<PermisosContenido>({
+    articulos: true,
+    videos: true,
+    testimonios: true,
+    faqs: true,
+    seo_stats: true,
+    categorias: true,
+    relaciones: true,
+  });
 
   // Idiomas del tenant (para traducciones)
   const { idiomas } = useIdiomas(tenantActual?.id);
@@ -151,6 +178,13 @@ export default function CrmContenido() {
   const [showYouTubeImportModal, setShowYouTubeImportModal] = useState(false);
   const [youtubeUrl, setYoutubeUrl] = useState('');
   const [importingYouTube, setImportingYouTube] = useState(false);
+  const [youtubeImportMode, setYoutubeImportMode] = useState<'video' | 'channel'>('video');
+  const [youtubePreview, setYoutubePreview] = useState<any>(null);
+  const [youtubePreviewLoading, setYoutubePreviewLoading] = useState(false);
+  const [youtubePreviewError, setYoutubePreviewError] = useState<string | null>(null);
+  const [channelVideos, setChannelVideos] = useState<any[]>([]);
+  const [channelInfo, setChannelInfo] = useState<any>(null);
+  const [importProgress, setImportProgress] = useState<{ current: number; total: number; importing: boolean }>({ current: 0, total: 0, importing: false });
 
   // Datos de cada tab
   const [articulos, setArticulos] = useState<Articulo[]>([]);
@@ -215,6 +249,65 @@ export default function CrmContenido() {
     setFiltroCategoria('');
     setFiltroPublicado(undefined);
   };
+
+  // Cargar permisos de contenido para usuarios no-admin
+  useEffect(() => {
+    const loadPermisosContenido = async () => {
+      if (!tenantActual?.id || esAdmin) return; // Admin tiene acceso a todo
+
+      try {
+        const token = await getToken();
+        const response = await fetch(
+          `${import.meta.env.VITE_API_URL || 'http://localhost:3001/api'}/tenants/${tenantActual.id}/configuracion/permisos-contenido`,
+          {
+            headers: {
+              ...(token ? { 'Authorization': `Bearer ${token}` } : {}),
+            },
+          }
+        );
+
+        if (response.ok) {
+          const data = await response.json();
+          setPermisosContenido(prev => ({ ...prev, ...data }));
+        }
+      } catch (error) {
+        console.error('Error cargando permisos de contenido:', error);
+      }
+    };
+
+    loadPermisosContenido();
+  }, [tenantActual?.id, esAdmin, getToken]);
+
+  // Verificar si un tab está permitido
+  const tabPermitido = (tab: TabType): boolean => {
+    if (esAdmin) return true; // Admin tiene acceso a todo
+
+    const mapeo: Record<TabType, keyof PermisosContenido> = {
+      articulos: 'articulos',
+      videos: 'videos',
+      faqs: 'faqs',
+      testimonios: 'testimonios',
+      seo: 'seo_stats',
+      categorias: 'categorias',
+      relacionar: 'relaciones',
+    };
+
+    return permisosContenido[mapeo[tab]] ?? false;
+  };
+
+  // Redirigir al primer tab permitido si el actual no lo es
+  useEffect(() => {
+    if (esAdmin) return; // Admin tiene acceso a todo
+
+    const tabs: TabType[] = ['articulos', 'videos', 'faqs', 'testimonios', 'seo', 'categorias', 'relacionar'];
+
+    if (!tabPermitido(activeTab)) {
+      const primerTabPermitido = tabs.find(tab => tabPermitido(tab));
+      if (primerTabPermitido) {
+        handleTabChange(primerTabPermitido);
+      }
+    }
+  }, [permisosContenido, activeTab, esAdmin]);
 
   // Configurar header según tab
   useEffect(() => {
@@ -2340,44 +2433,63 @@ export default function CrmContenido() {
       {/* Tabs */}
       <div className="contenido-tabs">
         {/* Contenido principal */}
-        <button className={`contenido-tab ${activeTab === 'articulos' ? 'active' : ''}`} onClick={() => handleTabChange('articulos')}>
-          <span className="tab-icon">{Icons.articulo}</span>
-          Artículos
-        </button>
-        <button className={`contenido-tab ${activeTab === 'videos' ? 'active' : ''}`} onClick={() => handleTabChange('videos')}>
-          <span className="tab-icon">{Icons.video}</span>
-          Videos
-        </button>
-        <button className={`contenido-tab ${activeTab === 'faqs' ? 'active' : ''}`} onClick={() => handleTabChange('faqs')}>
-          <span className="tab-icon">{Icons.faq}</span>
-          FAQs
-        </button>
-        <button className={`contenido-tab ${activeTab === 'testimonios' ? 'active' : ''}`} onClick={() => handleTabChange('testimonios')}>
-          <span className="tab-icon">{Icons.testimonio}</span>
-          Testimonios
-        </button>
+        {tabPermitido('articulos') && (
+          <button className={`contenido-tab ${activeTab === 'articulos' ? 'active' : ''}`} onClick={() => handleTabChange('articulos')}>
+            <span className="tab-icon">{Icons.articulo}</span>
+            Artículos
+          </button>
+        )}
+        {tabPermitido('videos') && (
+          <button className={`contenido-tab ${activeTab === 'videos' ? 'active' : ''}`} onClick={() => handleTabChange('videos')}>
+            <span className="tab-icon">{Icons.video}</span>
+            Videos
+          </button>
+        )}
+        {tabPermitido('faqs') && (
+          <button className={`contenido-tab ${activeTab === 'faqs' ? 'active' : ''}`} onClick={() => handleTabChange('faqs')}>
+            <span className="tab-icon">{Icons.faq}</span>
+            FAQs
+          </button>
+        )}
+        {tabPermitido('testimonios') && (
+          <button className={`contenido-tab ${activeTab === 'testimonios' ? 'active' : ''}`} onClick={() => handleTabChange('testimonios')}>
+            <span className="tab-icon">{Icons.testimonio}</span>
+            Testimonios
+          </button>
+        )}
 
-        {/* Separador */}
-        <div className="tab-separator" />
+        {/* Separador - solo si hay tabs antes y después */}
+        {(tabPermitido('articulos') || tabPermitido('videos') || tabPermitido('faqs') || tabPermitido('testimonios')) &&
+         (tabPermitido('seo') || tabPermitido('categorias')) && (
+          <div className="tab-separator" />
+        )}
 
         {/* SEO y configuración */}
-        <button className={`contenido-tab ${activeTab === 'seo' ? 'active' : ''}`} onClick={() => handleTabChange('seo')}>
-          <span className="tab-icon">{Icons.seo}</span>
-          SEO Stats
-        </button>
-        <button className={`contenido-tab ${activeTab === 'categorias' ? 'active' : ''}`} onClick={() => handleTabChange('categorias')}>
-          <span className="tab-icon">{Icons.categoria}</span>
-          Categorías
-        </button>
+        {tabPermitido('seo') && (
+          <button className={`contenido-tab ${activeTab === 'seo' ? 'active' : ''}`} onClick={() => handleTabChange('seo')}>
+            <span className="tab-icon">{Icons.seo}</span>
+            SEO Stats
+          </button>
+        )}
+        {tabPermitido('categorias') && (
+          <button className={`contenido-tab ${activeTab === 'categorias' ? 'active' : ''}`} onClick={() => handleTabChange('categorias')}>
+            <span className="tab-icon">{Icons.categoria}</span>
+            Categorías
+          </button>
+        )}
 
-        {/* Separador */}
-        <div className="tab-separator" />
+        {/* Separador - solo si hay tabs antes y después */}
+        {(tabPermitido('seo') || tabPermitido('categorias')) && tabPermitido('relacionar') && (
+          <div className="tab-separator" />
+        )}
 
         {/* Herramientas */}
-        <button className={`contenido-tab ${activeTab === 'relacionar' ? 'active' : ''}`} onClick={() => handleTabChange('relacionar')}>
-          <span className="tab-icon">{Icons.link}</span>
-          Relacionar
-        </button>
+        {tabPermitido('relacionar') && (
+          <button className={`contenido-tab ${activeTab === 'relacionar' ? 'active' : ''}`} onClick={() => handleTabChange('relacionar')}>
+            <span className="tab-icon">{Icons.link}</span>
+            Relacionar
+          </button>
+        )}
       </div>
 
       {/* Filtros (no para categorías ni relacionar) */}
@@ -2706,8 +2818,16 @@ export default function CrmContenido() {
 
       {/* Modal de Importar Videos de YouTube */}
       {showYouTubeImportModal && (
-        <div className="modal-overlay" onClick={() => setShowYouTubeImportModal(false)}>
-          <div className="modal-content modal-form" onClick={(e) => e.stopPropagation()} style={{ maxWidth: '600px' }}>
+        <div className="modal-overlay" onClick={() => {
+          setShowYouTubeImportModal(false);
+          setYoutubeUrl('');
+          setYoutubePreview(null);
+          setYoutubePreviewError(null);
+          setChannelVideos([]);
+          setChannelInfo(null);
+          setImportProgress({ current: 0, total: 0, importing: false });
+        }}>
+          <div className="modal-content modal-form" onClick={(e) => e.stopPropagation()} style={{ maxWidth: '700px' }}>
             <div className="modal-header">
               <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
                 <div style={{
@@ -2723,95 +2843,528 @@ export default function CrmContenido() {
                 </div>
                 <div>
                   <h3 style={{ margin: 0, fontWeight: 700 }}>Importar de YouTube</h3>
-                  <p style={{ margin: 0, fontSize: '0.85rem', color: '#64748b' }}>Agrega un video desde una URL de YouTube</p>
+                  <p style={{ margin: 0, fontSize: '0.85rem', color: '#64748b' }}>
+                    {youtubeImportMode === 'video' ? 'Importa un video individual' : 'Importa todos los videos de un canal'}
+                  </p>
                 </div>
               </div>
-              <button onClick={() => setShowYouTubeImportModal(false)} className="btn-icon">{Icons.x}</button>
+              <button onClick={() => {
+                setShowYouTubeImportModal(false);
+                setYoutubeUrl('');
+                setYoutubePreview(null);
+                setYoutubePreviewError(null);
+                setChannelVideos([]);
+                setChannelInfo(null);
+              }} className="btn-icon">{Icons.x}</button>
             </div>
-            <div className="modal-body">
-              <div className="form-group">
-                <label style={{ fontWeight: 600, marginBottom: '8px', display: 'block' }}>
-                  URL del Video de YouTube
-                </label>
-                <input
-                  type="url"
-                  value={youtubeUrl}
-                  onChange={(e) => setYoutubeUrl(e.target.value)}
-                  placeholder="https://www.youtube.com/watch?v=..."
-                  style={{
-                    width: '100%',
-                    padding: '12px 14px',
-                    border: '2px solid #e2e8f0',
-                    borderRadius: '10px',
-                    fontSize: '0.95rem',
-                    transition: 'border-color 0.2s'
-                  }}
-                  onFocus={(e) => e.target.style.borderColor = '#FF0000'}
-                  onBlur={(e) => e.target.style.borderColor = '#e2e8f0'}
-                />
-                <p style={{ margin: '8px 0 0', fontSize: '0.8rem', color: '#64748b' }}>
-                  Formatos aceptados: youtube.com/watch?v=..., youtu.be/..., youtube.com/embed/...
-                </p>
-              </div>
 
-              <div style={{
-                marginTop: '16px',
-                padding: '16px',
-                background: '#fef3c7',
-                borderRadius: '10px',
-                border: '1px solid #fcd34d'
-              }}>
-                <div style={{ display: 'flex', alignItems: 'flex-start', gap: '12px' }}>
-                  <LucideIcons.Info size={20} style={{ color: '#d97706', flexShrink: 0, marginTop: '2px' }} />
-                  <div style={{ fontSize: '0.85rem', color: '#92400e' }}>
-                    <p style={{ margin: 0, fontWeight: 600 }}>Próximamente: Importación masiva</p>
-                    <p style={{ margin: '4px 0 0' }}>
-                      La función para importar videos completos de un canal de YouTube estará disponible próximamente.
+            {/* Tabs de modo */}
+            <div style={{ display: 'flex', borderBottom: '1px solid #e2e8f0' }}>
+              <button
+                onClick={() => {
+                  setYoutubeImportMode('video');
+                  setYoutubeUrl('');
+                  setYoutubePreview(null);
+                  setYoutubePreviewError(null);
+                  setChannelVideos([]);
+                  setChannelInfo(null);
+                }}
+                style={{
+                  flex: 1,
+                  padding: '12px',
+                  border: 'none',
+                  background: youtubeImportMode === 'video' ? '#fff' : '#f8fafc',
+                  borderBottom: youtubeImportMode === 'video' ? '2px solid #FF0000' : 'none',
+                  color: youtubeImportMode === 'video' ? '#FF0000' : '#64748b',
+                  fontWeight: youtubeImportMode === 'video' ? 600 : 400,
+                  cursor: 'pointer',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  gap: '8px'
+                }}
+              >
+                <LucideIcons.PlayCircle size={18} />
+                Video Individual
+              </button>
+              <button
+                onClick={() => {
+                  setYoutubeImportMode('channel');
+                  setYoutubeUrl('');
+                  setYoutubePreview(null);
+                  setYoutubePreviewError(null);
+                  setChannelVideos([]);
+                  setChannelInfo(null);
+                }}
+                style={{
+                  flex: 1,
+                  padding: '12px',
+                  border: 'none',
+                  background: youtubeImportMode === 'channel' ? '#fff' : '#f8fafc',
+                  borderBottom: youtubeImportMode === 'channel' ? '2px solid #FF0000' : 'none',
+                  color: youtubeImportMode === 'channel' ? '#FF0000' : '#64748b',
+                  fontWeight: youtubeImportMode === 'channel' ? 600 : 400,
+                  cursor: 'pointer',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  gap: '8px'
+                }}
+              >
+                <LucideIcons.Users size={18} />
+                Canal Completo
+              </button>
+            </div>
+
+            <div className="modal-body">
+              {/* Modo VIDEO INDIVIDUAL */}
+              {youtubeImportMode === 'video' && (
+                <>
+                  <div className="form-group">
+                    <label style={{ fontWeight: 600, marginBottom: '8px', display: 'block' }}>
+                      URL del Video de YouTube
+                    </label>
+                    <div style={{ display: 'flex', gap: '8px' }}>
+                      <input
+                        type="url"
+                        value={youtubeUrl}
+                        onChange={(e) => setYoutubeUrl(e.target.value)}
+                        placeholder="https://www.youtube.com/watch?v=..."
+                        style={{
+                          flex: 1,
+                          padding: '12px 14px',
+                          border: '2px solid #e2e8f0',
+                          borderRadius: '10px',
+                          fontSize: '0.95rem',
+                          transition: 'border-color 0.2s'
+                        }}
+                        onFocus={(e) => e.target.style.borderColor = '#FF0000'}
+                        onBlur={(e) => e.target.style.borderColor = '#e2e8f0'}
+                      />
+                      <button
+                        onClick={async () => {
+                          if (!youtubeUrl.trim() || !tenantActual?.id) return;
+                          setYoutubePreviewLoading(true);
+                          setYoutubePreviewError(null);
+                          try {
+                            const token = await getToken();
+                            const response = await fetch(
+                              `${import.meta.env.VITE_API_URL || 'http://localhost:3001/api'}/tenants/${tenantActual.id}/contenido/youtube/video-info?url=${encodeURIComponent(youtubeUrl)}`,
+                              { headers: token ? { 'Authorization': `Bearer ${token}` } : {} }
+                            );
+                            if (!response.ok) {
+                              const err = await response.json();
+                              throw new Error(err.error || err.message || 'Error al obtener información');
+                            }
+                            const data = await response.json();
+                            setYoutubePreview(data);
+                          } catch (err: any) {
+                            setYoutubePreviewError(err.message);
+                            setYoutubePreview(null);
+                          } finally {
+                            setYoutubePreviewLoading(false);
+                          }
+                        }}
+                        disabled={!youtubeUrl.trim() || youtubePreviewLoading}
+                        style={{
+                          padding: '12px 20px',
+                          background: '#f1f5f9',
+                          border: '1px solid #e2e8f0',
+                          borderRadius: '10px',
+                          cursor: youtubeUrl.trim() && !youtubePreviewLoading ? 'pointer' : 'not-allowed',
+                          display: 'flex',
+                          alignItems: 'center',
+                          gap: '6px',
+                          color: '#475569'
+                        }}
+                      >
+                        {youtubePreviewLoading ? <LucideIcons.Loader2 size={16} className="animate-spin" /> : <LucideIcons.Search size={16} />}
+                        Buscar
+                      </button>
+                    </div>
+                  </div>
+
+                  {youtubePreviewError && (
+                    <div style={{ padding: '12px 16px', background: '#fef2f2', border: '1px solid #fecaca', borderRadius: '10px', marginTop: '16px' }}>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: '8px', color: '#dc2626' }}>
+                        <LucideIcons.AlertCircle size={18} />
+                        <span style={{ fontSize: '0.9rem' }}>{youtubePreviewError}</span>
+                      </div>
+                    </div>
+                  )}
+
+                  {youtubePreview && (
+                    <div style={{ marginTop: '20px', padding: '16px', background: '#f8fafc', borderRadius: '12px', border: '1px solid #e2e8f0' }}>
+                      <div style={{ display: 'flex', gap: '16px' }}>
+                        <img
+                          src={youtubePreview.youtube?.thumbnailUrl || youtubePreview.youtube?.thumbnailUrlHq}
+                          alt="Thumbnail"
+                          style={{ width: '180px', height: '100px', objectFit: 'cover', borderRadius: '8px' }}
+                        />
+                        <div style={{ flex: 1 }}>
+                          <h4 style={{ margin: '0 0 8px', fontSize: '1rem', fontWeight: 600, color: '#1e293b' }}>
+                            {youtubePreview.youtube?.titulo}
+                          </h4>
+                          <p style={{ margin: '0 0 8px', fontSize: '0.85rem', color: '#64748b' }}>
+                            <strong>Canal:</strong> {youtubePreview.youtube?.canal?.nombre}
+                          </p>
+                          <div style={{ display: 'flex', gap: '16px', fontSize: '0.8rem', color: '#94a3b8' }}>
+                            <span style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
+                              <LucideIcons.Clock size={14} />
+                              {Math.floor((youtubePreview.youtube?.duracionSegundos || 0) / 60)}:{String((youtubePreview.youtube?.duracionSegundos || 0) % 60).padStart(2, '0')}
+                            </span>
+                            {youtubePreview.youtube?.estadisticas?.vistas && (
+                              <span style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
+                                <LucideIcons.Eye size={14} />
+                                {youtubePreview.youtube.estadisticas.vistas.toLocaleString()} vistas
+                              </span>
+                            )}
+                          </div>
+                        </div>
+                      </div>
+                      <div style={{ marginTop: '12px', padding: '12px', background: '#ecfdf5', borderRadius: '8px', border: '1px solid #a7f3d0' }}>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: '8px', color: '#059669', fontSize: '0.85rem' }}>
+                          <LucideIcons.CheckCircle size={16} />
+                          <span>Video encontrado y listo para importar</span>
+                        </div>
+                      </div>
+                    </div>
+                  )}
+                </>
+              )}
+
+              {/* Modo CANAL */}
+              {youtubeImportMode === 'channel' && (
+                <>
+                  <div className="form-group">
+                    <label style={{ fontWeight: 600, marginBottom: '8px', display: 'block' }}>
+                      URL del Canal de YouTube
+                    </label>
+                    <div style={{ display: 'flex', gap: '8px' }}>
+                      <input
+                        type="url"
+                        value={youtubeUrl}
+                        onChange={(e) => setYoutubeUrl(e.target.value)}
+                        placeholder="https://www.youtube.com/@canalname o /channel/UC..."
+                        style={{
+                          flex: 1,
+                          padding: '12px 14px',
+                          border: '2px solid #e2e8f0',
+                          borderRadius: '10px',
+                          fontSize: '0.95rem',
+                          transition: 'border-color 0.2s'
+                        }}
+                        onFocus={(e) => e.target.style.borderColor = '#FF0000'}
+                        onBlur={(e) => e.target.style.borderColor = '#e2e8f0'}
+                      />
+                      <button
+                        onClick={async () => {
+                          if (!youtubeUrl.trim() || !tenantActual?.id) return;
+                          setYoutubePreviewLoading(true);
+                          setYoutubePreviewError(null);
+                          try {
+                            const token = await getToken();
+                            // Obtener info del canal
+                            const channelRes = await fetch(
+                              `${import.meta.env.VITE_API_URL || 'http://localhost:3001/api'}/tenants/${tenantActual.id}/contenido/youtube/channel-info?url=${encodeURIComponent(youtubeUrl)}`,
+                              { headers: token ? { 'Authorization': `Bearer ${token}` } : {} }
+                            );
+                            if (!channelRes.ok) {
+                              const err = await channelRes.json();
+                              throw new Error(err.error || err.message || 'Error al obtener información del canal');
+                            }
+                            const channelData = await channelRes.json();
+                            setChannelInfo(channelData);
+
+                            // Obtener videos del canal
+                            const videosRes = await fetch(
+                              `${import.meta.env.VITE_API_URL || 'http://localhost:3001/api'}/tenants/${tenantActual.id}/contenido/youtube/channel-videos?url=${encodeURIComponent(youtubeUrl)}&maxResults=50`,
+                              { headers: token ? { 'Authorization': `Bearer ${token}` } : {} }
+                            );
+                            if (videosRes.ok) {
+                              const videosData = await videosRes.json();
+                              setChannelVideos(videosData.videos || []);
+                            }
+                          } catch (err: any) {
+                            setYoutubePreviewError(err.message);
+                            setChannelInfo(null);
+                            setChannelVideos([]);
+                          } finally {
+                            setYoutubePreviewLoading(false);
+                          }
+                        }}
+                        disabled={!youtubeUrl.trim() || youtubePreviewLoading}
+                        style={{
+                          padding: '12px 20px',
+                          background: '#f1f5f9',
+                          border: '1px solid #e2e8f0',
+                          borderRadius: '10px',
+                          cursor: youtubeUrl.trim() && !youtubePreviewLoading ? 'pointer' : 'not-allowed',
+                          display: 'flex',
+                          alignItems: 'center',
+                          gap: '6px',
+                          color: '#475569'
+                        }}
+                      >
+                        {youtubePreviewLoading ? <LucideIcons.Loader2 size={16} className="animate-spin" /> : <LucideIcons.Search size={16} />}
+                        Buscar
+                      </button>
+                    </div>
+                    <p style={{ margin: '8px 0 0', fontSize: '0.8rem', color: '#64748b' }}>
+                      Formatos: youtube.com/@nombre, youtube.com/channel/UC..., youtube.com/c/nombre
                     </p>
                   </div>
-                </div>
-              </div>
+
+                  {youtubePreviewError && (
+                    <div style={{ padding: '12px 16px', background: '#fef2f2', border: '1px solid #fecaca', borderRadius: '10px', marginTop: '16px' }}>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: '8px', color: '#dc2626' }}>
+                        <LucideIcons.AlertCircle size={18} />
+                        <span style={{ fontSize: '0.9rem' }}>{youtubePreviewError}</span>
+                      </div>
+                    </div>
+                  )}
+
+                  {channelInfo && (
+                    <div style={{ marginTop: '20px' }}>
+                      {/* Info del canal */}
+                      <div style={{ padding: '16px', background: '#f8fafc', borderRadius: '12px', border: '1px solid #e2e8f0', marginBottom: '16px' }}>
+                        <div style={{ display: 'flex', gap: '16px', alignItems: 'center' }}>
+                          <img
+                            src={channelInfo.thumbnailUrl}
+                            alt={channelInfo.nombre}
+                            style={{ width: '64px', height: '64px', borderRadius: '50%', objectFit: 'cover' }}
+                          />
+                          <div style={{ flex: 1 }}>
+                            <h4 style={{ margin: '0 0 4px', fontSize: '1.1rem', fontWeight: 600, color: '#1e293b' }}>
+                              {channelInfo.nombre}
+                            </h4>
+                            <div style={{ display: 'flex', gap: '16px', fontSize: '0.85rem', color: '#64748b' }}>
+                              <span>{channelInfo.videoCount?.toLocaleString() || 0} videos</span>
+                              {channelInfo.subscriberCount && (
+                                <span>{channelInfo.subscriberCount.toLocaleString()} suscriptores</span>
+                              )}
+                            </div>
+                          </div>
+                        </div>
+                      </div>
+
+                      {/* Lista de videos a importar */}
+                      {channelVideos.length > 0 && (
+                        <div style={{ background: '#fff', border: '1px solid #e2e8f0', borderRadius: '12px' }}>
+                          <div style={{ padding: '12px 16px', borderBottom: '1px solid #e2e8f0', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                            <span style={{ fontWeight: 600, color: '#1e293b' }}>
+                              Videos encontrados: {channelVideos.length}
+                            </span>
+                            <span style={{ fontSize: '0.8rem', color: '#64748b' }}>
+                              (máximo 50 videos por importación)
+                            </span>
+                          </div>
+                          <div style={{ maxHeight: '200px', overflow: 'auto' }}>
+                            {channelVideos.slice(0, 10).map((video, idx) => (
+                              <div key={video.videoId} style={{ display: 'flex', gap: '12px', padding: '10px 16px', borderBottom: '1px solid #f1f5f9' }}>
+                                <img
+                                  src={video.thumbnailUrl}
+                                  alt=""
+                                  style={{ width: '80px', height: '45px', objectFit: 'cover', borderRadius: '4px' }}
+                                />
+                                <div style={{ flex: 1, overflow: 'hidden' }}>
+                                  <p style={{ margin: 0, fontSize: '0.85rem', fontWeight: 500, color: '#1e293b', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+                                    {video.titulo}
+                                  </p>
+                                  <p style={{ margin: '2px 0 0', fontSize: '0.75rem', color: '#94a3b8' }}>
+                                    {new Date(video.fechaPublicacion).toLocaleDateString()}
+                                  </p>
+                                </div>
+                              </div>
+                            ))}
+                            {channelVideos.length > 10 && (
+                              <div style={{ padding: '10px 16px', textAlign: 'center', color: '#64748b', fontSize: '0.85rem' }}>
+                                ... y {channelVideos.length - 10} videos más
+                              </div>
+                            )}
+                          </div>
+                        </div>
+                      )}
+
+                      {/* Progreso de importación */}
+                      {importProgress.importing && (
+                        <div style={{ marginTop: '16px', padding: '16px', background: '#eff6ff', borderRadius: '10px', border: '1px solid #bfdbfe' }}>
+                          <div style={{ display: 'flex', alignItems: 'center', gap: '12px', marginBottom: '8px' }}>
+                            <LucideIcons.Loader2 size={20} className="animate-spin" style={{ color: '#2563eb' }} />
+                            <span style={{ fontWeight: 600, color: '#1e40af' }}>
+                              Importando videos... {importProgress.current} de {importProgress.total}
+                            </span>
+                          </div>
+                          <div style={{ height: '8px', background: '#dbeafe', borderRadius: '4px', overflow: 'hidden' }}>
+                            <div
+                              style={{
+                                width: `${(importProgress.current / importProgress.total) * 100}%`,
+                                height: '100%',
+                                background: '#2563eb',
+                                transition: 'width 0.3s'
+                              }}
+                            />
+                          </div>
+                        </div>
+                      )}
+                    </div>
+                  )}
+                </>
+              )}
             </div>
+
             <div className="modal-footer">
-              <button onClick={() => setShowYouTubeImportModal(false)} className="btn-secondary">Cancelar</button>
               <button
-                onClick={async () => {
-                  if (!youtubeUrl.trim()) {
-                    alert('Por favor ingresa una URL de YouTube');
-                    return;
-                  }
-
-                  // Extraer el video ID de la URL
-                  let videoId: string | null = null;
-                  const patterns = [
-                    /(?:youtube\.com\/watch\?v=|youtu\.be\/|youtube\.com\/embed\/)([a-zA-Z0-9_-]+)/,
-                    /youtube\.com\/v\/([a-zA-Z0-9_-]+)/,
-                  ];
-
-                  for (const pattern of patterns) {
-                    const match = youtubeUrl.match(pattern);
-                    if (match) {
-                      videoId = match[1];
-                      break;
-                    }
-                  }
-
-                  if (!videoId) {
-                    alert('URL de YouTube no válida. Por favor verifica el formato.');
-                    return;
-                  }
-
-                  // Navegar al editor de video con los parámetros de YouTube
-                  navigate(`/crm/${tenantSlug}/contenido/videos/nuevo?youtube=${videoId}`);
+                onClick={() => {
                   setShowYouTubeImportModal(false);
                   setYoutubeUrl('');
+                  setYoutubePreview(null);
+                  setYoutubePreviewError(null);
+                  setChannelVideos([]);
+                  setChannelInfo(null);
+                  setImportProgress({ current: 0, total: 0, importing: false });
                 }}
-                className="btn-primary"
-                style={{ display: 'flex', alignItems: 'center', gap: '6px' }}
+                className="btn-secondary"
+                disabled={importProgress.importing}
               >
-                <LucideIcons.Play size={16} />
-                Importar Video
+                Cancelar
               </button>
+
+              {youtubeImportMode === 'video' ? (
+                <button
+                  onClick={async () => {
+                    if (!youtubePreview || !tenantActual?.id) {
+                      if (!youtubeUrl.trim()) {
+                        alert('Por favor ingresa una URL de YouTube');
+                        return;
+                      }
+                      // Si no hay preview, navegar al editor tradicional
+                      let videoId: string | null = null;
+                      const patterns = [
+                        /(?:youtube\.com\/watch\?v=|youtu\.be\/|youtube\.com\/embed\/)([a-zA-Z0-9_-]+)/,
+                        /youtube\.com\/v\/([a-zA-Z0-9_-]+)/,
+                      ];
+                      for (const pattern of patterns) {
+                        const match = youtubeUrl.match(pattern);
+                        if (match) { videoId = match[1]; break; }
+                      }
+                      if (!videoId) {
+                        alert('URL de YouTube no válida');
+                        return;
+                      }
+                      navigate(`/crm/${tenantSlug}/contenido/videos/nuevo?youtube=${videoId}`);
+                      setShowYouTubeImportModal(false);
+                      setYoutubeUrl('');
+                      return;
+                    }
+
+                    // Importar directamente
+                    setImportingYouTube(true);
+                    try {
+                      const token = await getToken();
+                      const response = await fetch(
+                        `${import.meta.env.VITE_API_URL || 'http://localhost:3001/api'}/tenants/${tenantActual.id}/contenido/youtube/import-video`,
+                        {
+                          method: 'POST',
+                          headers: {
+                            'Content-Type': 'application/json',
+                            ...(token ? { 'Authorization': `Bearer ${token}` } : {})
+                          },
+                          body: JSON.stringify({ url: youtubeUrl, publicado: true })
+                        }
+                      );
+                      if (!response.ok) {
+                        const err = await response.json();
+                        throw new Error(err.error || err.message || 'Error al importar');
+                      }
+                      const result = await response.json();
+                      setSuccessMessage('Video importado exitosamente');
+                      loadData();
+                      setShowYouTubeImportModal(false);
+                      setYoutubeUrl('');
+                      setYoutubePreview(null);
+                      // Navegar al video creado
+                      if (result.video?.id) {
+                        navigate(`/crm/${tenantSlug}/contenido/videos/${result.video.id}`);
+                      }
+                    } catch (err: any) {
+                      alert(err.message || 'Error al importar video');
+                    } finally {
+                      setImportingYouTube(false);
+                    }
+                  }}
+                  className="btn-primary"
+                  style={{ display: 'flex', alignItems: 'center', gap: '6px' }}
+                  disabled={importingYouTube}
+                >
+                  {importingYouTube ? (
+                    <><LucideIcons.Loader2 size={16} className="animate-spin" /> Importando...</>
+                  ) : (
+                    <><LucideIcons.Download size={16} /> {youtubePreview ? 'Importar Video' : 'Continuar al Editor'}</>
+                  )}
+                </button>
+              ) : (
+                <button
+                  onClick={async () => {
+                    if (!channelInfo || channelVideos.length === 0 || !tenantActual?.id) {
+                      alert('Primero busca un canal con videos');
+                      return;
+                    }
+
+                    setImportProgress({ current: 0, total: channelVideos.length, importing: true });
+
+                    try {
+                      const token = await getToken();
+                      const response = await fetch(
+                        `${import.meta.env.VITE_API_URL || 'http://localhost:3001/api'}/tenants/${tenantActual.id}/contenido/youtube/import-channel`,
+                        {
+                          method: 'POST',
+                          headers: {
+                            'Content-Type': 'application/json',
+                            ...(token ? { 'Authorization': `Bearer ${token}` } : {})
+                          },
+                          body: JSON.stringify({
+                            url: youtubeUrl,
+                            publicado: false, // Por defecto no publicar masivamente
+                            maxVideos: 50
+                          })
+                        }
+                      );
+
+                      if (!response.ok) {
+                        const err = await response.json();
+                        throw new Error(err.error || err.message || 'Error al importar');
+                      }
+
+                      const result = await response.json();
+                      setImportProgress({ current: result.summary.imported, total: result.summary.totalFound, importing: false });
+                      setSuccessMessage(`Importación completada: ${result.summary.imported} videos importados, ${result.summary.skipped} omitidos, ${result.summary.errors} errores`);
+                      loadData();
+
+                      // Cerrar modal después de un momento
+                      setTimeout(() => {
+                        setShowYouTubeImportModal(false);
+                        setYoutubeUrl('');
+                        setChannelInfo(null);
+                        setChannelVideos([]);
+                        setImportProgress({ current: 0, total: 0, importing: false });
+                      }, 2000);
+                    } catch (err: any) {
+                      setImportProgress({ current: 0, total: 0, importing: false });
+                      alert(err.message || 'Error al importar canal');
+                    }
+                  }}
+                  className="btn-primary"
+                  style={{ display: 'flex', alignItems: 'center', gap: '6px' }}
+                  disabled={!channelInfo || channelVideos.length === 0 || importProgress.importing}
+                >
+                  {importProgress.importing ? (
+                    <><LucideIcons.Loader2 size={16} className="animate-spin" /> Importando...</>
+                  ) : (
+                    <><LucideIcons.Download size={16} /> Importar {channelVideos.length} Videos</>
+                  )}
+                </button>
+              )}
             </div>
           </div>
         </div>
