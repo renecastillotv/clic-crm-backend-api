@@ -363,6 +363,49 @@ export function mapYouTubeVideoToContent(youtubeVideo: YouTubeVideoInfo): {
 }
 
 /**
+ * Obtiene estadísticas de múltiples videos de YouTube en una sola llamada
+ * La API permite hasta 50 videos por request
+ */
+export async function getMultipleVideoStats(videoIds: string[]): Promise<Map<string, { vistas: number; likes: number; comentarios: number }>> {
+  if (!YOUTUBE_API_KEY) {
+    throw new Error('YOUTUBE_API_KEY no está configurada en las variables de entorno');
+  }
+
+  const statsMap = new Map<string, { vistas: number; likes: number; comentarios: number }>();
+
+  // Procesar en lotes de 50 (límite de la API)
+  for (let i = 0; i < videoIds.length; i += 50) {
+    const batch = videoIds.slice(i, i + 50);
+
+    const url = `${YOUTUBE_API_BASE}/videos?` + new URLSearchParams({
+      part: 'statistics',
+      id: batch.join(','),
+      key: YOUTUBE_API_KEY,
+    });
+
+    const response = await fetch(url);
+
+    if (!response.ok) {
+      console.error('Error fetching video stats:', await response.text());
+      continue;
+    }
+
+    const data = await response.json() as { items?: any[] };
+
+    (data.items || []).forEach((item: any) => {
+      const stats = item.statistics;
+      statsMap.set(item.id, {
+        vistas: parseInt(stats?.viewCount || '0', 10),
+        likes: parseInt(stats?.likeCount || '0', 10),
+        comentarios: parseInt(stats?.commentCount || '0', 10),
+      });
+    });
+  }
+
+  return statsMap;
+}
+
+/**
  * Detecta si un video es un Short basado en duración y metadatos
  */
 export function isYouTubeShort(video: { duracionSegundos?: number; titulo?: string; descripcion?: string }): boolean {

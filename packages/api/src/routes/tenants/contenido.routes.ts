@@ -17,7 +17,8 @@ import {
   getChannelPlaylists,
   getPlaylistVideos,
   getChannelVideosWithDetails,
-  isYouTubeShort
+  isYouTubeShort,
+  getMultipleVideoStats
 } from '../../services/youtubeImportService.js';
 
 const router = express.Router({ mergeParams: true });
@@ -252,19 +253,73 @@ router.delete('/articulos/:articuloId', requirePermission('contenido', 'eliminar
 
 /**
  * GET /api/tenants/:tenantId/contenido/videos
+ * Query params:
+ *   - search: búsqueda en título y descripción
+ *   - categoria_id: filtrar por categoría
+ *   - publicado: filtrar por estado (true/false)
+ *   - limit: límite de resultados (default 50)
+ *   - offset: offset para paginación
  */
 router.get('/videos', async (req: Request<TenantParams>, res: Response, next: NextFunction) => {
   try {
     const { tenantId } = req.params;
-    const sql = `
+    const { search, categoria_id, publicado, limit, offset } = req.query;
+
+    let sql = `
       SELECT v.*, c.nombre as categoria_nombre
       FROM videos v
       LEFT JOIN categorias_contenido c ON v.categoria_id = c.id
       WHERE v.tenant_id = $1
-      ORDER BY v.orden ASC, v.created_at DESC
     `;
-    const result = await query(sql, [tenantId]);
-    res.json(result.rows);
+    const params: any[] = [tenantId];
+    let paramIndex = 2;
+
+    // Filtro de búsqueda
+    if (search && typeof search === 'string' && search.trim()) {
+      sql += ` AND (v.titulo ILIKE $${paramIndex} OR v.descripcion ILIKE $${paramIndex})`;
+      params.push(`%${search.trim()}%`);
+      paramIndex++;
+    }
+
+    // Filtro de categoría
+    if (categoria_id && typeof categoria_id === 'string') {
+      sql += ` AND v.categoria_id = $${paramIndex}`;
+      params.push(categoria_id);
+      paramIndex++;
+    }
+
+    // Filtro de publicado
+    if (publicado !== undefined) {
+      sql += ` AND v.publicado = $${paramIndex}`;
+      params.push(publicado === 'true');
+      paramIndex++;
+    }
+
+    // Contar total para paginación
+    const countSql = sql.replace('SELECT v.*, c.nombre as categoria_nombre', 'SELECT COUNT(*) as total');
+    const countResult = await query(countSql, params);
+    const total = parseInt(countResult.rows[0]?.total || '0');
+
+    // Ordenar y paginar
+    sql += ' ORDER BY v.orden ASC, v.created_at DESC';
+
+    if (limit) {
+      sql += ` LIMIT $${paramIndex}`;
+      params.push(parseInt(limit as string));
+      paramIndex++;
+    }
+    if (offset) {
+      sql += ` OFFSET $${paramIndex}`;
+      params.push(parseInt(offset as string));
+    }
+
+    const result = await query(sql, params);
+    res.json({
+      videos: result.rows,
+      total,
+      limit: limit ? parseInt(limit as string) : null,
+      offset: offset ? parseInt(offset as string) : 0
+    });
   } catch (error) {
     next(error);
   }
@@ -1947,6 +2002,87 @@ router.post('/youtube/import-selected', requirePermission('contenido', 'crear'),
       imported: importedVideos,
       skipped: skippedVideos,
       errors: errors
+    });
+  } catch (error: any) {
+    if (error.message?.includes('YOUTUBE_API_KEY')) {
+      return res.status(503).json({
+        error: 'Servicio no disponible',
+        message: 'La API de YouTube no está configurada'
+      });
+    }
+    next(error);
+  }
+});
+
+/**
+ * POST /api/tenants/:tenantId/contenido/youtube/sync-stats
+ * Sincroniza las estadísticas (vistas, likes) de videos de YouTube importados
+ * Body opcional: { videoIds?: string[] } - si no se especifica, sincroniza todos los videos de YouTube
+ */
+router.post('/youtube/sync-stats', requirePermission('contenido', 'editar'), async (req: Request<TenantParams>, res: Response, next: NextFunction) => {
+  try {
+    const { tenantId } = req.params;
+    const { videoIds: specificIds } = req.body;
+
+    // Obtener videos de YouTube del tenant
+    let videosToSync;
+    if (specificIds && Array.isArray(specificIds) && specificIds.length > 0) {
+      // Sincronizar solo los especificados
+      videosToSync = await query(
+        `SELECT id, video_id, titulo FROM videos WHERE tenant_id = $1 AND tipo_video = 'youtube' AND video_id = ANY($2)`,
+        [tenantId, specificIds]
+      );
+    } else {
+      // Sincronizar todos los videos de YouTube
+      videosToSync = await query(
+        `SELECT id, video_id, titulo FROM videos WHERE tenant_id = $1 AND tipo_video = 'youtube' AND video_id IS NOT NULL`,
+        [tenantId]
+      );
+    }
+
+    if (videosToSync.rows.length === 0) {
+      return res.json({
+        success: true,
+        message: 'No hay videos de YouTube para sincronizar',
+        updated: 0
+      });
+    }
+
+    // Obtener IDs de YouTube
+    const youtubeIds = videosToSync.rows.map((v: any) => v.video_id).filter(Boolean);
+
+    // Obtener estadísticas de YouTube
+    const statsMap = await getMultipleVideoStats(youtubeIds);
+
+    // Actualizar videos en la base de datos
+    let updated = 0;
+    const errors: any[] = [];
+
+    for (const video of videosToSync.rows) {
+      const stats = statsMap.get(video.video_id);
+      if (stats) {
+        try {
+          await query(
+            `UPDATE videos SET vistas = $1, updated_at = NOW() WHERE id = $2`,
+            [stats.vistas, video.id]
+          );
+          updated++;
+        } catch (err: any) {
+          errors.push({ videoId: video.id, error: err.message });
+        }
+      }
+    }
+
+    res.json({
+      success: true,
+      message: `Sincronización completada`,
+      summary: {
+        total: videosToSync.rows.length,
+        updated,
+        notFound: videosToSync.rows.length - statsMap.size,
+        errors: errors.length
+      },
+      errors: errors.length > 0 ? errors : undefined
     });
   } catch (error: any) {
     if (error.message?.includes('YOUTUBE_API_KEY')) {

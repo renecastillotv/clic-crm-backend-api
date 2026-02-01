@@ -36,6 +36,7 @@ import {
   updateTestimonio,
   updateSeoStat,
   getPropiedadesCrm,
+  syncYouTubeStats,
   Articulo,
   Video,
   FAQ,
@@ -202,6 +203,11 @@ export default function CrmContenido() {
   // Selección múltiple para acciones masivas en la lista de videos
   const [selectedCrmVideos, setSelectedCrmVideos] = useState<Set<string>>(new Set());
   const [bulkUpdating, setBulkUpdating] = useState(false);
+
+  // Paginación de videos
+  const [videosPagination, setVideosPagination] = useState({ total: 0, limit: 20, offset: 0 });
+  const [syncingStats, setSyncingStats] = useState(false);
+
   const [testimonios, setTestimonios] = useState<Testimonio[]>([]);
   const [seoStats, setSeoStats] = useState<SeoStat[]>([]);
   const [categorias, setCategorias] = useState<CategoriaContenido[]>([]);
@@ -411,11 +417,16 @@ export default function CrmContenido() {
     });
   }, [activeTab, setPageHeader, navigate, tenantSlug, canCreate]);
 
+  // Resetear paginación cuando cambian los filtros
+  useEffect(() => {
+    setVideosPagination(prev => ({ ...prev, offset: 0 }));
+  }, [busqueda, filtroCategoria, filtroPublicado]);
+
   // Cargar datos según tab activo
   useEffect(() => {
     if (!tenantActual?.id) return;
     loadData();
-  }, [tenantActual?.id, activeTab, busqueda, filtroCategoria, filtroPublicado, filtroTipo]);
+  }, [tenantActual?.id, activeTab, busqueda, filtroCategoria, filtroPublicado, filtroTipo, videosPagination.offset]);
 
   const loadData = async () => {
     if (!tenantActual?.id) return;
@@ -433,12 +444,20 @@ export default function CrmContenido() {
           setArticulos(arts);
           break;
         case 'videos':
-          const vids = await getVideos(tenantActual.id, {
+          const vidsResponse = await getVideos(tenantActual.id, {
             search: busqueda || undefined,
             categoriaId: filtroCategoria || undefined,
             publicado: filtroPublicado,
+            limit: videosPagination.limit,
+            offset: videosPagination.offset,
           });
-          setVideos(vids);
+          setVideos(vidsResponse.videos);
+          setVideosPagination(prev => ({
+            ...prev,
+            total: vidsResponse.total
+          }));
+          // Limpiar selección al cambiar de página o filtrar
+          setSelectedCrmVideos(new Set());
           break;
         case 'faqs':
           const fqs = await getFaqs(tenantActual.id, {
@@ -652,6 +671,25 @@ export default function CrmContenido() {
       setError(err.message || 'Error al actualizar videos');
     } finally {
       setBulkUpdating(false);
+    }
+  };
+
+  // Handler de sincronizar vistas de YouTube
+  const handleSyncYouTubeStats = async () => {
+    if (!tenantActual?.id) return;
+    setSyncingStats(true);
+    try {
+      const result = await syncYouTubeStats(tenantActual.id);
+      if (result.success) {
+        setSuccessMessage(`Sincronización completada: ${result.summary.updated} de ${result.summary.total} videos actualizados`);
+        setTimeout(() => setSuccessMessage(null), 5000);
+        // Recargar videos para mostrar las vistas actualizadas
+        loadData();
+      }
+    } catch (err: any) {
+      setError(err.message || 'Error al sincronizar vistas de YouTube');
+    } finally {
+      setSyncingStats(false);
     }
   };
 
@@ -968,16 +1006,66 @@ export default function CrmContenido() {
     </>
   );
 
-  const renderVideosList = () => (
+  const renderVideosList = () => {
+    const totalPages = Math.ceil(videosPagination.total / videosPagination.limit);
+    const currentPage = Math.floor(videosPagination.offset / videosPagination.limit) + 1;
+
+    return (
     <>
-      {videos.length === 0 ? (
+      {videos.length === 0 && !busqueda ? (
         <div className="empty-state">
           <div className="empty-icon">{Icons.video}</div>
           <h3>No hay videos</h3>
-          <p>{busqueda ? 'No se encontraron videos' : 'Crea tu primer video'}</p>
+          <p>Crea tu primer video</p>
+        </div>
+      ) : videos.length === 0 && busqueda ? (
+        <div className="empty-state">
+          <div className="empty-icon">{Icons.video}</div>
+          <h3>Sin resultados</h3>
+          <p>No se encontraron videos con "{busqueda}"</p>
         </div>
       ) : (
         <>
+          {/* Barra de herramientas: Sincronizar y total */}
+          <div style={{
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'space-between',
+            marginBottom: '12px',
+            padding: '8px 0'
+          }}>
+            <span style={{ fontSize: '0.9rem', color: '#64748b' }}>
+              {videosPagination.total} video{videosPagination.total !== 1 ? 's' : ''} en total
+            </span>
+            {canEdit && (
+              <button
+                onClick={handleSyncYouTubeStats}
+                disabled={syncingStats}
+                style={{
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: '6px',
+                  padding: '8px 14px',
+                  background: '#fef2f2',
+                  border: '1px solid #fecaca',
+                  borderRadius: '8px',
+                  color: '#dc2626',
+                  cursor: syncingStats ? 'not-allowed' : 'pointer',
+                  fontSize: '0.85rem',
+                  fontWeight: 500
+                }}
+                title="Sincronizar vistas desde YouTube"
+              >
+                {syncingStats ? (
+                  <LucideIcons.Loader2 size={16} className="animate-spin" />
+                ) : (
+                  <LucideIcons.RefreshCw size={16} />
+                )}
+                {syncingStats ? 'Sincronizando...' : 'Sincronizar Vistas YouTube'}
+              </button>
+            )}
+          </div>
+
           {/* Barra de acciones masivas */}
           {selectedCrmVideos.size > 0 && canEdit && (
             <div style={{
@@ -1145,10 +1233,61 @@ export default function CrmContenido() {
               </tbody>
             </table>
           </div>
+
+          {/* Controles de paginación */}
+          {totalPages > 1 && (
+            <div style={{
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              gap: '12px',
+              marginTop: '16px',
+              padding: '12px 0'
+            }}>
+              <button
+                onClick={() => setVideosPagination(prev => ({ ...prev, offset: Math.max(0, prev.offset - prev.limit) }))}
+                disabled={currentPage === 1}
+                style={{
+                  padding: '8px 12px',
+                  background: currentPage === 1 ? '#f1f5f9' : '#fff',
+                  border: '1px solid #e2e8f0',
+                  borderRadius: '6px',
+                  cursor: currentPage === 1 ? 'not-allowed' : 'pointer',
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: '4px'
+                }}
+              >
+                <LucideIcons.ChevronLeft size={16} />
+                Anterior
+              </button>
+              <span style={{ fontSize: '0.9rem', color: '#475569' }}>
+                Página {currentPage} de {totalPages}
+              </span>
+              <button
+                onClick={() => setVideosPagination(prev => ({ ...prev, offset: prev.offset + prev.limit }))}
+                disabled={currentPage === totalPages}
+                style={{
+                  padding: '8px 12px',
+                  background: currentPage === totalPages ? '#f1f5f9' : '#fff',
+                  border: '1px solid #e2e8f0',
+                  borderRadius: '6px',
+                  cursor: currentPage === totalPages ? 'not-allowed' : 'pointer',
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: '4px'
+                }}
+              >
+                Siguiente
+                <LucideIcons.ChevronRight size={16} />
+              </button>
+            </div>
+          )}
         </>
       )}
     </>
   );
+  };
 
   const renderFaqsList = () => (
     <>

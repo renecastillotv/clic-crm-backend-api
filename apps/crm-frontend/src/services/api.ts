@@ -5061,14 +5061,87 @@ export interface Video {
 }
 
 /**
- * Obtiene la lista de videos
+ * Opciones para obtener videos
+ */
+interface GetVideosOptions {
+  search?: string;
+  categoriaId?: string;
+  publicado?: boolean;
+  limit?: number;
+  offset?: number;
+}
+
+/**
+ * Respuesta paginada de videos
+ */
+export interface GetVideosResponse {
+  videos: Video[];
+  total: number;
+  limit: number | null;
+  offset: number;
+}
+
+/**
+ * Obtiene la lista de videos con soporte para filtros y paginación
  * @param tenantId - ID del tenant
+ * @param options - Opciones de filtrado y paginación
  * @param token - Token de autenticación opcional
  */
-export async function getVideos(tenantId: string, token?: string | null): Promise<Video[]> {
-  const response = await apiFetch(`/tenants/${tenantId}/contenido/videos`, {}, token);
+export async function getVideos(
+  tenantId: string,
+  options?: GetVideosOptions | string | null,
+  token?: string | null
+): Promise<GetVideosResponse> {
+  // Compatibilidad hacia atrás: si options es string, es el token
+  if (typeof options === 'string' || options === null) {
+    token = options;
+    options = undefined;
+  }
+
+  const params = new URLSearchParams();
+  if (options?.search) params.append('search', options.search);
+  if (options?.categoriaId) params.append('categoria_id', options.categoriaId);
+  if (options?.publicado !== undefined) params.append('publicado', String(options.publicado));
+  if (options?.limit) params.append('limit', String(options.limit));
+  if (options?.offset) params.append('offset', String(options.offset));
+
+  const queryString = params.toString();
+  const url = `/tenants/${tenantId}/contenido/videos${queryString ? `?${queryString}` : ''}`;
+
+  const response = await apiFetch(url, {}, token);
   const data = await response.json();
-  return data.videos || data || [];
+
+  // Si viene con estructura de paginación, devolver todo
+  if (data.videos && typeof data.total === 'number') {
+    return data as GetVideosResponse;
+  }
+
+  // Compatibilidad hacia atrás (si el backend aún no soporta paginación)
+  const videosArray = data.videos || data || [];
+  return {
+    videos: videosArray,
+    total: videosArray.length,
+    limit: null,
+    offset: 0
+  };
+}
+
+/**
+ * Sincroniza las estadísticas de vistas de YouTube para los videos importados
+ * @param tenantId - ID del tenant
+ * @param videoIds - IDs específicos a sincronizar (opcional, si no se especifica sincroniza todos)
+ * @param token - Token de autenticación opcional
+ */
+export async function syncYouTubeStats(
+  tenantId: string,
+  videoIds?: string[],
+  token?: string | null
+): Promise<{ success: boolean; summary: { total: number; updated: number; notFound: number; errors: number } }> {
+  const response = await apiFetch(`/tenants/${tenantId}/contenido/youtube/sync-stats`, {
+    method: 'POST',
+    body: JSON.stringify({ videoIds }),
+  }, token);
+  return response.json();
 }
 
 /**
