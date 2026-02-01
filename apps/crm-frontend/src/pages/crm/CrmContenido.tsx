@@ -185,6 +185,14 @@ export default function CrmContenido() {
   const [channelVideos, setChannelVideos] = useState<any[]>([]);
   const [channelInfo, setChannelInfo] = useState<any>(null);
   const [importProgress, setImportProgress] = useState<{ current: number; total: number; importing: boolean }>({ current: 0, total: 0, importing: false });
+  // Estados adicionales para importación avanzada
+  const [selectedVideoIds, setSelectedVideoIds] = useState<Set<string>>(new Set());
+  const [videoTypeFilter, setVideoTypeFilter] = useState<'all' | 'regular' | 'shorts'>('all');
+  const [channelPlaylists, setChannelPlaylists] = useState<any[]>([]);
+  const [selectedPlaylist, setSelectedPlaylist] = useState<string>('');
+  const [importCategoryId, setImportCategoryId] = useState<string>('');
+  const [loadingMore, setLoadingMore] = useState(false);
+  const [nextPageToken, setNextPageToken] = useState<string | undefined>();
 
   // Datos de cada tab
   const [articulos, setArticulos] = useState<Articulo[]>([]);
@@ -3062,28 +3070,32 @@ export default function CrmContenido() {
                           if (!youtubeUrl.trim() || !tenantActual?.id) return;
                           setYoutubePreviewLoading(true);
                           setYoutubePreviewError(null);
+                          setSelectedVideoIds(new Set());
+                          setVideoTypeFilter('all');
                           try {
                             const token = await getToken();
-                            // Obtener info del canal
-                            const channelRes = await fetch(
-                              `${import.meta.env.VITE_API_URL || 'http://localhost:3001/api'}/tenants/${tenantActual.id}/contenido/youtube/channel-info?url=${encodeURIComponent(youtubeUrl)}`,
-                              { headers: token ? { 'Authorization': `Bearer ${token}` } : {} }
-                            );
-                            if (!channelRes.ok) {
-                              const err = await channelRes.json();
-                              throw new Error(err.error || err.message || 'Error al obtener información del canal');
-                            }
-                            const channelData = await channelRes.json();
-                            setChannelInfo(channelData);
-
-                            // Obtener videos del canal
+                            // Obtener videos con detalles (incluye detección de shorts y duplicados)
                             const videosRes = await fetch(
-                              `${import.meta.env.VITE_API_URL || 'http://localhost:3001/api'}/tenants/${tenantActual.id}/contenido/youtube/channel-videos?url=${encodeURIComponent(youtubeUrl)}&maxResults=50`,
+                              `${import.meta.env.VITE_API_URL || 'http://localhost:3001/api'}/tenants/${tenantActual.id}/contenido/youtube/channel-videos-detailed?url=${encodeURIComponent(youtubeUrl)}&maxResults=50`,
                               { headers: token ? { 'Authorization': `Bearer ${token}` } : {} }
                             );
-                            if (videosRes.ok) {
-                              const videosData = await videosRes.json();
-                              setChannelVideos(videosData.videos || []);
+                            if (!videosRes.ok) {
+                              const err = await videosRes.json();
+                              throw new Error(err.error || err.message || 'Error al obtener videos del canal');
+                            }
+                            const data = await videosRes.json();
+                            setChannelInfo(data.channelInfo);
+                            setChannelVideos(data.videos || []);
+                            setNextPageToken(data.nextPageToken);
+
+                            // Obtener playlists del canal
+                            const playlistsRes = await fetch(
+                              `${import.meta.env.VITE_API_URL || 'http://localhost:3001/api'}/tenants/${tenantActual.id}/contenido/youtube/channel-playlists?url=${encodeURIComponent(youtubeUrl)}`,
+                              { headers: token ? { 'Authorization': `Bearer ${token}` } : {} }
+                            );
+                            if (playlistsRes.ok) {
+                              const playlistsData = await playlistsRes.json();
+                              setChannelPlaylists(playlistsData.playlists || []);
                             }
                           } catch (err: any) {
                             setYoutubePreviewError(err.message);
@@ -3110,9 +3122,6 @@ export default function CrmContenido() {
                         Buscar
                       </button>
                     </div>
-                    <p style={{ margin: '8px 0 0', fontSize: '0.8rem', color: '#64748b' }}>
-                      Formatos: youtube.com/@nombre, youtube.com/channel/UC..., youtube.com/c/nombre
-                    </p>
                   </div>
 
                   {youtubePreviewError && (
@@ -3125,85 +3134,215 @@ export default function CrmContenido() {
                   )}
 
                   {channelInfo && (
-                    <div style={{ marginTop: '20px' }}>
+                    <div style={{ marginTop: '16px' }}>
                       {/* Info del canal */}
-                      <div style={{ padding: '16px', background: '#f8fafc', borderRadius: '12px', border: '1px solid #e2e8f0', marginBottom: '16px' }}>
-                        <div style={{ display: 'flex', gap: '16px', alignItems: 'center' }}>
-                          <img
-                            src={channelInfo.thumbnailUrl}
-                            alt={channelInfo.nombre}
-                            style={{ width: '64px', height: '64px', borderRadius: '50%', objectFit: 'cover' }}
-                          />
+                      <div style={{ padding: '12px 16px', background: '#f8fafc', borderRadius: '10px', border: '1px solid #e2e8f0', marginBottom: '12px' }}>
+                        <div style={{ display: 'flex', gap: '12px', alignItems: 'center' }}>
+                          <img src={channelInfo.thumbnailUrl} alt={channelInfo.nombre} style={{ width: '48px', height: '48px', borderRadius: '50%', objectFit: 'cover' }} />
                           <div style={{ flex: 1 }}>
-                            <h4 style={{ margin: '0 0 4px', fontSize: '1.1rem', fontWeight: 600, color: '#1e293b' }}>
-                              {channelInfo.nombre}
-                            </h4>
-                            <div style={{ display: 'flex', gap: '16px', fontSize: '0.85rem', color: '#64748b' }}>
-                              <span>{channelInfo.videoCount?.toLocaleString() || 0} videos</span>
-                              {channelInfo.subscriberCount && (
-                                <span>{channelInfo.subscriberCount.toLocaleString()} suscriptores</span>
-                              )}
-                            </div>
+                            <h4 style={{ margin: 0, fontSize: '1rem', fontWeight: 600 }}>{channelInfo.nombre}</h4>
+                            <p style={{ margin: 0, fontSize: '0.8rem', color: '#64748b' }}>{channelInfo.videoCount?.toLocaleString() || 0} videos</p>
                           </div>
                         </div>
                       </div>
 
-                      {/* Lista de videos a importar */}
-                      {channelVideos.length > 0 && (
-                        <div style={{ background: '#fff', border: '1px solid #e2e8f0', borderRadius: '12px' }}>
-                          <div style={{ padding: '12px 16px', borderBottom: '1px solid #e2e8f0', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                            <span style={{ fontWeight: 600, color: '#1e293b' }}>
-                              Videos encontrados: {channelVideos.length}
-                            </span>
-                            <span style={{ fontSize: '0.8rem', color: '#64748b' }}>
-                              (máximo 50 videos por importación)
-                            </span>
-                          </div>
-                          <div style={{ maxHeight: '200px', overflow: 'auto' }}>
-                            {channelVideos.slice(0, 10).map((video, idx) => (
-                              <div key={video.videoId} style={{ display: 'flex', gap: '12px', padding: '10px 16px', borderBottom: '1px solid #f1f5f9' }}>
-                                <img
-                                  src={video.thumbnailUrl}
-                                  alt=""
-                                  style={{ width: '80px', height: '45px', objectFit: 'cover', borderRadius: '4px' }}
-                                />
-                                <div style={{ flex: 1, overflow: 'hidden' }}>
-                                  <p style={{ margin: 0, fontSize: '0.85rem', fontWeight: 500, color: '#1e293b', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
-                                    {video.titulo}
-                                  </p>
-                                  <p style={{ margin: '2px 0 0', fontSize: '0.75rem', color: '#94a3b8' }}>
-                                    {new Date(video.fechaPublicacion).toLocaleDateString()}
-                                  </p>
-                                </div>
-                              </div>
+                      {/* Filtros y controles */}
+                      <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap', marginBottom: '12px', alignItems: 'center' }}>
+                        {/* Filtro por tipo */}
+                        <select
+                          value={videoTypeFilter}
+                          onChange={(e) => setVideoTypeFilter(e.target.value as 'all' | 'regular' | 'shorts')}
+                          style={{ padding: '8px 12px', borderRadius: '8px', border: '1px solid #e2e8f0', fontSize: '0.85rem' }}
+                        >
+                          <option value="all">Todos los videos</option>
+                          <option value="regular">Solo largos</option>
+                          <option value="shorts">Solo Shorts</option>
+                        </select>
+
+                        {/* Selector de playlist */}
+                        {channelPlaylists.length > 0 && (
+                          <select
+                            value={selectedPlaylist}
+                            onChange={async (e) => {
+                              const playlistId = e.target.value;
+                              setSelectedPlaylist(playlistId);
+                              if (!tenantActual?.id) return;
+                              setLoadingMore(true);
+                              try {
+                                const token = await getToken();
+                                // Si se selecciona una playlist específica, cargar sus videos
+                                // Si se selecciona "Todos", recargar videos del canal
+                                const endpoint = playlistId
+                                  ? `playlist-videos?playlistId=${playlistId}&maxResults=50`
+                                  : `channel-videos-detailed?url=${encodeURIComponent(youtubeUrl)}&maxResults=50`;
+                                const res = await fetch(
+                                  `${import.meta.env.VITE_API_URL || 'http://localhost:3001/api'}/tenants/${tenantActual.id}/contenido/youtube/${endpoint}`,
+                                  { headers: token ? { 'Authorization': `Bearer ${token}` } : {} }
+                                );
+                                if (res.ok) {
+                                  const data = await res.json();
+                                  setChannelVideos(data.videos || []);
+                                  setNextPageToken(data.nextPageToken);
+                                }
+                              } finally {
+                                setLoadingMore(false);
+                              }
+                            }}
+                            style={{ padding: '8px 12px', borderRadius: '8px', border: '1px solid #e2e8f0', fontSize: '0.85rem', maxWidth: '200px' }}
+                          >
+                            <option value="">Todos (uploads)</option>
+                            {channelPlaylists.map(pl => (
+                              <option key={pl.playlistId} value={pl.playlistId}>{pl.titulo} ({pl.videoCount})</option>
                             ))}
-                            {channelVideos.length > 10 && (
-                              <div style={{ padding: '10px 16px', textAlign: 'center', color: '#64748b', fontSize: '0.85rem' }}>
-                                ... y {channelVideos.length - 10} videos más
+                          </select>
+                        )}
+
+                        {/* Categoría para importar */}
+                        <select
+                          value={importCategoryId}
+                          onChange={(e) => setImportCategoryId(e.target.value)}
+                          style={{ padding: '8px 12px', borderRadius: '8px', border: '1px solid #e2e8f0', fontSize: '0.85rem' }}
+                        >
+                          <option value="">Sin categoría</option>
+                          {categorias.filter(c => c.tipo === 'video').map(cat => (
+                            <option key={cat.id} value={cat.id}>{cat.nombre}</option>
+                          ))}
+                        </select>
+                      </div>
+
+                      {/* Botones de selección */}
+                      <div style={{ display: 'flex', gap: '8px', marginBottom: '8px' }}>
+                        <button
+                          onClick={() => {
+                            const filtered = channelVideos.filter(v => {
+                              if (v.alreadyImported) return false;
+                              if (videoTypeFilter === 'regular' && v.isShort) return false;
+                              if (videoTypeFilter === 'shorts' && !v.isShort) return false;
+                              return true;
+                            });
+                            setSelectedVideoIds(new Set(filtered.map(v => v.videoId)));
+                          }}
+                          style={{ padding: '6px 12px', background: '#f1f5f9', border: '1px solid #e2e8f0', borderRadius: '6px', fontSize: '0.8rem', cursor: 'pointer' }}
+                        >
+                          Seleccionar todos
+                        </button>
+                        <button
+                          onClick={() => setSelectedVideoIds(new Set())}
+                          style={{ padding: '6px 12px', background: '#f1f5f9', border: '1px solid #e2e8f0', borderRadius: '6px', fontSize: '0.8rem', cursor: 'pointer' }}
+                        >
+                          Deseleccionar todos
+                        </button>
+                        <span style={{ fontSize: '0.85rem', color: '#64748b', marginLeft: 'auto' }}>
+                          {selectedVideoIds.size} seleccionados
+                        </span>
+                      </div>
+
+                      {/* Lista de videos */}
+                      <div style={{ background: '#fff', border: '1px solid #e2e8f0', borderRadius: '10px', maxHeight: '300px', overflow: 'auto' }}>
+                        {channelVideos
+                          .filter(v => {
+                            if (videoTypeFilter === 'regular' && v.isShort) return false;
+                            if (videoTypeFilter === 'shorts' && !v.isShort) return false;
+                            return true;
+                          })
+                          .map(video => (
+                          <div
+                            key={video.videoId}
+                            onClick={() => {
+                              if (video.alreadyImported) return;
+                              const newSet = new Set(selectedVideoIds);
+                              if (newSet.has(video.videoId)) {
+                                newSet.delete(video.videoId);
+                              } else {
+                                newSet.add(video.videoId);
+                              }
+                              setSelectedVideoIds(newSet);
+                            }}
+                            style={{
+                              display: 'flex',
+                              gap: '10px',
+                              padding: '8px 12px',
+                              borderBottom: '1px solid #f1f5f9',
+                              cursor: video.alreadyImported ? 'not-allowed' : 'pointer',
+                              background: video.alreadyImported ? '#f8fafc' : selectedVideoIds.has(video.videoId) ? '#eff6ff' : 'transparent',
+                              opacity: video.alreadyImported ? 0.6 : 1
+                            }}
+                          >
+                            {/* Checkbox */}
+                            <div style={{ display: 'flex', alignItems: 'center' }}>
+                              <input
+                                type="checkbox"
+                                checked={selectedVideoIds.has(video.videoId)}
+                                disabled={video.alreadyImported}
+                                onChange={() => {}}
+                                style={{ width: '16px', height: '16px', cursor: video.alreadyImported ? 'not-allowed' : 'pointer' }}
+                              />
+                            </div>
+                            {/* Thumbnail */}
+                            <img src={video.thumbnailUrl} alt="" style={{ width: '60px', height: '34px', objectFit: 'cover', borderRadius: '4px' }} />
+                            {/* Info */}
+                            <div style={{ flex: 1, minWidth: 0 }}>
+                              <p style={{ margin: 0, fontSize: '0.8rem', fontWeight: 500, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+                                {video.titulo}
+                              </p>
+                              <div style={{ display: 'flex', gap: '8px', fontSize: '0.7rem', color: '#94a3b8' }}>
+                                <span>{Math.floor((video.duracionSegundos || 0) / 60)}:{String((video.duracionSegundos || 0) % 60).padStart(2, '0')}</span>
+                                {video.isShort && <span style={{ background: '#fef3c7', color: '#d97706', padding: '1px 6px', borderRadius: '4px' }}>Short</span>}
+                                {video.alreadyImported && <span style={{ background: '#dcfce7', color: '#16a34a', padding: '1px 6px', borderRadius: '4px' }}>Ya importado</span>}
                               </div>
-                            )}
+                            </div>
                           </div>
-                        </div>
+                        ))}
+                        {loadingMore && (
+                          <div style={{ padding: '12px', textAlign: 'center' }}>
+                            <LucideIcons.Loader2 size={20} className="animate-spin" style={{ color: '#64748b' }} />
+                          </div>
+                        )}
+                      </div>
+
+                      {/* Cargar más */}
+                      {nextPageToken && (
+                        <button
+                          onClick={async () => {
+                            if (!tenantActual?.id || loadingMore) return;
+                            setLoadingMore(true);
+                            try {
+                              const token = await getToken();
+                              const endpoint = selectedPlaylist
+                                ? `playlist-videos?playlistId=${selectedPlaylist}&maxResults=50&pageToken=${nextPageToken}`
+                                : `channel-videos-detailed?url=${encodeURIComponent(youtubeUrl)}&maxResults=50&pageToken=${nextPageToken}`;
+                              const res = await fetch(
+                                `${import.meta.env.VITE_API_URL || 'http://localhost:3001/api'}/tenants/${tenantActual.id}/contenido/youtube/${endpoint}`,
+                                { headers: token ? { 'Authorization': `Bearer ${token}` } : {} }
+                              );
+                              if (res.ok) {
+                                const data = await res.json();
+                                setChannelVideos(prev => [...prev, ...(data.videos || [])]);
+                                setNextPageToken(data.nextPageToken);
+                              }
+                            } finally {
+                              setLoadingMore(false);
+                            }
+                          }}
+                          disabled={loadingMore}
+                          style={{ width: '100%', marginTop: '8px', padding: '10px', background: '#f1f5f9', border: '1px solid #e2e8f0', borderRadius: '8px', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '6px' }}
+                        >
+                          {loadingMore ? <LucideIcons.Loader2 size={16} className="animate-spin" /> : <LucideIcons.ChevronDown size={16} />}
+                          Cargar más videos
+                        </button>
                       )}
 
                       {/* Progreso de importación */}
                       {importProgress.importing && (
-                        <div style={{ marginTop: '16px', padding: '16px', background: '#eff6ff', borderRadius: '10px', border: '1px solid #bfdbfe' }}>
-                          <div style={{ display: 'flex', alignItems: 'center', gap: '12px', marginBottom: '8px' }}>
-                            <LucideIcons.Loader2 size={20} className="animate-spin" style={{ color: '#2563eb' }} />
-                            <span style={{ fontWeight: 600, color: '#1e40af' }}>
-                              Importando videos... {importProgress.current} de {importProgress.total}
+                        <div style={{ marginTop: '12px', padding: '12px', background: '#eff6ff', borderRadius: '8px', border: '1px solid #bfdbfe' }}>
+                          <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '6px' }}>
+                            <LucideIcons.Loader2 size={16} className="animate-spin" style={{ color: '#2563eb' }} />
+                            <span style={{ fontWeight: 600, color: '#1e40af', fontSize: '0.85rem' }}>
+                              Importando {importProgress.current} de {importProgress.total}...
                             </span>
                           </div>
-                          <div style={{ height: '8px', background: '#dbeafe', borderRadius: '4px', overflow: 'hidden' }}>
-                            <div
-                              style={{
-                                width: `${(importProgress.current / importProgress.total) * 100}%`,
-                                height: '100%',
-                                background: '#2563eb',
-                                transition: 'width 0.3s'
-                              }}
-                            />
+                          <div style={{ height: '6px', background: '#dbeafe', borderRadius: '3px', overflow: 'hidden' }}>
+                            <div style={{ width: `${(importProgress.current / importProgress.total) * 100}%`, height: '100%', background: '#2563eb', transition: 'width 0.3s' }} />
                           </div>
                         </div>
                       )}
@@ -3223,6 +3362,10 @@ export default function CrmContenido() {
                   setChannelVideos([]);
                   setChannelInfo(null);
                   setImportProgress({ current: 0, total: 0, importing: false });
+                  setSelectedVideoIds(new Set());
+                  setChannelPlaylists([]);
+                  setSelectedPlaylist('');
+                  setImportCategoryId('');
                 }}
                 className="btn-secondary"
                 disabled={importProgress.importing}
@@ -3238,7 +3381,6 @@ export default function CrmContenido() {
                         alert('Por favor ingresa una URL de YouTube');
                         return;
                       }
-                      // Si no hay preview, navegar al editor tradicional
                       let videoId: string | null = null;
                       const patterns = [
                         /(?:youtube\.com\/watch\?v=|youtu\.be\/|youtube\.com\/embed\/)([a-zA-Z0-9_-]+)/,
@@ -3257,8 +3399,6 @@ export default function CrmContenido() {
                       setYoutubeUrl('');
                       return;
                     }
-
-                    // Importar directamente
                     setImportingYouTube(true);
                     try {
                       const token = await getToken();
@@ -3266,11 +3406,8 @@ export default function CrmContenido() {
                         `${import.meta.env.VITE_API_URL || 'http://localhost:3001/api'}/tenants/${tenantActual.id}/contenido/youtube/import-video`,
                         {
                           method: 'POST',
-                          headers: {
-                            'Content-Type': 'application/json',
-                            ...(token ? { 'Authorization': `Bearer ${token}` } : {})
-                          },
-                          body: JSON.stringify({ url: youtubeUrl, publicado: true })
+                          headers: { 'Content-Type': 'application/json', ...(token ? { 'Authorization': `Bearer ${token}` } : {}) },
+                          body: JSON.stringify({ url: youtubeUrl, publicado: true, categoria_id: importCategoryId || undefined })
                         }
                       );
                       if (!response.ok) {
@@ -3283,7 +3420,6 @@ export default function CrmContenido() {
                       setShowYouTubeImportModal(false);
                       setYoutubeUrl('');
                       setYoutubePreview(null);
-                      // Navegar al video creado
                       if (result.video?.id) {
                         navigate(`/crm/${tenantSlug}/contenido/videos/${result.video.id}`);
                       }
@@ -3306,62 +3442,58 @@ export default function CrmContenido() {
               ) : (
                 <button
                   onClick={async () => {
-                    if (!channelInfo || channelVideos.length === 0 || !tenantActual?.id) {
-                      alert('Primero busca un canal con videos');
+                    if (selectedVideoIds.size === 0 || !tenantActual?.id) {
+                      alert('Selecciona al menos un video para importar');
                       return;
                     }
-
-                    setImportProgress({ current: 0, total: channelVideos.length, importing: true });
-
+                    const videoIdsArray = Array.from(selectedVideoIds);
+                    setImportProgress({ current: 0, total: videoIdsArray.length, importing: true });
                     try {
                       const token = await getToken();
                       const response = await fetch(
-                        `${import.meta.env.VITE_API_URL || 'http://localhost:3001/api'}/tenants/${tenantActual.id}/contenido/youtube/import-channel`,
+                        `${import.meta.env.VITE_API_URL || 'http://localhost:3001/api'}/tenants/${tenantActual.id}/contenido/youtube/import-selected`,
                         {
                           method: 'POST',
-                          headers: {
-                            'Content-Type': 'application/json',
-                            ...(token ? { 'Authorization': `Bearer ${token}` } : {})
-                          },
+                          headers: { 'Content-Type': 'application/json', ...(token ? { 'Authorization': `Bearer ${token}` } : {}) },
                           body: JSON.stringify({
-                            url: youtubeUrl,
-                            publicado: false, // Por defecto no publicar masivamente
-                            maxVideos: 50
+                            videoIds: videoIdsArray,
+                            categoria_id: importCategoryId || undefined,
+                            publicado: false
                           })
                         }
                       );
-
                       if (!response.ok) {
                         const err = await response.json();
                         throw new Error(err.error || err.message || 'Error al importar');
                       }
-
                       const result = await response.json();
-                      setImportProgress({ current: result.summary.imported, total: result.summary.totalFound, importing: false });
+                      setImportProgress({ current: result.summary.imported, total: result.summary.requested, importing: false });
                       setSuccessMessage(`Importación completada: ${result.summary.imported} videos importados, ${result.summary.skipped} omitidos, ${result.summary.errors} errores`);
                       loadData();
-
-                      // Cerrar modal después de un momento
                       setTimeout(() => {
                         setShowYouTubeImportModal(false);
                         setYoutubeUrl('');
                         setChannelInfo(null);
                         setChannelVideos([]);
                         setImportProgress({ current: 0, total: 0, importing: false });
+                        setSelectedVideoIds(new Set());
+                        setChannelPlaylists([]);
+                        setSelectedPlaylist('');
+                        setImportCategoryId('');
                       }, 2000);
                     } catch (err: any) {
                       setImportProgress({ current: 0, total: 0, importing: false });
-                      alert(err.message || 'Error al importar canal');
+                      alert(err.message || 'Error al importar videos');
                     }
                   }}
                   className="btn-primary"
                   style={{ display: 'flex', alignItems: 'center', gap: '6px' }}
-                  disabled={!channelInfo || channelVideos.length === 0 || importProgress.importing}
+                  disabled={selectedVideoIds.size === 0 || importProgress.importing}
                 >
                   {importProgress.importing ? (
                     <><LucideIcons.Loader2 size={16} className="animate-spin" /> Importando...</>
                   ) : (
-                    <><LucideIcons.Download size={16} /> Importar {channelVideos.length} Videos</>
+                    <><LucideIcons.Download size={16} /> Importar {selectedVideoIds.size} Videos</>
                   )}
                 </button>
               )}

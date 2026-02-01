@@ -50,6 +50,19 @@ export interface YouTubeChannelVideo {
   descripcion: string;
   thumbnailUrl: string;
   fechaPublicacion: string;
+  duracionSegundos?: number;
+  isShort?: boolean;
+  playlistId?: string;
+  playlistTitle?: string;
+}
+
+// Interface para playlist de canal
+export interface YouTubePlaylist {
+  playlistId: string;
+  titulo: string;
+  descripcion: string;
+  thumbnailUrl: string;
+  videoCount: number;
 }
 
 // Acepta YOUTUBE_API_KEY o GOOGLE_API_KEY (la misma key funciona para ambos)
@@ -346,5 +359,190 @@ export function mapYouTubeVideoToContent(youtubeVideo: YouTubeVideoInfo): {
     thumbnail_url: youtubeVideo.thumbnailUrlHq || youtubeVideo.thumbnailUrl,
     duracion: youtubeVideo.duracionSegundos,
     fuente: 'youtube',
+  };
+}
+
+/**
+ * Detecta si un video es un Short basado en duración y metadatos
+ */
+export function isYouTubeShort(video: { duracionSegundos?: number; titulo?: string; descripcion?: string }): boolean {
+  // Shorts son videos de menos de 60 segundos
+  if (video.duracionSegundos && video.duracionSegundos <= 60) {
+    return true;
+  }
+  // También verificar si tiene #shorts en título o descripción
+  const text = `${video.titulo || ''} ${video.descripcion || ''}`.toLowerCase();
+  if (text.includes('#shorts') || text.includes('#short')) {
+    return true;
+  }
+  return false;
+}
+
+/**
+ * Obtiene las playlists de un canal de YouTube
+ */
+export async function getChannelPlaylists(
+  channelIdOrUrl: string,
+  maxResults: number = 50
+): Promise<{ playlists: YouTubePlaylist[]; nextPageToken?: string }> {
+  if (!YOUTUBE_API_KEY) {
+    throw new Error('YOUTUBE_API_KEY no está configurada en las variables de entorno');
+  }
+
+  const channelInfo = await getChannelInfo(channelIdOrUrl);
+
+  const url = `${YOUTUBE_API_BASE}/playlists?` + new URLSearchParams({
+    part: 'snippet,contentDetails',
+    channelId: channelInfo.channelId,
+    maxResults: Math.min(maxResults, 50).toString(),
+    key: YOUTUBE_API_KEY,
+  });
+
+  const response = await fetch(url);
+
+  if (!response.ok) {
+    const error = await response.json() as { error?: { message?: string } };
+    throw new Error(error.error?.message || 'Error al obtener playlists del canal');
+  }
+
+  const data = await response.json() as { items?: any[]; nextPageToken?: string };
+
+  const playlists: YouTubePlaylist[] = (data.items || []).map((item: any) => ({
+    playlistId: item.id,
+    titulo: item.snippet.title,
+    descripcion: item.snippet.description || '',
+    thumbnailUrl: item.snippet.thumbnails?.medium?.url || item.snippet.thumbnails?.default?.url || '',
+    videoCount: item.contentDetails?.itemCount || 0,
+  }));
+
+  return {
+    playlists,
+    nextPageToken: data.nextPageToken,
+  };
+}
+
+/**
+ * Obtiene videos de una playlist específica con información de duración
+ */
+export async function getPlaylistVideos(
+  playlistId: string,
+  maxResults: number = 50,
+  pageToken?: string
+): Promise<{ videos: YouTubeChannelVideo[]; nextPageToken?: string; totalResults: number }> {
+  if (!YOUTUBE_API_KEY) {
+    throw new Error('YOUTUBE_API_KEY no está configurada en las variables de entorno');
+  }
+
+  const params: Record<string, string> = {
+    part: 'snippet',
+    playlistId: playlistId,
+    maxResults: Math.min(maxResults, 50).toString(),
+    key: YOUTUBE_API_KEY,
+  };
+
+  if (pageToken) {
+    params.pageToken = pageToken;
+  }
+
+  const url = `${YOUTUBE_API_BASE}/playlistItems?` + new URLSearchParams(params);
+  const response = await fetch(url);
+
+  if (!response.ok) {
+    const error = await response.json() as { error?: { message?: string } };
+    throw new Error(error.error?.message || 'Error al obtener videos de la playlist');
+  }
+
+  const data = await response.json() as { items?: any[]; nextPageToken?: string; pageInfo?: { totalResults?: number } };
+
+  // Obtener IDs de videos para consultar duración
+  const videoIds = (data.items || [])
+    .map((item: any) => item.snippet?.resourceId?.videoId)
+    .filter(Boolean);
+
+  // Obtener detalles de duración de los videos
+  let videoDurations: Record<string, number> = {};
+  if (videoIds.length > 0) {
+    const detailsUrl = `${YOUTUBE_API_BASE}/videos?` + new URLSearchParams({
+      part: 'contentDetails',
+      id: videoIds.join(','),
+      key: YOUTUBE_API_KEY,
+    });
+    const detailsResponse = await fetch(detailsUrl);
+    if (detailsResponse.ok) {
+      const detailsData = await detailsResponse.json() as { items?: any[] };
+      (detailsData.items || []).forEach((item: any) => {
+        videoDurations[item.id] = parseDuration(item.contentDetails?.duration || 'PT0S');
+      });
+    }
+  }
+
+  const videos: YouTubeChannelVideo[] = (data.items || [])
+    .filter((item: any) => item.snippet?.resourceId?.videoId) // Filtrar items sin videoId
+    .map((item: any) => {
+      const videoId = item.snippet.resourceId.videoId;
+      const duracionSegundos = videoDurations[videoId] || 0;
+      const titulo = item.snippet.title;
+      const descripcion = item.snippet.description || '';
+
+      return {
+        videoId,
+        titulo,
+        descripcion,
+        thumbnailUrl: item.snippet.thumbnails?.medium?.url || item.snippet.thumbnails?.default?.url || '',
+        fechaPublicacion: item.snippet.publishedAt,
+        duracionSegundos,
+        isShort: isYouTubeShort({ duracionSegundos, titulo, descripcion }),
+        playlistId: playlistId,
+      };
+    });
+
+  return {
+    videos,
+    nextPageToken: data.nextPageToken,
+    totalResults: data.pageInfo?.totalResults || videos.length,
+  };
+}
+
+/**
+ * Obtiene todos los videos de un canal con información completa (incluye duración)
+ * Esto permite detectar Shorts vs videos normales
+ */
+export async function getChannelVideosWithDetails(
+  channelIdOrUrl: string,
+  maxResults: number = 200,
+  pageToken?: string
+): Promise<{ videos: YouTubeChannelVideo[]; nextPageToken?: string; totalResults: number; channelInfo: YouTubeChannelInfo }> {
+  if (!YOUTUBE_API_KEY) {
+    throw new Error('YOUTUBE_API_KEY no está configurada en las variables de entorno');
+  }
+
+  const channelInfo = await getChannelInfo(channelIdOrUrl);
+
+  // Obtener el playlist ID de uploads del canal
+  const channelUrl = `${YOUTUBE_API_BASE}/channels?` + new URLSearchParams({
+    part: 'contentDetails',
+    id: channelInfo.channelId,
+    key: YOUTUBE_API_KEY,
+  });
+
+  const channelResponse = await fetch(channelUrl);
+  const channelData = await channelResponse.json() as { items?: any[] };
+
+  if (!channelData.items || channelData.items.length === 0) {
+    throw new Error('No se pudo obtener el playlist de uploads del canal');
+  }
+
+  const uploadsPlaylistId = channelData.items[0].contentDetails?.relatedPlaylists?.uploads;
+
+  if (!uploadsPlaylistId) {
+    throw new Error('El canal no tiene videos públicos');
+  }
+
+  // Usar getPlaylistVideos para obtener videos con detalles
+  const result = await getPlaylistVideos(uploadsPlaylistId, Math.min(maxResults, 50), pageToken);
+
+  return {
+    ...result,
+    channelInfo,
   };
 }
