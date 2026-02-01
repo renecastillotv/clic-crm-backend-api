@@ -1693,7 +1693,6 @@ export default function CrmLayout() {
             gap: 16px;
             flex: 1;
             min-width: 0; /* Permite que se contraiga */
-            overflow: hidden;
           }
 
           .header-back-btn {
@@ -1725,11 +1724,16 @@ export default function CrmLayout() {
             display: flex;
             align-items: baseline;
             gap: 10px;
+            min-width: 0; /* Permite truncamiento */
+            overflow: hidden;
           }
 
           .header-title {
             margin: 0;
             font-size: 1.1rem;
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
             font-weight: 600;
             color: var(--text-primary);
           }
@@ -2118,6 +2122,8 @@ export default function CrmLayout() {
             /* Header left more compact */
             .header-left {
               gap: 8px;
+              flex: 1;
+              min-width: 0;
             }
 
             /* Stack header title section */
@@ -2125,57 +2131,37 @@ export default function CrmLayout() {
               flex-direction: column;
               align-items: flex-start;
               gap: 2px;
+              max-width: 140px;
             }
 
             .header-title {
-              font-size: 0.95rem;
-              white-space: nowrap;
-              overflow: hidden;
-              text-overflow: ellipsis;
-              max-width: 120px;
+              font-size: 0.9rem;
             }
 
             .header-subtitle {
-              font-size: 0.7rem;
-              display: none; /* Ocultar subtítulo en móvil pequeño */
+              font-size: 0.65rem;
+              display: none;
             }
 
-            /* Header actions más compactos */
+            /* Header actions compactos */
             .header-actions {
               gap: 4px;
             }
 
-            /* Botones del header: solo icono en móvil */
+            /* Botones del header más pequeños en móvil */
             .header-actions button,
             .header-actions .btn-primary,
             .header-actions .btn-secondary,
             .header-actions .crm-btn {
-              padding: 6px 8px;
+              padding: 6px 10px;
               font-size: 0.75rem;
               gap: 4px;
-            }
-
-            /* Ocultar texto en botones con iconos SVG en móvil */
-            .header-actions button svg ~ span,
-            .header-actions .btn-primary svg ~ span,
-            .header-actions .btn-secondary svg ~ span {
-              display: none;
-            }
-
-            /* Si el botón tiene un texto directo (sin span), hacerlo más corto */
-            .header-actions button:not(:has(svg)),
-            .header-actions .btn-primary:not(:has(svg)),
-            .header-actions .btn-secondary:not(:has(svg)) {
-              max-width: 100px;
-              overflow: hidden;
-              text-overflow: ellipsis;
-              white-space: nowrap;
             }
 
             /* Back button smaller */
             .header-back-btn {
               padding: 4px 8px;
-              font-size: 0.8rem;
+              font-size: 0.75rem;
             }
 
             .header-back-btn span {
