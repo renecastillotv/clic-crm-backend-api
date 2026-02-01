@@ -20,6 +20,14 @@ import {
   isYouTubeShort,
   getMultipleVideoStats
 } from '../../services/youtubeImportService.js';
+import {
+  generateArticle,
+  generateFAQs,
+  generateSeoStat,
+  ArticlePrompt,
+  FAQPrompt,
+  SeoStatPrompt
+} from '../../services/aiContentService.js';
 
 const router = express.Router({ mergeParams: true });
 router.use(resolveUserScope);
@@ -2089,6 +2097,144 @@ router.post('/youtube/sync-stats', requirePermission('contenido', 'editar'), asy
       return res.status(503).json({
         error: 'Servicio no disponible',
         message: 'La API de YouTube no está configurada'
+      });
+    }
+    next(error);
+  }
+});
+
+// ==================== RUTAS: GENERACIÓN DE CONTENIDO CON IA ====================
+
+/**
+ * POST /api/tenants/:tenantId/contenido/ai/generate-article
+ * Genera un artículo usando ChatGPT
+ * Solo disponible para admin
+ */
+router.post('/ai/generate-article', requirePermission('contenido', 'crear'), async (req: Request<TenantParams>, res: Response, next: NextFunction) => {
+  try {
+    // Verificar que sea admin
+    const userRole = (req as any).userFromDb?.role;
+    if (userRole !== 'admin' && userRole !== 'superadmin') {
+      return res.status(403).json({ error: 'Esta función está disponible solo para administradores' });
+    }
+
+    const { tema, tipoPropiedad, operacion, ubicacion, palabrasClave, tono, longitud } = req.body;
+
+    if (!tema || typeof tema !== 'string' || !tema.trim()) {
+      return res.status(400).json({ error: 'El campo "tema" es requerido' });
+    }
+
+    const params: ArticlePrompt = {
+      tema: tema.trim(),
+      tipoPropiedad: tipoPropiedad || undefined,
+      operacion: operacion || undefined,
+      ubicacion: ubicacion || undefined,
+      palabrasClave: Array.isArray(palabrasClave) ? palabrasClave : undefined,
+      tono: ['profesional', 'casual', 'informativo'].includes(tono) ? tono : 'profesional',
+      longitud: ['corto', 'medio', 'largo'].includes(longitud) ? longitud : 'medio'
+    };
+
+    const article = await generateArticle(params);
+    res.json(article);
+  } catch (error: any) {
+    if (error.message?.includes('OPENAI_API_KEY')) {
+      return res.status(503).json({
+        error: 'Servicio no disponible',
+        message: 'La API de OpenAI no está configurada'
+      });
+    }
+    next(error);
+  }
+});
+
+/**
+ * POST /api/tenants/:tenantId/contenido/ai/generate-faqs
+ * Genera FAQs usando ChatGPT
+ * Solo disponible para admin
+ */
+router.post('/ai/generate-faqs', requirePermission('contenido', 'crear'), async (req: Request<TenantParams>, res: Response, next: NextFunction) => {
+  try {
+    // Verificar que sea admin
+    const userRole = (req as any).userFromDb?.role;
+    if (userRole !== 'admin' && userRole !== 'superadmin') {
+      return res.status(403).json({ error: 'Esta función está disponible solo para administradores' });
+    }
+
+    const { contexto, tipoPropiedad, operacion, ubicacion, cantidad } = req.body;
+
+    if (!contexto || typeof contexto !== 'string' || !contexto.trim()) {
+      return res.status(400).json({ error: 'El campo "contexto" es requerido' });
+    }
+
+    const params: FAQPrompt = {
+      contexto: contexto.trim(),
+      tipoPropiedad: tipoPropiedad || undefined,
+      operacion: operacion || undefined,
+      ubicacion: ubicacion || undefined,
+      cantidad: cantidad ? Math.min(Math.max(parseInt(cantidad), 3), 10) : 5
+    };
+
+    const faqs = await generateFAQs(params);
+    res.json({ faqs });
+  } catch (error: any) {
+    if (error.message?.includes('OPENAI_API_KEY')) {
+      return res.status(503).json({
+        error: 'Servicio no disponible',
+        message: 'La API de OpenAI no está configurada'
+      });
+    }
+    next(error);
+  }
+});
+
+/**
+ * POST /api/tenants/:tenantId/contenido/ai/generate-seo-stat
+ * Genera un SEO Stat usando ChatGPT
+ * Solo disponible para admin
+ */
+router.post('/ai/generate-seo-stat', requirePermission('contenido', 'crear'), async (req: Request<TenantParams>, res: Response, next: NextFunction) => {
+  try {
+    // Verificar que sea admin
+    const userRole = (req as any).userFromDb?.role;
+    if (userRole !== 'admin' && userRole !== 'superadmin') {
+      return res.status(403).json({ error: 'Esta función está disponible solo para administradores' });
+    }
+
+    const { operaciones, nombreUbicacion, nombreTipoPropiedad, tipoPropiedadIds, ubicacionIds, precioPromedio, propiedadesDisponibles } = req.body;
+
+    if (!operaciones || !Array.isArray(operaciones) || operaciones.length === 0) {
+      return res.status(400).json({ error: 'El campo "operaciones" es requerido (array con "comprar" y/o "alquilar")' });
+    }
+
+    const validOps = operaciones.filter(op => ['comprar', 'alquilar'].includes(op));
+    if (validOps.length === 0) {
+      return res.status(400).json({ error: 'operaciones debe contener "comprar" y/o "alquilar"' });
+    }
+
+    const params: SeoStatPrompt = {
+      operaciones: validOps,
+      nombreUbicacion: nombreUbicacion || undefined,
+      nombreTipoPropiedad: nombreTipoPropiedad || undefined,
+      tipoPropiedadIds: Array.isArray(tipoPropiedadIds) ? tipoPropiedadIds : undefined,
+      ubicacionIds: Array.isArray(ubicacionIds) ? ubicacionIds : undefined,
+      precioPromedio: precioPromedio ? parseFloat(precioPromedio) : undefined,
+      propiedadesDisponibles: propiedadesDisponibles ? parseInt(propiedadesDisponibles) : undefined
+    };
+
+    const seoStat = await generateSeoStat(params);
+
+    // Agregar los IDs para que el frontend pueda guardarlos
+    res.json({
+      ...seoStat,
+      operaciones: validOps,
+      tipoPropiedadIds: params.tipoPropiedadIds || [],
+      ubicacionIds: params.ubicacionIds || []
+    });
+  } catch (error: any) {
+    if (error.message?.includes('OPENAI_API_KEY')) {
+      return res.status(503).json({
+        error: 'Servicio no disponible',
+        message: 'La API de OpenAI no está configurada'
       });
     }
     next(error);
