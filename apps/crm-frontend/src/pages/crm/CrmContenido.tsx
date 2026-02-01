@@ -162,6 +162,11 @@ export default function CrmContenido() {
   // Es admin si tiene acceso a contenido-config o es platform admin
   const esAdmin = isPlatformAdmin || tieneAcceso('contenido-config');
 
+  // Es admin real (por rol, no por permiso) - para funciones exclusivas como IA
+  // Verifica si tiene rol tenant_admin o tenant_owner, o es platform admin
+  const esAdminReal = isPlatformAdmin ||
+    tenantActual?.roles?.some((r: any) => ['tenant_admin', 'tenant_owner', 'admin', 'superadmin'].includes(r.codigo));
+
   // Permisos de contenido para usuarios no-admin
   const [permisosContenido, setPermisosContenido] = useState<PermisosContenido>({
     articulos: true,
@@ -391,7 +396,7 @@ export default function CrmContenido() {
           subtitle: 'Gestiona los artículos de tu blog',
           action: canCreate ? (
             <div style={{ display: 'flex', gap: '10px' }}>
-              {esAdmin && (
+              {esAdminReal && (
                 <button
                   onClick={() => { setShowAIModal('articulo'); setAIGenerated(null); setAIError(null); }}
                   className="btn-secondary"
@@ -433,7 +438,7 @@ export default function CrmContenido() {
           subtitle: 'Gestiona las preguntas frecuentes',
           action: canCreate ? (
             <div style={{ display: 'flex', gap: '10px' }}>
-              {esAdmin && (
+              {esAdminReal && (
                 <button
                   onClick={() => { setShowAIModal('faq'); setAIGenerated(null); setAIError(null); }}
                   className="btn-secondary"
@@ -465,7 +470,7 @@ export default function CrmContenido() {
           subtitle: 'Contenido enriquecido para SEO',
           action: canCreate ? (
             <div style={{ display: 'flex', gap: '10px' }}>
-              {esAdmin && (
+              {esAdminReal && (
                 <button
                   onClick={() => { setShowAIModal('seo-stat'); setAIGenerated(null); setAIError(null); }}
                   className="btn-secondary"
@@ -506,7 +511,7 @@ export default function CrmContenido() {
       subtitle: config.subtitle,
       actions: config.action,
     });
-  }, [activeTab, setPageHeader, navigate, tenantSlug, canCreate, esAdmin]);
+  }, [activeTab, setPageHeader, navigate, tenantSlug, canCreate, esAdmin, esAdminReal]);
 
   // Resetear paginación cuando cambian los filtros
   useEffect(() => {
