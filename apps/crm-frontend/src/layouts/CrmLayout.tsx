@@ -2145,17 +2145,37 @@ export default function CrmLayout() {
 
             /* Header actions compactos */
             .header-actions {
-              gap: 4px;
+              gap: 6px;
             }
 
-            /* Botones del header más pequeños en móvil */
+            /* ===== BOTONES ICON-ONLY EN MÓVIL ===== */
+            /* Los botones muestran solo el icono, ocultando el texto */
             .header-actions button,
             .header-actions .btn-primary,
             .header-actions .btn-secondary,
             .header-actions .crm-btn {
-              padding: 6px 10px;
-              font-size: 0.75rem;
-              gap: 4px;
+              /* Tamaño fijo cuadrado para solo icono */
+              width: 36px;
+              height: 36px;
+              padding: 0;
+              /* Ocultar texto pero mantener SVG */
+              font-size: 0;
+              line-height: 0;
+              /* Centrar el icono */
+              display: inline-flex;
+              align-items: center;
+              justify-content: center;
+              border-radius: 8px;
+            }
+
+            /* El SVG dentro del botón mantiene su tamaño */
+            .header-actions button svg,
+            .header-actions .btn-primary svg,
+            .header-actions .btn-secondary svg,
+            .header-actions .crm-btn svg {
+              width: 18px;
+              height: 18px;
+              flex-shrink: 0;
             }
 
             /* Back button smaller */
