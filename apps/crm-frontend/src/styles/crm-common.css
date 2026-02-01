@@ -584,3 +584,197 @@
   background: var(--premium-border-light, #F1F5F9);
   margin: 0 var(--space-4, 16px);
 }
+
+/* ============================================================================
+   CARD UNIFICADO (Fase 3.1)
+   ============================================================================ */
+
+.crm-card {
+  background: var(--premium-card-bg, #ffffff);
+  border: 1px solid var(--premium-card-border, #E2E8F0);
+  border-radius: var(--premium-radius-lg, 12px);
+  box-shadow: var(--shadow-xs, 0 1px 2px rgba(0, 0, 0, 0.04));
+  transition: box-shadow var(--transition-base, 200ms ease-out), border-color var(--transition-base, 200ms ease-out);
+}
+
+.crm-card:hover {
+  box-shadow: var(--shadow-sm, 0 2px 4px rgba(0, 0, 0, 0.06));
+}
+
+.crm-card-header {
+  padding: var(--space-4, 16px) var(--space-5, 20px);
+  border-bottom: 1px solid var(--premium-border-light, #F1F5F9);
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-3, 12px);
+}
+
+.crm-card-header-title {
+  font-size: 1rem;
+  font-weight: 600;
+  color: var(--premium-text-strong, #0F172A);
+  margin: 0;
+}
+
+.crm-card-header-subtitle {
+  font-size: 0.875rem;
+  color: var(--premium-text-muted, #64748B);
+  margin: 0;
+}
+
+.crm-card-body {
+  padding: var(--space-5, 20px);
+}
+
+.crm-card-footer {
+  padding: var(--space-4, 16px) var(--space-5, 20px);
+  border-top: 1px solid var(--premium-border-light, #F1F5F9);
+  background: var(--premium-surface, #F8F9FA);
+  border-radius: 0 0 var(--premium-radius-lg, 12px) var(--premium-radius-lg, 12px);
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: var(--space-3, 12px);
+}
+
+/* Variantes */
+.crm-card-interactive {
+  cursor: pointer;
+}
+
+.crm-card-interactive:hover {
+  border-color: var(--premium-primary-light, rgba(0, 87, 255, 0.3));
+}
+
+.crm-card-flush {
+  border: none;
+  box-shadow: none;
+  background: transparent;
+}
+
+.crm-card-flush:hover {
+  box-shadow: none;
+}
+
+.crm-card-elevated {
+  box-shadow: var(--shadow-md, 0 4px 12px rgba(0, 0, 0, 0.08));
+}
+
+.crm-card-elevated:hover {
+  box-shadow: var(--shadow-lg, 0 8px 24px rgba(0, 0, 0, 0.12));
+}
+
+/* Card sin padding (para contenido que ocupa todo) */
+.crm-card-body.no-padding {
+  padding: 0;
+}
+
+/* Card con imagen */
+.crm-card-image {
+  width: 100%;
+  height: auto;
+  border-radius: var(--premium-radius-lg, 12px) var(--premium-radius-lg, 12px) 0 0;
+  display: block;
+}
+
+/* ============================================================================
+   TABLE CONTAINER (Fase 3.3)
+   ============================================================================ */
+
+.crm-table-container {
+  background: var(--premium-card-bg, #ffffff);
+  border: 1px solid var(--premium-card-border, #E2E8F0);
+  border-radius: var(--premium-radius-lg, 12px);
+  overflow: hidden;
+}
+
+.crm-table-container .crm-table th:first-child {
+  border-radius: var(--premium-radius-lg, 12px) 0 0 0;
+}
+
+.crm-table-container .crm-table th:last-child {
+  border-radius: 0 var(--premium-radius-lg, 12px) 0 0;
+}
+
+.crm-table tbody tr:last-child td {
+  border-bottom: none;
+}
+
+/* Responsive table */
+@media (max-width: 768px) {
+  .crm-table-container {
+    overflow-x: auto;
+    -webkit-overflow-scrolling: touch;
+  }
+
+  .crm-table {
+    min-width: 600px;
+  }
+}
+
+/* ============================================================================
+   SKELETON LOADING (Fase 3 - Utilidad)
+   ============================================================================ */
+
+.crm-skeleton {
+  background: linear-gradient(
+    90deg,
+    var(--premium-border-light, #F1F5F9) 25%,
+    var(--premium-surface, #F8F9FA) 50%,
+    var(--premium-border-light, #F1F5F9) 75%
+  );
+  background-size: 200% 100%;
+  animation: crm-shimmer 1.5s infinite;
+  border-radius: var(--premium-radius-soft, 8px);
+}
+
+.crm-skeleton-text {
+  height: 1em;
+  margin-bottom: 0.5em;
+}
+
+.crm-skeleton-title {
+  height: 1.5em;
+  width: 60%;
+  margin-bottom: 0.75em;
+}
+
+.crm-skeleton-avatar {
+  width: 40px;
+  height: 40px;
+  border-radius: 50%;
+}
+
+.crm-skeleton-button {
+  width: 100px;
+  height: 36px;
+}
+
+.crm-skeleton-card {
+  height: 120px;
+}
+
+@keyframes crm-shimmer {
+  0% { background-position: 200% 0; }
+  100% { background-position: -200% 0; }
+}
+
+/* ============================================================================
+   FADE IN ANIMATION (Fase 3 - Utilidad)
+   ============================================================================ */
+
+.crm-fade-in {
+  animation: crm-fadeInUp 0.3s ease-out;
+}
+
+@keyframes crm-fadeInUp {
+  from {
+    opacity: 0;
+    transform: translateY(10px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
