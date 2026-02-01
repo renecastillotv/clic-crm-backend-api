@@ -2023,8 +2023,8 @@ export default function CrmLayout() {
             position: fixed;
             inset: 0;
             background: rgba(0, 0, 0, 0.5);
-            z-index: var(--z-modal-backdrop, 500);
-            opacity: 0;
+            z-index: 350; /* Between header (300) and sidebar (400) */
+            opacity: 1;
             transition: opacity 0.3s ease;
           }
 
