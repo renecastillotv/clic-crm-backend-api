@@ -195,6 +195,29 @@ export default function CrmContenido() {
   const [loadingMore, setLoadingMore] = useState(false);
   const [nextPageToken, setNextPageToken] = useState<string | undefined>();
 
+  // Canales de YouTube recientes (para sugerencias)
+  const [recentChannels, setRecentChannels] = useState<Array<{ url: string; nombre: string; thumbnailUrl?: string }>>([]);
+
+  // Cargar canales recientes desde localStorage
+  useEffect(() => {
+    try {
+      const saved = localStorage.getItem(`youtube_channels_${tenantActual?.id}`);
+      if (saved) {
+        setRecentChannels(JSON.parse(saved));
+      }
+    } catch (e) {
+      console.error('Error loading recent channels:', e);
+    }
+  }, [tenantActual?.id]);
+
+  // Función para guardar un canal como reciente
+  const saveRecentChannel = (channel: { url: string; nombre: string; thumbnailUrl?: string }) => {
+    if (!tenantActual?.id) return;
+    const updated = [channel, ...recentChannels.filter(c => c.url !== channel.url)].slice(0, 5);
+    setRecentChannels(updated);
+    localStorage.setItem(`youtube_channels_${tenantActual.id}`, JSON.stringify(updated));
+  };
+
   // Datos de cada tab
   const [articulos, setArticulos] = useState<Articulo[]>([]);
   const [videos, setVideos] = useState<Video[]>([]);
@@ -3338,6 +3361,55 @@ export default function CrmContenido() {
                     <p style={{ fontSize: '0.8rem', color: '#64748b', margin: '0 0 8px 0' }}>
                       Escribe el @usuario, URL completa o ID del canal
                     </p>
+                    {/* Canales recientes */}
+                    {recentChannels.length > 0 && !channelInfo && (
+                      <div style={{ marginBottom: '12px' }}>
+                        <p style={{ fontSize: '0.75rem', color: '#94a3b8', margin: '0 0 6px 0', fontWeight: 500 }}>
+                          Canales recientes:
+                        </p>
+                        <div style={{ display: 'flex', flexWrap: 'wrap', gap: '8px' }}>
+                          {recentChannels.map((ch, idx) => (
+                            <button
+                              key={idx}
+                              onClick={() => setYoutubeUrl(ch.url)}
+                              style={{
+                                display: 'flex',
+                                alignItems: 'center',
+                                gap: '6px',
+                                padding: '6px 10px',
+                                background: youtubeUrl === ch.url ? '#fee2e2' : '#f8fafc',
+                                border: youtubeUrl === ch.url ? '1px solid #fca5a5' : '1px solid #e2e8f0',
+                                borderRadius: '20px',
+                                fontSize: '0.8rem',
+                                cursor: 'pointer',
+                                transition: 'all 0.15s'
+                              }}
+                              onMouseOver={(e) => {
+                                if (youtubeUrl !== ch.url) {
+                                  e.currentTarget.style.background = '#f1f5f9';
+                                  e.currentTarget.style.borderColor = '#cbd5e1';
+                                }
+                              }}
+                              onMouseOut={(e) => {
+                                if (youtubeUrl !== ch.url) {
+                                  e.currentTarget.style.background = '#f8fafc';
+                                  e.currentTarget.style.borderColor = '#e2e8f0';
+                                }
+                              }}
+                            >
+                              {ch.thumbnailUrl && (
+                                <img
+                                  src={ch.thumbnailUrl}
+                                  alt=""
+                                  style={{ width: '18px', height: '18px', borderRadius: '50%' }}
+                                />
+                              )}
+                              <span style={{ color: '#334155' }}>{ch.nombre}</span>
+                            </button>
+                          ))}
+                        </div>
+                      </div>
+                    )}
                     <div style={{ display: 'flex', gap: '8px' }}>
                       <input
                         type="text"
@@ -3401,6 +3473,15 @@ export default function CrmContenido() {
                             setNextPageToken(data.nextPageToken);
                             // Actualizar el input con la URL normalizada para futuras referencias
                             setYoutubeUrl(normalizedUrl);
+
+                            // Guardar canal como reciente
+                            if (data.channelInfo) {
+                              saveRecentChannel({
+                                url: normalizedUrl,
+                                nombre: data.channelInfo.nombre,
+                                thumbnailUrl: data.channelInfo.thumbnailUrl
+                              });
+                            }
 
                             // Obtener playlists del canal
                             const playlistsRes = await fetch(
@@ -3784,17 +3865,34 @@ export default function CrmContenido() {
                       setImportProgress({ current: result.summary.imported, total: result.summary.requested, importing: false });
                       setSuccessMessage(`Importación completada: ${result.summary.imported} videos importados, ${result.summary.skipped} omitidos, ${result.summary.errors} errores`);
                       loadData();
-                      setTimeout(() => {
-                        setShowYouTubeImportModal(false);
-                        setYoutubeUrl('');
-                        setChannelInfo(null);
-                        setChannelVideos([]);
-                        setImportProgress({ current: 0, total: 0, importing: false });
-                        setSelectedVideoIds(new Set());
-                        setChannelPlaylists([]);
-                        setSelectedPlaylist('');
-                        setImportCategoryId('');
-                      }, 2000);
+                      // No cerrar modal - limpiar selección y actualizar lista de videos para marcar los ya importados
+                      setSelectedVideoIds(new Set());
+                      // Refrescar la lista de videos del canal para marcar los recién importados
+                      if (channelInfo && selectedPlaylist === '') {
+                        // Recargar videos del canal
+                        try {
+                          const refreshResponse = await fetch(
+                            `${import.meta.env.VITE_API_URL || 'http://localhost:3001/api'}/tenants/${tenantActual.id}/contenido/youtube/channel-videos-detailed?channelId=${channelInfo.channelId}`,
+                            { headers: token ? { 'Authorization': `Bearer ${token}` } : {} }
+                          );
+                          if (refreshResponse.ok) {
+                            const refreshData = await refreshResponse.json();
+                            setChannelVideos(refreshData.videos || []);
+                          }
+                        } catch (e) { console.error('Error refreshing videos:', e); }
+                      } else if (selectedPlaylist) {
+                        // Recargar videos del playlist
+                        try {
+                          const refreshResponse = await fetch(
+                            `${import.meta.env.VITE_API_URL || 'http://localhost:3001/api'}/tenants/${tenantActual.id}/contenido/youtube/playlist-videos?playlistId=${selectedPlaylist}`,
+                            { headers: token ? { 'Authorization': `Bearer ${token}` } : {} }
+                          );
+                          if (refreshResponse.ok) {
+                            const refreshData = await refreshResponse.json();
+                            setChannelVideos(refreshData.videos || []);
+                          }
+                        } catch (e) { console.error('Error refreshing playlist videos:', e); }
+                      }
                     } catch (err: any) {
                       setImportProgress({ current: 0, total: 0, importing: false });
                       alert(err.message || 'Error al importar videos');
