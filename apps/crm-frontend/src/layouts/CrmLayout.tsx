@@ -467,6 +467,20 @@ const Icons = {
       <path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06A1.65 1.65 0 0 0 4.68 15a1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06A1.65 1.65 0 0 0 9 4.68a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z"/>
     </svg>
   ),
+  // Mobile menu icons
+  menu: (
+    <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+      <line x1="3" y1="12" x2="21" y2="12"/>
+      <line x1="3" y1="6" x2="21" y2="6"/>
+      <line x1="3" y1="18" x2="21" y2="18"/>
+    </svg>
+  ),
+  close: (
+    <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+      <line x1="18" y1="6" x2="6" y2="18"/>
+      <line x1="6" y1="6" x2="18" y2="18"/>
+    </svg>
+  ),
 };
 
 export default function CrmLayout() {
@@ -490,6 +504,14 @@ export default function CrmLayout() {
   const [isotipoUrl, setIsotipoUrl] = useState<string | null>(null);
   const [unreadCorreo, setUnreadCorreo] = useState(0);
   const [unreadChats, setUnreadChats] = useState(0);
+
+  // Estado para sidebar responsive
+  const [sidebarMobileOpen, setSidebarMobileOpen] = useState(false);
+
+  // Cerrar sidebar mobile al cambiar de ruta
+  useEffect(() => {
+    setSidebarMobileOpen(false);
+  }, [location.pathname]);
 
   // Sincronizar tenantActual con la URL cuando cambia el slug
   useEffect(() => {
@@ -791,8 +813,16 @@ export default function CrmLayout() {
     <CatalogosProvider>
     <PageContext.Provider value={{ setPageHeader }}>
       <div className="crm-layout">
+        {/* Mobile Overlay */}
+        {sidebarMobileOpen && (
+          <div
+            className="mobile-overlay"
+            onClick={() => setSidebarMobileOpen(false)}
+          />
+        )}
+
         {/* Sidebar */}
-        <aside className="crm-sidebar">
+        <aside className={`crm-sidebar ${sidebarMobileOpen ? 'mobile-open' : ''}`}>
           {/* Logo/Tenant */}
           <div className="sidebar-brand">
             <div className={`brand-logo ${isotipoUrl ? 'has-image' : ''}`}>
@@ -806,6 +836,13 @@ export default function CrmLayout() {
               <span className="brand-name">{tenantActual?.nombre || tenantSlug}</span>
               <span className="brand-type">CRM Inmobiliario</span>
             </div>
+            {/* Close button for mobile */}
+            <button
+              className="sidebar-close-btn"
+              onClick={() => setSidebarMobileOpen(false)}
+            >
+              {Icons.close}
+            </button>
           </div>
 
           {/* Navegación Principal */}
@@ -1162,6 +1199,13 @@ export default function CrmLayout() {
           {/* Header */}
           <header className="crm-header">
             <div className="header-left">
+              {/* Mobile menu button */}
+              <button
+                className="mobile-menu-btn"
+                onClick={() => setSidebarMobileOpen(true)}
+              >
+                {Icons.menu}
+              </button>
               {pageHeader?.backButton && (
                 <button className="header-back-btn" onClick={pageHeader.backButton.onClick}>
                   {Icons.back}
@@ -1364,6 +1408,17 @@ export default function CrmLayout() {
             --shadow-md: 0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06);
             --radius: 8px;
             --radius-lg: 12px;
+            /* Z-index hierarchy (from theme-clic.css) */
+            --z-base: 0;
+            --z-dropdown: 100;
+            --z-sticky: 200;
+            --z-header: 300;
+            --z-sidebar: 400;
+            --z-modal-backdrop: 500;
+            --z-modal: 600;
+            --z-popover: 700;
+            --z-tooltip: 800;
+            --z-toast: 900;
           }
 
           /* ========== LAYOUT BASE ========== */
@@ -1385,7 +1440,7 @@ export default function CrmLayout() {
             top: 0;
             left: 0;
             bottom: 0;
-            z-index: 100;
+            z-index: var(--z-sidebar, 400);
           }
 
           /* Brand */
@@ -1629,7 +1684,7 @@ export default function CrmLayout() {
             border-bottom: 1px solid var(--border);
             position: sticky;
             top: 0;
-            z-index: 1000;
+            z-index: var(--z-header, 300);
           }
 
           .header-left {
@@ -1727,7 +1782,7 @@ export default function CrmLayout() {
             align-items: center;
             gap: 10px;
             position: relative;
-            z-index: 100;
+            z-index: var(--z-dropdown, 100);
           }
 
           .header-actions {
@@ -1739,7 +1794,7 @@ export default function CrmLayout() {
           /* User Menu */
           .user-menu-wrapper {
             position: relative;
-            z-index: 9999;
+            z-index: var(--z-popover, 700);
           }
 
           .user-menu-trigger {
@@ -1773,7 +1828,7 @@ export default function CrmLayout() {
             border: 1px solid var(--border);
             border-radius: var(--radius-lg);
             box-shadow: 0 10px 40px rgba(0, 0, 0, 0.15), 0 2px 10px rgba(0, 0, 0, 0.1);
-            z-index: 9999;
+            z-index: var(--z-popover, 700);
           }
 
           .dropdown-item {
@@ -1908,7 +1963,7 @@ export default function CrmLayout() {
             padding: 24px 32px;
             overflow-y: auto;
             position: relative;
-            z-index: 1;
+            z-index: var(--z-base, 0);
             background: white;
           }
 
@@ -1918,15 +1973,163 @@ export default function CrmLayout() {
             100% { transform: rotate(360deg); }
           }
 
-          /* ========== RESPONSIVE ========== */
+          /* ========== MOBILE MENU BUTTON ========== */
+          .mobile-menu-btn {
+            display: none;
+            align-items: center;
+            justify-content: center;
+            width: 40px;
+            height: 40px;
+            padding: 0;
+            background: none;
+            border: 1px solid var(--border);
+            border-radius: var(--radius);
+            color: var(--text-secondary);
+            cursor: pointer;
+            transition: all 0.15s ease;
+            flex-shrink: 0;
+          }
+
+          .mobile-menu-btn:hover {
+            background: var(--border-light);
+            color: var(--text-primary);
+          }
+
+          /* ========== SIDEBAR CLOSE BUTTON (Mobile) ========== */
+          .sidebar-close-btn {
+            display: none;
+            align-items: center;
+            justify-content: center;
+            width: 32px;
+            height: 32px;
+            padding: 0;
+            background: none;
+            border: none;
+            border-radius: var(--radius);
+            color: var(--text-muted);
+            cursor: pointer;
+            transition: all 0.15s ease;
+            margin-left: auto;
+          }
+
+          .sidebar-close-btn:hover {
+            background: var(--border-light);
+            color: var(--text-primary);
+          }
+
+          /* ========== MOBILE OVERLAY ========== */
+          .mobile-overlay {
+            display: none;
+            position: fixed;
+            inset: 0;
+            background: rgba(0, 0, 0, 0.5);
+            z-index: var(--z-modal-backdrop, 500);
+            opacity: 0;
+            transition: opacity 0.3s ease;
+          }
+
+          /* ========== RESPONSIVE - Tablet & Mobile ========== */
           @media (max-width: 1024px) {
-            .crm-sidebar {
-              transform: translateX(-100%);
-              transition: transform 0.3s ease;
+            /* Show mobile menu button */
+            .mobile-menu-btn {
+              display: flex;
             }
 
+            /* Show sidebar close button */
+            .sidebar-close-btn {
+              display: flex;
+            }
+
+            /* Sidebar slides in from left */
+            .crm-sidebar {
+              transform: translateX(-100%);
+              transition: transform 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+              z-index: var(--z-sidebar, 400);
+              box-shadow: none;
+            }
+
+            .crm-sidebar.mobile-open {
+              transform: translateX(0);
+              box-shadow: 4px 0 24px rgba(0, 0, 0, 0.15);
+            }
+
+            /* Main content full width */
             .crm-main {
               margin-left: 0;
+            }
+
+            /* Show overlay when sidebar is open */
+            .mobile-overlay {
+              display: block;
+              opacity: 1;
+            }
+
+            /* Adjust header padding */
+            .crm-header {
+              padding: 0 16px;
+            }
+
+            /* Hide header stats on tablet */
+            .header-stats {
+              display: none;
+            }
+
+            /* Content padding adjustment */
+            .crm-content {
+              padding: 16px;
+            }
+
+            /* Hide user name on small screens */
+            .user-name {
+              display: none;
+            }
+
+            .user-menu-trigger {
+              padding: 6px 8px;
+            }
+          }
+
+          /* ========== RESPONSIVE - Mobile Small ========== */
+          @media (max-width: 640px) {
+            /* Smaller header */
+            .crm-header {
+              padding: 0 12px;
+              height: 56px;
+            }
+
+            /* Smaller content padding */
+            .crm-content {
+              padding: 12px;
+            }
+
+            /* Stack header title section */
+            .header-title-section {
+              flex-direction: column;
+              align-items: flex-start;
+              gap: 2px;
+            }
+
+            .header-title {
+              font-size: 1rem;
+            }
+
+            .header-subtitle {
+              font-size: 0.7rem;
+            }
+
+            /* Header actions stack */
+            .header-actions {
+              gap: 4px;
+            }
+
+            /* Back button smaller */
+            .header-back-btn {
+              padding: 4px 8px;
+              font-size: 0.8rem;
+            }
+
+            .header-back-btn span {
+              display: none;
             }
           }
         `}</style>

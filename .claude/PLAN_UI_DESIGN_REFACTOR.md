@@ -10,10 +10,20 @@
 | Fase | Estado | Commit | Fecha | Notas |
 |------|--------|--------|-------|-------|
 | **Fase 1: Fundación CSS** | ✅ LISTO PARA PRUEBAS | `56add66` | 2026-02-01 | Tag: `ui-fase-1`, Deployed |
-| Fase 2: Layout Responsive | ⏳ Pendiente | - | - | - |
+| **Fase 2: Layout Responsive** | 🔄 EN PROGRESO | - | 2026-02-01 | Implementando mobile toggle |
 | Fase 3: Componentes | ⏳ Pendiente | - | - | - |
 | Fase 4: Migración | ⏳ Pendiente | - | - | - |
 | Fase 5: Polish Premium | ⏳ Pendiente | - | - | - |
+
+### Detalle Fase 2
+- [x] 2.1 Estado sidebarMobileOpen y useEffect para cerrar en cambio de ruta
+- [x] 2.2 Iconos menu/close agregados a Icons object
+- [x] 2.3 Mobile overlay con click para cerrar
+- [x] 2.4 Botón hamburguesa en header (visible en mobile)
+- [x] 2.5 Botón cerrar en sidebar (visible en mobile)
+- [x] 2.6 Media queries para 1024px y 640px
+- [x] 2.7 Z-index actualizados a variables CSS
+- [ ] 2.8 Commit y deploy para pruebas
 
 ### Detalle Fase 1
 - [x] 1.1 Variables CSS en theme-clic.css (z-index, spacing, shadows, transitions)
