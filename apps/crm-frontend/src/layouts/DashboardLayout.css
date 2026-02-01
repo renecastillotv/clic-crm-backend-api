@@ -147,7 +147,7 @@
   padding: 1.5rem 2rem;
   position: sticky;
   top: 0;
-  z-index: 10;
+  z-index: var(--z-header, 300);
 }
 
 .dashboard-header h1 {

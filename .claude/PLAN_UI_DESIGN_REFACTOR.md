@@ -9,11 +9,17 @@
 
 | Fase | Estado | Commit | Fecha | Notas |
 |------|--------|--------|-------|-------|
-| **Fase 1: Fundación CSS** | 🔄 EN PROGRESO | - | 2026-02-01 | Actualizando variables y botones |
+| **Fase 1: Fundación CSS** | 🔄 EN PROGRESO | - | 2026-02-01 | 1.1✅ 1.2✅ 1.3✅ 1.4 commit/deploy |
 | Fase 2: Layout Responsive | ⏳ Pendiente | - | - | - |
 | Fase 3: Componentes | ⏳ Pendiente | - | - | - |
 | Fase 4: Migración | ⏳ Pendiente | - | - | - |
 | Fase 5: Polish Premium | ⏳ Pendiente | - | - | - |
+
+### Detalle Fase 1
+- [x] 1.1 Variables CSS en theme-clic.css (z-index, spacing, shadows, transitions)
+- [x] 1.2 Sistema de botones consolidado en crm-common.css (primary, secondary, danger, ghost, success, sizes)
+- [x] 1.3 Z-index hierarchy aplicado a Modal.css, ComponenteConfigModal.css, layouts, páginas
+- [ ] 1.4 Commit y deploy para pruebas de usuario
 
 ### Instrucciones para Retomar
 Si pierdes contexto, lee este archivo. El estado actual está arriba.
