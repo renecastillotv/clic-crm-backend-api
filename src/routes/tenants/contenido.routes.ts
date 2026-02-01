@@ -2106,15 +2106,41 @@ router.post('/youtube/sync-stats', requirePermission('contenido', 'editar'), asy
 // ==================== RUTAS: GENERACIÓN DE CONTENIDO CON IA ====================
 
 /**
+ * Helper para verificar si el usuario es admin (platform admin o tenant admin)
+ */
+async function isUserAdmin(req: any, tenantId: string): Promise<boolean> {
+  // Platform admin siempre tiene acceso
+  if (req.scope?.isPlatformAdmin) return true;
+
+  // Verificar si tiene rol de admin en el tenant
+  if (!req.scope?.dbUserId) return false;
+
+  const rolesResult = await query(`
+    SELECT r.codigo
+    FROM usuarios_roles ur
+    JOIN roles r ON ur.rol_id = r.id
+    WHERE ur.usuario_id = $1
+      AND (ur.tenant_id = $2 OR ur.tenant_id IS NULL)
+      AND ur.activo = true
+      AND r.codigo IN ('tenant_admin', 'tenant_owner', 'admin', 'superadmin')
+    LIMIT 1
+  `, [req.scope.dbUserId, tenantId]);
+
+  return rolesResult.rows.length > 0;
+}
+
+/**
  * POST /api/tenants/:tenantId/contenido/ai/generate-article
  * Genera un artículo usando ChatGPT
  * Solo disponible para admin
  */
 router.post('/ai/generate-article', requirePermission('contenido', 'crear'), async (req: Request<TenantParams>, res: Response, next: NextFunction) => {
   try {
+    const { tenantId } = req.params;
+
     // Verificar que sea admin
-    const userRole = (req as any).userFromDb?.role;
-    if (userRole !== 'admin' && userRole !== 'superadmin') {
+    const isAdmin = await isUserAdmin(req, tenantId);
+    if (!isAdmin) {
       return res.status(403).json({ error: 'Esta función está disponible solo para administradores' });
     }
 
@@ -2154,9 +2180,11 @@ router.post('/ai/generate-article', requirePermission('contenido', 'crear'), asy
  */
 router.post('/ai/generate-faqs', requirePermission('contenido', 'crear'), async (req: Request<TenantParams>, res: Response, next: NextFunction) => {
   try {
+    const { tenantId } = req.params;
+
     // Verificar que sea admin
-    const userRole = (req as any).userFromDb?.role;
-    if (userRole !== 'admin' && userRole !== 'superadmin') {
+    const isAdmin = await isUserAdmin(req, tenantId);
+    if (!isAdmin) {
       return res.status(403).json({ error: 'Esta función está disponible solo para administradores' });
     }
 
@@ -2194,9 +2222,11 @@ router.post('/ai/generate-faqs', requirePermission('contenido', 'crear'), async 
  */
 router.post('/ai/generate-seo-stat', requirePermission('contenido', 'crear'), async (req: Request<TenantParams>, res: Response, next: NextFunction) => {
   try {
+    const { tenantId } = req.params;
+
     // Verificar que sea admin
-    const userRole = (req as any).userFromDb?.role;
-    if (userRole !== 'admin' && userRole !== 'superadmin') {
+    const isAdmin = await isUserAdmin(req, tenantId);
+    if (!isAdmin) {
       return res.status(403).json({ error: 'Esta función está disponible solo para administradores' });
     }
 
