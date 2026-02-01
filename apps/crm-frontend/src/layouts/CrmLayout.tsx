@@ -1692,6 +1692,8 @@ export default function CrmLayout() {
             align-items: center;
             gap: 16px;
             flex: 1;
+            min-width: 0; /* Permite que se contraiga */
+            overflow: hidden;
           }
 
           .header-back-btn {
@@ -1783,12 +1785,14 @@ export default function CrmLayout() {
             gap: 10px;
             position: relative;
             z-index: var(--z-dropdown, 100);
+            flex-shrink: 0; /* No comprimir los botones de acción */
           }
 
           .header-actions {
             display: flex;
             align-items: center;
             gap: 8px;
+            flex-wrap: wrap; /* Permitir wrap si es necesario */
           }
 
           /* User Menu */
@@ -2087,6 +2091,15 @@ export default function CrmLayout() {
             .user-menu-trigger {
               padding: 6px 8px;
             }
+
+            /* Botones del header más compactos en tablet */
+            .header-actions button,
+            .header-actions .btn-primary,
+            .header-actions .btn-secondary,
+            .header-actions .crm-btn {
+              padding: 6px 12px;
+              font-size: 0.8rem;
+            }
           }
 
           /* ========== RESPONSIVE - Mobile Small ========== */
@@ -2102,6 +2115,11 @@ export default function CrmLayout() {
               padding: 12px;
             }
 
+            /* Header left more compact */
+            .header-left {
+              gap: 8px;
+            }
+
             /* Stack header title section */
             .header-title-section {
               flex-direction: column;
@@ -2110,16 +2128,48 @@ export default function CrmLayout() {
             }
 
             .header-title {
-              font-size: 1rem;
+              font-size: 0.95rem;
+              white-space: nowrap;
+              overflow: hidden;
+              text-overflow: ellipsis;
+              max-width: 120px;
             }
 
             .header-subtitle {
               font-size: 0.7rem;
+              display: none; /* Ocultar subtítulo en móvil pequeño */
             }
 
-            /* Header actions stack */
+            /* Header actions más compactos */
             .header-actions {
               gap: 4px;
+            }
+
+            /* Botones del header: solo icono en móvil */
+            .header-actions button,
+            .header-actions .btn-primary,
+            .header-actions .btn-secondary,
+            .header-actions .crm-btn {
+              padding: 6px 8px;
+              font-size: 0.75rem;
+              gap: 4px;
+            }
+
+            /* Ocultar texto en botones con iconos SVG en móvil */
+            .header-actions button svg ~ span,
+            .header-actions .btn-primary svg ~ span,
+            .header-actions .btn-secondary svg ~ span {
+              display: none;
+            }
+
+            /* Si el botón tiene un texto directo (sin span), hacerlo más corto */
+            .header-actions button:not(:has(svg)),
+            .header-actions .btn-primary:not(:has(svg)),
+            .header-actions .btn-secondary:not(:has(svg)) {
+              max-width: 100px;
+              overflow: hidden;
+              text-overflow: ellipsis;
+              white-space: nowrap;
             }
 
             /* Back button smaller */
@@ -2130,6 +2180,11 @@ export default function CrmLayout() {
 
             .header-back-btn span {
               display: none;
+            }
+
+            /* Header right más compacto */
+            .header-right {
+              gap: 6px;
             }
           }
         `}</style>
