@@ -198,6 +198,10 @@ export default function CrmContenido() {
   const [articulos, setArticulos] = useState<Articulo[]>([]);
   const [videos, setVideos] = useState<Video[]>([]);
   const [faqs, setFaqs] = useState<FAQ[]>([]);
+
+  // Selección múltiple para acciones masivas en la lista de videos
+  const [selectedCrmVideos, setSelectedCrmVideos] = useState<Set<string>>(new Set());
+  const [bulkUpdating, setBulkUpdating] = useState(false);
   const [testimonios, setTestimonios] = useState<Testimonio[]>([]);
   const [seoStats, setSeoStats] = useState<SeoStat[]>([]);
   const [categorias, setCategorias] = useState<CategoriaContenido[]>([]);
@@ -618,6 +622,39 @@ export default function CrmContenido() {
     }
   };
 
+  // Handler de actualización masiva de videos
+  const handleBulkUpdateVideos = async (action: 'publicar' | 'despublicar') => {
+    if (!tenantActual?.id || selectedCrmVideos.size === 0) return;
+    setBulkUpdating(true);
+    try {
+      const newStatus = action === 'publicar';
+      const videoIds = Array.from(selectedCrmVideos);
+
+      // Actualizar cada video
+      for (const id of videoIds) {
+        const vid = videos.find(v => v.id === id);
+        if (vid) {
+          const { tagIds, ...videoData } = vid as any;
+          await updateVideo(tenantActual.id, id, { ...videoData, publicado: newStatus });
+        }
+      }
+
+      // Actualizar estado local
+      setVideos(prev => prev.map(v =>
+        selectedCrmVideos.has(v.id) ? { ...v, publicado: newStatus } : v
+      ));
+
+      // Limpiar selección
+      setSelectedCrmVideos(new Set());
+      setSuccessMessage(`${videoIds.length} videos ${action === 'publicar' ? 'publicados' : 'despublicados'} correctamente`);
+      setTimeout(() => setSuccessMessage(null), 3000);
+    } catch (err: any) {
+      setError(err.message || 'Error al actualizar videos');
+    } finally {
+      setBulkUpdating(false);
+    }
+  };
+
   // Handler de eliminar
   const handleDelete = async () => {
     if (!tenantActual?.id || !deleteConfirm) return;
@@ -940,64 +977,175 @@ export default function CrmContenido() {
           <p>{busqueda ? 'No se encontraron videos' : 'Crea tu primer video'}</p>
         </div>
       ) : (
-        <div className="table-container">
-          <table className="data-table">
-            <thead>
-              <tr>
-                <th>TÍTULO</th>
-                <th>CATEGORÍA</th>
-                <th>TIPO</th>
-                <th>ESTADO</th>
-                <th>VISTAS</th>
-                <th>ACCIONES</th>
-              </tr>
-            </thead>
-            <tbody>
-              {videos.map(vid => {
-                // Soportar tanto snake_case (API) como camelCase
-                const v = vid as any;
-                const thumbnail = v.thumbnail || v.thumbnail_url;
-                const categoriaId = v.categoriaId || v.categoria_id;
-                const tipoVideo = v.tipoVideo || v.tipo_video || v.plataforma || '-';
-                return (
-                <tr key={vid.id}>
-                  <td>
-                    <div className="item-with-image">
-                      {thumbnail ? (
-                        <img src={thumbnail} alt={vid.titulo} className="item-thumb" />
-                      ) : (
-                        <div className="item-thumb-placeholder">{Icons.video}</div>
-                      )}
-                      <div className="item-info">
-                        <div className="item-title">{vid.titulo}</div>
-                        {vid.descripcion && <div className="item-excerpt">{stripHtml(vid.descripcion, 60)}</div>}
-                      </div>
-                    </div>
-                  </td>
-                  <td>{categorias.find(c => c.id === categoriaId)?.nombre || '-'}</td>
-                  <td>{tipoVideo}</td>
-                  <td>
-                    <button
-                      onClick={() => canEdit && handleTogglePublicado('video', vid.id, vid.publicado)}
-                      className={`status-btn ${vid.publicado ? 'published' : 'draft'}`}
-                      style={!canEdit ? { cursor: 'default', opacity: 0.7 } : undefined}
-                    >
-                      {vid.publicado ? 'Publicado' : 'Borrador'}
-                    </button>
-                  </td>
-                  <td>{vid.vistas || 0}</td>
-                  <td>
-                    <div className="row-actions">
-                      <button onClick={() => navigate(`/crm/${tenantSlug}/contenido/videos/${vid.id}${!canEdit ? '?mode=ver' : ''}`)} className="action-btn" title={canEdit ? 'Editar' : 'Ver'}>{canEdit ? Icons.edit : Icons.eye}</button>
-                      {canDelete && <button onClick={() => setDeleteConfirm({ tipo: 'video', id: vid.id })} className="action-btn action-btn-danger">{Icons.trash}</button>}
-                    </div>
-                  </td>
+        <>
+          {/* Barra de acciones masivas */}
+          {selectedCrmVideos.size > 0 && canEdit && (
+            <div style={{
+              display: 'flex',
+              alignItems: 'center',
+              gap: '12px',
+              padding: '12px 16px',
+              background: '#eff6ff',
+              borderRadius: '8px',
+              marginBottom: '12px',
+              border: '1px solid #bfdbfe'
+            }}>
+              <span style={{ fontWeight: 600, color: '#1e40af' }}>
+                {selectedCrmVideos.size} video{selectedCrmVideos.size > 1 ? 's' : ''} seleccionado{selectedCrmVideos.size > 1 ? 's' : ''}
+              </span>
+              <div style={{ display: 'flex', gap: '8px', marginLeft: 'auto' }}>
+                <button
+                  onClick={() => handleBulkUpdateVideos('publicar')}
+                  disabled={bulkUpdating}
+                  style={{
+                    padding: '6px 12px',
+                    background: '#10b981',
+                    color: 'white',
+                    border: 'none',
+                    borderRadius: '6px',
+                    cursor: bulkUpdating ? 'not-allowed' : 'pointer',
+                    fontSize: '0.85rem',
+                    fontWeight: 500,
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: '6px'
+                  }}
+                >
+                  {bulkUpdating ? <LucideIcons.Loader2 size={14} className="animate-spin" /> : <LucideIcons.Eye size={14} />}
+                  Publicar
+                </button>
+                <button
+                  onClick={() => handleBulkUpdateVideos('despublicar')}
+                  disabled={bulkUpdating}
+                  style={{
+                    padding: '6px 12px',
+                    background: '#f59e0b',
+                    color: 'white',
+                    border: 'none',
+                    borderRadius: '6px',
+                    cursor: bulkUpdating ? 'not-allowed' : 'pointer',
+                    fontSize: '0.85rem',
+                    fontWeight: 500,
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: '6px'
+                  }}
+                >
+                  {bulkUpdating ? <LucideIcons.Loader2 size={14} className="animate-spin" /> : <LucideIcons.EyeOff size={14} />}
+                  Despublicar
+                </button>
+                <button
+                  onClick={() => setSelectedCrmVideos(new Set())}
+                  style={{
+                    padding: '6px 12px',
+                    background: '#e2e8f0',
+                    color: '#475569',
+                    border: 'none',
+                    borderRadius: '6px',
+                    cursor: 'pointer',
+                    fontSize: '0.85rem'
+                  }}
+                >
+                  Cancelar
+                </button>
+              </div>
+            </div>
+          )}
+          <div className="table-container">
+            <table className="data-table">
+              <thead>
+                <tr>
+                  {canEdit && (
+                    <th style={{ width: '40px', textAlign: 'center' }}>
+                      <input
+                        type="checkbox"
+                        checked={videos.length > 0 && selectedCrmVideos.size === videos.length}
+                        onChange={(e) => {
+                          if (e.target.checked) {
+                            setSelectedCrmVideos(new Set(videos.map(v => v.id)));
+                          } else {
+                            setSelectedCrmVideos(new Set());
+                          }
+                        }}
+                        style={{ width: '16px', height: '16px', cursor: 'pointer' }}
+                        title="Seleccionar todos"
+                      />
+                    </th>
+                  )}
+                  <th>TÍTULO</th>
+                  <th>CATEGORÍA</th>
+                  <th>TIPO</th>
+                  <th>ESTADO</th>
+                  <th>VISTAS</th>
+                  <th>ACCIONES</th>
                 </tr>
-              );
-              })}
-            </tbody>
-          </table>
-        </div>
+              </thead>
+              <tbody>
+                {videos.map(vid => {
+                  // Soportar tanto snake_case (API) como camelCase
+                  const v = vid as any;
+                  const thumbnail = v.thumbnail || v.thumbnail_url;
+                  const categoriaId = v.categoriaId || v.categoria_id;
+                  const tipoVideo = v.tipoVideo || v.tipo_video || v.plataforma || '-';
+                  const isSelected = selectedCrmVideos.has(vid.id);
+                  return (
+                  <tr key={vid.id} style={{ background: isSelected ? '#eff6ff' : undefined }}>
+                    {canEdit && (
+                      <td style={{ textAlign: 'center' }}>
+                        <input
+                          type="checkbox"
+                          checked={isSelected}
+                          onChange={(e) => {
+                            const newSet = new Set(selectedCrmVideos);
+                            if (e.target.checked) {
+                              newSet.add(vid.id);
+                            } else {
+                              newSet.delete(vid.id);
+                            }
+                            setSelectedCrmVideos(newSet);
+                          }}
+                          style={{ width: '16px', height: '16px', cursor: 'pointer' }}
+                        />
+                      </td>
+                    )}
+                    <td>
+                      <div className="item-with-image">
+                        {thumbnail ? (
+                          <img src={thumbnail} alt={vid.titulo} className="item-thumb" />
+                        ) : (
+                          <div className="item-thumb-placeholder">{Icons.video}</div>
+                        )}
+                        <div className="item-info">
+                          <div className="item-title">{vid.titulo}</div>
+                          {vid.descripcion && <div className="item-excerpt">{stripHtml(vid.descripcion, 60)}</div>}
+                        </div>
+                      </div>
+                    </td>
+                    <td>{categorias.find(c => c.id === categoriaId)?.nombre || '-'}</td>
+                    <td>{tipoVideo}</td>
+                    <td>
+                      <button
+                        onClick={() => canEdit && handleTogglePublicado('video', vid.id, vid.publicado)}
+                        className={`status-btn ${vid.publicado ? 'published' : 'draft'}`}
+                        style={!canEdit ? { cursor: 'default', opacity: 0.7 } : undefined}
+                      >
+                        {vid.publicado ? 'Publicado' : 'Borrador'}
+                      </button>
+                    </td>
+                    <td>{vid.vistas || 0}</td>
+                    <td>
+                      <div className="row-actions">
+                        <button onClick={() => navigate(`/crm/${tenantSlug}/contenido/videos/${vid.id}${!canEdit ? '?mode=ver' : ''}`)} className="action-btn" title={canEdit ? 'Editar' : 'Ver'}>{canEdit ? Icons.edit : Icons.eye}</button>
+                        {canDelete && <button onClick={() => setDeleteConfirm({ tipo: 'video', id: vid.id })} className="action-btn action-btn-danger">{Icons.trash}</button>}
+                      </div>
+                    </td>
+                  </tr>
+                );
+                })}
+              </tbody>
+            </table>
+          </div>
+        </>
       )}
     </>
   );
@@ -3046,14 +3194,17 @@ export default function CrmContenido() {
                 <>
                   <div className="form-group">
                     <label style={{ fontWeight: 600, marginBottom: '8px', display: 'block' }}>
-                      URL del Canal de YouTube
+                      Canal de YouTube
                     </label>
+                    <p style={{ fontSize: '0.8rem', color: '#64748b', margin: '0 0 8px 0' }}>
+                      Escribe el @usuario, URL completa o ID del canal
+                    </p>
                     <div style={{ display: 'flex', gap: '8px' }}>
                       <input
-                        type="url"
+                        type="text"
                         value={youtubeUrl}
                         onChange={(e) => setYoutubeUrl(e.target.value)}
-                        placeholder="https://www.youtube.com/@canalname o /channel/UC..."
+                        placeholder="@clicinmobiliaria o youtube.com/@canal"
                         style={{
                           flex: 1,
                           padding: '12px 14px',
@@ -3064,6 +3215,12 @@ export default function CrmContenido() {
                         }}
                         onFocus={(e) => e.target.style.borderColor = '#FF0000'}
                         onBlur={(e) => e.target.style.borderColor = '#e2e8f0'}
+                        onKeyDown={(e) => {
+                          if (e.key === 'Enter') {
+                            e.preventDefault();
+                            (e.target as HTMLInputElement).closest('div')?.querySelector('button')?.click();
+                          }
+                        }}
                       />
                       <button
                         onClick={async () => {
@@ -3072,11 +3229,27 @@ export default function CrmContenido() {
                           setYoutubePreviewError(null);
                           setSelectedVideoIds(new Set());
                           setVideoTypeFilter('all');
+
+                          // Normalizar el input del usuario
+                          let normalizedUrl = youtubeUrl.trim();
+                          // Si es solo @usuario, convertir a URL completa
+                          if (normalizedUrl.startsWith('@')) {
+                            normalizedUrl = `https://www.youtube.com/${normalizedUrl}`;
+                          }
+                          // Si es youtube.com/@ sin https, agregar protocolo
+                          else if (normalizedUrl.match(/^(www\.)?youtube\.com\/@/i)) {
+                            normalizedUrl = `https://${normalizedUrl.replace(/^www\./, '')}`;
+                          }
+                          // Si es solo el nombre de usuario sin @
+                          else if (!normalizedUrl.includes('/') && !normalizedUrl.includes('.') && !normalizedUrl.startsWith('UC')) {
+                            normalizedUrl = `https://www.youtube.com/@${normalizedUrl}`;
+                          }
+
                           try {
                             const token = await getToken();
                             // Obtener videos con detalles (incluye detección de shorts y duplicados)
                             const videosRes = await fetch(
-                              `${import.meta.env.VITE_API_URL || 'http://localhost:3001/api'}/tenants/${tenantActual.id}/contenido/youtube/channel-videos-detailed?url=${encodeURIComponent(youtubeUrl)}&maxResults=50`,
+                              `${import.meta.env.VITE_API_URL || 'http://localhost:3001/api'}/tenants/${tenantActual.id}/contenido/youtube/channel-videos-detailed?url=${encodeURIComponent(normalizedUrl)}&maxResults=50`,
                               { headers: token ? { 'Authorization': `Bearer ${token}` } : {} }
                             );
                             if (!videosRes.ok) {
@@ -3087,10 +3260,12 @@ export default function CrmContenido() {
                             setChannelInfo(data.channelInfo);
                             setChannelVideos(data.videos || []);
                             setNextPageToken(data.nextPageToken);
+                            // Actualizar el input con la URL normalizada para futuras referencias
+                            setYoutubeUrl(normalizedUrl);
 
                             // Obtener playlists del canal
                             const playlistsRes = await fetch(
-                              `${import.meta.env.VITE_API_URL || 'http://localhost:3001/api'}/tenants/${tenantActual.id}/contenido/youtube/channel-playlists?url=${encodeURIComponent(youtubeUrl)}`,
+                              `${import.meta.env.VITE_API_URL || 'http://localhost:3001/api'}/tenants/${tenantActual.id}/contenido/youtube/channel-playlists?url=${encodeURIComponent(normalizedUrl)}`,
                               { headers: token ? { 'Authorization': `Bearer ${token}` } : {} }
                             );
                             if (playlistsRes.ok) {
