@@ -2187,16 +2187,17 @@ export default function CrmLayout() {
           }
 
           .toggle-indicator {
-            width: 4px;
-            height: 20px;
-            background: linear-gradient(180deg, var(--primary) 0%, var(--sidebar-icon-active) 100%);
-            border-radius: 2px;
-            opacity: 0.6;
-            transition: opacity 0.2s ease;
+            width: 6px;
+            height: 6px;
+            background: var(--sidebar-icon-active);
+            border-radius: 50%;
+            opacity: 0.5;
+            transition: opacity 0.2s ease, transform 0.2s ease;
           }
 
           .sidebar-toggle-wrapper:hover .toggle-indicator {
             opacity: 1;
+            transform: scale(1.2);
           }
 
           .crm-sidebar.collapsed .sidebar-toggle-wrapper {
@@ -2210,8 +2211,8 @@ export default function CrmLayout() {
           }
 
           .crm-sidebar.collapsed .toggle-indicator {
-            width: 16px;
-            height: 3px;
+            width: 6px;
+            height: 6px;
           }
 
           /* ========== SIDEBAR COLLAPSED MODE ========== */
