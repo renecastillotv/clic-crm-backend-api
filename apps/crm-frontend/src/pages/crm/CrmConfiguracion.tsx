@@ -1108,6 +1108,12 @@ export default function CrmConfiguracion() {
         /* Modal de colores */
         .modal-colores {
           max-width: 640px;
+          max-height: 90vh;
+        }
+
+        .modal-colores .modal-body {
+          max-height: calc(90vh - 140px);
+          overflow-y: auto;
         }
 
         .colores-options {
