@@ -542,6 +542,7 @@ export default function CrmLayout() {
   // Estado para submenú flotante en hover (modo colapsado)
   const [hoveringMenu, setHoveringMenu] = useState<string | null>(null);
   const [hoverMenuPosition, setHoverMenuPosition] = useState<{ top: number; bottom?: number; invertY: boolean } | null>(null);
+  const hoverTimeoutRef = useRef<NodeJS.Timeout | null>(null);
 
   // Función para calcular la posición del menú flotante
   const calculateMenuPosition = (rect: DOMRect, menuItemsCount: number) => {
@@ -555,6 +556,41 @@ export default function CrmLayout() {
     }
     return { top: rect.top, invertY: false };
   };
+
+  // Helpers para hover menu con delay para evitar parpadeo
+  const openHoverMenu = (menuName: string, rect: DOMRect, itemsCount: number) => {
+    if (hoverTimeoutRef.current) {
+      clearTimeout(hoverTimeoutRef.current);
+      hoverTimeoutRef.current = null;
+    }
+    setHoveringMenu(menuName);
+    setHoverMenuPosition(calculateMenuPosition(rect, itemsCount));
+  };
+
+  const closeHoverMenuWithDelay = () => {
+    if (hoverTimeoutRef.current) {
+      clearTimeout(hoverTimeoutRef.current);
+    }
+    hoverTimeoutRef.current = setTimeout(() => {
+      setHoveringMenu(null);
+    }, 150); // 150ms delay antes de cerrar
+  };
+
+  const cancelCloseHoverMenu = () => {
+    if (hoverTimeoutRef.current) {
+      clearTimeout(hoverTimeoutRef.current);
+      hoverTimeoutRef.current = null;
+    }
+  };
+
+  // Limpiar timeout al desmontar
+  useEffect(() => {
+    return () => {
+      if (hoverTimeoutRef.current) {
+        clearTimeout(hoverTimeoutRef.current);
+      }
+    };
+  }, []);
 
   // Guardar preferencia de sidebar colapsado
   useEffect(() => {
@@ -929,12 +965,10 @@ export default function CrmLayout() {
                 className="nav-group"
                 onMouseEnter={(e) => {
                   if (sidebarCollapsed) {
-                    setHoveringMenu('crm');
-                    const rect = e.currentTarget.getBoundingClientRect();
-                    setHoverMenuPosition(calculateMenuPosition(rect, visibleCrmItems.length));
+                    openHoverMenu('crm', e.currentTarget.getBoundingClientRect(), visibleCrmItems.length);
                   }
                 }}
-                onMouseLeave={() => setHoveringMenu(null)}
+                onMouseLeave={closeHoverMenuWithDelay}
               >
               <button
                 className={`nav-item nav-expandable ${isCrmActive ? 'active' : ''}`}
@@ -971,8 +1005,8 @@ export default function CrmLayout() {
                 <div
                   className={`nav-floating-submenu ${hoverMenuPosition.invertY ? 'inverted' : ''}`}
                   style={hoverMenuPosition.invertY ? { bottom: hoverMenuPosition.bottom } : { top: hoverMenuPosition.top }}
-                  onMouseEnter={() => setHoveringMenu('crm')}
-                  onMouseLeave={() => setHoveringMenu(null)}
+                  onMouseEnter={cancelCloseHoverMenu}
+                  onMouseLeave={closeHoverMenuWithDelay}
                 >
                   <div className="floating-submenu-title">CRM</div>
                   {visibleCrmItems.map((item) => (
@@ -1015,12 +1049,10 @@ export default function CrmLayout() {
                 className="nav-group"
                 onMouseEnter={(e) => {
                   if (sidebarCollapsed) {
-                    setHoveringMenu('finanzas');
-                    const rect = e.currentTarget.getBoundingClientRect();
-                    setHoverMenuPosition(calculateMenuPosition(rect, 5));
+                    openHoverMenu('finanzas', e.currentTarget.getBoundingClientRect(), 5);
                   }
                 }}
-                onMouseLeave={() => setHoveringMenu(null)}
+                onMouseLeave={closeHoverMenuWithDelay}
               >
               <button
                 className={`nav-item nav-expandable ${isFinanzasActive ? 'active' : ''}`}
@@ -1056,8 +1088,8 @@ export default function CrmLayout() {
                 <div
                   className={`nav-floating-submenu ${hoverMenuPosition.invertY ? 'inverted' : ''}`}
                   style={hoverMenuPosition.invertY ? { bottom: hoverMenuPosition.bottom } : { top: hoverMenuPosition.top }}
-                  onMouseEnter={() => setHoveringMenu('finanzas')}
-                  onMouseLeave={() => setHoveringMenu(null)}
+                  onMouseEnter={cancelCloseHoverMenu}
+                  onMouseLeave={closeHoverMenuWithDelay}
                 >
                   <div className="floating-submenu-title">Finanzas</div>
                   {visibleFinanzasItems.map((item) => (
@@ -1081,12 +1113,10 @@ export default function CrmLayout() {
                 className="nav-group"
                 onMouseEnter={(e) => {
                   if (sidebarCollapsed) {
-                    setHoveringMenu('mensajeria');
-                    const rect = e.currentTarget.getBoundingClientRect();
-                    setHoverMenuPosition(calculateMenuPosition(rect, 5));
+                    openHoverMenu('mensajeria', e.currentTarget.getBoundingClientRect(), 5);
                   }
                 }}
-                onMouseLeave={() => setHoveringMenu(null)}
+                onMouseLeave={closeHoverMenuWithDelay}
               >
               <button
                 className={`nav-item nav-expandable ${isMensajeriaActive ? 'active' : ''}`}
@@ -1131,8 +1161,8 @@ export default function CrmLayout() {
                 <div
                   className={`nav-floating-submenu ${hoverMenuPosition.invertY ? 'inverted' : ''}`}
                   style={hoverMenuPosition.invertY ? { bottom: hoverMenuPosition.bottom } : { top: hoverMenuPosition.top }}
-                  onMouseEnter={() => setHoveringMenu('mensajeria')}
-                  onMouseLeave={() => setHoveringMenu(null)}
+                  onMouseEnter={cancelCloseHoverMenu}
+                  onMouseLeave={closeHoverMenuWithDelay}
                 >
                   <div className="floating-submenu-title">Mensajería</div>
                   {mensajeriaSubItems.map((item) => {
@@ -1170,12 +1200,10 @@ export default function CrmLayout() {
                 className="nav-group"
                 onMouseEnter={(e) => {
                   if (sidebarCollapsed) {
-                    setHoveringMenu('marketing');
-                    const rect = e.currentTarget.getBoundingClientRect();
-                    setHoverMenuPosition(calculateMenuPosition(rect, 5));
+                    openHoverMenu('marketing', e.currentTarget.getBoundingClientRect(), 5);
                   }
                 }}
-                onMouseLeave={() => setHoveringMenu(null)}
+                onMouseLeave={closeHoverMenuWithDelay}
               >
               <button
                 className={`nav-item nav-expandable ${isMarketingActive ? 'active' : ''}`}
@@ -1211,8 +1239,8 @@ export default function CrmLayout() {
                 <div
                   className={`nav-floating-submenu ${hoverMenuPosition.invertY ? 'inverted' : ''}`}
                   style={hoverMenuPosition.invertY ? { bottom: hoverMenuPosition.bottom } : { top: hoverMenuPosition.top }}
-                  onMouseEnter={() => setHoveringMenu('marketing')}
-                  onMouseLeave={() => setHoveringMenu(null)}
+                  onMouseEnter={cancelCloseHoverMenu}
+                  onMouseLeave={closeHoverMenuWithDelay}
                 >
                   <div className="floating-submenu-title">Marketing</div>
                   {visibleMarketingItems.map((item) => (
@@ -1285,12 +1313,10 @@ export default function CrmLayout() {
                 className="nav-group"
                 onMouseEnter={(e) => {
                   if (sidebarCollapsed) {
-                    setHoveringMenu('documentos');
-                    const rect = e.currentTarget.getBoundingClientRect();
-                    setHoverMenuPosition(calculateMenuPosition(rect, 5));
+                    openHoverMenu('documentos', e.currentTarget.getBoundingClientRect(), 5);
                   }
                 }}
-                onMouseLeave={() => setHoveringMenu(null)}
+                onMouseLeave={closeHoverMenuWithDelay}
               >
               <button
                 className={`nav-item nav-expandable ${isDocumentosActive ? 'active' : ''}`}
@@ -1327,8 +1353,8 @@ export default function CrmLayout() {
                 <div
                   className={`nav-floating-submenu ${hoverMenuPosition.invertY ? 'inverted' : ''}`}
                   style={hoverMenuPosition.invertY ? { bottom: hoverMenuPosition.bottom } : { top: hoverMenuPosition.top }}
-                  onMouseEnter={() => setHoveringMenu('documentos')}
-                  onMouseLeave={() => setHoveringMenu(null)}
+                  onMouseEnter={cancelCloseHoverMenu}
+                  onMouseLeave={closeHoverMenuWithDelay}
                 >
                   <div className="floating-submenu-title">Documentos</div>
                   {documentosSubItems.map((item) => (
@@ -1360,12 +1386,10 @@ export default function CrmLayout() {
                 className="nav-group"
                 onMouseEnter={(e) => {
                   if (sidebarCollapsed) {
-                    setHoveringMenu('sistemaFases');
-                    const rect = e.currentTarget.getBoundingClientRect();
-                    setHoverMenuPosition(calculateMenuPosition(rect, 5));
+                    openHoverMenu('sistemaFases', e.currentTarget.getBoundingClientRect(), 5);
                   }
                 }}
-                onMouseLeave={() => setHoveringMenu(null)}
+                onMouseLeave={closeHoverMenuWithDelay}
               >
               <button
                 className={`nav-item nav-expandable ${isSistemaFasesActive ? 'active' : ''}`}
@@ -1401,8 +1425,8 @@ export default function CrmLayout() {
                 <div
                   className={`nav-floating-submenu ${hoverMenuPosition.invertY ? 'inverted' : ''}`}
                   style={hoverMenuPosition.invertY ? { bottom: hoverMenuPosition.bottom } : { top: hoverMenuPosition.top }}
-                  onMouseEnter={() => setHoveringMenu('sistemaFases')}
-                  onMouseLeave={() => setHoveringMenu(null)}
+                  onMouseEnter={cancelCloseHoverMenu}
+                  onMouseLeave={closeHoverMenuWithDelay}
                 >
                   <div className="floating-submenu-title">Rendimiento</div>
                   {visibleSistemaFasesItems.map((item) => (
@@ -1452,12 +1476,10 @@ export default function CrmLayout() {
                 className="nav-group"
                 onMouseEnter={(e) => {
                   if (sidebarCollapsed) {
-                    setHoveringMenu('config');
-                    const rect = e.currentTarget.getBoundingClientRect();
-                    setHoverMenuPosition(calculateMenuPosition(rect, 5));
+                    openHoverMenu('config', e.currentTarget.getBoundingClientRect(), 5);
                   }
                 }}
-                onMouseLeave={() => setHoveringMenu(null)}
+                onMouseLeave={closeHoverMenuWithDelay}
               >
               <button
                 className={`nav-item nav-expandable ${isConfigActive ? 'active' : ''}`}
@@ -1493,8 +1515,8 @@ export default function CrmLayout() {
                 <div
                   className={`nav-floating-submenu ${hoverMenuPosition.invertY ? 'inverted' : ''}`}
                   style={hoverMenuPosition.invertY ? { bottom: hoverMenuPosition.bottom } : { top: hoverMenuPosition.top }}
-                  onMouseEnter={() => setHoveringMenu('config')}
-                  onMouseLeave={() => setHoveringMenu(null)}
+                  onMouseEnter={cancelCloseHoverMenu}
+                  onMouseLeave={closeHoverMenuWithDelay}
                 >
                   <div className="floating-submenu-title">Configuración</div>
                   {visibleConfigItems.map((item) => (
@@ -1722,7 +1744,7 @@ export default function CrmLayout() {
           /* ========== VARIABLES ========== */
           .crm-layout {
             --sidebar-width: 220px;
-            --sidebar-collapsed-width: 56px;
+            --sidebar-collapsed-width: 68px;
             --header-height: 64px;
             --primary: #2563eb;
             --primary-light: #3b82f6;
@@ -1748,11 +1770,11 @@ export default function CrmLayout() {
             --sidebar-text-muted: #94A3B8;
             --sidebar-text-active: #FFFFFF;
             --sidebar-border: rgba(255, 255, 255, 0.08);
-            --sidebar-hover-bg: rgba(148, 163, 184, 0.15);
-            --sidebar-hover-text: #F1F5F9;
+            --sidebar-hover-bg: rgba(255, 255, 255, 0.1);
+            --sidebar-hover-text: #FFFFFF;
             --sidebar-active-bg: rgba(59, 130, 246, 0.35);
-            --sidebar-icon-color: #64748B;
-            --sidebar-icon-hover: #CBD5E1;
+            --sidebar-icon-color: #94A3B8;
+            --sidebar-icon-hover: #F1F5F9;
             --sidebar-icon-active: #60A5FA;
             /* Z-index hierarchy (from theme-clic.css) */
             --z-base: 0;
@@ -2142,37 +2164,45 @@ export default function CrmLayout() {
 
           .crm-sidebar.collapsed .nav-item {
             justify-content: center;
-            padding: 10px 8px;
-            border-radius: 8px;
-            margin: 2px 4px;
-            width: calc(100% - 8px);
+            padding: 12px 10px;
+            border-radius: 10px;
+            margin: 3px 6px;
+            width: calc(100% - 12px);
+            background: transparent !important;
+            box-shadow: none !important;
           }
 
           .crm-sidebar.collapsed .nav-item .nav-icon {
-            width: 22px;
-            height: 22px;
+            width: 24px;
+            height: 24px;
             color: var(--sidebar-icon-color);
-            transition: all 0.2s ease;
+            transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
           }
 
           .crm-sidebar.collapsed .nav-item .nav-icon svg {
-            width: 20px;
-            height: 20px;
+            width: 22px;
+            height: 22px;
+            transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
           }
 
+          /* Collapsed hover state - blue glow effect */
           .crm-sidebar.collapsed .nav-item:hover {
-            background: rgba(96, 165, 250, 0.12);
+            background: rgba(59, 130, 246, 0.15) !important;
           }
 
           .crm-sidebar.collapsed .nav-item:hover .nav-icon {
-            color: #93C5FD;
-            transform: scale(1.15);
+            color: #60A5FA;
           }
 
-          /* Collapsed active state - subtle dot indicator */
+          .crm-sidebar.collapsed .nav-item:hover .nav-icon svg {
+            width: 26px;
+            height: 26px;
+          }
+
+          /* Collapsed active state - subtle box + vertical line + bright icon */
           .crm-sidebar.collapsed .nav-item.active {
-            background: transparent;
-            box-shadow: none;
+            background: rgba(59, 130, 246, 0.12) !important;
+            box-shadow: none !important;
             position: relative;
           }
 
@@ -2183,13 +2213,27 @@ export default function CrmLayout() {
             top: 50%;
             transform: translateY(-50%);
             width: 3px;
-            height: 20px;
+            height: 24px;
             background: linear-gradient(180deg, #3B82F6 0%, #60A5FA 100%);
-            border-radius: 0 2px 2px 0;
+            border-radius: 0 3px 3px 0;
           }
 
           .crm-sidebar.collapsed .nav-item.active .nav-icon {
             color: #60A5FA;
+          }
+
+          .crm-sidebar.collapsed .nav-item.active .nav-icon svg {
+            width: 26px;
+            height: 26px;
+          }
+
+          /* Collapsed active + hover state */
+          .crm-sidebar.collapsed .nav-item.active:hover {
+            background: rgba(59, 130, 246, 0.2) !important;
+          }
+
+          .crm-sidebar.collapsed .nav-item.active:hover .nav-icon {
+            color: #93C5FD;
           }
 
           .crm-sidebar.collapsed .nav-submenu {
