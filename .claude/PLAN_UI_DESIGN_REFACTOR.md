@@ -13,7 +13,7 @@
 | **Fase 2: Layout Responsive** | ✅ LISTO PARA PRUEBAS | `4d79f48` | 2026-02-01 | Tag: `ui-fase-2`, Deployed |
 | **Fase 3: Componentes** | ✅ LISTO PARA PRUEBAS | `3d6aa75` | 2026-02-01 | Tag: `ui-fase-3`, Deployed |
 | **Fase 4: Migración** | ✅ LISTO PARA PRUEBAS | `f080e7c` | 2026-02-01 | Tag: `ui-fase-4`, Deployed |
-| **Fase 5: Polish Premium** | ✅ LISTO PARA PRUEBAS | `492c738` | 2026-02-01 | Tag: `ui-fase-5`, Deployed |
+| **Fase 5: Polish Premium** | ✅ LISTO PARA PRUEBAS | `4c4dd76` | 2026-02-01 | Tag: `ui-fase-5`, Deployed |
 
 ### Detalle Fase 5
 - [x] 5.1 Sidebar oscuro con gradiente (Dark theme: #1E293B → #0F172A)
