@@ -561,9 +561,10 @@ export default function CrmLayout() {
     localStorage.setItem('crm-sidebar-collapsed', String(sidebarCollapsed));
   }, [sidebarCollapsed]);
 
-  // Cerrar sidebar mobile al cambiar de ruta
+  // Cerrar sidebar mobile y menú flotante al cambiar de ruta
   useEffect(() => {
     setSidebarMobileOpen(false);
+    setHoveringMenu(null);
   }, [location.pathname]);
 
   // Sincronizar tenantActual con la URL cuando cambia el slug
@@ -937,7 +938,13 @@ export default function CrmLayout() {
               >
               <button
                 className={`nav-item nav-expandable ${isCrmActive ? 'active' : ''}`}
-                onClick={() => !sidebarCollapsed && toggleSubmenu('crm')}
+                onClick={() => {
+                  if (sidebarCollapsed) {
+                    setHoveringMenu(hoveringMenu === 'crm' ? null : 'crm');
+                  } else {
+                    toggleSubmenu('crm');
+                  }
+                }}
               >
                 <span className="nav-icon">{Icons.pipeline}</span>
                 <span className="nav-label">CRM</span>
@@ -1017,7 +1024,13 @@ export default function CrmLayout() {
               >
               <button
                 className={`nav-item nav-expandable ${isFinanzasActive ? 'active' : ''}`}
-                onClick={() => !sidebarCollapsed && toggleSubmenu('finanzas')}
+                onClick={() => {
+                  if (sidebarCollapsed) {
+                    setHoveringMenu(hoveringMenu === 'finanzas' ? null : 'finanzas');
+                  } else {
+                    toggleSubmenu('finanzas');
+                  }
+                }}
               >
                 <span className="nav-icon">{Icons.finanzas}</span>
                 <span className="nav-label">Finanzas</span>
@@ -1077,7 +1090,13 @@ export default function CrmLayout() {
               >
               <button
                 className={`nav-item nav-expandable ${isMensajeriaActive ? 'active' : ''}`}
-                onClick={() => !sidebarCollapsed && toggleSubmenu('mensajeria')}
+                onClick={() => {
+                  if (sidebarCollapsed) {
+                    setHoveringMenu(hoveringMenu === 'mensajeria' ? null : 'mensajeria');
+                  } else {
+                    toggleSubmenu('mensajeria');
+                  }
+                }}
               >
                 <span className="nav-icon">{Icons.mensajeria}</span>
                 <span className="nav-label">Mensajería</span>
@@ -1160,7 +1179,13 @@ export default function CrmLayout() {
               >
               <button
                 className={`nav-item nav-expandable ${isMarketingActive ? 'active' : ''}`}
-                onClick={() => !sidebarCollapsed && toggleSubmenu('marketing')}
+                onClick={() => {
+                  if (sidebarCollapsed) {
+                    setHoveringMenu(hoveringMenu === 'marketing' ? null : 'marketing');
+                  } else {
+                    toggleSubmenu('marketing');
+                  }
+                }}
               >
                 <span className="nav-icon">{Icons.marketing}</span>
                 <span className="nav-label">Marketing</span>
@@ -1269,7 +1294,13 @@ export default function CrmLayout() {
               >
               <button
                 className={`nav-item nav-expandable ${isDocumentosActive ? 'active' : ''}`}
-                onClick={() => !sidebarCollapsed && toggleSubmenu('documentos')}
+                onClick={() => {
+                  if (sidebarCollapsed) {
+                    setHoveringMenu(hoveringMenu === 'documentos' ? null : 'documentos');
+                  } else {
+                    toggleSubmenu('documentos');
+                  }
+                }}
               >
                 <span className="nav-icon">{Icons.documentos}</span>
                 <span className="nav-label">Documentos</span>
@@ -1338,7 +1369,13 @@ export default function CrmLayout() {
               >
               <button
                 className={`nav-item nav-expandable ${isSistemaFasesActive ? 'active' : ''}`}
-                onClick={() => !sidebarCollapsed && toggleSubmenu('sistemaFases')}
+                onClick={() => {
+                  if (sidebarCollapsed) {
+                    setHoveringMenu(hoveringMenu === 'sistemaFases' ? null : 'sistemaFases');
+                  } else {
+                    toggleSubmenu('sistemaFases');
+                  }
+                }}
               >
                 <span className="nav-icon">{Icons.fases}</span>
                 <span className="nav-label">Rendimiento</span>
@@ -1424,7 +1461,13 @@ export default function CrmLayout() {
               >
               <button
                 className={`nav-item nav-expandable ${isConfigActive ? 'active' : ''}`}
-                onClick={() => !sidebarCollapsed && toggleSubmenu('config')}
+                onClick={() => {
+                  if (sidebarCollapsed) {
+                    setHoveringMenu(hoveringMenu === 'config' ? null : 'config');
+                  } else {
+                    toggleSubmenu('config');
+                  }
+                }}
               >
                 <span className="nav-icon">{Icons.configuracion}</span>
                 <span className="nav-label">Configuración</span>
@@ -1679,7 +1722,7 @@ export default function CrmLayout() {
           /* ========== VARIABLES ========== */
           .crm-layout {
             --sidebar-width: 220px;
-            --sidebar-collapsed-width: 64px;
+            --sidebar-collapsed-width: 56px;
             --header-height: 64px;
             --primary: #2563eb;
             --primary-light: #3b82f6;
@@ -1701,15 +1744,15 @@ export default function CrmLayout() {
             --radius: 8px;
             --radius-lg: 12px;
             /* Dark sidebar colors - vibrant & readable */
-            --sidebar-text: #E2E8F0;
+            --sidebar-text: #CBD5E1;
             --sidebar-text-muted: #94A3B8;
             --sidebar-text-active: #FFFFFF;
             --sidebar-border: rgba(255, 255, 255, 0.08);
-            --sidebar-hover-bg: rgba(255, 255, 255, 0.08);
-            --sidebar-hover-text: #FFFFFF;
-            --sidebar-active-bg: rgba(59, 130, 246, 0.5);
-            --sidebar-icon-color: #94A3B8;
-            --sidebar-icon-hover: #E2E8F0;
+            --sidebar-hover-bg: rgba(148, 163, 184, 0.15);
+            --sidebar-hover-text: #F1F5F9;
+            --sidebar-active-bg: rgba(59, 130, 246, 0.35);
+            --sidebar-icon-color: #64748B;
+            --sidebar-icon-hover: #CBD5E1;
             --sidebar-icon-active: #60A5FA;
             /* Z-index hierarchy (from theme-clic.css) */
             --z-base: 0;
@@ -2059,54 +2102,90 @@ export default function CrmLayout() {
           }
 
           .crm-sidebar.collapsed {
-            width: var(--sidebar-collapsed-width, 64px);
+            width: var(--sidebar-collapsed-width, 56px);
           }
 
           .crm-sidebar.collapsed .brand-info,
           .crm-sidebar.collapsed .brand-type,
-          .crm-sidebar.collapsed .nav-section-title,
           .crm-sidebar.collapsed .nav-label,
           .crm-sidebar.collapsed .nav-chevron,
           .crm-sidebar.collapsed .nav-badge {
             display: none;
           }
 
+          /* Section titles become subtle dividers in collapsed mode */
+          .crm-sidebar.collapsed .nav-section-title {
+            height: 1px;
+            padding: 0;
+            margin: 8px 10px;
+            background: var(--sidebar-border);
+            font-size: 0;
+            overflow: hidden;
+          }
+
+          .crm-sidebar.collapsed .nav-section:first-child .nav-section-title {
+            display: none;
+          }
+
           .crm-sidebar.collapsed .sidebar-brand {
             justify-content: center;
-            padding: 14px 8px;
+            padding: 12px 6px;
+          }
+
+          .crm-sidebar.collapsed .sidebar-nav {
+            padding: 8px 4px;
+          }
+
+          .crm-sidebar.collapsed .nav-section {
+            margin-bottom: 4px;
           }
 
           .crm-sidebar.collapsed .nav-item {
             justify-content: center;
-            padding: 12px;
-            border-radius: 10px;
-            margin: 2px 6px;
-            width: calc(100% - 12px);
+            padding: 10px 8px;
+            border-radius: 8px;
+            margin: 2px 4px;
+            width: calc(100% - 8px);
           }
 
           .crm-sidebar.collapsed .nav-item .nav-icon {
-            width: 24px;
-            height: 24px;
+            width: 22px;
+            height: 22px;
+            color: var(--sidebar-icon-color);
+            transition: all 0.2s ease;
           }
 
           .crm-sidebar.collapsed .nav-item .nav-icon svg {
-            width: 22px;
-            height: 22px;
+            width: 20px;
+            height: 20px;
           }
 
           .crm-sidebar.collapsed .nav-item:hover {
-            background: rgba(59, 130, 246, 0.15);
-            transform: scale(1.08);
+            background: rgba(96, 165, 250, 0.12);
           }
 
           .crm-sidebar.collapsed .nav-item:hover .nav-icon {
-            color: #60A5FA;
-            transform: none;
+            color: #93C5FD;
+            transform: scale(1.15);
           }
 
+          /* Collapsed active state - subtle dot indicator */
           .crm-sidebar.collapsed .nav-item.active {
-            background: rgba(59, 130, 246, 0.25);
+            background: transparent;
             box-shadow: none;
+            position: relative;
+          }
+
+          .crm-sidebar.collapsed .nav-item.active::before {
+            content: '';
+            position: absolute;
+            left: 0;
+            top: 50%;
+            transform: translateY(-50%);
+            width: 3px;
+            height: 20px;
+            background: linear-gradient(180deg, #3B82F6 0%, #60A5FA 100%);
+            border-radius: 0 2px 2px 0;
           }
 
           .crm-sidebar.collapsed .nav-item.active .nav-icon {
@@ -2115,10 +2194,6 @@ export default function CrmLayout() {
 
           .crm-sidebar.collapsed .nav-submenu {
             display: none;
-          }
-
-          .crm-sidebar.collapsed .sidebar-nav {
-            padding: 12px 4px;
           }
 
           /* Nav group wrapper with invisible bridge */
@@ -2145,7 +2220,7 @@ export default function CrmLayout() {
           /* ========== FLOATING SUBMENU (Collapsed Mode) ========== */
           .nav-floating-submenu {
             position: fixed;
-            left: calc(var(--sidebar-collapsed-width, 64px) + 8px);
+            left: calc(var(--sidebar-collapsed-width, 56px) + 8px);
             background: linear-gradient(180deg, #1E293B 0%, #0F172A 100%);
             border: 1px solid rgba(255, 255, 255, 0.1);
             border-radius: var(--radius-lg);
@@ -2253,8 +2328,8 @@ export default function CrmLayout() {
 
           /* Main content adjustment for collapsed sidebar */
           .crm-layout:has(.crm-sidebar.collapsed) .crm-main {
-            margin-left: var(--sidebar-collapsed-width, 64px);
-            max-width: calc(100vw - var(--sidebar-collapsed-width, 64px));
+            margin-left: var(--sidebar-collapsed-width, 56px);
+            max-width: calc(100vw - var(--sidebar-collapsed-width, 56px));
           }
 
           /* ========== MAIN AREA ========== */
@@ -2658,11 +2733,22 @@ export default function CrmLayout() {
 
             .crm-sidebar.collapsed .brand-info,
             .crm-sidebar.collapsed .brand-type,
-            .crm-sidebar.collapsed .nav-section-title,
             .crm-sidebar.collapsed .nav-label,
             .crm-sidebar.collapsed .nav-chevron,
             .crm-sidebar.collapsed .nav-badge {
               display: revert;
+            }
+
+            .crm-sidebar.collapsed .nav-section-title {
+              height: auto;
+              padding: 0 10px;
+              margin: 0 0 6px 0;
+              background: transparent;
+              font-size: 0.625rem;
+            }
+
+            .crm-sidebar.collapsed .nav-section:first-child .nav-section-title {
+              display: block;
             }
 
             .crm-sidebar.collapsed .sidebar-brand {
@@ -2670,9 +2756,40 @@ export default function CrmLayout() {
               padding: 14px 16px;
             }
 
+            .crm-sidebar.collapsed .nav-section {
+              margin-bottom: 16px;
+            }
+
             .crm-sidebar.collapsed .nav-item {
               justify-content: flex-start;
-              padding: 7px 10px;
+              padding: 9px 12px;
+              margin: 0 0 2px 0;
+              width: 100%;
+              border-radius: var(--radius);
+            }
+
+            .crm-sidebar.collapsed .nav-item .nav-icon {
+              width: 20px;
+              height: 20px;
+            }
+
+            .crm-sidebar.collapsed .nav-item .nav-icon svg {
+              width: 18px;
+              height: 18px;
+            }
+
+            .crm-sidebar.collapsed .nav-item:hover {
+              background: var(--sidebar-hover-bg);
+              transform: none;
+            }
+
+            .crm-sidebar.collapsed .nav-item.active {
+              background: var(--sidebar-active-bg);
+              box-shadow: inset 3px 0 0 #3B82F6;
+            }
+
+            .crm-sidebar.collapsed .nav-item.active::before {
+              display: none;
             }
 
             .crm-sidebar.collapsed .nav-submenu {
