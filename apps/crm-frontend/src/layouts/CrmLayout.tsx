@@ -144,6 +144,16 @@ const Icons = {
       <polyline points="6 9 12 15 18 9"/>
     </svg>
   ),
+  chevronLeft: (
+    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+      <polyline points="15 18 9 12 15 6"/>
+    </svg>
+  ),
+  chevronRight: (
+    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+      <polyline points="9 18 15 12 9 6"/>
+    </svg>
+  ),
   external: (
     <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
       <path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"/>
@@ -508,6 +518,21 @@ export default function CrmLayout() {
   // Estado para sidebar responsive
   const [sidebarMobileOpen, setSidebarMobileOpen] = useState(false);
 
+  // Estado para sidebar colapsado (desktop)
+  const [sidebarCollapsed, setSidebarCollapsed] = useState(() => {
+    const saved = localStorage.getItem('crm-sidebar-collapsed');
+    return saved === 'true';
+  });
+
+  // Estado para submenú flotante en hover (modo colapsado)
+  const [hoveringMenu, setHoveringMenu] = useState<string | null>(null);
+  const [hoverMenuPosition, setHoverMenuPosition] = useState<{ top: number } | null>(null);
+
+  // Guardar preferencia de sidebar colapsado
+  useEffect(() => {
+    localStorage.setItem('crm-sidebar-collapsed', String(sidebarCollapsed));
+  }, [sidebarCollapsed]);
+
   // Cerrar sidebar mobile al cambiar de ruta
   useEffect(() => {
     setSidebarMobileOpen(false);
@@ -822,7 +847,7 @@ export default function CrmLayout() {
         )}
 
         {/* Sidebar */}
-        <aside className={`crm-sidebar ${sidebarMobileOpen ? 'mobile-open' : ''}`}>
+        <aside className={`crm-sidebar ${sidebarMobileOpen ? 'mobile-open' : ''} ${sidebarCollapsed ? 'collapsed' : ''}`}>
           {/* Logo/Tenant */}
           <div className="sidebar-brand">
             <div className={`brand-logo ${isotipoUrl ? 'has-image' : ''}`}>
@@ -871,10 +896,20 @@ export default function CrmLayout() {
                   <span className="nav-label">{visibleCrmItems[0].label}</span>
                 </NavLink>
               ) : visibleCrmItems.length > 1 && (
-              <>
+              <div
+                className="nav-group"
+                onMouseEnter={(e) => {
+                  if (sidebarCollapsed) {
+                    setHoveringMenu('crm');
+                    const rect = e.currentTarget.getBoundingClientRect();
+                    setHoverMenuPosition({ top: rect.top });
+                  }
+                }}
+                onMouseLeave={() => setHoveringMenu(null)}
+              >
               <button
                 className={`nav-item nav-expandable ${isCrmActive ? 'active' : ''}`}
-                onClick={() => toggleSubmenu('crm')}
+                onClick={() => !sidebarCollapsed && toggleSubmenu('crm')}
               >
                 <span className="nav-icon">{Icons.pipeline}</span>
                 <span className="nav-label">CRM</span>
@@ -895,7 +930,29 @@ export default function CrmLayout() {
                   </NavLink>
                 ))}
               </div>
-              </>
+
+              {/* Floating submenu for collapsed mode */}
+              {sidebarCollapsed && hoveringMenu === 'crm' && hoverMenuPosition && (
+                <div
+                  className="nav-floating-submenu"
+                  style={{ top: hoverMenuPosition.top }}
+                  onMouseEnter={() => setHoveringMenu('crm')}
+                  onMouseLeave={() => setHoveringMenu(null)}
+                >
+                  <div className="floating-submenu-title">CRM</div>
+                  {visibleCrmItems.map((item) => (
+                    <NavLink
+                      key={item.id}
+                      to={`${basePath}/${item.path}`}
+                      className={({ isActive }) => `nav-subitem ${isActive ? 'active' : ''}`}
+                    >
+                      <span className="nav-icon">{item.icon}</span>
+                      <span className="nav-label">{item.label}</span>
+                    </NavLink>
+                  ))}
+                </div>
+              )}
+              </div>
               )}
 
               {/* Propiedades */}
@@ -919,10 +976,20 @@ export default function CrmLayout() {
                   <span className="nav-label">{visibleFinanzasItems[0].label}</span>
                 </NavLink>
               ) : visibleFinanzasItems.length > 1 && (
-              <>
+              <div
+                className="nav-group"
+                onMouseEnter={(e) => {
+                  if (sidebarCollapsed) {
+                    setHoveringMenu('finanzas');
+                    const rect = e.currentTarget.getBoundingClientRect();
+                    setHoverMenuPosition({ top: rect.top });
+                  }
+                }}
+                onMouseLeave={() => setHoveringMenu(null)}
+              >
               <button
                 className={`nav-item nav-expandable ${isFinanzasActive ? 'active' : ''}`}
-                onClick={() => toggleSubmenu('finanzas')}
+                onClick={() => !sidebarCollapsed && toggleSubmenu('finanzas')}
               >
                 <span className="nav-icon">{Icons.finanzas}</span>
                 <span className="nav-label">Finanzas</span>
@@ -943,15 +1010,46 @@ export default function CrmLayout() {
                   </NavLink>
                 ))}
               </div>
-              </>
+
+              {sidebarCollapsed && hoveringMenu === 'finanzas' && hoverMenuPosition && (
+                <div
+                  className="nav-floating-submenu"
+                  style={{ top: hoverMenuPosition.top }}
+                  onMouseEnter={() => setHoveringMenu('finanzas')}
+                  onMouseLeave={() => setHoveringMenu(null)}
+                >
+                  <div className="floating-submenu-title">Finanzas</div>
+                  {visibleFinanzasItems.map((item) => (
+                    <NavLink
+                      key={item.id}
+                      to={`${basePath}/${item.path}`}
+                      className={({ isActive }) => `nav-subitem ${isActive ? 'active' : ''}`}
+                    >
+                      <span className="nav-icon">{item.icon}</span>
+                      <span className="nav-label">{item.label}</span>
+                    </NavLink>
+                  ))}
+                </div>
+              )}
+              </div>
               )}
 
               {/* Mensajería con submenú */}
               {tieneAcceso('mensajeria') && (
-              <>
+              <div
+                className="nav-group"
+                onMouseEnter={(e) => {
+                  if (sidebarCollapsed) {
+                    setHoveringMenu('mensajeria');
+                    const rect = e.currentTarget.getBoundingClientRect();
+                    setHoverMenuPosition({ top: rect.top });
+                  }
+                }}
+                onMouseLeave={() => setHoveringMenu(null)}
+              >
               <button
                 className={`nav-item nav-expandable ${isMensajeriaActive ? 'active' : ''}`}
-                onClick={() => toggleSubmenu('mensajeria')}
+                onClick={() => !sidebarCollapsed && toggleSubmenu('mensajeria')}
               >
                 <span className="nav-icon">{Icons.mensajeria}</span>
                 <span className="nav-label">Mensajería</span>
@@ -981,7 +1079,34 @@ export default function CrmLayout() {
                   );
                 })}
               </div>
-              </>
+
+              {sidebarCollapsed && hoveringMenu === 'mensajeria' && hoverMenuPosition && (
+                <div
+                  className="nav-floating-submenu"
+                  style={{ top: hoverMenuPosition.top }}
+                  onMouseEnter={() => setHoveringMenu('mensajeria')}
+                  onMouseLeave={() => setHoveringMenu(null)}
+                >
+                  <div className="floating-submenu-title">Mensajería</div>
+                  {mensajeriaSubItems.map((item) => {
+                    const badge = item.id === 'mensajeria-correo' ? unreadCorreo
+                      : item.id === 'mensajeria-chats' ? unreadChats
+                      : 0;
+                    return (
+                      <NavLink
+                        key={item.id}
+                        to={`${basePath}/${item.path}`}
+                        className={({ isActive }) => `nav-subitem ${isActive ? 'active' : ''}`}
+                      >
+                        <span className="nav-icon">{item.icon}</span>
+                        <span className="nav-label">{item.label}</span>
+                        {badge > 0 && <span className="nav-badge">{badge}</span>}
+                      </NavLink>
+                    );
+                  })}
+                </div>
+              )}
+              </div>
               )}
 
               {/* Marketing con submenú */}
@@ -994,10 +1119,20 @@ export default function CrmLayout() {
                   <span className="nav-label">{visibleMarketingItems[0].label}</span>
                 </NavLink>
               ) : visibleMarketingItems.length > 1 && (
-              <>
+              <div
+                className="nav-group"
+                onMouseEnter={(e) => {
+                  if (sidebarCollapsed) {
+                    setHoveringMenu('marketing');
+                    const rect = e.currentTarget.getBoundingClientRect();
+                    setHoverMenuPosition({ top: rect.top });
+                  }
+                }}
+                onMouseLeave={() => setHoveringMenu(null)}
+              >
               <button
                 className={`nav-item nav-expandable ${isMarketingActive ? 'active' : ''}`}
-                onClick={() => toggleSubmenu('marketing')}
+                onClick={() => !sidebarCollapsed && toggleSubmenu('marketing')}
               >
                 <span className="nav-icon">{Icons.marketing}</span>
                 <span className="nav-label">Marketing</span>
@@ -1018,7 +1153,28 @@ export default function CrmLayout() {
                   </NavLink>
                 ))}
               </div>
-              </>
+
+              {sidebarCollapsed && hoveringMenu === 'marketing' && hoverMenuPosition && (
+                <div
+                  className="nav-floating-submenu"
+                  style={{ top: hoverMenuPosition.top }}
+                  onMouseEnter={() => setHoveringMenu('marketing')}
+                  onMouseLeave={() => setHoveringMenu(null)}
+                >
+                  <div className="floating-submenu-title">Marketing</div>
+                  {visibleMarketingItems.map((item) => (
+                    <NavLink
+                      key={item.id}
+                      to={`${basePath}/${item.path}`}
+                      className={({ isActive }) => `nav-subitem ${isActive ? 'active' : ''}`}
+                    >
+                      <span className="nav-icon">{item.icon}</span>
+                      <span className="nav-label">{item.label}</span>
+                    </NavLink>
+                  ))}
+                </div>
+              )}
+              </div>
               )}
             </div>
 
@@ -1072,9 +1228,20 @@ export default function CrmLayout() {
               )}
 
               {/* Documentos con submenú - siempre visible */}
+              <div
+                className="nav-group"
+                onMouseEnter={(e) => {
+                  if (sidebarCollapsed) {
+                    setHoveringMenu('documentos');
+                    const rect = e.currentTarget.getBoundingClientRect();
+                    setHoverMenuPosition({ top: rect.top });
+                  }
+                }}
+                onMouseLeave={() => setHoveringMenu(null)}
+              >
               <button
                 className={`nav-item nav-expandable ${isDocumentosActive ? 'active' : ''}`}
-                onClick={() => toggleSubmenu('documentos')}
+                onClick={() => !sidebarCollapsed && toggleSubmenu('documentos')}
               >
                 <span className="nav-icon">{Icons.documentos}</span>
                 <span className="nav-label">Documentos</span>
@@ -1097,6 +1264,29 @@ export default function CrmLayout() {
                 ))}
               </div>
 
+              {sidebarCollapsed && hoveringMenu === 'documentos' && hoverMenuPosition && (
+                <div
+                  className="nav-floating-submenu"
+                  style={{ top: hoverMenuPosition.top }}
+                  onMouseEnter={() => setHoveringMenu('documentos')}
+                  onMouseLeave={() => setHoveringMenu(null)}
+                >
+                  <div className="floating-submenu-title">Documentos</div>
+                  {documentosSubItems.map((item) => (
+                    <NavLink
+                      key={item.id}
+                      to={`${basePath}/${item.path}`}
+                      end={item.path === 'documentos'}
+                      className={({ isActive }) => `nav-subitem ${isActive ? 'active' : ''}`}
+                    >
+                      <span className="nav-icon">{item.icon}</span>
+                      <span className="nav-label">{item.label}</span>
+                    </NavLink>
+                  ))}
+                </div>
+              )}
+              </div>
+
               {/* Rendimiento (Fases + Productividad) */}
               {visibleSistemaFasesItems.length === 1 ? (
                 <NavLink
@@ -1107,10 +1297,20 @@ export default function CrmLayout() {
                   <span className="nav-label">{visibleSistemaFasesItems[0].label}</span>
                 </NavLink>
               ) : visibleSistemaFasesItems.length > 1 && (
-              <>
+              <div
+                className="nav-group"
+                onMouseEnter={(e) => {
+                  if (sidebarCollapsed) {
+                    setHoveringMenu('sistemaFases');
+                    const rect = e.currentTarget.getBoundingClientRect();
+                    setHoverMenuPosition({ top: rect.top });
+                  }
+                }}
+                onMouseLeave={() => setHoveringMenu(null)}
+              >
               <button
                 className={`nav-item nav-expandable ${isSistemaFasesActive ? 'active' : ''}`}
-                onClick={() => toggleSubmenu('sistemaFases')}
+                onClick={() => !sidebarCollapsed && toggleSubmenu('sistemaFases')}
               >
                 <span className="nav-icon">{Icons.fases}</span>
                 <span className="nav-label">Rendimiento</span>
@@ -1131,7 +1331,28 @@ export default function CrmLayout() {
                   </NavLink>
                 ))}
               </div>
-              </>
+
+              {sidebarCollapsed && hoveringMenu === 'sistemaFases' && hoverMenuPosition && (
+                <div
+                  className="nav-floating-submenu"
+                  style={{ top: hoverMenuPosition.top }}
+                  onMouseEnter={() => setHoveringMenu('sistemaFases')}
+                  onMouseLeave={() => setHoveringMenu(null)}
+                >
+                  <div className="floating-submenu-title">Rendimiento</div>
+                  {visibleSistemaFasesItems.map((item) => (
+                    <NavLink
+                      key={item.id}
+                      to={`${basePath}/${item.path}`}
+                      className={({ isActive }) => `nav-subitem ${isActive ? 'active' : ''}`}
+                    >
+                      <span className="nav-icon">{item.icon}</span>
+                      <span className="nav-label">{item.label}</span>
+                    </NavLink>
+                  ))}
+                </div>
+              )}
+              </div>
               )}
             </div>
             )}
@@ -1162,10 +1383,20 @@ export default function CrmLayout() {
                   <span className="nav-label">{visibleConfigItems[0].label}</span>
                 </NavLink>
               ) : visibleConfigItems.length > 1 && (
-              <>
+              <div
+                className="nav-group"
+                onMouseEnter={(e) => {
+                  if (sidebarCollapsed) {
+                    setHoveringMenu('config');
+                    const rect = e.currentTarget.getBoundingClientRect();
+                    setHoverMenuPosition({ top: rect.top });
+                  }
+                }}
+                onMouseLeave={() => setHoveringMenu(null)}
+              >
               <button
                 className={`nav-item nav-expandable ${isConfigActive ? 'active' : ''}`}
-                onClick={() => toggleSubmenu('config')}
+                onClick={() => !sidebarCollapsed && toggleSubmenu('config')}
               >
                 <span className="nav-icon">{Icons.configuracion}</span>
                 <span className="nav-label">Configuración</span>
@@ -1186,12 +1417,41 @@ export default function CrmLayout() {
                   </NavLink>
                 ))}
               </div>
-              </>
+
+              {sidebarCollapsed && hoveringMenu === 'config' && hoverMenuPosition && (
+                <div
+                  className="nav-floating-submenu"
+                  style={{ top: hoverMenuPosition.top }}
+                  onMouseEnter={() => setHoveringMenu('config')}
+                  onMouseLeave={() => setHoveringMenu(null)}
+                >
+                  <div className="floating-submenu-title">Configuración</div>
+                  {visibleConfigItems.map((item) => (
+                    <NavLink
+                      key={item.id}
+                      to={`${basePath}/${item.path}`}
+                      className={({ isActive }) => `nav-subitem ${isActive ? 'active' : ''}`}
+                    >
+                      <span className="nav-icon">{item.icon}</span>
+                      <span className="nav-label">{item.label}</span>
+                    </NavLink>
+                  ))}
+                </div>
+              )}
+              </div>
               )}
             </div>
             )}
           </nav>
 
+          {/* Toggle button para colapsar/expandir sidebar */}
+          <button
+            className="sidebar-toggle-btn"
+            onClick={() => setSidebarCollapsed(!sidebarCollapsed)}
+            title={sidebarCollapsed ? 'Expandir menú' : 'Colapsar menú'}
+          >
+            {sidebarCollapsed ? Icons.chevronRight : Icons.chevronLeft}
+          </button>
         </aside>
 
         {/* Main Content */}
@@ -1388,6 +1648,7 @@ export default function CrmLayout() {
           /* ========== VARIABLES ========== */
           .crm-layout {
             --sidebar-width: 220px;
+            --sidebar-collapsed-width: 64px;
             --header-height: 64px;
             --primary: #2563eb;
             --primary-light: #3b82f6;
@@ -1676,6 +1937,153 @@ export default function CrmLayout() {
 
           .nav-subitem.active .nav-icon {
             opacity: 1;
+          }
+
+          /* ========== SIDEBAR TOGGLE BUTTON ========== */
+          .sidebar-toggle-btn {
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            width: 32px;
+            height: 32px;
+            margin: 8px auto 16px;
+            border: 1px solid var(--sidebar-border);
+            border-radius: 50%;
+            background: rgba(255, 255, 255, 0.05);
+            color: var(--sidebar-text-muted);
+            cursor: pointer;
+            transition: all 0.2s ease;
+            flex-shrink: 0;
+          }
+
+          .sidebar-toggle-btn:hover {
+            background: rgba(255, 255, 255, 0.1);
+            color: var(--sidebar-text);
+            border-color: rgba(255, 255, 255, 0.2);
+          }
+
+          /* ========== SIDEBAR COLLAPSED MODE ========== */
+          .crm-sidebar {
+            transition: width 0.25s cubic-bezier(0.4, 0, 0.2, 1);
+          }
+
+          .crm-sidebar.collapsed {
+            width: var(--sidebar-collapsed-width, 64px);
+          }
+
+          .crm-sidebar.collapsed .brand-info,
+          .crm-sidebar.collapsed .brand-type,
+          .crm-sidebar.collapsed .nav-section-title,
+          .crm-sidebar.collapsed .nav-label,
+          .crm-sidebar.collapsed .nav-chevron,
+          .crm-sidebar.collapsed .nav-badge {
+            display: none;
+          }
+
+          .crm-sidebar.collapsed .sidebar-brand {
+            justify-content: center;
+            padding: 14px 8px;
+          }
+
+          .crm-sidebar.collapsed .nav-item {
+            justify-content: center;
+            padding: 10px;
+          }
+
+          .crm-sidebar.collapsed .nav-submenu {
+            display: none;
+          }
+
+          .crm-sidebar.collapsed .sidebar-nav {
+            padding: 12px 8px;
+          }
+
+          /* Nav group wrapper */
+          .nav-group {
+            position: relative;
+          }
+
+          /* ========== FLOATING SUBMENU (Collapsed Mode) ========== */
+          .nav-floating-submenu {
+            position: fixed;
+            left: var(--sidebar-collapsed-width, 64px);
+            background: linear-gradient(180deg, #1E293B 0%, #0F172A 100%);
+            border: 1px solid var(--sidebar-border);
+            border-radius: var(--radius-lg);
+            padding: 8px;
+            min-width: 180px;
+            box-shadow: 0 8px 32px rgba(0, 0, 0, 0.4);
+            z-index: calc(var(--z-sidebar) + 10);
+            animation: floatingSubmenuIn 0.15s ease-out;
+          }
+
+          @keyframes floatingSubmenuIn {
+            from {
+              opacity: 0;
+              transform: translateX(-8px);
+            }
+            to {
+              opacity: 1;
+              transform: translateX(0);
+            }
+          }
+
+          .floating-submenu-title {
+            font-size: 0.7rem;
+            font-weight: 600;
+            text-transform: uppercase;
+            letter-spacing: 0.08em;
+            color: var(--sidebar-text-muted);
+            padding: 6px 10px 8px;
+            border-bottom: 1px solid var(--sidebar-border);
+            margin-bottom: 6px;
+          }
+
+          .nav-floating-submenu .nav-subitem {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            padding: 8px 10px;
+            color: var(--sidebar-text);
+            text-decoration: none;
+            border-radius: var(--radius);
+            margin-bottom: 2px;
+            transition: all 0.15s ease;
+            font-size: 0.8125rem;
+            font-weight: 500;
+          }
+
+          .nav-floating-submenu .nav-subitem:hover {
+            background: var(--sidebar-hover);
+            color: var(--sidebar-text-active);
+          }
+
+          .nav-floating-submenu .nav-subitem.active {
+            background: var(--sidebar-active-bg);
+            color: var(--sidebar-text-active);
+            font-weight: 600;
+          }
+
+          .nav-floating-submenu .nav-subitem .nav-icon {
+            opacity: 0.8;
+          }
+
+          .nav-floating-submenu .nav-subitem.active .nav-icon {
+            opacity: 1;
+          }
+
+          .nav-floating-submenu .nav-subitem .nav-label {
+            display: block !important;
+          }
+
+          .nav-floating-submenu .nav-subitem .nav-badge {
+            display: inline-flex !important;
+          }
+
+          /* Main content adjustment for collapsed sidebar */
+          .crm-layout:has(.crm-sidebar.collapsed) .crm-main {
+            margin-left: var(--sidebar-collapsed-width, 64px);
+            max-width: calc(100vw - var(--sidebar-collapsed-width, 64px));
           }
 
           /* ========== MAIN AREA ========== */
@@ -2067,6 +2475,48 @@ export default function CrmLayout() {
               display: flex;
             }
 
+            /* Hide toggle button on mobile - use hamburger menu instead */
+            .sidebar-toggle-btn {
+              display: none;
+            }
+
+            /* Disable collapsed mode on mobile - always full width sidebar */
+            .crm-sidebar.collapsed {
+              width: var(--sidebar-width);
+            }
+
+            .crm-sidebar.collapsed .brand-info,
+            .crm-sidebar.collapsed .brand-type,
+            .crm-sidebar.collapsed .nav-section-title,
+            .crm-sidebar.collapsed .nav-label,
+            .crm-sidebar.collapsed .nav-chevron,
+            .crm-sidebar.collapsed .nav-badge {
+              display: revert;
+            }
+
+            .crm-sidebar.collapsed .sidebar-brand {
+              justify-content: flex-start;
+              padding: 14px 16px;
+            }
+
+            .crm-sidebar.collapsed .nav-item {
+              justify-content: flex-start;
+              padding: 7px 10px;
+            }
+
+            .crm-sidebar.collapsed .nav-submenu {
+              display: block;
+            }
+
+            .crm-sidebar.collapsed .sidebar-nav {
+              padding: 12px 10px;
+            }
+
+            /* Hide floating submenus on mobile */
+            .nav-floating-submenu {
+              display: none !important;
+            }
+
             /* Sidebar slides in from left */
             .crm-sidebar {
               transform: translateX(-100%);
@@ -2085,6 +2535,12 @@ export default function CrmLayout() {
               margin-left: 0;
               max-width: 100vw;
               width: 100%;
+            }
+
+            /* Override :has selector for collapsed sidebar on mobile */
+            .crm-layout:has(.crm-sidebar.collapsed) .crm-main {
+              margin-left: 0;
+              max-width: 100vw;
             }
 
             /* Show overlay when sidebar is open */
