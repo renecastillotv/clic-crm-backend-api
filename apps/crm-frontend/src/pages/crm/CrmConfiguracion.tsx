@@ -147,22 +147,30 @@ export default function CrmConfiguracion() {
 
   // Aplicar colores al DOM para preview
   const aplicarColoresPreview = (colors: typeof coloresCRM) => {
-    // Las variables están definidas en .crm-layout, no en :root
-    const crmLayout = document.querySelector('.crm-layout') as HTMLElement;
-    if (!crmLayout) return;
+    // Inyectar un <style> dinámico para sobrescribir las variables CSS
+    const styleId = 'crm-dynamic-theme';
+    let styleEl = document.getElementById(styleId) as HTMLStyleElement;
+    if (!styleEl) {
+      styleEl = document.createElement('style');
+      styleEl.id = styleId;
+      document.head.appendChild(styleEl);
+    }
 
-    crmLayout.style.setProperty('--bg-sidebar',
-      `linear-gradient(180deg, ${colors.sidebarBgStart} 0%, ${colors.sidebarBgEnd} 100%)`);
-    crmLayout.style.setProperty('--sidebar-text', colors.sidebarText);
-    crmLayout.style.setProperty('--sidebar-text-active', colors.sidebarTextActive);
-    crmLayout.style.setProperty('--sidebar-hover-text', colors.sidebarTextActive);
-    crmLayout.style.setProperty('--sidebar-hover-bg', colors.sidebarHoverBg);
-    crmLayout.style.setProperty('--sidebar-active-bg', colors.sidebarActiveBg);
-    crmLayout.style.setProperty('--sidebar-icon-color', colors.sidebarIconColor);
-    crmLayout.style.setProperty('--sidebar-icon-active', colors.sidebarIconActive);
-    crmLayout.style.setProperty('--sidebar-icon-hover', colors.sidebarIconActive);
-    crmLayout.style.setProperty('--primary', colors.crmPrimary);
-    crmLayout.style.setProperty('--primary-light', colors.crmPrimary);
+    styleEl.textContent = `
+      .crm-layout {
+        --bg-sidebar: linear-gradient(180deg, ${colors.sidebarBgStart} 0%, ${colors.sidebarBgEnd} 100%) !important;
+        --sidebar-text: ${colors.sidebarText} !important;
+        --sidebar-text-active: ${colors.sidebarTextActive} !important;
+        --sidebar-hover-text: ${colors.sidebarTextActive} !important;
+        --sidebar-hover-bg: ${colors.sidebarHoverBg} !important;
+        --sidebar-active-bg: ${colors.sidebarActiveBg} !important;
+        --sidebar-icon-color: ${colors.sidebarIconColor} !important;
+        --sidebar-icon-active: ${colors.sidebarIconActive} !important;
+        --sidebar-icon-hover: ${colors.sidebarIconActive} !important;
+        --primary: ${colors.crmPrimary} !important;
+        --primary-light: ${colors.crmPrimary} !important;
+      }
+    `;
   };
 
   // Abrir modal de colores
