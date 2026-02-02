@@ -147,19 +147,22 @@ export default function CrmConfiguracion() {
 
   // Aplicar colores al DOM para preview
   const aplicarColoresPreview = (colors: typeof coloresCRM) => {
-    const root = document.documentElement;
-    root.style.setProperty('--bg-sidebar',
+    // Las variables están definidas en .crm-layout, no en :root
+    const crmLayout = document.querySelector('.crm-layout') as HTMLElement;
+    if (!crmLayout) return;
+
+    crmLayout.style.setProperty('--bg-sidebar',
       `linear-gradient(180deg, ${colors.sidebarBgStart} 0%, ${colors.sidebarBgEnd} 100%)`);
-    root.style.setProperty('--sidebar-text', colors.sidebarText);
-    root.style.setProperty('--sidebar-text-active', colors.sidebarTextActive);
-    root.style.setProperty('--sidebar-hover-text', colors.sidebarTextActive);
-    root.style.setProperty('--sidebar-hover-bg', colors.sidebarHoverBg);
-    root.style.setProperty('--sidebar-active-bg', colors.sidebarActiveBg);
-    root.style.setProperty('--sidebar-icon-color', colors.sidebarIconColor);
-    root.style.setProperty('--sidebar-icon-active', colors.sidebarIconActive);
-    root.style.setProperty('--sidebar-icon-hover', colors.sidebarIconActive);
-    root.style.setProperty('--primary', colors.crmPrimary);
-    root.style.setProperty('--primary-light', colors.crmPrimary);
+    crmLayout.style.setProperty('--sidebar-text', colors.sidebarText);
+    crmLayout.style.setProperty('--sidebar-text-active', colors.sidebarTextActive);
+    crmLayout.style.setProperty('--sidebar-hover-text', colors.sidebarTextActive);
+    crmLayout.style.setProperty('--sidebar-hover-bg', colors.sidebarHoverBg);
+    crmLayout.style.setProperty('--sidebar-active-bg', colors.sidebarActiveBg);
+    crmLayout.style.setProperty('--sidebar-icon-color', colors.sidebarIconColor);
+    crmLayout.style.setProperty('--sidebar-icon-active', colors.sidebarIconActive);
+    crmLayout.style.setProperty('--sidebar-icon-hover', colors.sidebarIconActive);
+    crmLayout.style.setProperty('--primary', colors.crmPrimary);
+    crmLayout.style.setProperty('--primary-light', colors.crmPrimary);
   };
 
   // Abrir modal de colores
