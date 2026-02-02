@@ -2,7 +2,7 @@
  * CrmLayout - Layout moderno para el CRM de cada tenant
  */
 
-import { useState, useEffect, createContext, useContext, ReactNode } from 'react';
+import { useState, useEffect, useRef, createContext, useContext, ReactNode } from 'react';
 import { Outlet, NavLink, useParams, useNavigate, useLocation } from 'react-router-dom';
 import { useClerk, useAuth as useClerkAuth } from '@clerk/clerk-react';
 import { useAuth } from '../contexts/AuthContext';
