@@ -8,7 +8,7 @@ import { useClerk, useAuth as useClerkAuth } from '@clerk/clerk-react';
 import { useAuth } from '../contexts/AuthContext';
 import { CatalogosProvider } from '../contexts/CatalogosContext';
 import MiPerfil from '../components/MiPerfil';
-import { getInfoNegocio, apiFetch } from '../services/api';
+import { getInfoNegocio, apiFetch, getTema, DEFAULT_CRM_COLORS } from '../services/api';
 
 // ========== PAGE HEADER CONTEXT ==========
 interface PageHeaderStat {
@@ -638,6 +638,55 @@ export default function CrmLayout() {
     };
     cargarIsotipo();
   }, [tenantActual?.id, getToken]);
+
+  // Cargar y aplicar colores del tema CRM
+  useEffect(() => {
+    const cargarColoresTema = async () => {
+      if (!tenantActual?.id) return;
+      try {
+        const tema = await getTema(tenantActual.id);
+        const root = document.documentElement;
+
+        // Aplicar colores del sidebar (usando valores guardados o defaults)
+        const colors = {
+          sidebarBgStart: tema.sidebarBgStart || DEFAULT_CRM_COLORS.sidebarBgStart,
+          sidebarBgEnd: tema.sidebarBgEnd || DEFAULT_CRM_COLORS.sidebarBgEnd,
+          sidebarText: tema.sidebarText || DEFAULT_CRM_COLORS.sidebarText,
+          sidebarTextActive: tema.sidebarTextActive || DEFAULT_CRM_COLORS.sidebarTextActive,
+          sidebarHoverBg: tema.sidebarHoverBg || DEFAULT_CRM_COLORS.sidebarHoverBg,
+          sidebarActiveBg: tema.sidebarActiveBg || DEFAULT_CRM_COLORS.sidebarActiveBg,
+          sidebarIconColor: tema.sidebarIconColor || DEFAULT_CRM_COLORS.sidebarIconColor,
+          sidebarIconActive: tema.sidebarIconActive || DEFAULT_CRM_COLORS.sidebarIconActive,
+          crmPrimary: tema.crmPrimary || DEFAULT_CRM_COLORS.crmPrimary,
+        };
+
+        // Gradiente del sidebar
+        root.style.setProperty('--bg-sidebar',
+          `linear-gradient(180deg, ${colors.sidebarBgStart} 0%, ${colors.sidebarBgEnd} 100%)`);
+
+        // Colores de texto
+        root.style.setProperty('--sidebar-text-color', colors.sidebarText);
+        root.style.setProperty('--sidebar-text-active', colors.sidebarTextActive);
+
+        // Colores de hover y activo
+        root.style.setProperty('--sidebar-hover-bg', colors.sidebarHoverBg);
+        root.style.setProperty('--sidebar-active-bg', colors.sidebarActiveBg);
+        root.style.setProperty('--sidebar-hover-text', colors.sidebarTextActive);
+
+        // Colores de iconos
+        root.style.setProperty('--sidebar-icon-color', colors.sidebarIconColor);
+        root.style.setProperty('--sidebar-icon-active', colors.sidebarIconActive);
+        root.style.setProperty('--sidebar-icon-hover', colors.sidebarIconActive);
+
+        // Color primario del CRM
+        root.style.setProperty('--crm-primary', colors.crmPrimary);
+
+      } catch (err) {
+        console.error('Error cargando colores del tema:', err);
+      }
+    };
+    cargarColoresTema();
+  }, [tenantActual?.id]);
 
   // Polling de unread counts para sidebar badges
   useEffect(() => {

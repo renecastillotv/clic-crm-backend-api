@@ -10,9 +10,13 @@ import {
   getMonedasCatalogo,
   getTenantMonedas,
   setTenantMonedasHabilitadas,
-  type Moneda
+  getTema,
+  updateTema,
+  DEFAULT_CRM_COLORS,
+  type Moneda,
+  type TemaColores
 } from '../../services/api';
-import { DollarSign, X, Check, Star, Building2, ChevronRight, Users, MapPin, List } from 'lucide-react';
+import { DollarSign, X, Check, Star, Building2, ChevronRight, Users, MapPin, List, Palette, RotateCcw } from 'lucide-react';
 
 interface MonedaHabilitada {
   codigo: string;
@@ -31,6 +35,24 @@ export default function CrmConfiguracion() {
   const [loadingMonedas, setLoadingMonedas] = useState(false);
   const [savingMonedas, setSavingMonedas] = useState(false);
   const [monedaDefault, setMonedaDefault] = useState<string>('USD');
+
+  // Estado para modal de colores CRM
+  const [showColoresModal, setShowColoresModal] = useState(false);
+  const [loadingColores, setLoadingColores] = useState(false);
+  const [savingColores, setSavingColores] = useState(false);
+  const [previewEnTiempoReal, setPreviewEnTiempoReal] = useState(true);
+  const [coloresOriginales, setColoresOriginales] = useState<Partial<TemaColores> | null>(null);
+  const [coloresCRM, setColoresCRM] = useState({
+    crmPrimary: DEFAULT_CRM_COLORS.crmPrimary,
+    sidebarBgStart: DEFAULT_CRM_COLORS.sidebarBgStart,
+    sidebarBgEnd: DEFAULT_CRM_COLORS.sidebarBgEnd,
+    sidebarText: DEFAULT_CRM_COLORS.sidebarText,
+    sidebarTextActive: DEFAULT_CRM_COLORS.sidebarTextActive,
+    sidebarHoverBg: DEFAULT_CRM_COLORS.sidebarHoverBg,
+    sidebarActiveBg: DEFAULT_CRM_COLORS.sidebarActiveBg,
+    sidebarIconColor: DEFAULT_CRM_COLORS.sidebarIconColor,
+    sidebarIconActive: DEFAULT_CRM_COLORS.sidebarIconActive,
+  });
 
   // Configurar header de la página
   useEffect(() => {
@@ -123,6 +145,121 @@ export default function CrmConfiguracion() {
     }
   };
 
+  // Aplicar colores al DOM para preview
+  const aplicarColoresPreview = (colors: typeof coloresCRM) => {
+    const root = document.documentElement;
+    root.style.setProperty('--bg-sidebar',
+      `linear-gradient(180deg, ${colors.sidebarBgStart} 0%, ${colors.sidebarBgEnd} 100%)`);
+    root.style.setProperty('--sidebar-text-color', colors.sidebarText);
+    root.style.setProperty('--sidebar-text-active', colors.sidebarTextActive);
+    root.style.setProperty('--sidebar-hover-bg', colors.sidebarHoverBg);
+    root.style.setProperty('--sidebar-active-bg', colors.sidebarActiveBg);
+    root.style.setProperty('--sidebar-hover-text', colors.sidebarTextActive);
+    root.style.setProperty('--sidebar-icon-color', colors.sidebarIconColor);
+    root.style.setProperty('--sidebar-icon-active', colors.sidebarIconActive);
+    root.style.setProperty('--sidebar-icon-hover', colors.sidebarIconActive);
+    root.style.setProperty('--crm-primary', colors.crmPrimary);
+  };
+
+  // Abrir modal de colores
+  const abrirModalColores = async () => {
+    setShowColoresModal(true);
+    setLoadingColores(true);
+
+    try {
+      if (tenantActual?.id) {
+        const tema = await getTema(tenantActual.id);
+        const coloresActuales = {
+          crmPrimary: tema.crmPrimary || DEFAULT_CRM_COLORS.crmPrimary,
+          sidebarBgStart: tema.sidebarBgStart || DEFAULT_CRM_COLORS.sidebarBgStart,
+          sidebarBgEnd: tema.sidebarBgEnd || DEFAULT_CRM_COLORS.sidebarBgEnd,
+          sidebarText: tema.sidebarText || DEFAULT_CRM_COLORS.sidebarText,
+          sidebarTextActive: tema.sidebarTextActive || DEFAULT_CRM_COLORS.sidebarTextActive,
+          sidebarHoverBg: tema.sidebarHoverBg || DEFAULT_CRM_COLORS.sidebarHoverBg,
+          sidebarActiveBg: tema.sidebarActiveBg || DEFAULT_CRM_COLORS.sidebarActiveBg,
+          sidebarIconColor: tema.sidebarIconColor || DEFAULT_CRM_COLORS.sidebarIconColor,
+          sidebarIconActive: tema.sidebarIconActive || DEFAULT_CRM_COLORS.sidebarIconActive,
+        };
+        setColoresCRM(coloresActuales);
+        setColoresOriginales(tema);
+      }
+    } catch (error) {
+      console.error('Error al cargar colores:', error);
+    } finally {
+      setLoadingColores(false);
+    }
+  };
+
+  // Manejar cambio de color
+  const handleColorChange = (campo: keyof typeof coloresCRM, valor: string) => {
+    const nuevosColores = { ...coloresCRM, [campo]: valor };
+    setColoresCRM(nuevosColores);
+    if (previewEnTiempoReal) {
+      aplicarColoresPreview(nuevosColores);
+    }
+  };
+
+  // Restaurar valores por defecto
+  const restaurarColoresDefault = () => {
+    const defaults = {
+      crmPrimary: DEFAULT_CRM_COLORS.crmPrimary,
+      sidebarBgStart: DEFAULT_CRM_COLORS.sidebarBgStart,
+      sidebarBgEnd: DEFAULT_CRM_COLORS.sidebarBgEnd,
+      sidebarText: DEFAULT_CRM_COLORS.sidebarText,
+      sidebarTextActive: DEFAULT_CRM_COLORS.sidebarTextActive,
+      sidebarHoverBg: DEFAULT_CRM_COLORS.sidebarHoverBg,
+      sidebarActiveBg: DEFAULT_CRM_COLORS.sidebarActiveBg,
+      sidebarIconColor: DEFAULT_CRM_COLORS.sidebarIconColor,
+      sidebarIconActive: DEFAULT_CRM_COLORS.sidebarIconActive,
+    };
+    setColoresCRM(defaults);
+    if (previewEnTiempoReal) {
+      aplicarColoresPreview(defaults);
+    }
+  };
+
+  // Cancelar y restaurar colores originales
+  const cancelarColores = () => {
+    if (coloresOriginales) {
+      const originales = {
+        crmPrimary: coloresOriginales.crmPrimary || DEFAULT_CRM_COLORS.crmPrimary,
+        sidebarBgStart: coloresOriginales.sidebarBgStart || DEFAULT_CRM_COLORS.sidebarBgStart,
+        sidebarBgEnd: coloresOriginales.sidebarBgEnd || DEFAULT_CRM_COLORS.sidebarBgEnd,
+        sidebarText: coloresOriginales.sidebarText || DEFAULT_CRM_COLORS.sidebarText,
+        sidebarTextActive: coloresOriginales.sidebarTextActive || DEFAULT_CRM_COLORS.sidebarTextActive,
+        sidebarHoverBg: coloresOriginales.sidebarHoverBg || DEFAULT_CRM_COLORS.sidebarHoverBg,
+        sidebarActiveBg: coloresOriginales.sidebarActiveBg || DEFAULT_CRM_COLORS.sidebarActiveBg,
+        sidebarIconColor: coloresOriginales.sidebarIconColor || DEFAULT_CRM_COLORS.sidebarIconColor,
+        sidebarIconActive: coloresOriginales.sidebarIconActive || DEFAULT_CRM_COLORS.sidebarIconActive,
+      };
+      aplicarColoresPreview(originales);
+    }
+    setShowColoresModal(false);
+  };
+
+  // Guardar colores
+  const guardarColores = async () => {
+    if (!tenantActual?.id) return;
+
+    setSavingColores(true);
+    try {
+      // Obtener el tema actual y mezclarlo con los nuevos colores
+      const temaActual = coloresOriginales || {};
+      const temaActualizado = {
+        ...temaActual,
+        ...coloresCRM,
+      };
+      await updateTema(tenantActual.id, temaActualizado as TemaColores);
+      setColoresOriginales(temaActualizado);
+      setShowColoresModal(false);
+    } catch (error) {
+      console.error('Error al guardar colores:', error);
+      alert('Error al guardar los colores');
+    } finally {
+      setSavingColores(false);
+    }
+  };
+
   return (
     <div className="page">
       <div className="settings-grid">
@@ -207,6 +344,21 @@ export default function CrmConfiguracion() {
             <h3>Personalizar Elementos</h3>
           </div>
           <p className="card-desc">Tipos de propiedad, contacto, actividades, etiquetas y más</p>
+          <div className="card-action">
+            <span>Configurar</span>
+            <ChevronRight size={18} />
+          </div>
+        </div>
+
+        {/* Tarjeta de Colores del CRM */}
+        <div className="settings-card settings-card-active" onClick={abrirModalColores}>
+          <div className="card-header">
+            <div className="card-icon card-icon-pink">
+              <Palette size={24} />
+            </div>
+            <h3>Colores del CRM</h3>
+          </div>
+          <p className="card-desc">Personaliza los colores del sidebar y tema del panel</p>
           <div className="card-action">
             <span>Configurar</span>
             <ChevronRight size={18} />
@@ -357,6 +509,213 @@ export default function CrmConfiguracion() {
                 disabled={savingMonedas || monedasHabilitadas.length === 0}
               >
                 {savingMonedas ? 'Guardando...' : 'Guardar'}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Modal de Configuración de Colores CRM */}
+      {showColoresModal && (
+        <div className="modal-overlay" onClick={cancelarColores}>
+          <div className="modal-content modal-colores" onClick={e => e.stopPropagation()}>
+            <div className="modal-header">
+              <h2>Colores del CRM</h2>
+              <button className="modal-close" onClick={cancelarColores}>
+                <X size={20} />
+              </button>
+            </div>
+
+            <div className="modal-body">
+              {loadingColores ? (
+                <div className="loading-state">Cargando colores...</div>
+              ) : (
+                <>
+                  <div className="colores-options">
+                    <label className="checkbox-option">
+                      <input
+                        type="checkbox"
+                        checked={previewEnTiempoReal}
+                        onChange={(e) => setPreviewEnTiempoReal(e.target.checked)}
+                      />
+                      <span>Vista previa en tiempo real</span>
+                    </label>
+                    <button className="btn-restore" onClick={restaurarColoresDefault}>
+                      <RotateCcw size={14} />
+                      Restaurar valores por defecto
+                    </button>
+                  </div>
+
+                  <div className="colores-section">
+                    <h4>Color Principal</h4>
+                    <div className="color-picker-row">
+                      <label>Color primario del CRM</label>
+                      <div className="color-input-group">
+                        <input
+                          type="color"
+                          value={coloresCRM.crmPrimary}
+                          onChange={(e) => handleColorChange('crmPrimary', e.target.value)}
+                        />
+                        <input
+                          type="text"
+                          value={coloresCRM.crmPrimary}
+                          onChange={(e) => handleColorChange('crmPrimary', e.target.value)}
+                          className="color-text-input"
+                        />
+                      </div>
+                    </div>
+                  </div>
+
+                  <div className="colores-section">
+                    <h4>Gradiente del Sidebar</h4>
+                    <div className="color-picker-row">
+                      <label>Color inicio (arriba)</label>
+                      <div className="color-input-group">
+                        <input
+                          type="color"
+                          value={coloresCRM.sidebarBgStart}
+                          onChange={(e) => handleColorChange('sidebarBgStart', e.target.value)}
+                        />
+                        <input
+                          type="text"
+                          value={coloresCRM.sidebarBgStart}
+                          onChange={(e) => handleColorChange('sidebarBgStart', e.target.value)}
+                          className="color-text-input"
+                        />
+                      </div>
+                    </div>
+                    <div className="color-picker-row">
+                      <label>Color fin (abajo)</label>
+                      <div className="color-input-group">
+                        <input
+                          type="color"
+                          value={coloresCRM.sidebarBgEnd}
+                          onChange={(e) => handleColorChange('sidebarBgEnd', e.target.value)}
+                        />
+                        <input
+                          type="text"
+                          value={coloresCRM.sidebarBgEnd}
+                          onChange={(e) => handleColorChange('sidebarBgEnd', e.target.value)}
+                          className="color-text-input"
+                        />
+                      </div>
+                    </div>
+                  </div>
+
+                  <div className="colores-section">
+                    <h4>Texto del Sidebar</h4>
+                    <div className="color-picker-row">
+                      <label>Texto normal</label>
+                      <div className="color-input-group">
+                        <input
+                          type="color"
+                          value={coloresCRM.sidebarText}
+                          onChange={(e) => handleColorChange('sidebarText', e.target.value)}
+                        />
+                        <input
+                          type="text"
+                          value={coloresCRM.sidebarText}
+                          onChange={(e) => handleColorChange('sidebarText', e.target.value)}
+                          className="color-text-input"
+                        />
+                      </div>
+                    </div>
+                    <div className="color-picker-row">
+                      <label>Texto activo / hover</label>
+                      <div className="color-input-group">
+                        <input
+                          type="color"
+                          value={coloresCRM.sidebarTextActive}
+                          onChange={(e) => handleColorChange('sidebarTextActive', e.target.value)}
+                        />
+                        <input
+                          type="text"
+                          value={coloresCRM.sidebarTextActive}
+                          onChange={(e) => handleColorChange('sidebarTextActive', e.target.value)}
+                          className="color-text-input"
+                        />
+                      </div>
+                    </div>
+                  </div>
+
+                  <div className="colores-section">
+                    <h4>Iconos del Sidebar</h4>
+                    <div className="color-picker-row">
+                      <label>Iconos normales</label>
+                      <div className="color-input-group">
+                        <input
+                          type="color"
+                          value={coloresCRM.sidebarIconColor}
+                          onChange={(e) => handleColorChange('sidebarIconColor', e.target.value)}
+                        />
+                        <input
+                          type="text"
+                          value={coloresCRM.sidebarIconColor}
+                          onChange={(e) => handleColorChange('sidebarIconColor', e.target.value)}
+                          className="color-text-input"
+                        />
+                      </div>
+                    </div>
+                    <div className="color-picker-row">
+                      <label>Iconos activos / hover</label>
+                      <div className="color-input-group">
+                        <input
+                          type="color"
+                          value={coloresCRM.sidebarIconActive}
+                          onChange={(e) => handleColorChange('sidebarIconActive', e.target.value)}
+                        />
+                        <input
+                          type="text"
+                          value={coloresCRM.sidebarIconActive}
+                          onChange={(e) => handleColorChange('sidebarIconActive', e.target.value)}
+                          className="color-text-input"
+                        />
+                      </div>
+                    </div>
+                  </div>
+
+                  <div className="colores-section">
+                    <h4>Fondos de Estado</h4>
+                    <p className="section-hint">Estos valores aceptan RGBA para transparencia</p>
+                    <div className="color-picker-row">
+                      <label>Fondo hover</label>
+                      <div className="color-input-group color-input-rgba">
+                        <input
+                          type="text"
+                          value={coloresCRM.sidebarHoverBg}
+                          onChange={(e) => handleColorChange('sidebarHoverBg', e.target.value)}
+                          className="color-text-input-full"
+                          placeholder="rgba(59, 130, 246, 0.18)"
+                        />
+                      </div>
+                    </div>
+                    <div className="color-picker-row">
+                      <label>Fondo activo</label>
+                      <div className="color-input-group color-input-rgba">
+                        <input
+                          type="text"
+                          value={coloresCRM.sidebarActiveBg}
+                          onChange={(e) => handleColorChange('sidebarActiveBg', e.target.value)}
+                          className="color-text-input-full"
+                          placeholder="rgba(59, 130, 246, 0.35)"
+                        />
+                      </div>
+                    </div>
+                  </div>
+                </>
+              )}
+            </div>
+
+            <div className="modal-footer">
+              <button className="btn-secondary" onClick={cancelarColores}>
+                Cancelar
+              </button>
+              <button
+                className="btn-primary"
+                onClick={guardarColores}
+                disabled={savingColores}
+              >
+                {savingColores ? 'Guardando...' : 'Guardar'}
               </button>
             </div>
           </div>
@@ -734,6 +1093,150 @@ export default function CrmConfiguracion() {
         .btn-primary:disabled {
           opacity: 0.5;
           cursor: not-allowed;
+        }
+
+        /* Estilos para el icono rosa/pink */
+        .card-icon-pink {
+          background: #fce7f3;
+          color: #db2777;
+        }
+
+        /* Modal de colores */
+        .modal-colores {
+          max-width: 640px;
+        }
+
+        .colores-options {
+          display: flex;
+          justify-content: space-between;
+          align-items: center;
+          margin-bottom: 24px;
+          padding-bottom: 16px;
+          border-bottom: 1px solid #e2e8f0;
+        }
+
+        .checkbox-option {
+          display: flex;
+          align-items: center;
+          gap: 8px;
+          cursor: pointer;
+          font-size: 0.875rem;
+          color: #475569;
+        }
+
+        .checkbox-option input[type="checkbox"] {
+          width: 16px;
+          height: 16px;
+          accent-color: #2563eb;
+        }
+
+        .btn-restore {
+          display: inline-flex;
+          align-items: center;
+          gap: 6px;
+          padding: 6px 12px;
+          background: #f8fafc;
+          border: 1px solid #e2e8f0;
+          border-radius: 6px;
+          font-size: 0.75rem;
+          color: #64748b;
+          cursor: pointer;
+          transition: all 0.2s;
+        }
+
+        .btn-restore:hover {
+          background: #f1f5f9;
+          border-color: #cbd5e1;
+          color: #475569;
+        }
+
+        .colores-section {
+          margin-bottom: 20px;
+        }
+
+        .colores-section h4 {
+          margin: 0 0 12px 0;
+          font-size: 0.875rem;
+          font-weight: 600;
+          color: #0f172a;
+        }
+
+        .section-hint {
+          margin: -8px 0 12px 0;
+          font-size: 0.75rem;
+          color: #94a3b8;
+        }
+
+        .color-picker-row {
+          display: flex;
+          align-items: center;
+          justify-content: space-between;
+          padding: 10px 12px;
+          background: #f8fafc;
+          border-radius: 8px;
+          margin-bottom: 8px;
+        }
+
+        .color-picker-row label {
+          font-size: 0.875rem;
+          color: #475569;
+        }
+
+        .color-input-group {
+          display: flex;
+          align-items: center;
+          gap: 8px;
+        }
+
+        .color-input-group input[type="color"] {
+          width: 36px;
+          height: 36px;
+          padding: 2px;
+          border: 2px solid #e2e8f0;
+          border-radius: 8px;
+          cursor: pointer;
+          background: white;
+        }
+
+        .color-input-group input[type="color"]:hover {
+          border-color: #cbd5e1;
+        }
+
+        .color-text-input {
+          width: 90px;
+          padding: 8px 10px;
+          border: 1px solid #e2e8f0;
+          border-radius: 6px;
+          font-size: 0.8rem;
+          font-family: monospace;
+          color: #475569;
+          background: white;
+        }
+
+        .color-text-input:focus {
+          outline: none;
+          border-color: #2563eb;
+        }
+
+        .color-input-rgba {
+          flex: 1;
+          max-width: 280px;
+        }
+
+        .color-text-input-full {
+          width: 100%;
+          padding: 8px 10px;
+          border: 1px solid #e2e8f0;
+          border-radius: 6px;
+          font-size: 0.8rem;
+          font-family: monospace;
+          color: #475569;
+          background: white;
+        }
+
+        .color-text-input-full:focus {
+          outline: none;
+          border-color: #2563eb;
         }
       `}</style>
     </div>

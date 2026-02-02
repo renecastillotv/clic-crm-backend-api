@@ -121,6 +121,7 @@ export interface ComponenteWeb {
 }
 
 export interface TemaColores {
+  // Colores del sitio web
   primary: string;
   secondary: string;
   accent: string;
@@ -131,7 +132,30 @@ export interface TemaColores {
   success: string;
   warning: string;
   error: string;
+  // Colores del CRM (opcionales para retrocompatibilidad)
+  crmPrimary?: string;           // Color primario del CRM
+  sidebarBgStart?: string;       // Gradiente sidebar - inicio
+  sidebarBgEnd?: string;         // Gradiente sidebar - fin
+  sidebarText?: string;          // Texto normal del sidebar
+  sidebarTextActive?: string;    // Texto activo/seleccionado
+  sidebarHoverBg?: string;       // Fondo hover (rgba)
+  sidebarActiveBg?: string;      // Fondo activo (rgba)
+  sidebarIconColor?: string;     // Color iconos normales
+  sidebarIconActive?: string;    // Color iconos activos
 }
+
+// Valores por defecto para colores del CRM
+export const DEFAULT_CRM_COLORS = {
+  crmPrimary: '#2563eb',
+  sidebarBgStart: '#1E293B',
+  sidebarBgEnd: '#0F172A',
+  sidebarText: '#E2E8F0',
+  sidebarTextActive: '#FFFFFF',
+  sidebarHoverBg: 'rgba(59, 130, 246, 0.18)',
+  sidebarActiveBg: 'rgba(59, 130, 246, 0.35)',
+  sidebarIconColor: '#94A3B8',
+  sidebarIconActive: '#60A5FA',
+};
 
 /**
  * Obtiene el primer tenant (para desarrollo)
