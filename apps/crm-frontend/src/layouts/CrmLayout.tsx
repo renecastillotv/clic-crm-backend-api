@@ -1393,7 +1393,7 @@ export default function CrmLayout() {
             --primary-light: #3b82f6;
             --primary-bg: #eff6ff;
             --bg-main: #f8fafc;
-            --bg-sidebar: #ffffff;
+            --bg-sidebar: linear-gradient(180deg, #1E293B 0%, #0F172A 100%);
             --bg-card: #ffffff;
             --text-primary: #0f172a;
             --text-secondary: #64748b;
@@ -1408,6 +1408,13 @@ export default function CrmLayout() {
             --shadow-md: 0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06);
             --radius: 8px;
             --radius-lg: 12px;
+            /* Dark sidebar colors */
+            --sidebar-text: #E2E8F0;
+            --sidebar-text-muted: #94A3B8;
+            --sidebar-text-active: #FFFFFF;
+            --sidebar-border: rgba(255, 255, 255, 0.1);
+            --sidebar-hover: rgba(255, 255, 255, 0.08);
+            --sidebar-active-bg: rgba(59, 130, 246, 0.2);
             /* Z-index hierarchy (from theme-clic.css) */
             --z-base: 0;
             --z-dropdown: 100;
@@ -1432,11 +1439,11 @@ export default function CrmLayout() {
             overflow-x: hidden;
           }
 
-          /* ========== SIDEBAR ========== */
+          /* ========== SIDEBAR (Dark Theme - Phase 5) ========== */
           .crm-sidebar {
             width: var(--sidebar-width);
             background: var(--bg-sidebar);
-            border-right: 1px solid var(--border);
+            border-right: 1px solid var(--sidebar-border);
             display: flex;
             flex-direction: column;
             position: fixed;
@@ -1444,21 +1451,22 @@ export default function CrmLayout() {
             left: 0;
             bottom: 0;
             z-index: var(--z-sidebar, 400);
+            box-shadow: 4px 0 24px rgba(0, 0, 0, 0.15);
           }
 
-          /* Brand */
+          /* Brand (Dark Theme) */
           .sidebar-brand {
             display: flex;
             align-items: center;
             gap: 10px;
             padding: 14px 16px;
-            border-bottom: 1px solid var(--border);
+            border-bottom: 1px solid var(--sidebar-border);
           }
 
           .brand-logo {
             width: 34px;
             height: 34px;
-            background: linear-gradient(135deg, var(--primary), var(--primary-light));
+            background: linear-gradient(135deg, #3B82F6 0%, #2563EB 100%);
             border-radius: var(--radius);
             display: flex;
             align-items: center;
@@ -1468,10 +1476,12 @@ export default function CrmLayout() {
             font-size: 1rem;
             flex-shrink: 0;
             overflow: hidden;
+            box-shadow: 0 2px 8px rgba(59, 130, 246, 0.4);
           }
 
           .brand-logo.has-image {
             background: transparent;
+            box-shadow: none;
           }
 
           .brand-logo img {
@@ -1489,7 +1499,7 @@ export default function CrmLayout() {
           .brand-name {
             font-weight: 600;
             font-size: 0.85rem;
-            color: var(--text-primary);
+            color: var(--sidebar-text);
             white-space: nowrap;
             overflow: hidden;
             text-overflow: ellipsis;
@@ -1497,10 +1507,10 @@ export default function CrmLayout() {
 
           .brand-type {
             font-size: 0.7rem;
-            color: var(--text-muted);
+            color: var(--sidebar-text-muted);
           }
 
-          /* Navigation */
+          /* Navigation (Dark Theme) */
           .sidebar-nav {
             flex: 1;
             padding: 12px 10px;
@@ -1516,8 +1526,8 @@ export default function CrmLayout() {
             font-size: 0.625rem;
             font-weight: 600;
             text-transform: uppercase;
-            letter-spacing: 0.05em;
-            color: var(--text-muted);
+            letter-spacing: 0.08em;
+            color: var(--sidebar-text-muted);
             padding: 0 10px;
             margin-bottom: 6px;
           }
@@ -1527,7 +1537,7 @@ export default function CrmLayout() {
             align-items: center;
             gap: 8px;
             padding: 7px 10px;
-            color: var(--text-secondary);
+            color: var(--sidebar-text);
             text-decoration: none;
             border-radius: var(--radius);
             margin-bottom: 1px;
@@ -1542,14 +1552,15 @@ export default function CrmLayout() {
           }
 
           .nav-item:hover {
-            background: var(--border-light);
-            color: var(--text-primary);
+            background: var(--sidebar-hover);
+            color: var(--sidebar-text-active);
           }
 
           .nav-item.active {
-            background: var(--primary-bg);
-            color: var(--primary);
+            background: var(--sidebar-active-bg);
+            color: var(--sidebar-text-active);
             font-weight: 600;
+            box-shadow: inset 3px 0 0 #3B82F6;
           }
 
           .nav-icon {
@@ -1609,11 +1620,11 @@ export default function CrmLayout() {
             transform: rotate(180deg);
           }
 
-          /* Submenu */
+          /* Submenu (Dark Theme) */
           .nav-submenu {
             margin-left: 10px;
             padding-left: 10px;
-            border-left: 2px solid var(--border);
+            border-left: 2px solid var(--sidebar-border);
             overflow: hidden;
             max-height: 0;
             opacity: 0;
@@ -1632,7 +1643,7 @@ export default function CrmLayout() {
             align-items: center;
             gap: 8px;
             padding: 6px 10px;
-            color: var(--text-secondary);
+            color: var(--sidebar-text-muted);
             text-decoration: none;
             border-radius: var(--radius);
             margin-bottom: 1px;
@@ -1642,13 +1653,13 @@ export default function CrmLayout() {
           }
 
           .nav-subitem:hover {
-            background: var(--border-light);
-            color: var(--text-primary);
+            background: var(--sidebar-hover);
+            color: var(--sidebar-text-active);
           }
 
           .nav-subitem.active {
-            background: var(--primary-bg);
-            color: var(--primary);
+            background: var(--sidebar-active-bg);
+            color: var(--sidebar-text-active);
             font-weight: 600;
           }
 
@@ -1678,18 +1689,21 @@ export default function CrmLayout() {
             overflow-x: hidden;
           }
 
-          /* Header */
+          /* Header (Glassmorphism - Phase 5) */
           .crm-header {
             height: var(--header-height);
             display: flex;
             justify-content: space-between;
             align-items: center;
             padding: 0 32px;
-            background: var(--bg-card);
-            border-bottom: 1px solid var(--border);
+            background: rgba(255, 255, 255, 0.85);
+            backdrop-filter: blur(12px);
+            -webkit-backdrop-filter: blur(12px);
+            border-bottom: 1px solid rgba(226, 232, 240, 0.8);
             position: sticky;
             top: 0;
             z-index: var(--z-header, 300);
+            box-shadow: 0 1px 3px rgba(0, 0, 0, 0.04);
           }
 
           .header-left {
@@ -2008,7 +2022,7 @@ export default function CrmLayout() {
             color: var(--text-primary);
           }
 
-          /* ========== SIDEBAR CLOSE BUTTON (Mobile) ========== */
+          /* ========== SIDEBAR CLOSE BUTTON (Mobile - Dark Theme) ========== */
           .sidebar-close-btn {
             display: none;
             align-items: center;
@@ -2019,15 +2033,15 @@ export default function CrmLayout() {
             background: none;
             border: none;
             border-radius: var(--radius);
-            color: var(--text-muted);
+            color: var(--sidebar-text-muted);
             cursor: pointer;
             transition: all 0.15s ease;
             margin-left: auto;
           }
 
           .sidebar-close-btn:hover {
-            background: var(--border-light);
-            color: var(--text-primary);
+            background: var(--sidebar-hover);
+            color: var(--sidebar-text-active);
           }
 
           /* ========== MOBILE OVERLAY ========== */

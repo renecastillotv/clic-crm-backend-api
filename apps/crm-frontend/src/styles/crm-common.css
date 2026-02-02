@@ -327,26 +327,48 @@
   font-size: 0.75rem;
   font-weight: 500;
   white-space: nowrap;
+  transition: all var(--transition-fast, 150ms ease-out);
 }
 
+/* Phase 5: Badge Glow Effects */
 .crm-badge-primary {
   background: var(--premium-primary-light, rgba(0, 87, 255, 0.12));
   color: var(--premium-primary, #0057FF);
+  box-shadow: 0 0 0 0 rgba(0, 87, 255, 0);
+}
+
+.crm-badge-primary:hover {
+  box-shadow: 0 0 0 3px rgba(0, 87, 255, 0.15);
 }
 
 .crm-badge-success {
   background: var(--color-success-light, rgba(16, 185, 129, 0.12));
   color: var(--color-success, #10B981);
+  box-shadow: 0 0 0 0 rgba(16, 185, 129, 0);
+}
+
+.crm-badge-success:hover {
+  box-shadow: 0 0 0 3px rgba(16, 185, 129, 0.15);
 }
 
 .crm-badge-warning {
   background: var(--color-warning-light, rgba(245, 158, 11, 0.12));
   color: var(--color-warning, #F59E0B);
+  box-shadow: 0 0 0 0 rgba(245, 158, 11, 0);
+}
+
+.crm-badge-warning:hover {
+  box-shadow: 0 0 0 3px rgba(245, 158, 11, 0.15);
 }
 
 .crm-badge-danger {
   background: var(--color-danger-light, rgba(239, 68, 68, 0.12));
   color: var(--color-danger, #EF4444);
+  box-shadow: 0 0 0 0 rgba(239, 68, 68, 0);
+}
+
+.crm-badge-danger:hover {
+  box-shadow: 0 0 0 3px rgba(239, 68, 68, 0.15);
 }
 
 .crm-badge-gray {
@@ -357,6 +379,11 @@
 .crm-badge-info {
   background: var(--color-info-light, rgba(59, 130, 246, 0.12));
   color: var(--color-info, #3B82F6);
+  box-shadow: 0 0 0 0 rgba(59, 130, 246, 0);
+}
+
+.crm-badge-info:hover {
+  box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.15);
 }
 
 /* ============================================================================
@@ -594,11 +621,13 @@
   border: 1px solid var(--premium-card-border, #E2E8F0);
   border-radius: var(--premium-radius-lg, 12px);
   box-shadow: var(--shadow-xs, 0 1px 2px rgba(0, 0, 0, 0.04));
-  transition: box-shadow var(--transition-base, 200ms ease-out), border-color var(--transition-base, 200ms ease-out);
+  transition: box-shadow var(--transition-base, 200ms ease-out), border-color var(--transition-base, 200ms ease-out), transform var(--transition-base, 200ms ease-out);
 }
 
+/* Phase 5: Enhanced card hover with subtle border color */
 .crm-card:hover {
   box-shadow: var(--shadow-sm, 0 2px 4px rgba(0, 0, 0, 0.06));
+  border-color: rgba(0, 87, 255, 0.2);
 }
 
 .crm-card-header {
@@ -777,4 +806,125 @@
     opacity: 1;
     transform: translateY(0);
   }
+}
+
+/* ============================================================================
+   PHASE 5: PREMIUM POLISH - GLOBAL ENHANCEMENTS
+   ============================================================================ */
+
+/* Enhanced Focus States (Accessible & Pretty) */
+.crm-btn:focus-visible,
+.crm-input:focus-visible,
+.crm-select:focus-visible,
+.crm-action-btn:focus-visible {
+  outline: 2px solid var(--premium-primary, #0057FF);
+  outline-offset: 2px;
+}
+
+/* Interactive elements micro-lift on hover */
+.crm-card-interactive:hover {
+  transform: translateY(-2px);
+  box-shadow: var(--shadow-md, 0 4px 12px rgba(0, 0, 0, 0.1));
+}
+
+/* Status cards with lift effect */
+.crm-status-card:hover {
+  transform: translateY(-2px);
+  box-shadow: var(--shadow-md, 0 4px 12px rgba(0, 0, 0, 0.08));
+}
+
+/* Table row highlight enhancement */
+.crm-table tbody tr {
+  transition: background-color var(--transition-fast, 150ms ease-out);
+}
+
+.crm-table tbody tr:hover td {
+  background: var(--premium-primary-lighter, rgba(0, 87, 255, 0.04));
+}
+
+/* Action button lift on hover */
+.crm-action-btn:hover {
+  transform: translateY(-1px);
+}
+
+/* View toggle animation */
+.crm-view-toggle-btn {
+  transition: all var(--transition-fast, 150ms ease-out);
+}
+
+.crm-view-toggle-btn:hover {
+  transform: scale(1.05);
+}
+
+/* Loading overlay with better blur */
+.crm-loading-overlay {
+  backdrop-filter: blur(2px);
+  -webkit-backdrop-filter: blur(2px);
+}
+
+/* Enhanced skeleton shimmer */
+.crm-skeleton {
+  position: relative;
+  overflow: hidden;
+}
+
+/* Pulse animation for pending states */
+@keyframes crm-pulse {
+  0%, 100% {
+    opacity: 1;
+  }
+  50% {
+    opacity: 0.6;
+  }
+}
+
+.crm-pulse {
+  animation: crm-pulse 2s cubic-bezier(0.4, 0, 0.6, 1) infinite;
+}
+
+/* Scale up animation for appearing elements */
+@keyframes crm-scaleIn {
+  from {
+    opacity: 0;
+    transform: scale(0.95);
+  }
+  to {
+    opacity: 1;
+    transform: scale(1);
+  }
+}
+
+.crm-scale-in {
+  animation: crm-scaleIn 0.2s ease-out;
+}
+
+/* Slide in from right for panels/drawers */
+@keyframes crm-slideInRight {
+  from {
+    opacity: 0;
+    transform: translateX(20px);
+  }
+  to {
+    opacity: 1;
+    transform: translateX(0);
+  }
+}
+
+.crm-slide-in-right {
+  animation: crm-slideInRight 0.3s ease-out;
+}
+
+/* Success state glow */
+.crm-success-glow {
+  box-shadow: 0 0 0 3px rgba(16, 185, 129, 0.2);
+}
+
+/* Error state glow */
+.crm-error-glow {
+  box-shadow: 0 0 0 3px rgba(239, 68, 68, 0.2);
+}
+
+/* Primary state glow */
+.crm-primary-glow {
+  box-shadow: 0 0 0 3px rgba(0, 87, 255, 0.2);
 }
