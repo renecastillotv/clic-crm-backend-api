@@ -664,22 +664,23 @@ export default function CrmLayout() {
         root.style.setProperty('--bg-sidebar',
           `linear-gradient(180deg, ${colors.sidebarBgStart} 0%, ${colors.sidebarBgEnd} 100%)`);
 
-        // Colores de texto
-        root.style.setProperty('--sidebar-text-color', colors.sidebarText);
+        // Colores de texto (usar nombres exactos que usa el CSS)
+        root.style.setProperty('--sidebar-text', colors.sidebarText);
         root.style.setProperty('--sidebar-text-active', colors.sidebarTextActive);
+        root.style.setProperty('--sidebar-hover-text', colors.sidebarTextActive);
 
         // Colores de hover y activo
         root.style.setProperty('--sidebar-hover-bg', colors.sidebarHoverBg);
         root.style.setProperty('--sidebar-active-bg', colors.sidebarActiveBg);
-        root.style.setProperty('--sidebar-hover-text', colors.sidebarTextActive);
 
         // Colores de iconos
         root.style.setProperty('--sidebar-icon-color', colors.sidebarIconColor);
         root.style.setProperty('--sidebar-icon-active', colors.sidebarIconActive);
         root.style.setProperty('--sidebar-icon-hover', colors.sidebarIconActive);
 
-        // Color primario del CRM
-        root.style.setProperty('--crm-primary', colors.crmPrimary);
+        // Color primario del CRM (afecta botones y acentos)
+        root.style.setProperty('--primary', colors.crmPrimary);
+        root.style.setProperty('--primary-light', colors.crmPrimary);
 
       } catch (err) {
         console.error('Error cargando colores del tema:', err);

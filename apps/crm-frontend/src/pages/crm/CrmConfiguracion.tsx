@@ -150,15 +150,16 @@ export default function CrmConfiguracion() {
     const root = document.documentElement;
     root.style.setProperty('--bg-sidebar',
       `linear-gradient(180deg, ${colors.sidebarBgStart} 0%, ${colors.sidebarBgEnd} 100%)`);
-    root.style.setProperty('--sidebar-text-color', colors.sidebarText);
+    root.style.setProperty('--sidebar-text', colors.sidebarText);
     root.style.setProperty('--sidebar-text-active', colors.sidebarTextActive);
+    root.style.setProperty('--sidebar-hover-text', colors.sidebarTextActive);
     root.style.setProperty('--sidebar-hover-bg', colors.sidebarHoverBg);
     root.style.setProperty('--sidebar-active-bg', colors.sidebarActiveBg);
-    root.style.setProperty('--sidebar-hover-text', colors.sidebarTextActive);
     root.style.setProperty('--sidebar-icon-color', colors.sidebarIconColor);
     root.style.setProperty('--sidebar-icon-active', colors.sidebarIconActive);
     root.style.setProperty('--sidebar-icon-hover', colors.sidebarIconActive);
-    root.style.setProperty('--crm-primary', colors.crmPrimary);
+    root.style.setProperty('--primary', colors.crmPrimary);
+    root.style.setProperty('--primary-light', colors.crmPrimary);
   };
 
   // Abrir modal de colores
