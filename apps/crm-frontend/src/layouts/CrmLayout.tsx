@@ -154,6 +154,21 @@ const Icons = {
       <polyline points="9 18 15 12 9 6"/>
     </svg>
   ),
+  // Modern sidebar panel icons
+  panelLeftClose: (
+    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+      <rect x="3" y="3" width="18" height="18" rx="2"/>
+      <path d="M9 3v18"/>
+      <path d="M16 15l-3-3 3-3"/>
+    </svg>
+  ),
+  panelLeftOpen: (
+    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+      <rect x="3" y="3" width="18" height="18" rx="2"/>
+      <path d="M9 3v18"/>
+      <path d="M14 9l3 3-3 3"/>
+    </svg>
+  ),
   external: (
     <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
       <path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"/>
@@ -526,7 +541,20 @@ export default function CrmLayout() {
 
   // Estado para submenú flotante en hover (modo colapsado)
   const [hoveringMenu, setHoveringMenu] = useState<string | null>(null);
-  const [hoverMenuPosition, setHoverMenuPosition] = useState<{ top: number } | null>(null);
+  const [hoverMenuPosition, setHoverMenuPosition] = useState<{ top: number; bottom?: number; invertY: boolean } | null>(null);
+
+  // Función para calcular la posición del menú flotante
+  const calculateMenuPosition = (rect: DOMRect, menuItemsCount: number) => {
+    const estimatedMenuHeight = menuItemsCount * 42 + 60; // ~42px per item + header/padding
+    const viewportHeight = window.innerHeight;
+    const bottomSpace = viewportHeight - rect.bottom;
+
+    // Si no hay suficiente espacio abajo, invertir
+    if (bottomSpace < estimatedMenuHeight && rect.top > estimatedMenuHeight) {
+      return { top: 0, bottom: viewportHeight - rect.bottom, invertY: true };
+    }
+    return { top: rect.top, invertY: false };
+  };
 
   // Guardar preferencia de sidebar colapsado
   useEffect(() => {
@@ -902,7 +930,7 @@ export default function CrmLayout() {
                   if (sidebarCollapsed) {
                     setHoveringMenu('crm');
                     const rect = e.currentTarget.getBoundingClientRect();
-                    setHoverMenuPosition({ top: rect.top });
+                    setHoverMenuPosition(calculateMenuPosition(rect, visibleCrmItems.length));
                   }
                 }}
                 onMouseLeave={() => setHoveringMenu(null)}
@@ -934,8 +962,8 @@ export default function CrmLayout() {
               {/* Floating submenu for collapsed mode */}
               {sidebarCollapsed && hoveringMenu === 'crm' && hoverMenuPosition && (
                 <div
-                  className="nav-floating-submenu"
-                  style={{ top: hoverMenuPosition.top }}
+                  className={`nav-floating-submenu ${hoverMenuPosition.invertY ? 'inverted' : ''}`}
+                  style={hoverMenuPosition.invertY ? { bottom: hoverMenuPosition.bottom } : { top: hoverMenuPosition.top }}
                   onMouseEnter={() => setHoveringMenu('crm')}
                   onMouseLeave={() => setHoveringMenu(null)}
                 >
@@ -982,7 +1010,7 @@ export default function CrmLayout() {
                   if (sidebarCollapsed) {
                     setHoveringMenu('finanzas');
                     const rect = e.currentTarget.getBoundingClientRect();
-                    setHoverMenuPosition({ top: rect.top });
+                    setHoverMenuPosition(calculateMenuPosition(rect, 5));
                   }
                 }}
                 onMouseLeave={() => setHoveringMenu(null)}
@@ -1013,8 +1041,8 @@ export default function CrmLayout() {
 
               {sidebarCollapsed && hoveringMenu === 'finanzas' && hoverMenuPosition && (
                 <div
-                  className="nav-floating-submenu"
-                  style={{ top: hoverMenuPosition.top }}
+                  className={`nav-floating-submenu ${hoverMenuPosition.invertY ? 'inverted' : ''}`}
+                  style={hoverMenuPosition.invertY ? { bottom: hoverMenuPosition.bottom } : { top: hoverMenuPosition.top }}
                   onMouseEnter={() => setHoveringMenu('finanzas')}
                   onMouseLeave={() => setHoveringMenu(null)}
                 >
@@ -1042,7 +1070,7 @@ export default function CrmLayout() {
                   if (sidebarCollapsed) {
                     setHoveringMenu('mensajeria');
                     const rect = e.currentTarget.getBoundingClientRect();
-                    setHoverMenuPosition({ top: rect.top });
+                    setHoverMenuPosition(calculateMenuPosition(rect, 5));
                   }
                 }}
                 onMouseLeave={() => setHoveringMenu(null)}
@@ -1082,8 +1110,8 @@ export default function CrmLayout() {
 
               {sidebarCollapsed && hoveringMenu === 'mensajeria' && hoverMenuPosition && (
                 <div
-                  className="nav-floating-submenu"
-                  style={{ top: hoverMenuPosition.top }}
+                  className={`nav-floating-submenu ${hoverMenuPosition.invertY ? 'inverted' : ''}`}
+                  style={hoverMenuPosition.invertY ? { bottom: hoverMenuPosition.bottom } : { top: hoverMenuPosition.top }}
                   onMouseEnter={() => setHoveringMenu('mensajeria')}
                   onMouseLeave={() => setHoveringMenu(null)}
                 >
@@ -1125,7 +1153,7 @@ export default function CrmLayout() {
                   if (sidebarCollapsed) {
                     setHoveringMenu('marketing');
                     const rect = e.currentTarget.getBoundingClientRect();
-                    setHoverMenuPosition({ top: rect.top });
+                    setHoverMenuPosition(calculateMenuPosition(rect, 5));
                   }
                 }}
                 onMouseLeave={() => setHoveringMenu(null)}
@@ -1156,8 +1184,8 @@ export default function CrmLayout() {
 
               {sidebarCollapsed && hoveringMenu === 'marketing' && hoverMenuPosition && (
                 <div
-                  className="nav-floating-submenu"
-                  style={{ top: hoverMenuPosition.top }}
+                  className={`nav-floating-submenu ${hoverMenuPosition.invertY ? 'inverted' : ''}`}
+                  style={hoverMenuPosition.invertY ? { bottom: hoverMenuPosition.bottom } : { top: hoverMenuPosition.top }}
                   onMouseEnter={() => setHoveringMenu('marketing')}
                   onMouseLeave={() => setHoveringMenu(null)}
                 >
@@ -1234,7 +1262,7 @@ export default function CrmLayout() {
                   if (sidebarCollapsed) {
                     setHoveringMenu('documentos');
                     const rect = e.currentTarget.getBoundingClientRect();
-                    setHoverMenuPosition({ top: rect.top });
+                    setHoverMenuPosition(calculateMenuPosition(rect, 5));
                   }
                 }}
                 onMouseLeave={() => setHoveringMenu(null)}
@@ -1266,8 +1294,8 @@ export default function CrmLayout() {
 
               {sidebarCollapsed && hoveringMenu === 'documentos' && hoverMenuPosition && (
                 <div
-                  className="nav-floating-submenu"
-                  style={{ top: hoverMenuPosition.top }}
+                  className={`nav-floating-submenu ${hoverMenuPosition.invertY ? 'inverted' : ''}`}
+                  style={hoverMenuPosition.invertY ? { bottom: hoverMenuPosition.bottom } : { top: hoverMenuPosition.top }}
                   onMouseEnter={() => setHoveringMenu('documentos')}
                   onMouseLeave={() => setHoveringMenu(null)}
                 >
@@ -1303,7 +1331,7 @@ export default function CrmLayout() {
                   if (sidebarCollapsed) {
                     setHoveringMenu('sistemaFases');
                     const rect = e.currentTarget.getBoundingClientRect();
-                    setHoverMenuPosition({ top: rect.top });
+                    setHoverMenuPosition(calculateMenuPosition(rect, 5));
                   }
                 }}
                 onMouseLeave={() => setHoveringMenu(null)}
@@ -1334,8 +1362,8 @@ export default function CrmLayout() {
 
               {sidebarCollapsed && hoveringMenu === 'sistemaFases' && hoverMenuPosition && (
                 <div
-                  className="nav-floating-submenu"
-                  style={{ top: hoverMenuPosition.top }}
+                  className={`nav-floating-submenu ${hoverMenuPosition.invertY ? 'inverted' : ''}`}
+                  style={hoverMenuPosition.invertY ? { bottom: hoverMenuPosition.bottom } : { top: hoverMenuPosition.top }}
                   onMouseEnter={() => setHoveringMenu('sistemaFases')}
                   onMouseLeave={() => setHoveringMenu(null)}
                 >
@@ -1389,7 +1417,7 @@ export default function CrmLayout() {
                   if (sidebarCollapsed) {
                     setHoveringMenu('config');
                     const rect = e.currentTarget.getBoundingClientRect();
-                    setHoverMenuPosition({ top: rect.top });
+                    setHoverMenuPosition(calculateMenuPosition(rect, 5));
                   }
                 }}
                 onMouseLeave={() => setHoveringMenu(null)}
@@ -1420,8 +1448,8 @@ export default function CrmLayout() {
 
               {sidebarCollapsed && hoveringMenu === 'config' && hoverMenuPosition && (
                 <div
-                  className="nav-floating-submenu"
-                  style={{ top: hoverMenuPosition.top }}
+                  className={`nav-floating-submenu ${hoverMenuPosition.invertY ? 'inverted' : ''}`}
+                  style={hoverMenuPosition.invertY ? { bottom: hoverMenuPosition.bottom } : { top: hoverMenuPosition.top }}
                   onMouseEnter={() => setHoveringMenu('config')}
                   onMouseLeave={() => setHoveringMenu(null)}
                 >
@@ -1445,13 +1473,16 @@ export default function CrmLayout() {
           </nav>
 
           {/* Toggle button para colapsar/expandir sidebar */}
-          <button
-            className="sidebar-toggle-btn"
-            onClick={() => setSidebarCollapsed(!sidebarCollapsed)}
-            title={sidebarCollapsed ? 'Expandir menú' : 'Colapsar menú'}
-          >
-            {sidebarCollapsed ? Icons.chevronRight : Icons.chevronLeft}
-          </button>
+          <div className="sidebar-toggle-wrapper">
+            <button
+              className="sidebar-toggle-btn"
+              onClick={() => setSidebarCollapsed(!sidebarCollapsed)}
+              title={sidebarCollapsed ? 'Expandir menú' : 'Colapsar menú'}
+            >
+              {sidebarCollapsed ? Icons.panelLeftOpen : Icons.panelLeftClose}
+            </button>
+            <span className="toggle-indicator" />
+          </div>
         </aside>
 
         {/* Main Content */}
@@ -1669,13 +1700,17 @@ export default function CrmLayout() {
             --shadow-md: 0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06);
             --radius: 8px;
             --radius-lg: 12px;
-            /* Dark sidebar colors - improved contrast */
-            --sidebar-text: #CBD5E1;
-            --sidebar-text-muted: #64748B;
+            /* Dark sidebar colors - vibrant & readable */
+            --sidebar-text: #E2E8F0;
+            --sidebar-text-muted: #94A3B8;
             --sidebar-text-active: #FFFFFF;
-            --sidebar-border: rgba(255, 255, 255, 0.1);
-            --sidebar-hover: rgba(255, 255, 255, 0.06);
-            --sidebar-active-bg: rgba(59, 130, 246, 0.4);
+            --sidebar-border: rgba(255, 255, 255, 0.08);
+            --sidebar-hover-bg: rgba(255, 255, 255, 0.08);
+            --sidebar-hover-text: #FFFFFF;
+            --sidebar-active-bg: rgba(59, 130, 246, 0.5);
+            --sidebar-icon-color: #94A3B8;
+            --sidebar-icon-hover: #E2E8F0;
+            --sidebar-icon-active: #60A5FA;
             /* Z-index hierarchy (from theme-clic.css) */
             --z-base: 0;
             --z-dropdown: 100;
@@ -1796,13 +1831,13 @@ export default function CrmLayout() {
           .nav-item {
             display: flex;
             align-items: center;
-            gap: 8px;
-            padding: 7px 10px;
+            gap: 10px;
+            padding: 9px 12px;
             color: var(--sidebar-text);
             text-decoration: none;
             border-radius: var(--radius);
-            margin-bottom: 1px;
-            transition: all 0.15s ease;
+            margin-bottom: 2px;
+            transition: all 0.2s ease;
             font-size: 0.8125rem;
             font-weight: 500;
             border: none;
@@ -1812,9 +1847,19 @@ export default function CrmLayout() {
             text-align: left;
           }
 
+          .nav-item .nav-icon {
+            color: var(--sidebar-icon-color);
+            transition: color 0.2s ease, transform 0.2s ease;
+          }
+
           .nav-item:hover {
-            background: var(--sidebar-hover);
-            color: var(--sidebar-text-active);
+            background: var(--sidebar-hover-bg);
+            color: var(--sidebar-hover-text);
+          }
+
+          .nav-item:hover .nav-icon {
+            color: var(--sidebar-icon-hover);
+            transform: scale(1.1);
           }
 
           .nav-item.active {
@@ -1824,18 +1869,22 @@ export default function CrmLayout() {
             box-shadow: inset 3px 0 0 #3B82F6;
           }
 
+          .nav-item.active .nav-icon {
+            color: var(--sidebar-icon-active);
+          }
+
           .nav-icon {
             display: flex;
             align-items: center;
             justify-content: center;
             flex-shrink: 0;
-            width: 18px;
-            height: 18px;
+            width: 20px;
+            height: 20px;
           }
 
           .nav-icon svg {
-            width: 16px;
-            height: 16px;
+            width: 18px;
+            height: 18px;
           }
 
           .nav-label {
@@ -1903,19 +1952,19 @@ export default function CrmLayout() {
             display: flex;
             align-items: center;
             gap: 8px;
-            padding: 6px 10px;
-            color: var(--sidebar-text-muted);
+            padding: 7px 10px;
+            color: var(--sidebar-text);
             text-decoration: none;
             border-radius: var(--radius);
-            margin-bottom: 1px;
-            transition: all 0.15s ease;
-            font-size: 0.75rem;
+            margin-bottom: 2px;
+            transition: all 0.2s ease;
+            font-size: 0.8rem;
             font-weight: 500;
           }
 
           .nav-subitem:hover {
-            background: var(--sidebar-hover);
-            color: var(--sidebar-text-active);
+            background: var(--sidebar-hover-bg);
+            color: var(--sidebar-hover-text);
           }
 
           .nav-subitem.active {
@@ -1925,9 +1974,14 @@ export default function CrmLayout() {
           }
 
           .nav-subitem .nav-icon {
-            opacity: 0.7;
+            color: var(--sidebar-icon-color);
             width: 16px;
             height: 16px;
+            transition: color 0.2s ease;
+          }
+
+          .nav-subitem:hover .nav-icon {
+            color: var(--sidebar-icon-hover);
           }
 
           .nav-subitem .nav-icon svg {
@@ -1936,30 +1990,67 @@ export default function CrmLayout() {
           }
 
           .nav-subitem.active .nav-icon {
-            opacity: 1;
+            color: var(--sidebar-icon-active);
           }
 
           /* ========== SIDEBAR TOGGLE BUTTON ========== */
+          .sidebar-toggle-wrapper {
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            padding: 12px 10px 16px;
+            margin-top: auto;
+            border-top: 1px solid var(--sidebar-border);
+            gap: 8px;
+          }
+
           .sidebar-toggle-btn {
             display: flex;
             align-items: center;
             justify-content: center;
-            width: 32px;
-            height: 32px;
-            margin: 8px auto 16px;
-            border: 1px solid var(--sidebar-border);
-            border-radius: 50%;
-            background: rgba(255, 255, 255, 0.05);
+            width: 38px;
+            height: 38px;
+            border: 1px solid rgba(255, 255, 255, 0.12);
+            border-radius: 10px;
+            background: rgba(255, 255, 255, 0.04);
             color: var(--sidebar-text-muted);
             cursor: pointer;
-            transition: all 0.2s ease;
+            transition: all 0.25s ease;
             flex-shrink: 0;
           }
 
           .sidebar-toggle-btn:hover {
-            background: rgba(255, 255, 255, 0.1);
-            color: var(--sidebar-text);
-            border-color: rgba(255, 255, 255, 0.2);
+            background: rgba(59, 130, 246, 0.15);
+            color: #60A5FA;
+            border-color: rgba(59, 130, 246, 0.3);
+            transform: scale(1.05);
+          }
+
+          .sidebar-toggle-btn:active {
+            transform: scale(0.95);
+          }
+
+          .toggle-indicator {
+            width: 4px;
+            height: 20px;
+            background: linear-gradient(180deg, #3B82F6 0%, #60A5FA 100%);
+            border-radius: 2px;
+            opacity: 0.6;
+            transition: opacity 0.2s ease;
+          }
+
+          .sidebar-toggle-wrapper:hover .toggle-indicator {
+            opacity: 1;
+          }
+
+          .crm-sidebar.collapsed .sidebar-toggle-wrapper {
+            flex-direction: column;
+            padding: 12px 8px 16px;
+          }
+
+          .crm-sidebar.collapsed .toggle-indicator {
+            width: 20px;
+            height: 4px;
           }
 
           /* ========== SIDEBAR COLLAPSED MODE ========== */
@@ -1987,7 +2078,39 @@ export default function CrmLayout() {
 
           .crm-sidebar.collapsed .nav-item {
             justify-content: center;
-            padding: 10px;
+            padding: 12px;
+            border-radius: 10px;
+            margin: 2px 6px;
+            width: calc(100% - 12px);
+          }
+
+          .crm-sidebar.collapsed .nav-item .nav-icon {
+            width: 24px;
+            height: 24px;
+          }
+
+          .crm-sidebar.collapsed .nav-item .nav-icon svg {
+            width: 22px;
+            height: 22px;
+          }
+
+          .crm-sidebar.collapsed .nav-item:hover {
+            background: rgba(59, 130, 246, 0.15);
+            transform: scale(1.08);
+          }
+
+          .crm-sidebar.collapsed .nav-item:hover .nav-icon {
+            color: #60A5FA;
+            transform: none;
+          }
+
+          .crm-sidebar.collapsed .nav-item.active {
+            background: rgba(59, 130, 246, 0.25);
+            box-shadow: none;
+          }
+
+          .crm-sidebar.collapsed .nav-item.active .nav-icon {
+            color: #60A5FA;
           }
 
           .crm-sidebar.collapsed .nav-submenu {
@@ -1995,32 +2118,59 @@ export default function CrmLayout() {
           }
 
           .crm-sidebar.collapsed .sidebar-nav {
-            padding: 12px 8px;
+            padding: 12px 4px;
           }
 
-          /* Nav group wrapper */
+          /* Nav group wrapper with invisible bridge */
           .nav-group {
             position: relative;
+          }
+
+          /* Invisible bridge to connect icon with floating menu */
+          .crm-sidebar.collapsed .nav-group::after {
+            content: '';
+            position: absolute;
+            left: 100%;
+            top: 0;
+            width: 20px;
+            height: 100%;
+            background: transparent;
+            pointer-events: none;
+          }
+
+          .crm-sidebar.collapsed .nav-group:hover::after {
+            pointer-events: auto;
           }
 
           /* ========== FLOATING SUBMENU (Collapsed Mode) ========== */
           .nav-floating-submenu {
             position: fixed;
-            left: var(--sidebar-collapsed-width, 64px);
+            left: calc(var(--sidebar-collapsed-width, 64px) + 8px);
             background: linear-gradient(180deg, #1E293B 0%, #0F172A 100%);
-            border: 1px solid var(--sidebar-border);
+            border: 1px solid rgba(255, 255, 255, 0.1);
             border-radius: var(--radius-lg);
-            padding: 8px;
-            min-width: 180px;
-            box-shadow: 0 8px 32px rgba(0, 0, 0, 0.4);
+            padding: 10px;
+            min-width: 200px;
+            box-shadow: 0 8px 32px rgba(0, 0, 0, 0.5), 0 0 0 1px rgba(255, 255, 255, 0.05);
             z-index: calc(var(--z-sidebar) + 10);
-            animation: floatingSubmenuIn 0.15s ease-out;
+            animation: floatingSubmenuIn 0.18s ease-out;
+          }
+
+          /* Invisible bridge from menu to icon */
+          .nav-floating-submenu::before {
+            content: '';
+            position: absolute;
+            right: 100%;
+            top: 0;
+            width: 20px;
+            height: 100%;
+            background: transparent;
           }
 
           @keyframes floatingSubmenuIn {
             from {
               opacity: 0;
-              transform: translateX(-8px);
+              transform: translateX(-10px);
             }
             to {
               opacity: 1;
@@ -2030,13 +2180,13 @@ export default function CrmLayout() {
 
           .floating-submenu-title {
             font-size: 0.7rem;
-            font-weight: 600;
+            font-weight: 700;
             text-transform: uppercase;
-            letter-spacing: 0.08em;
-            color: var(--sidebar-text-muted);
-            padding: 6px 10px 8px;
-            border-bottom: 1px solid var(--sidebar-border);
-            margin-bottom: 6px;
+            letter-spacing: 0.1em;
+            color: #60A5FA;
+            padding: 6px 12px 10px;
+            border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+            margin-bottom: 8px;
           }
 
           .nav-floating-submenu .nav-subitem {
@@ -2054,8 +2204,8 @@ export default function CrmLayout() {
           }
 
           .nav-floating-submenu .nav-subitem:hover {
-            background: var(--sidebar-hover);
-            color: var(--sidebar-text-active);
+            background: var(--sidebar-hover-bg);
+            color: var(--sidebar-hover-text);
           }
 
           .nav-floating-submenu .nav-subitem.active {
@@ -2070,6 +2220,27 @@ export default function CrmLayout() {
 
           .nav-floating-submenu .nav-subitem.active .nav-icon {
             opacity: 1;
+          }
+
+          /* Inverted floating submenu (when near bottom of screen) */
+          .nav-floating-submenu.inverted {
+            animation: floatingSubmenuInUp 0.18s ease-out;
+          }
+
+          .nav-floating-submenu.inverted::before {
+            top: auto;
+            bottom: 0;
+          }
+
+          @keyframes floatingSubmenuInUp {
+            from {
+              opacity: 0;
+              transform: translateX(-10px) translateY(10px);
+            }
+            to {
+              opacity: 1;
+              transform: translateX(0) translateY(0);
+            }
           }
 
           .nav-floating-submenu .nav-subitem .nav-label {
