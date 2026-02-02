@@ -186,8 +186,11 @@ export default function CrmConfiguracion() {
         color: ${colors.sidebarIconActive} !important;
       }
       .crm-layout .crm-sidebar .nav-item.active {
-        background: ${colors.sidebarActiveBg} !important;
+        background: transparent !important;
         color: ${colors.sidebarTextActive} !important;
+      }
+      .crm-layout .crm-sidebar .nav-item.active::after {
+        background: ${colors.sidebarIconActive} !important;
       }
       .crm-layout .crm-sidebar .nav-item.active .nav-icon {
         color: ${colors.sidebarIconActive} !important;

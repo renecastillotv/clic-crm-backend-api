@@ -699,8 +699,11 @@ export default function CrmLayout() {
             color: ${colors.sidebarIconActive} !important;
           }
           .crm-layout .crm-sidebar .nav-item.active {
-            background: ${colors.sidebarActiveBg} !important;
+            background: transparent !important;
             color: ${colors.sidebarTextActive} !important;
+          }
+          .crm-layout .crm-sidebar .nav-item.active::after {
+            background: ${colors.sidebarIconActive} !important;
           }
           .crm-layout .crm-sidebar .nav-item.active .nav-icon {
             color: ${colors.sidebarIconActive} !important;
@@ -2019,10 +2022,24 @@ export default function CrmLayout() {
           }
 
           .nav-item.active {
-            background: var(--sidebar-active-bg);
+            background: transparent;
             color: var(--sidebar-text-active);
             font-weight: 600;
-            box-shadow: inset 3px 0 0 var(--primary);
+            box-shadow: none;
+            position: relative;
+          }
+
+          .nav-item.active::after {
+            content: '';
+            position: absolute;
+            right: 12px;
+            top: 50%;
+            transform: translateY(-50%);
+            width: 6px;
+            height: 6px;
+            background: var(--sidebar-icon-active);
+            border-radius: 50%;
+            opacity: 0.8;
           }
 
           .nav-item.active .nav-icon {
@@ -2298,23 +2315,23 @@ export default function CrmLayout() {
             height: 26px;
           }
 
-          /* Collapsed active state - ONLY vertical line + bright icon (no background) */
+          /* Collapsed active state - subtle dot indicator */
           .crm-sidebar.collapsed .nav-item.active {
             background: transparent !important;
             box-shadow: none !important;
             position: relative;
           }
 
-          .crm-sidebar.collapsed .nav-item.active::before {
+          .crm-sidebar.collapsed .nav-item.active::after {
             content: '';
             position: absolute;
-            left: 0;
-            top: 50%;
-            transform: translateY(-50%);
-            width: 3px;
-            height: 24px;
-            background: linear-gradient(180deg, var(--primary) 0%, var(--sidebar-icon-active) 100%);
-            border-radius: 0 3px 3px 0;
+            right: 8px;
+            bottom: 8px;
+            width: 5px;
+            height: 5px;
+            background: var(--sidebar-icon-active);
+            border-radius: 50%;
+            opacity: 0.8;
           }
 
           .crm-sidebar.collapsed .nav-item.active .nav-icon {
@@ -2932,12 +2949,13 @@ export default function CrmLayout() {
             }
 
             .crm-sidebar.collapsed .nav-item.active {
-              background: var(--sidebar-active-bg);
-              box-shadow: inset 3px 0 0 var(--primary);
+              background: transparent;
+              box-shadow: none;
             }
 
-            .crm-sidebar.collapsed .nav-item.active::before {
-              display: none;
+            .crm-sidebar.collapsed .nav-item.active::after {
+              right: 6px;
+              bottom: 6px;
             }
 
             .crm-sidebar.collapsed .nav-submenu {
