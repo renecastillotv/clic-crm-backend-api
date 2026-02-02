@@ -683,6 +683,41 @@ export default function CrmLayout() {
             --primary: ${colors.crmPrimary} !important;
             --primary-light: ${colors.crmPrimary} !important;
           }
+
+          /* Estilos directos para nav-item (menú principal) */
+          .crm-layout .sidebar .nav-item {
+            color: ${colors.sidebarText} !important;
+          }
+          .crm-layout .sidebar .nav-item .nav-icon {
+            color: ${colors.sidebarIconColor} !important;
+          }
+          .crm-layout .sidebar .nav-item:hover {
+            background: ${colors.sidebarHoverBg} !important;
+            color: ${colors.sidebarTextActive} !important;
+          }
+          .crm-layout .sidebar .nav-item:hover .nav-icon {
+            color: ${colors.sidebarIconActive} !important;
+          }
+          .crm-layout .sidebar .nav-item.active {
+            background: ${colors.sidebarActiveBg} !important;
+            color: ${colors.sidebarTextActive} !important;
+          }
+          .crm-layout .sidebar .nav-item.active .nav-icon {
+            color: ${colors.sidebarIconActive} !important;
+          }
+
+          /* Estilos directos para nav-subitem (subsecciones) */
+          .crm-layout .sidebar .nav-subitem {
+            color: ${colors.sidebarText} !important;
+          }
+          .crm-layout .sidebar .nav-subitem:hover {
+            background: ${colors.sidebarHoverBg} !important;
+            color: ${colors.sidebarTextActive} !important;
+          }
+          .crm-layout .sidebar .nav-subitem.active {
+            background: ${colors.sidebarActiveBg} !important;
+            color: ${colors.sidebarTextActive} !important;
+          }
         `;
 
       } catch (err) {
