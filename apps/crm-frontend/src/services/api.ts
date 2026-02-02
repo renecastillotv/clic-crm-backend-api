@@ -142,6 +142,7 @@ export interface TemaColores {
   sidebarActiveBg?: string;      // Fondo activo (rgba)
   sidebarIconColor?: string;     // Color iconos normales
   sidebarIconActive?: string;    // Color iconos activos
+  sidebarIconCollapsed?: string; // Color iconos en modo colapsado
 }
 
 // Valores por defecto para colores del CRM
@@ -155,6 +156,7 @@ export const DEFAULT_CRM_COLORS = {
   sidebarActiveBg: 'rgba(59, 130, 246, 0.35)',
   sidebarIconColor: '#94A3B8',
   sidebarIconActive: '#60A5FA',
+  sidebarIconCollapsed: '#60A5FA',
 };
 
 /**

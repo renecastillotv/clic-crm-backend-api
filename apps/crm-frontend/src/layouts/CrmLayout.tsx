@@ -656,6 +656,7 @@ export default function CrmLayout() {
           sidebarActiveBg: tema.sidebarActiveBg || DEFAULT_CRM_COLORS.sidebarActiveBg,
           sidebarIconColor: tema.sidebarIconColor || DEFAULT_CRM_COLORS.sidebarIconColor,
           sidebarIconActive: tema.sidebarIconActive || DEFAULT_CRM_COLORS.sidebarIconActive,
+          sidebarIconCollapsed: tema.sidebarIconCollapsed || DEFAULT_CRM_COLORS.sidebarIconCollapsed,
           crmPrimary: tema.crmPrimary || DEFAULT_CRM_COLORS.crmPrimary,
         };
 
@@ -680,6 +681,7 @@ export default function CrmLayout() {
             --sidebar-icon-color: ${colors.sidebarIconColor} !important;
             --sidebar-icon-active: ${colors.sidebarIconActive} !important;
             --sidebar-icon-hover: ${colors.sidebarIconActive} !important;
+            --sidebar-icon-collapsed: ${colors.sidebarIconCollapsed} !important;
             --primary: ${colors.crmPrimary} !important;
             --primary-light: ${colors.crmPrimary} !important;
           }
@@ -1870,6 +1872,7 @@ export default function CrmLayout() {
             --sidebar-icon-color: #94A3B8;
             --sidebar-icon-hover: #60A5FA;
             --sidebar-icon-active: #60A5FA;
+            --sidebar-icon-collapsed: #60A5FA;
             /* Z-index hierarchy (from theme-clic.css) */
             --z-base: 0;
             --z-dropdown: 100;
@@ -2022,24 +2025,23 @@ export default function CrmLayout() {
           }
 
           .nav-item.active {
-            background: transparent;
+            background: rgba(0, 0, 0, 0.15);
             color: var(--sidebar-text-active);
             font-weight: 600;
-            box-shadow: none;
+            box-shadow: inset 0 1px 3px rgba(0, 0, 0, 0.2);
             position: relative;
           }
 
           .nav-item.active::after {
             content: '';
             position: absolute;
-            right: 12px;
+            right: 0;
             top: 50%;
             transform: translateY(-50%);
-            width: 6px;
-            height: 6px;
+            width: 3px;
+            height: 60%;
             background: var(--sidebar-icon-active);
-            border-radius: 50%;
-            opacity: 0.8;
+            border-radius: 3px 0 0 3px;
           }
 
           .nav-item.active .nav-icon {
@@ -2204,17 +2206,7 @@ export default function CrmLayout() {
           }
 
           .toggle-indicator {
-            width: 6px;
-            height: 6px;
-            background: var(--sidebar-icon-active);
-            border-radius: 50%;
-            opacity: 0.5;
-            transition: opacity 0.2s ease, transform 0.2s ease;
-          }
-
-          .sidebar-toggle-wrapper:hover .toggle-indicator {
-            opacity: 1;
-            transform: scale(1.2);
+            display: none;
           }
 
           .crm-sidebar.collapsed .sidebar-toggle-wrapper {
@@ -2315,37 +2307,31 @@ export default function CrmLayout() {
             height: 26px;
           }
 
-          /* Collapsed active state - subtle dot indicator */
+          /* Collapsed active state - subtle recessed box */
           .crm-sidebar.collapsed .nav-item.active {
-            background: transparent !important;
-            box-shadow: none !important;
+            background: rgba(0, 0, 0, 0.2) !important;
+            box-shadow: inset 0 2px 4px rgba(0, 0, 0, 0.3) !important;
+            border-radius: 10px;
             position: relative;
           }
 
           .crm-sidebar.collapsed .nav-item.active::after {
-            content: '';
-            position: absolute;
-            right: 8px;
-            bottom: 8px;
-            width: 5px;
-            height: 5px;
-            background: var(--sidebar-icon-active);
-            border-radius: 50%;
-            opacity: 0.8;
+            display: none;
           }
 
           .crm-sidebar.collapsed .nav-item.active .nav-icon {
-            color: var(--sidebar-icon-active);
+            color: var(--sidebar-icon-collapsed, var(--sidebar-icon-active));
           }
 
           .crm-sidebar.collapsed .nav-item.active .nav-icon svg {
-            width: 24px;
-            height: 24px;
+            width: 22px;
+            height: 22px;
           }
 
-          /* Collapsed active + hover state - only show hover bg when hovering */
+          /* Collapsed active + hover state */
           .crm-sidebar.collapsed .nav-item.active:hover {
-            background: var(--sidebar-hover-bg) !important;
+            background: rgba(0, 0, 0, 0.25) !important;
+            box-shadow: inset 0 2px 4px rgba(0, 0, 0, 0.35) !important;
           }
 
           .crm-sidebar.collapsed .nav-item.active:hover .nav-icon {
@@ -2353,8 +2339,8 @@ export default function CrmLayout() {
           }
 
           .crm-sidebar.collapsed .nav-item.active:hover .nav-icon svg {
-            width: 26px;
-            height: 26px;
+            width: 24px;
+            height: 24px;
           }
 
           .crm-sidebar.collapsed .nav-submenu {
@@ -2949,13 +2935,8 @@ export default function CrmLayout() {
             }
 
             .crm-sidebar.collapsed .nav-item.active {
-              background: transparent;
-              box-shadow: none;
-            }
-
-            .crm-sidebar.collapsed .nav-item.active::after {
-              right: 6px;
-              bottom: 6px;
+              background: rgba(0, 0, 0, 0.15);
+              box-shadow: inset 0 1px 3px rgba(0, 0, 0, 0.2);
             }
 
             .crm-sidebar.collapsed .nav-submenu {

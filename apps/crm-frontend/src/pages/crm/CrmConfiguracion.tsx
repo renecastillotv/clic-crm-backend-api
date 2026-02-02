@@ -52,6 +52,7 @@ export default function CrmConfiguracion() {
     sidebarActiveBg: DEFAULT_CRM_COLORS.sidebarActiveBg,
     sidebarIconColor: DEFAULT_CRM_COLORS.sidebarIconColor,
     sidebarIconActive: DEFAULT_CRM_COLORS.sidebarIconActive,
+    sidebarIconCollapsed: DEFAULT_CRM_COLORS.sidebarIconCollapsed,
   });
 
   // Configurar header de la página
@@ -167,6 +168,7 @@ export default function CrmConfiguracion() {
         --sidebar-icon-color: ${colors.sidebarIconColor} !important;
         --sidebar-icon-active: ${colors.sidebarIconActive} !important;
         --sidebar-icon-hover: ${colors.sidebarIconActive} !important;
+        --sidebar-icon-collapsed: ${colors.sidebarIconCollapsed} !important;
         --primary: ${colors.crmPrimary} !important;
         --primary-light: ${colors.crmPrimary} !important;
       }
@@ -229,6 +231,7 @@ export default function CrmConfiguracion() {
           sidebarActiveBg: tema.sidebarActiveBg || DEFAULT_CRM_COLORS.sidebarActiveBg,
           sidebarIconColor: tema.sidebarIconColor || DEFAULT_CRM_COLORS.sidebarIconColor,
           sidebarIconActive: tema.sidebarIconActive || DEFAULT_CRM_COLORS.sidebarIconActive,
+          sidebarIconCollapsed: tema.sidebarIconCollapsed || DEFAULT_CRM_COLORS.sidebarIconCollapsed,
         };
         setColoresCRM(coloresActuales);
         setColoresOriginales(tema);
@@ -261,6 +264,7 @@ export default function CrmConfiguracion() {
       sidebarActiveBg: DEFAULT_CRM_COLORS.sidebarActiveBg,
       sidebarIconColor: DEFAULT_CRM_COLORS.sidebarIconColor,
       sidebarIconActive: DEFAULT_CRM_COLORS.sidebarIconActive,
+      sidebarIconCollapsed: DEFAULT_CRM_COLORS.sidebarIconCollapsed,
     };
     setColoresCRM(defaults);
     if (previewEnTiempoReal) {
@@ -281,6 +285,7 @@ export default function CrmConfiguracion() {
         sidebarActiveBg: coloresOriginales.sidebarActiveBg || DEFAULT_CRM_COLORS.sidebarActiveBg,
         sidebarIconColor: coloresOriginales.sidebarIconColor || DEFAULT_CRM_COLORS.sidebarIconColor,
         sidebarIconActive: coloresOriginales.sidebarIconActive || DEFAULT_CRM_COLORS.sidebarIconActive,
+        sidebarIconCollapsed: coloresOriginales.sidebarIconCollapsed || DEFAULT_CRM_COLORS.sidebarIconCollapsed,
       };
       aplicarColoresPreview(originales);
     }
@@ -718,6 +723,22 @@ export default function CrmConfiguracion() {
                           type="text"
                           value={coloresCRM.sidebarIconActive}
                           onChange={(e) => handleColorChange('sidebarIconActive', e.target.value)}
+                          className="color-text-input"
+                        />
+                      </div>
+                    </div>
+                    <div className="color-picker-row">
+                      <label>Iconos (modo colapsado)</label>
+                      <div className="color-input-group">
+                        <input
+                          type="color"
+                          value={coloresCRM.sidebarIconCollapsed}
+                          onChange={(e) => handleColorChange('sidebarIconCollapsed', e.target.value)}
+                        />
+                        <input
+                          type="text"
+                          value={coloresCRM.sidebarIconCollapsed}
+                          onChange={(e) => handleColorChange('sidebarIconCollapsed', e.target.value)}
                           className="color-text-input"
                         />
                       </div>
