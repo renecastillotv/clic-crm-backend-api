@@ -1884,7 +1884,7 @@ export default function CrmLayout() {
           .brand-logo {
             width: 34px;
             height: 34px;
-            background: linear-gradient(135deg, #3B82F6 0%, #2563EB 100%);
+            background: linear-gradient(135deg, var(--primary-light) 0%, var(--primary) 100%);
             border-radius: var(--radius);
             display: flex;
             align-items: center;
@@ -1894,7 +1894,7 @@ export default function CrmLayout() {
             font-size: 1rem;
             flex-shrink: 0;
             overflow: hidden;
-            box-shadow: 0 2px 8px rgba(59, 130, 246, 0.4);
+            box-shadow: 0 2px 8px var(--sidebar-hover-bg);
           }
 
           .brand-logo.has-image {
@@ -1988,7 +1988,7 @@ export default function CrmLayout() {
             background: var(--sidebar-active-bg);
             color: var(--sidebar-text-active);
             font-weight: 600;
-            box-shadow: inset 3px 0 0 #3B82F6;
+            box-shadow: inset 3px 0 0 var(--primary);
           }
 
           .nav-item.active .nav-icon {
@@ -2142,9 +2142,9 @@ export default function CrmLayout() {
           }
 
           .sidebar-toggle-btn:hover {
-            background: rgba(59, 130, 246, 0.15);
-            color: #60A5FA;
-            border-color: rgba(59, 130, 246, 0.3);
+            background: var(--sidebar-hover-bg);
+            color: var(--sidebar-icon-active);
+            border-color: var(--sidebar-hover-bg);
             transform: scale(1.05);
           }
 
@@ -2155,7 +2155,7 @@ export default function CrmLayout() {
           .toggle-indicator {
             width: 4px;
             height: 20px;
-            background: linear-gradient(180deg, #3B82F6 0%, #60A5FA 100%);
+            background: linear-gradient(180deg, var(--primary) 0%, var(--sidebar-icon-active) 100%);
             border-radius: 2px;
             opacity: 0.6;
             transition: opacity 0.2s ease;
@@ -2249,13 +2249,13 @@ export default function CrmLayout() {
             transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
           }
 
-          /* Collapsed hover state - blue glow effect */
+          /* Collapsed hover state - glow effect */
           .crm-sidebar.collapsed .nav-item:hover {
-            background: rgba(59, 130, 246, 0.15) !important;
+            background: var(--sidebar-hover-bg) !important;
           }
 
           .crm-sidebar.collapsed .nav-item:hover .nav-icon {
-            color: #60A5FA;
+            color: var(--sidebar-icon-active);
           }
 
           .crm-sidebar.collapsed .nav-item:hover .nav-icon svg {
@@ -2278,12 +2278,12 @@ export default function CrmLayout() {
             transform: translateY(-50%);
             width: 3px;
             height: 24px;
-            background: linear-gradient(180deg, #3B82F6 0%, #60A5FA 100%);
+            background: linear-gradient(180deg, var(--primary) 0%, var(--sidebar-icon-active) 100%);
             border-radius: 0 3px 3px 0;
           }
 
           .crm-sidebar.collapsed .nav-item.active .nav-icon {
-            color: #60A5FA;
+            color: var(--sidebar-icon-active);
           }
 
           .crm-sidebar.collapsed .nav-item.active .nav-icon svg {
@@ -2293,11 +2293,11 @@ export default function CrmLayout() {
 
           /* Collapsed active + hover state - only show hover bg when hovering */
           .crm-sidebar.collapsed .nav-item.active:hover {
-            background: rgba(59, 130, 246, 0.15) !important;
+            background: var(--sidebar-hover-bg) !important;
           }
 
           .crm-sidebar.collapsed .nav-item.active:hover .nav-icon {
-            color: #93C5FD;
+            color: var(--sidebar-text-active);
           }
 
           .crm-sidebar.collapsed .nav-item.active:hover .nav-icon svg {
@@ -2334,7 +2334,7 @@ export default function CrmLayout() {
           .nav-floating-submenu {
             position: fixed;
             left: calc(var(--sidebar-collapsed-width, 68px) + 8px);
-            background: linear-gradient(180deg, #1E293B 0%, #0F172A 100%);
+            background: var(--bg-sidebar);
             border: 1px solid rgba(255, 255, 255, 0.1);
             border-radius: var(--radius-lg);
             padding: 10px;
@@ -2371,7 +2371,7 @@ export default function CrmLayout() {
             font-weight: 700;
             text-transform: uppercase;
             letter-spacing: 0.1em;
-            color: #60A5FA;
+            color: var(--sidebar-icon-active);
             padding: 6px 12px 10px;
             border-bottom: 1px solid rgba(255, 255, 255, 0.08);
             margin-bottom: 8px;
@@ -2898,7 +2898,7 @@ export default function CrmLayout() {
 
             .crm-sidebar.collapsed .nav-item.active {
               background: var(--sidebar-active-bg);
-              box-shadow: inset 3px 0 0 #3B82F6;
+              box-shadow: inset 3px 0 0 var(--primary);
             }
 
             .crm-sidebar.collapsed .nav-item.active::before {
