@@ -1408,13 +1408,13 @@ export default function CrmLayout() {
             --shadow-md: 0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06);
             --radius: 8px;
             --radius-lg: 12px;
-            /* Dark sidebar colors */
-            --sidebar-text: #E2E8F0;
-            --sidebar-text-muted: #94A3B8;
+            /* Dark sidebar colors - improved contrast */
+            --sidebar-text: #CBD5E1;
+            --sidebar-text-muted: #64748B;
             --sidebar-text-active: #FFFFFF;
             --sidebar-border: rgba(255, 255, 255, 0.1);
-            --sidebar-hover: rgba(255, 255, 255, 0.08);
-            --sidebar-active-bg: rgba(59, 130, 246, 0.2);
+            --sidebar-hover: rgba(255, 255, 255, 0.06);
+            --sidebar-active-bg: rgba(59, 130, 246, 0.4);
             /* Z-index hierarchy (from theme-clic.css) */
             --z-base: 0;
             --z-dropdown: 100;
