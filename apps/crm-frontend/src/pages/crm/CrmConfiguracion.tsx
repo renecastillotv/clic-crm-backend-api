@@ -177,14 +177,16 @@ export default function CrmConfiguracion() {
       .crm-layout .crm-sidebar .nav-item {
         color: ${colors.sidebarText} !important;
       }
-      .crm-layout .crm-sidebar .nav-item .nav-icon {
+      .crm-layout .crm-sidebar .nav-item .nav-icon,
+      .crm-layout .crm-sidebar .nav-item .nav-chevron {
         color: ${colors.sidebarIconColor} !important;
       }
       .crm-layout .crm-sidebar .nav-item:hover {
         background: ${colors.sidebarHoverBg} !important;
         color: ${colors.sidebarTextActive} !important;
       }
-      .crm-layout .crm-sidebar .nav-item:hover .nav-icon {
+      .crm-layout .crm-sidebar .nav-item:hover .nav-icon,
+      .crm-layout .crm-sidebar .nav-item:hover .nav-chevron {
         color: ${colors.sidebarIconActive} !important;
       }
       .crm-layout .crm-sidebar .nav-item.active {
@@ -194,7 +196,8 @@ export default function CrmConfiguracion() {
       .crm-layout .crm-sidebar .nav-item.active::after {
         background: ${colors.sidebarIconActive} !important;
       }
-      .crm-layout .crm-sidebar .nav-item.active .nav-icon {
+      .crm-layout .crm-sidebar .nav-item.active .nav-icon,
+      .crm-layout .crm-sidebar .nav-item.active .nav-chevron {
         color: ${colors.sidebarIconActive} !important;
       }
 

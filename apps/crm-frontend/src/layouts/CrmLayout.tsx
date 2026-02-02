@@ -690,14 +690,16 @@ export default function CrmLayout() {
           .crm-layout .crm-sidebar .nav-item {
             color: ${colors.sidebarText} !important;
           }
-          .crm-layout .crm-sidebar .nav-item .nav-icon {
+          .crm-layout .crm-sidebar .nav-item .nav-icon,
+          .crm-layout .crm-sidebar .nav-item .nav-chevron {
             color: ${colors.sidebarIconColor} !important;
           }
           .crm-layout .crm-sidebar .nav-item:hover {
             background: ${colors.sidebarHoverBg} !important;
             color: ${colors.sidebarTextActive} !important;
           }
-          .crm-layout .crm-sidebar .nav-item:hover .nav-icon {
+          .crm-layout .crm-sidebar .nav-item:hover .nav-icon,
+          .crm-layout .crm-sidebar .nav-item:hover .nav-chevron {
             color: ${colors.sidebarIconActive} !important;
           }
           .crm-layout .crm-sidebar .nav-item.active {
@@ -707,7 +709,8 @@ export default function CrmLayout() {
           .crm-layout .crm-sidebar .nav-item.active::after {
             background: ${colors.sidebarIconActive} !important;
           }
-          .crm-layout .crm-sidebar .nav-item.active .nav-icon {
+          .crm-layout .crm-sidebar .nav-item.active .nav-icon,
+          .crm-layout .crm-sidebar .nav-item.active .nav-chevron {
             color: ${colors.sidebarIconActive} !important;
           }
 
@@ -2110,9 +2113,18 @@ export default function CrmLayout() {
 
           .nav-chevron {
             margin-left: auto;
-            transition: transform 0.2s ease;
+            transition: transform 0.2s ease, color 0.2s ease;
             display: flex;
             align-items: center;
+            color: var(--sidebar-icon-color);
+          }
+
+          .nav-item:hover .nav-chevron {
+            color: var(--sidebar-icon-hover);
+          }
+
+          .nav-item.active .nav-chevron {
+            color: var(--sidebar-icon-active);
           }
 
           .nav-chevron.open {
