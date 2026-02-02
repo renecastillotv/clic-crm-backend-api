@@ -210,6 +210,17 @@ export default function CrmConfiguracion() {
         background: ${colors.sidebarActiveBg} !important;
         color: ${colors.sidebarTextActive} !important;
       }
+
+      /* Estilos para iconos en modo colapsado */
+      .crm-layout .crm-sidebar.collapsed .nav-item .nav-icon {
+        color: ${colors.sidebarIconColor} !important;
+      }
+      .crm-layout .crm-sidebar.collapsed .nav-item:hover .nav-icon {
+        color: ${colors.sidebarIconActive} !important;
+      }
+      .crm-layout .crm-sidebar.collapsed .nav-item.active .nav-icon {
+        color: ${colors.sidebarIconCollapsed} !important;
+      }
     `;
   };
 

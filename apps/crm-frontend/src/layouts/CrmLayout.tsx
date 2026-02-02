@@ -723,6 +723,17 @@ export default function CrmLayout() {
             background: ${colors.sidebarActiveBg} !important;
             color: ${colors.sidebarTextActive} !important;
           }
+
+          /* Estilos para iconos en modo colapsado */
+          .crm-layout .crm-sidebar.collapsed .nav-item .nav-icon {
+            color: ${colors.sidebarIconColor} !important;
+          }
+          .crm-layout .crm-sidebar.collapsed .nav-item:hover .nav-icon {
+            color: ${colors.sidebarIconActive} !important;
+          }
+          .crm-layout .crm-sidebar.collapsed .nav-item.active .nav-icon {
+            color: ${colors.sidebarIconCollapsed} !important;
+          }
         `;
 
       } catch (err) {
@@ -1976,18 +1987,11 @@ export default function CrmLayout() {
           }
 
           .nav-section {
-            margin-bottom: 16px;
+            margin-bottom: 8px;
           }
 
           .nav-section-title {
-            display: block;
-            font-size: 0.625rem;
-            font-weight: 600;
-            text-transform: uppercase;
-            letter-spacing: 0.08em;
-            color: var(--sidebar-text-muted);
-            padding: 0 10px;
-            margin-bottom: 6px;
+            display: none;
           }
 
           .nav-item {
@@ -2068,6 +2072,16 @@ export default function CrmLayout() {
 
           .nav-expandable {
             justify-content: flex-start;
+            font-family: inherit;
+            font-size: inherit;
+            font-weight: inherit;
+          }
+
+          /* Asegurar mismo peso visual para todos los nav-item */
+          .nav-item,
+          button.nav-item {
+            font-weight: 500;
+            font-size: 0.8125rem;
           }
 
           .nav-badge {
