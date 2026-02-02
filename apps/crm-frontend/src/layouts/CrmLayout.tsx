@@ -573,13 +573,23 @@ export default function CrmLayout() {
     }
     hoverTimeoutRef.current = setTimeout(() => {
       setHoveringMenu(null);
-    }, 150); // 150ms delay antes de cerrar
+    }, 200); // 200ms delay antes de cerrar
   };
 
   const cancelCloseHoverMenu = () => {
     if (hoverTimeoutRef.current) {
       clearTimeout(hoverTimeoutRef.current);
       hoverTimeoutRef.current = null;
+    }
+  };
+
+  // Handler para mantener el menú abierto mientras el mouse está sobre el nav-group
+  const handleNavGroupMouseMove = (menuName: string, e: React.MouseEvent<HTMLDivElement>, itemsCount: number) => {
+    if (sidebarCollapsed && hoveringMenu !== menuName) {
+      cancelCloseHoverMenu();
+      const rect = e.currentTarget.getBoundingClientRect();
+      setHoveringMenu(menuName);
+      setHoverMenuPosition(calculateMenuPosition(rect, itemsCount));
     }
   };
 
@@ -968,14 +978,13 @@ export default function CrmLayout() {
                     openHoverMenu('crm', e.currentTarget.getBoundingClientRect(), visibleCrmItems.length);
                   }
                 }}
+                onMouseMove={(e) => handleNavGroupMouseMove('crm', e, visibleCrmItems.length)}
                 onMouseLeave={closeHoverMenuWithDelay}
               >
               <button
                 className={`nav-item nav-expandable ${isCrmActive ? 'active' : ''}`}
                 onClick={() => {
-                  if (sidebarCollapsed) {
-                    setHoveringMenu(hoveringMenu === 'crm' ? null : 'crm');
-                  } else {
+                  if (!sidebarCollapsed) {
                     toggleSubmenu('crm');
                   }
                 }}
@@ -1052,14 +1061,13 @@ export default function CrmLayout() {
                     openHoverMenu('finanzas', e.currentTarget.getBoundingClientRect(), 5);
                   }
                 }}
+                onMouseMove={(e) => handleNavGroupMouseMove('finanzas', e, 5)}
                 onMouseLeave={closeHoverMenuWithDelay}
               >
               <button
                 className={`nav-item nav-expandable ${isFinanzasActive ? 'active' : ''}`}
                 onClick={() => {
-                  if (sidebarCollapsed) {
-                    setHoveringMenu(hoveringMenu === 'finanzas' ? null : 'finanzas');
-                  } else {
+                  if (!sidebarCollapsed) {
                     toggleSubmenu('finanzas');
                   }
                 }}
@@ -1116,14 +1124,13 @@ export default function CrmLayout() {
                     openHoverMenu('mensajeria', e.currentTarget.getBoundingClientRect(), 5);
                   }
                 }}
+                onMouseMove={(e) => handleNavGroupMouseMove('mensajeria', e, 5)}
                 onMouseLeave={closeHoverMenuWithDelay}
               >
               <button
                 className={`nav-item nav-expandable ${isMensajeriaActive ? 'active' : ''}`}
                 onClick={() => {
-                  if (sidebarCollapsed) {
-                    setHoveringMenu(hoveringMenu === 'mensajeria' ? null : 'mensajeria');
-                  } else {
+                  if (!sidebarCollapsed) {
                     toggleSubmenu('mensajeria');
                   }
                 }}
@@ -1203,14 +1210,13 @@ export default function CrmLayout() {
                     openHoverMenu('marketing', e.currentTarget.getBoundingClientRect(), 5);
                   }
                 }}
+                onMouseMove={(e) => handleNavGroupMouseMove('marketing', e, 5)}
                 onMouseLeave={closeHoverMenuWithDelay}
               >
               <button
                 className={`nav-item nav-expandable ${isMarketingActive ? 'active' : ''}`}
                 onClick={() => {
-                  if (sidebarCollapsed) {
-                    setHoveringMenu(hoveringMenu === 'marketing' ? null : 'marketing');
-                  } else {
+                  if (!sidebarCollapsed) {
                     toggleSubmenu('marketing');
                   }
                 }}
@@ -1316,14 +1322,13 @@ export default function CrmLayout() {
                     openHoverMenu('documentos', e.currentTarget.getBoundingClientRect(), 5);
                   }
                 }}
+                onMouseMove={(e) => handleNavGroupMouseMove('documentos', e, 5)}
                 onMouseLeave={closeHoverMenuWithDelay}
               >
               <button
                 className={`nav-item nav-expandable ${isDocumentosActive ? 'active' : ''}`}
                 onClick={() => {
-                  if (sidebarCollapsed) {
-                    setHoveringMenu(hoveringMenu === 'documentos' ? null : 'documentos');
-                  } else {
+                  if (!sidebarCollapsed) {
                     toggleSubmenu('documentos');
                   }
                 }}
@@ -1389,14 +1394,13 @@ export default function CrmLayout() {
                     openHoverMenu('sistemaFases', e.currentTarget.getBoundingClientRect(), 5);
                   }
                 }}
+                onMouseMove={(e) => handleNavGroupMouseMove('sistemaFases', e, 5)}
                 onMouseLeave={closeHoverMenuWithDelay}
               >
               <button
                 className={`nav-item nav-expandable ${isSistemaFasesActive ? 'active' : ''}`}
                 onClick={() => {
-                  if (sidebarCollapsed) {
-                    setHoveringMenu(hoveringMenu === 'sistemaFases' ? null : 'sistemaFases');
-                  } else {
+                  if (!sidebarCollapsed) {
                     toggleSubmenu('sistemaFases');
                   }
                 }}
@@ -1479,14 +1483,13 @@ export default function CrmLayout() {
                     openHoverMenu('config', e.currentTarget.getBoundingClientRect(), 5);
                   }
                 }}
+                onMouseMove={(e) => handleNavGroupMouseMove('config', e, 5)}
                 onMouseLeave={closeHoverMenuWithDelay}
               >
               <button
                 className={`nav-item nav-expandable ${isConfigActive ? 'active' : ''}`}
                 onClick={() => {
-                  if (sidebarCollapsed) {
-                    setHoveringMenu(hoveringMenu === 'config' ? null : 'config');
-                  } else {
+                  if (!sidebarCollapsed) {
                     toggleSubmenu('config');
                   }
                 }}
@@ -1770,8 +1773,8 @@ export default function CrmLayout() {
             --sidebar-text-muted: #94A3B8;
             --sidebar-text-active: #FFFFFF;
             --sidebar-border: rgba(255, 255, 255, 0.08);
-            --sidebar-hover-bg: rgba(255, 255, 255, 0.1);
-            --sidebar-hover-text: #FFFFFF;
+            --sidebar-hover-bg: rgba(255, 255, 255, 0.12);
+            --sidebar-hover-text: #F8FAFC;
             --sidebar-active-bg: rgba(59, 130, 246, 0.35);
             --sidebar-icon-color: #94A3B8;
             --sidebar-icon-hover: #F1F5F9;
@@ -2110,12 +2113,17 @@ export default function CrmLayout() {
 
           .crm-sidebar.collapsed .sidebar-toggle-wrapper {
             flex-direction: column;
-            padding: 12px 8px 16px;
+            padding: 8px 4px 12px;
+          }
+
+          .crm-sidebar.collapsed .sidebar-toggle-btn {
+            width: 34px;
+            height: 34px;
           }
 
           .crm-sidebar.collapsed .toggle-indicator {
-            width: 20px;
-            height: 4px;
+            width: 16px;
+            height: 3px;
           }
 
           /* ========== SIDEBAR COLLAPSED MODE ========== */
@@ -2164,10 +2172,10 @@ export default function CrmLayout() {
 
           .crm-sidebar.collapsed .nav-item {
             justify-content: center;
-            padding: 12px 10px;
-            border-radius: 10px;
-            margin: 3px 6px;
-            width: calc(100% - 12px);
+            padding: 10px 6px;
+            border-radius: 8px;
+            margin: 2px 4px;
+            width: calc(100% - 8px);
             background: transparent !important;
             box-shadow: none !important;
           }
@@ -2199,9 +2207,9 @@ export default function CrmLayout() {
             height: 26px;
           }
 
-          /* Collapsed active state - subtle box + vertical line + bright icon */
+          /* Collapsed active state - ONLY vertical line + bright icon (no background) */
           .crm-sidebar.collapsed .nav-item.active {
-            background: rgba(59, 130, 246, 0.12) !important;
+            background: transparent !important;
             box-shadow: none !important;
             position: relative;
           }
@@ -2223,17 +2231,22 @@ export default function CrmLayout() {
           }
 
           .crm-sidebar.collapsed .nav-item.active .nav-icon svg {
-            width: 26px;
-            height: 26px;
+            width: 24px;
+            height: 24px;
           }
 
-          /* Collapsed active + hover state */
+          /* Collapsed active + hover state - only show hover bg when hovering */
           .crm-sidebar.collapsed .nav-item.active:hover {
-            background: rgba(59, 130, 246, 0.2) !important;
+            background: rgba(59, 130, 246, 0.15) !important;
           }
 
           .crm-sidebar.collapsed .nav-item.active:hover .nav-icon {
             color: #93C5FD;
+          }
+
+          .crm-sidebar.collapsed .nav-item.active:hover .nav-icon svg {
+            width: 26px;
+            height: 26px;
           }
 
           .crm-sidebar.collapsed .nav-submenu {
