@@ -1769,15 +1769,15 @@ export default function CrmLayout() {
             --radius: 8px;
             --radius-lg: 12px;
             /* Dark sidebar colors - vibrant & readable */
-            --sidebar-text: #CBD5E1;
+            --sidebar-text: #E2E8F0;
             --sidebar-text-muted: #94A3B8;
             --sidebar-text-active: #FFFFFF;
             --sidebar-border: rgba(255, 255, 255, 0.08);
-            --sidebar-hover-bg: rgba(255, 255, 255, 0.12);
-            --sidebar-hover-text: #F8FAFC;
+            --sidebar-hover-bg: rgba(59, 130, 246, 0.18);
+            --sidebar-hover-text: #FFFFFF;
             --sidebar-active-bg: rgba(59, 130, 246, 0.35);
             --sidebar-icon-color: #94A3B8;
-            --sidebar-icon-hover: #F1F5F9;
+            --sidebar-icon-hover: #60A5FA;
             --sidebar-icon-active: #60A5FA;
             /* Z-index hierarchy (from theme-clic.css) */
             --z-base: 0;
@@ -2132,7 +2132,8 @@ export default function CrmLayout() {
           }
 
           .crm-sidebar.collapsed {
-            width: var(--sidebar-collapsed-width, 56px);
+            width: var(--sidebar-collapsed-width, 68px);
+            overflow-x: hidden;
           }
 
           .crm-sidebar.collapsed .brand-info,
@@ -2147,7 +2148,7 @@ export default function CrmLayout() {
           .crm-sidebar.collapsed .nav-section-title {
             height: 1px;
             padding: 0;
-            margin: 8px 10px;
+            margin: 8px 6px;
             background: var(--sidebar-border);
             font-size: 0;
             overflow: hidden;
@@ -2159,11 +2160,12 @@ export default function CrmLayout() {
 
           .crm-sidebar.collapsed .sidebar-brand {
             justify-content: center;
-            padding: 12px 6px;
+            padding: 12px 4px;
           }
 
           .crm-sidebar.collapsed .sidebar-nav {
             padding: 8px 4px;
+            overflow-x: hidden;
           }
 
           .crm-sidebar.collapsed .nav-section {
@@ -2277,7 +2279,7 @@ export default function CrmLayout() {
           /* ========== FLOATING SUBMENU (Collapsed Mode) ========== */
           .nav-floating-submenu {
             position: fixed;
-            left: calc(var(--sidebar-collapsed-width, 56px) + 8px);
+            left: calc(var(--sidebar-collapsed-width, 68px) + 8px);
             background: linear-gradient(180deg, #1E293B 0%, #0F172A 100%);
             border: 1px solid rgba(255, 255, 255, 0.1);
             border-radius: var(--radius-lg);
@@ -2385,8 +2387,8 @@ export default function CrmLayout() {
 
           /* Main content adjustment for collapsed sidebar */
           .crm-layout:has(.crm-sidebar.collapsed) .crm-main {
-            margin-left: var(--sidebar-collapsed-width, 56px);
-            max-width: calc(100vw - var(--sidebar-collapsed-width, 56px));
+            margin-left: var(--sidebar-collapsed-width, 68px);
+            max-width: calc(100vw - var(--sidebar-collapsed-width, 68px));
           }
 
           /* ========== MAIN AREA ========== */
