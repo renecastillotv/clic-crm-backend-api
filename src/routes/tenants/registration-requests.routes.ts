@@ -30,7 +30,7 @@ router.use(resolveUserScope);
  */
 router.get('/', async (req: Request, res: Response, next: NextFunction) => {
   try {
-    const { tenantId } = req.params as RouteParams;
+    const tenantId = req.scope?.tenantId || (req.params as RouteParams).tenantId;
     const { estado, tipo_solicitud, limit, offset } = req.query;
 
     console.log(`📋 GET registration-requests [tenant: ${tenantId}]`);
@@ -55,7 +55,7 @@ router.get('/', async (req: Request, res: Response, next: NextFunction) => {
  */
 router.get('/stats', async (req: Request, res: Response, next: NextFunction) => {
   try {
-    const { tenantId } = req.params as RouteParams;
+    const tenantId = req.scope?.tenantId || (req.params as RouteParams).tenantId;
 
     const counts = await getRequestsCountByStatus(tenantId);
 
@@ -75,7 +75,7 @@ router.get('/stats', async (req: Request, res: Response, next: NextFunction) => 
  */
 router.get('/:requestId', async (req: Request, res: Response, next: NextFunction) => {
   try {
-    const { tenantId } = req.params as RouteParams;
+    const tenantId = req.scope?.tenantId || (req.params as RouteParams).tenantId;
     const { requestId } = req.params;
 
     const request = await getRegistrationRequestById(requestId, tenantId);
@@ -99,7 +99,7 @@ router.get('/:requestId', async (req: Request, res: Response, next: NextFunction
  */
 router.patch('/:requestId', async (req: Request, res: Response, next: NextFunction) => {
   try {
-    const { tenantId } = req.params as RouteParams;
+    const tenantId = req.scope?.tenantId || (req.params as RouteParams).tenantId;
     const userId = req.scope?.dbUserId || '';
     const { requestId } = req.params;
     const { estado, accion_tomada, usuario_creado_id, notas_admin } = req.body;
@@ -132,7 +132,7 @@ router.patch('/:requestId', async (req: Request, res: Response, next: NextFuncti
  */
 router.post('/:requestId/mark-viewed', async (req: Request, res: Response, next: NextFunction) => {
   try {
-    const { tenantId } = req.params as RouteParams;
+    const tenantId = req.scope?.tenantId || (req.params as RouteParams).tenantId;
     const userId = req.scope?.dbUserId || '';
     const { requestId } = req.params;
 
@@ -157,7 +157,7 @@ router.post('/:requestId/mark-viewed', async (req: Request, res: Response, next:
  */
 router.post('/:requestId/approve', async (req: Request, res: Response, next: NextFunction) => {
   try {
-    const { tenantId } = req.params as RouteParams;
+    const tenantId = req.scope?.tenantId || (req.params as RouteParams).tenantId;
     const userId = req.scope?.dbUserId || '';
     const { requestId } = req.params;
     const { accion_tomada, notas_admin, usuario_creado_id } = req.body;
@@ -190,7 +190,7 @@ router.post('/:requestId/approve', async (req: Request, res: Response, next: Nex
  */
 router.post('/:requestId/reject', async (req: Request, res: Response, next: NextFunction) => {
   try {
-    const { tenantId } = req.params as RouteParams;
+    const tenantId = req.scope?.tenantId || (req.params as RouteParams).tenantId;
     const userId = req.scope?.dbUserId || '';
     const { requestId } = req.params;
     const { notas_admin } = req.body;
@@ -222,7 +222,7 @@ router.post('/:requestId/reject', async (req: Request, res: Response, next: Next
  */
 router.delete('/:requestId', async (req: Request, res: Response, next: NextFunction) => {
   try {
-    const { tenantId } = req.params as RouteParams;
+    const tenantId = req.scope?.tenantId || (req.params as RouteParams).tenantId;
     const { requestId } = req.params;
 
     const deleted = await deleteRegistrationRequest(requestId, tenantId);
