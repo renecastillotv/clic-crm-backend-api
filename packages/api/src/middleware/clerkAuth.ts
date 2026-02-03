@@ -135,6 +135,21 @@ export async function getClerkUser(userId: string) {
 }
 
 /**
+ * Buscar usuario de Clerk por email
+ */
+export async function getClerkUserByEmail(email: string) {
+  try {
+    const users = await clerkClient.users.getUserList({
+      emailAddress: [email],
+    });
+    return users.data[0] || null;
+  } catch (error) {
+    console.error('Error al buscar usuario en Clerk por email:', error);
+    return null;
+  }
+}
+
+/**
  * Crear usuario en Clerk con contraseña y email pre-verificado
  * El admin puede crear usuarios con contraseña temporal que pueden loguearse inmediatamente
  */
