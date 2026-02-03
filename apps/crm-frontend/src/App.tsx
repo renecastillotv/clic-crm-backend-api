@@ -23,6 +23,11 @@ import VerificarCertificado from './pages/VerificarCertificado';
 // Páginas de autenticación
 import LoginPage from './pages/auth/LoginPage';
 import SignupPage from './pages/auth/SignupPage';
+import TenantLoginPage from './pages/auth/TenantLoginPage';
+import TenantSignupPage from './pages/auth/TenantSignupPage';
+
+// Landing de Tenant
+import TenantLandingPage from './pages/TenantLandingPage';
 
 // Páginas Admin
 import AdminDashboard from './pages/admin/AdminDashboard';
@@ -475,6 +480,12 @@ function AppRoutes() {
       <Route path="/tenants/*" element={<Navigate to="/dashboard" replace />} />
       <Route path="/platform/*" element={<Navigate to="/admin" replace />} />
       <Route path="/saas" element={<Navigate to="/" replace />} />
+
+      {/* ========== LANDING PAGES POR TENANT ========== */}
+      {/* Estas rutas deben ir DESPUÉS de las rutas específicas pero ANTES del 404 */}
+      <Route path="/:tenantSlug" element={<TenantLandingPage />} />
+      <Route path="/:tenantSlug/login/*" element={<TenantLoginPage />} />
+      <Route path="/:tenantSlug/registro" element={<TenantSignupPage />} />
 
       {/* ========== 404 ========== */}
       <Route path="*" element={<NotFound />} />

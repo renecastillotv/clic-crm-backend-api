@@ -1,0 +1,215 @@
+.tenant-landing {
+  min-height: 100vh;
+  background: linear-gradient(135deg, #0f172a 0%, #1e293b 50%, #334155 100%);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 2rem;
+}
+
+.tenant-landing-content {
+  text-align: center;
+  max-width: 480px;
+  width: 100%;
+}
+
+/* Logo */
+.tenant-logo-container {
+  margin-bottom: 2rem;
+}
+
+.tenant-logo {
+  max-width: 180px;
+  max-height: 120px;
+  width: auto;
+  height: auto;
+  object-fit: contain;
+  filter: drop-shadow(0 4px 12px rgba(0, 0, 0, 0.3));
+}
+
+/* Nombre y slogan */
+.tenant-name {
+  font-size: 2.5rem;
+  font-weight: 700;
+  color: #ffffff;
+  margin: 0 0 0.75rem 0;
+  letter-spacing: -0.02em;
+}
+
+.tenant-slogan {
+  font-size: 1.125rem;
+  color: rgba(255, 255, 255, 0.7);
+  margin: 0 0 2.5rem 0;
+  line-height: 1.5;
+}
+
+/* Botones */
+.tenant-actions {
+  display: flex;
+  flex-direction: column;
+  gap: 1rem;
+  margin-bottom: 2.5rem;
+}
+
+.tenant-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: 1rem 2rem;
+  border-radius: 12px;
+  font-size: 1rem;
+  font-weight: 600;
+  text-decoration: none;
+  transition: all 0.2s ease;
+  cursor: pointer;
+  border: none;
+}
+
+.tenant-btn-primary {
+  background: #ffffff;
+  color: #0f172a;
+}
+
+.tenant-btn-primary:hover {
+  background: #f1f5f9;
+  transform: translateY(-2px);
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.25);
+}
+
+.tenant-btn-secondary {
+  background: transparent;
+  color: #ffffff;
+  border: 2px solid rgba(255, 255, 255, 0.3);
+}
+
+.tenant-btn-secondary:hover {
+  background: rgba(255, 255, 255, 0.1);
+  border-color: rgba(255, 255, 255, 0.5);
+  transform: translateY(-2px);
+}
+
+/* Contacto */
+.tenant-contact {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 1rem;
+  justify-content: center;
+  margin-bottom: 1.5rem;
+}
+
+.tenant-contact-item {
+  color: rgba(255, 255, 255, 0.6);
+  font-size: 0.875rem;
+  text-decoration: none;
+  transition: color 0.2s ease;
+}
+
+.tenant-contact-item:hover {
+  color: #ffffff;
+}
+
+/* Redes sociales */
+.tenant-social {
+  display: flex;
+  gap: 1rem;
+  justify-content: center;
+}
+
+.tenant-social-link {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 44px;
+  height: 44px;
+  border-radius: 50%;
+  background: rgba(255, 255, 255, 0.1);
+  color: rgba(255, 255, 255, 0.7);
+  transition: all 0.2s ease;
+}
+
+.tenant-social-link:hover {
+  background: rgba(255, 255, 255, 0.2);
+  color: #ffffff;
+  transform: translateY(-2px);
+}
+
+/* Loading */
+.tenant-loading {
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  min-height: 200px;
+}
+
+.loading-spinner {
+  width: 48px;
+  height: 48px;
+  border: 3px solid rgba(255, 255, 255, 0.1);
+  border-top-color: #ffffff;
+  border-radius: 50%;
+  animation: spin 1s linear infinite;
+}
+
+@keyframes spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+/* Error states */
+.tenant-landing-error {
+  background: linear-gradient(135deg, #1e293b 0%, #0f172a 100%);
+}
+
+.tenant-error-icon {
+  font-size: 4rem;
+  margin-bottom: 1.5rem;
+}
+
+.tenant-landing-error h1 {
+  font-size: 2rem;
+  color: #ffffff;
+  margin: 0 0 0.75rem 0;
+}
+
+.tenant-landing-error p {
+  color: rgba(255, 255, 255, 0.6);
+  margin: 0 0 2rem 0;
+}
+
+/* Responsive */
+@media (max-width: 640px) {
+  .tenant-landing {
+    padding: 1.5rem;
+  }
+
+  .tenant-logo {
+    max-width: 140px;
+    max-height: 100px;
+  }
+
+  .tenant-name {
+    font-size: 2rem;
+  }
+
+  .tenant-slogan {
+    font-size: 1rem;
+  }
+
+  .tenant-btn {
+    padding: 0.875rem 1.5rem;
+    font-size: 0.9375rem;
+  }
+}
+
+/* Tablet and up - horizontal buttons */
+@media (min-width: 480px) {
+  .tenant-actions {
+    flex-direction: row;
+    justify-content: center;
+  }
+
+  .tenant-btn {
+    min-width: 180px;
+  }
+}
