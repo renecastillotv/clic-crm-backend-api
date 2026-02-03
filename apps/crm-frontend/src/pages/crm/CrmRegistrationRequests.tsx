@@ -8,7 +8,7 @@ import { useState, useEffect } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { useAuth } from '@clerk/clerk-react';
 import { Eye, Check, X, Trash2, User, Mail, Phone, Calendar, FileText, Filter, UserPlus, ArrowLeft } from 'lucide-react';
-import { usePageHeader } from '../../contexts/PageHeaderContext';
+import { usePageHeader } from '../../layouts/CrmLayout';
 import { getRolesTenant, createUsuarioTenant, RolTenant } from '../../services/api';
 import { useAuth as useAuthContext } from '../../contexts/AuthContext';
 import Modal from '../../components/Modal';
