@@ -1735,6 +1735,8 @@ export default function CrmLayout() {
           .nav-icon svg {
             width: 18px;
             height: 18px;
+            /* Phosphor Icons usan currentColor - asegurar herencia */
+            color: inherit !important;
           }
 
           .nav-label {
@@ -1856,6 +1858,7 @@ export default function CrmLayout() {
           .nav-subitem .nav-icon svg {
             width: 14px;
             height: 14px;
+            color: inherit !important;
           }
 
           .nav-subitem.active .nav-icon {
@@ -1985,6 +1988,7 @@ export default function CrmLayout() {
             width: 22px;
             height: 22px;
             transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+            color: inherit !important;
           }
 
           /* Collapsed hover state - glow effect */
