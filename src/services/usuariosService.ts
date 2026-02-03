@@ -5,7 +5,7 @@
  */
 
 import { query } from '../utils/db.js';
-import { createClerkUser, createClerkUserWithoutPassword, deactivateClerkUser, reactivateClerkUser } from '../middleware/clerkAuth.js';
+import { createClerkUser, createClerkUserWithoutPassword, deactivateClerkUser, reactivateClerkUser, getClerkUserByEmail } from '../middleware/clerkAuth.js';
 import { v4 as uuidv4 } from 'uuid';
 import { registrarUsuarioCreado, registrarUsuarioEliminado } from './usageTrackingService.js';
 
@@ -797,9 +797,32 @@ export async function agregarUsuarioATenant(
         console.log(`✅ Usuario creado en Clerk SIN contraseña: ${data.email} (ID: ${clerkId})`);
       }
     } catch (clerkError: any) {
-      // Si falla Clerk, verificar si el usuario ya existe en Clerk
-      console.error(`⚠️ Error creando usuario en Clerk: ${clerkError.message}`);
-      // Continuamos sin clerk_id - el usuario podrá sincronizarse después
+      const errorMessage = clerkError.message || '';
+      console.error(`⚠️ Error creando usuario en Clerk: ${errorMessage}`);
+
+      // Verificar si el error es porque el email ya existe en Clerk
+      const isEmailTaken = errorMessage.toLowerCase().includes('email') &&
+        (errorMessage.toLowerCase().includes('taken') ||
+         errorMessage.toLowerCase().includes('already') ||
+         errorMessage.toLowerCase().includes('existe') ||
+         errorMessage.toLowerCase().includes('unique'));
+
+      if (isEmailTaken) {
+        // Intentar encontrar el usuario existente en Clerk
+        console.log(`🔍 Buscando usuario existente en Clerk: ${data.email}`);
+        const existingClerkUser = await getClerkUserByEmail(data.email);
+
+        if (existingClerkUser) {
+          clerkId = existingClerkUser.id;
+          console.log(`✅ Usuario encontrado en Clerk: ${data.email} (ID: ${clerkId})`);
+        } else {
+          // El email existe en Clerk pero no podemos obtener el usuario
+          throw new Error(`El email ${data.email} ya está registrado en el sistema de autenticación. El usuario debe iniciar sesión con su cuenta existente.`);
+        }
+      } else {
+        // Otro error de Clerk - notificar al usuario
+        throw new Error(`Error al crear usuario: ${errorMessage}`);
+      }
     }
 
     const insertSql = `
