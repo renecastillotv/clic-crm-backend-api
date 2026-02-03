@@ -1187,7 +1187,7 @@ export default function CrmLayout() {
                   }
                 }}
               >
-                <span className="nav-icon">{Icons.fases}</span>
+                <span className="nav-icon">{Icons.productividad}</span>
                 <span className="nav-label">Rendimiento</span>
                 <span className={`nav-chevron ${sistemaFasesOpen ? 'open' : ''}`}>
                   {Icons.chevronDown}
