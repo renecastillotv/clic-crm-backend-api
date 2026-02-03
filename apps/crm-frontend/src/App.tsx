@@ -99,6 +99,7 @@ import CrmContenido from './pages/crm/CrmContenido';
 import CrmClicConnect from './pages/crm/CrmClicConnect';
 import CrmClicConnectSolicitudes from './pages/crm/CrmClicConnectSolicitudes';
 import CrmClicConnectUpgradeRequests from './pages/crm/CrmClicConnectUpgradeRequests';
+import CrmRegistrationRequests from './pages/crm/CrmRegistrationRequests';
 
 // Páginas de University
 import CrmUniversity from './pages/crm/CrmUniversity';
@@ -362,6 +363,9 @@ function AppRoutes() {
         <Route path="clic-connect" element={<CrmClicConnect />} />
         <Route path="clic-connect/solicitudes" element={<CrmClicConnectSolicitudes />} />
         <Route path="clic-connect/upgrade-requests" element={<CrmClicConnectUpgradeRequests />} />
+
+        {/* Solicitudes de Registro (público) */}
+        <Route path="registration-requests" element={<CrmRegistrationRequests />} />
 
         {/* University */}
         <Route path="university" element={<CrmUniversity />} />

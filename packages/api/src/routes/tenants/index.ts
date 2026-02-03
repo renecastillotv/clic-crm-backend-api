@@ -51,6 +51,7 @@ import componentesRouter from './componentes.routes.js';
 import clicConnectRouter from './clic-connect.routes.js';
 import joinRequestsRouter from './join-requests.routes.js';
 import upgradeRequestsRouter from './upgrade-requests.routes.js';
+import registrationRequestsRouter from './registration-requests.routes.js';
 
 // Importar sub-routers modulares - Rutas específicas del tenant
 import amenidadesRouter from './amenidades.routes.js';
@@ -133,6 +134,9 @@ router.use('/:tenantId/join-requests', joinRequestsRouter);
 
 // Upgrade Requests Module (CLIC Connect solicitudes de upgrade)
 router.use('/:tenantId/upgrade-requests', upgradeRequestsRouter);
+
+// Registration Requests Module (solicitudes de registro públicas)
+router.use('/:tenantId/registration-requests', registrationRequestsRouter);
 
 // University Module (cursos, videos, certificados)
 router.use('/:tenantId/university', universityRouter);

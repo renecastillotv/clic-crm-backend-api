@@ -10,7 +10,10 @@
 import express, { Request, Response, NextFunction } from 'express';
 import { query } from '../utils/db.js';
 import { getTenantBySlug } from '../services/tenantsService.js';
-import { createJoinRequest } from '../services/clicConnectSolicitudesService.js';
+import {
+  createRegistrationRequest,
+  checkDuplicateRequest,
+} from '../services/registrationRequestsService.js';
 
 const router = express.Router();
 
@@ -78,17 +81,27 @@ router.get('/tenants/:slug', async (req: Request, res: Response, next: NextFunct
 });
 
 /**
- * POST /api/public/tenants/:slug/join-request
+ * POST /api/public/tenants/:slug/registro
  *
- * Crea una solicitud para unirse a un tenant.
+ * Crea una solicitud de registro para un tenant.
+ * Soporta diferentes tipos de solicitud según el tenant.
  * No requiere autenticación.
  */
-router.post('/tenants/:slug/join-request', async (req: Request, res: Response, next: NextFunction) => {
+router.post('/tenants/:slug/registro', async (req: Request, res: Response, next: NextFunction) => {
   try {
     const { slug } = req.params;
-    const { nombre, apellido, email, telefono, motivacion } = req.body;
+    const {
+      nombre,
+      apellido,
+      email,
+      telefono,
+      tipo_solicitud = 'usuario',
+      datos_adicionales = {},
+      // Campos legacy para compatibilidad
+      motivacion,
+    } = req.body;
 
-    console.log(`🌐 POST /api/public/tenants/${slug}/join-request`);
+    console.log(`🌐 POST /api/public/tenants/${slug}/registro [tipo: ${tipo_solicitud}]`);
 
     // Validar campos requeridos
     if (!nombre || !email) {
@@ -117,38 +130,104 @@ router.post('/tenants/:slug/join-request', async (req: Request, res: Response, n
       });
     }
 
-    // Verificar si ya existe una solicitud pendiente con este email para este tenant
-    const existingRequest = await query(
-      `SELECT id, estado FROM clic_connect_join_requests
-       WHERE tenant_id = $1 AND email = $2 AND estado = 'pending'`,
-      [tenant.id, email.toLowerCase()]
+    // Verificar si ya existe una solicitud pendiente
+    const existingRequest = await checkDuplicateRequest(
+      tenant.id,
+      email,
+      tipo_solicitud
     );
 
-    if (existingRequest.rows.length > 0) {
+    if (existingRequest) {
       return res.status(409).json({
         error: 'Solicitud duplicada',
         message: 'Ya existe una solicitud pendiente con este email. Te contactaremos pronto.',
       });
     }
 
-    // Crear la solicitud usando el servicio existente
-    const joinRequest = await createJoinRequest(tenant.id, {
+    // Preparar datos del formulario (incluir motivación si viene del form legacy)
+    const datosFormulario = {
+      ...datos_adicionales,
+      ...(motivacion && { motivacion }),
+    };
+
+    // Crear la solicitud
+    const request = await createRegistrationRequest(tenant.id, {
       nombre,
-      apellido: apellido || undefined,
-      email: email.toLowerCase(),
-      telefono: telefono || undefined,
-      motivacion: motivacion || undefined,
+      apellido,
+      email,
+      telefono,
+      tipo_solicitud,
+      datos_formulario: datosFormulario,
     });
 
-    console.log(`✅ Solicitud de acceso creada: ${joinRequest.id}`);
+    console.log(`✅ Solicitud de registro creada: ${request.id} [tipo: ${tipo_solicitud}]`);
 
     res.status(201).json({
       success: true,
       message: 'Tu solicitud ha sido enviada. El administrador te contactará pronto.',
-      requestId: joinRequest.id,
+      requestId: request.id,
     });
   } catch (error) {
-    console.error('❌ Error en POST /api/public/tenants/:slug/join-request:', error);
+    console.error('❌ Error en POST /api/public/tenants/:slug/registro:', error);
+    next(error);
+  }
+});
+
+// Alias para compatibilidad con el endpoint anterior
+router.post('/tenants/:slug/join-request', async (req: Request, res: Response, next: NextFunction) => {
+  // Redirigir internamente al nuevo endpoint
+  req.url = req.url.replace('/join-request', '/registro');
+  req.body.tipo_solicitud = req.body.tipo_solicitud || 'usuario';
+
+  // Forward to the registro handler
+  const { slug } = req.params;
+  const {
+    nombre,
+    apellido,
+    email,
+    telefono,
+    motivacion,
+  } = req.body;
+
+  try {
+    const tenant = await getTenantBySlug(slug);
+    if (!tenant) {
+      return res.status(404).json({
+        error: 'Tenant no encontrado',
+        message: `No existe un tenant con el slug "${slug}"`,
+      });
+    }
+
+    if (!nombre || !email) {
+      return res.status(400).json({
+        error: 'Campos requeridos faltantes',
+        message: 'Se requiere nombre y email',
+      });
+    }
+
+    const existingRequest = await checkDuplicateRequest(tenant.id, email, 'usuario');
+    if (existingRequest) {
+      return res.status(409).json({
+        error: 'Solicitud duplicada',
+        message: 'Ya existe una solicitud pendiente con este email.',
+      });
+    }
+
+    const request = await createRegistrationRequest(tenant.id, {
+      nombre,
+      apellido,
+      email,
+      telefono,
+      tipo_solicitud: 'usuario',
+      datos_formulario: motivacion ? { motivacion } : {},
+    });
+
+    res.status(201).json({
+      success: true,
+      message: 'Tu solicitud ha sido enviada. El administrador te contactará pronto.',
+      requestId: request.id,
+    });
+  } catch (error) {
     next(error);
   }
 });
