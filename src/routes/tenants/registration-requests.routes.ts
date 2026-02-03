@@ -72,13 +72,14 @@ router.use(async (req: Request, res: Response, next: NextFunction) => {
 router.get('/', async (req: Request, res: Response, next: NextFunction) => {
   try {
     const tenantId = (req as any).resolvedTenantId;
-    const { estado, tipo_solicitud, limit, offset } = req.query;
+    const { estado, tipo_solicitud, busqueda, limit, offset } = req.query;
 
-    console.log(`📋 GET registration-requests [tenant: ${tenantId}]`);
+    console.log(`📋 GET registration-requests [tenant: ${tenantId}] [busqueda: ${busqueda || 'none'}]`);
 
     const result = await getRegistrationRequests(tenantId, {
       estado: estado as string,
       tipo_solicitud: tipo_solicitud as string,
+      busqueda: busqueda as string,
       limit: limit ? parseInt(limit as string, 10) : undefined,
       offset: offset ? parseInt(offset as string, 10) : undefined,
     });
