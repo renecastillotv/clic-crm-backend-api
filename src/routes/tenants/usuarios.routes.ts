@@ -54,7 +54,7 @@ router.get('/', async (req, res, next) => {
       limit: limit ? parseInt(limit as string) : 50,
     };
 
-    const resultado = await getUsuariosByTenant(tenantId);
+    const resultado = await getUsuariosByTenant(tenantId, filtros);
     res.json(resultado);
   } catch (error) {
     next(error);

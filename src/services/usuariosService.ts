@@ -572,7 +572,38 @@ export interface UsuarioDocumento {
   updatedAt: string;
 }
 
-export async function getUsuariosByTenant(tenantId: string): Promise<UsuarioTenant[]> {
+export interface UsuariosFiltros {
+  activo?: boolean;
+  rol_id?: string;
+  equipo_id?: string;
+  oficina_id?: string;
+  busqueda?: string;
+  page?: number;
+  limit?: number;
+}
+
+export async function getUsuariosByTenant(tenantId: string, filtros?: UsuariosFiltros): Promise<UsuarioTenant[]> {
+  // Construir condiciones dinámicas
+  const conditions: string[] = ['ut.tenant_id = $1'];
+  const params: any[] = [tenantId];
+  let paramIndex = 2;
+
+  // Filtro de activo - si no se especifica, mostrar todos; si se especifica, filtrar
+  if (filtros?.activo === true) {
+    conditions.push('ut.activo = true');
+    conditions.push('u.activo = true');
+  } else if (filtros?.activo === false) {
+    conditions.push('(ut.activo = false OR u.activo = false)');
+  }
+  // Si filtros?.activo es undefined, no agregamos filtro de activo (muestra todos)
+
+  // Filtro de búsqueda
+  if (filtros?.busqueda) {
+    conditions.push(`(u.email ILIKE $${paramIndex} OR u.nombre ILIKE $${paramIndex} OR u.apellido ILIKE $${paramIndex})`);
+    params.push(`%${filtros.busqueda}%`);
+    paramIndex++;
+  }
+
   const sql = `
     SELECT
       u.id,
@@ -602,14 +633,28 @@ export async function getUsuariosByTenant(tenantId: string): Promise<UsuarioTena
     FROM usuarios_tenants ut
     JOIN usuarios u ON ut.usuario_id = u.id
     LEFT JOIN perfiles_asesor pa ON pa.usuario_id = u.id AND pa.tenant_id = ut.tenant_id
-    WHERE ut.tenant_id = $1
-      AND ut.activo = true
-      AND u.activo = true
+    WHERE ${conditions.join(' AND ')}
     ORDER BY ut.created_at DESC
   `;
 
-  const result = await query(sql, [tenantId]);
-  const usuarios = result.rows;
+  const result = await query(sql, params);
+  let usuarios = result.rows;
+
+  // Filtro de rol (post-query para evitar complejidad de JOINs)
+  if (filtros?.rol_id) {
+    const usuariosConRolFiltrado: any[] = [];
+    for (const usuario of usuarios) {
+      const checkRolSql = `
+        SELECT 1 FROM usuarios_roles ur
+        WHERE ur.usuario_id = $1 AND ur.tenant_id = $2 AND ur.rol_id = $3 AND ur.activo = true
+      `;
+      const checkResult = await query(checkRolSql, [usuario.id, tenantId, filtros.rol_id]);
+      if (checkResult.rows.length > 0) {
+        usuariosConRolFiltrado.push(usuario);
+      }
+    }
+    usuarios = usuariosConRolFiltrado;
+  }
 
   // Obtener roles para cada usuario
   const usuariosConRoles = await Promise.all(
