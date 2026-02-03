@@ -6,6 +6,9 @@
  * - /login, /signup → Autenticación con Clerk
  * - /admin/* → Panel de administración de la plataforma (solo platform admins)
  * - /crm/:tenantSlug/* → CRM de cada tenant
+ * - /:tenantSlug → Landing personalizada del tenant
+ * - /:tenantSlug/login → Login con branding del tenant
+ * - /:tenantSlug/registro → Solicitud de acceso al tenant
  */
 
 import { BrowserRouter as Router, Routes, Route, Navigate } from 'react-router-dom';
