@@ -3729,12 +3729,37 @@ export interface UsuarioTenant {
 }
 
 /**
+ * Filtros para listar usuarios
+ */
+export interface UsuariosFiltros {
+  activo?: boolean;
+  rol_id?: string;
+  busqueda?: string;
+}
+
+/**
  * Obtiene los usuarios de un tenant
  * @param tenantId - ID del tenant
  * @param token - Token de autenticación opcional
+ * @param filtros - Filtros opcionales (activo, rol_id, busqueda)
  */
-export async function getUsuariosTenant(tenantId: string, token?: string | null): Promise<UsuarioTenant[]> {
-  const response = await apiFetch(`/tenants/${tenantId}/usuarios`, {}, token);
+export async function getUsuariosTenant(tenantId: string, token?: string | null, filtros?: UsuariosFiltros): Promise<UsuarioTenant[]> {
+  // Construir query params desde filtros
+  const params = new URLSearchParams();
+  if (filtros?.activo !== undefined) {
+    params.append('activo', filtros.activo.toString());
+  }
+  if (filtros?.rol_id) {
+    params.append('rol_id', filtros.rol_id);
+  }
+  if (filtros?.busqueda) {
+    params.append('busqueda', filtros.busqueda);
+  }
+
+  const queryString = params.toString();
+  const url = `/tenants/${tenantId}/usuarios${queryString ? `?${queryString}` : ''}`;
+
+  const response = await apiFetch(url, {}, token);
   const data = await response.json();
   return data.usuarios || data || [];
 }
