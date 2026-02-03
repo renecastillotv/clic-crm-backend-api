@@ -14,6 +14,7 @@ import {
   deleteRegistrationRequest,
 } from '../../services/registrationRequestsService.js';
 import { resolveUserScope } from '../../middleware/scopeResolver.js';
+import { query } from '../../utils/db.js';
 
 interface RouteParams {
   [key: string]: string | undefined;
@@ -21,8 +22,48 @@ interface RouteParams {
   requestId?: string;
 }
 
+// UUID regex pattern
+const UUID_REGEX = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+
 const router = express.Router({ mergeParams: true });
 router.use(resolveUserScope);
+
+/**
+ * Middleware to resolve tenant slug to UUID
+ * If tenantId is already a UUID, use it as-is
+ * If it's a slug, query the database to get the UUID
+ */
+router.use(async (req: Request, res: Response, next: NextFunction) => {
+  try {
+    let tenantId = req.scope?.tenantId || (req.params as RouteParams).tenantId;
+
+    // If not a UUID, it's a slug - resolve it
+    if (tenantId && !UUID_REGEX.test(tenantId)) {
+      const result = await query(
+        'SELECT id FROM tenants WHERE slug = $1',
+        [tenantId]
+      );
+
+      if (result.rows.length === 0) {
+        return res.status(404).json({
+          error: 'Tenant no encontrado',
+          message: `No existe un tenant con el slug "${tenantId}"`,
+        });
+      }
+
+      // Store resolved UUID for use in routes
+      (req as any).resolvedTenantId = result.rows[0].id;
+      console.log(`🔄 Resolved tenant slug "${tenantId}" to UUID "${result.rows[0].id}"`);
+    } else {
+      (req as any).resolvedTenantId = tenantId;
+    }
+
+    next();
+  } catch (error) {
+    console.error('❌ Error resolving tenant:', error);
+    next(error);
+  }
+});
 
 /**
  * GET /api/tenants/:tenantId/registration-requests
@@ -30,7 +71,7 @@ router.use(resolveUserScope);
  */
 router.get('/', async (req: Request, res: Response, next: NextFunction) => {
   try {
-    const tenantId = req.scope?.tenantId || (req.params as RouteParams).tenantId;
+    const tenantId = (req as any).resolvedTenantId;
     const { estado, tipo_solicitud, limit, offset } = req.query;
 
     console.log(`📋 GET registration-requests [tenant: ${tenantId}]`);
@@ -55,7 +96,7 @@ router.get('/', async (req: Request, res: Response, next: NextFunction) => {
  */
 router.get('/stats', async (req: Request, res: Response, next: NextFunction) => {
   try {
-    const tenantId = req.scope?.tenantId || (req.params as RouteParams).tenantId;
+    const tenantId = (req as any).resolvedTenantId;
 
     const counts = await getRequestsCountByStatus(tenantId);
 
@@ -75,7 +116,7 @@ router.get('/stats', async (req: Request, res: Response, next: NextFunction) => 
  */
 router.get('/:requestId', async (req: Request, res: Response, next: NextFunction) => {
   try {
-    const tenantId = req.scope?.tenantId || (req.params as RouteParams).tenantId;
+    const tenantId = (req as any).resolvedTenantId;
     const { requestId } = req.params;
 
     const request = await getRegistrationRequestById(requestId, tenantId);
@@ -99,7 +140,7 @@ router.get('/:requestId', async (req: Request, res: Response, next: NextFunction
  */
 router.patch('/:requestId', async (req: Request, res: Response, next: NextFunction) => {
   try {
-    const tenantId = req.scope?.tenantId || (req.params as RouteParams).tenantId;
+    const tenantId = (req as any).resolvedTenantId;
     const userId = req.scope?.dbUserId || '';
     const { requestId } = req.params;
     const { estado, accion_tomada, usuario_creado_id, notas_admin } = req.body;
@@ -132,7 +173,7 @@ router.patch('/:requestId', async (req: Request, res: Response, next: NextFuncti
  */
 router.post('/:requestId/mark-viewed', async (req: Request, res: Response, next: NextFunction) => {
   try {
-    const tenantId = req.scope?.tenantId || (req.params as RouteParams).tenantId;
+    const tenantId = (req as any).resolvedTenantId;
     const userId = req.scope?.dbUserId || '';
     const { requestId } = req.params;
 
@@ -157,7 +198,7 @@ router.post('/:requestId/mark-viewed', async (req: Request, res: Response, next:
  */
 router.post('/:requestId/approve', async (req: Request, res: Response, next: NextFunction) => {
   try {
-    const tenantId = req.scope?.tenantId || (req.params as RouteParams).tenantId;
+    const tenantId = (req as any).resolvedTenantId;
     const userId = req.scope?.dbUserId || '';
     const { requestId } = req.params;
     const { accion_tomada, notas_admin, usuario_creado_id } = req.body;
@@ -190,7 +231,7 @@ router.post('/:requestId/approve', async (req: Request, res: Response, next: Nex
  */
 router.post('/:requestId/reject', async (req: Request, res: Response, next: NextFunction) => {
   try {
-    const tenantId = req.scope?.tenantId || (req.params as RouteParams).tenantId;
+    const tenantId = (req as any).resolvedTenantId;
     const userId = req.scope?.dbUserId || '';
     const { requestId } = req.params;
     const { notas_admin } = req.body;
@@ -222,7 +263,7 @@ router.post('/:requestId/reject', async (req: Request, res: Response, next: Next
  */
 router.delete('/:requestId', async (req: Request, res: Response, next: NextFunction) => {
   try {
-    const tenantId = req.scope?.tenantId || (req.params as RouteParams).tenantId;
+    const tenantId = (req as any).resolvedTenantId;
     const { requestId } = req.params;
 
     const deleted = await deleteRegistrationRequest(requestId, tenantId);
