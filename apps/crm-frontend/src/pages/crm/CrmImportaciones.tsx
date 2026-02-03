@@ -278,7 +278,7 @@ export default function CrmImportaciones() {
   }
 
   return (
-    <div style={{ maxWidth: '1200px', margin: '0 auto' }}>
+    <div style={{ padding: '0' }}>
       {/* Estadísticas rápidas */}
       <div style={{
         display: 'grid',

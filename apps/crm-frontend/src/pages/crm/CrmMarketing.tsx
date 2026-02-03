@@ -159,7 +159,7 @@ const CrmMarketing: React.FC = () => {
   ];
 
   return (
-    <div style={{ padding: '24px', maxWidth: '1200px' }}>
+    <div style={{ padding: '24px' }}>
       {/* KPI Stats */}
       <div
         style={{

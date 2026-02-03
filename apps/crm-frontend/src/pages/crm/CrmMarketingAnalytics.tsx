@@ -412,7 +412,7 @@ const CrmMarketingAnalytics: React.FC = () => {
 
   // ==================== RENDER: CONNECTED DASHBOARD ====================
   return (
-    <div style={{ padding: '24px', maxWidth: '1200px' }}>
+    <div style={{ padding: '24px' }}>
       {/* Header with date range selector */}
       <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '24px', flexWrap: 'wrap', gap: '16px' }}>
         <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>

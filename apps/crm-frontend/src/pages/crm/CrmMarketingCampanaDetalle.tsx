@@ -214,7 +214,7 @@ const CrmMarketingCampanaDetalle: React.FC = () => {
   const typeLabel = campaign ? (TYPE_LABELS[campaign.type] || campaign.type) : '';
 
   return (
-    <div style={{ padding: '24px', maxWidth: '1200px' }}>
+    <div style={{ padding: '24px' }}>
       {/* Campaign info header */}
       {campaign && (
         <div
