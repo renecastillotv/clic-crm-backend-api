@@ -390,7 +390,8 @@ function AppRoutes() {
         <Route path="documentos/generados" element={<Navigate to="../documentos" replace />} />
 
         {/* Marketing Centro */}
-        <Route path="marketing" element={<CrmMarketing />} />
+        <Route path="marketing/centro" element={<CrmMarketing />} />
+        <Route path="marketing" element={<Navigate to="marketing/centro" replace />} />
 
         {/* Creativos - wrapper con Outlet */}
         <Route path="marketing/creativos" element={<CrmMarketingCreativos />}>
