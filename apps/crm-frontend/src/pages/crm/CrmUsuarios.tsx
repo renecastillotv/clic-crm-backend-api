@@ -8,7 +8,7 @@
  * - Solo visible para admins del tenant
  */
 
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useRef } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { useAuth } from '../../contexts/AuthContext';
 import { useAuth as useClerkAuth } from '@clerk/clerk-react';
@@ -152,6 +152,8 @@ export default function CrmUsuarios() {
   const [confirmPassword, setConfirmPassword] = useState('');
   const [showPassword, setShowPassword] = useState(false);
   const [savingPassword, setSavingPassword] = useState(false);
+  // Ref para guardar el valor del buscador antes de abrir modales (evitar autocomplete del navegador)
+  const searchValueBeforeModal = useRef<string>('');
   const [togglingStatus, setTogglingStatus] = useState<string | null>(null);
   const [togglingVisibility, setTogglingVisibility] = useState<string | null>(null);
   const [successMessage, setSuccessMessage] = useState<string | null>(null);
@@ -353,12 +355,22 @@ export default function CrmUsuarios() {
     }
   };
 
+  // Abrir modal de contraseña guardando el estado del buscador
+  const openPasswordModal = (userId: string, userName: string) => {
+    searchValueBeforeModal.current = busqueda;
+    setPasswordModal({ userId, userName });
+  };
+
   // Cerrar modal de contraseña y limpiar estados
   const closePasswordModal = () => {
     setPasswordModal(null);
     setNewPassword('');
     setConfirmPassword('');
     setShowPassword(false);
+    // Restaurar el valor del buscador (el navegador puede haberlo sobreescrito con autocomplete)
+    setTimeout(() => {
+      setBusqueda(searchValueBeforeModal.current);
+    }, 0);
   };
 
   // Formatear nombre completo
@@ -568,7 +580,7 @@ export default function CrmUsuarios() {
                       </button>
                       <button
                         className="action-btn"
-                        onClick={() => setPasswordModal({ userId: usuario.id, userName: getNombreCompleto(usuario) })}
+                        onClick={() => openPasswordModal(usuario.id, getNombreCompleto(usuario))}
                         title="Cambiar contraseña"
                       >
                         <Icons.key />
@@ -687,7 +699,7 @@ export default function CrmUsuarios() {
                 </button>
                 <button
                   className="action-btn"
-                  onClick={() => setPasswordModal({ userId: usuario.id, userName: getNombreCompleto(usuario) })}
+                  onClick={() => openPasswordModal(usuario.id, getNombreCompleto(usuario))}
                   title="Cambiar contraseña"
                 >
                   <Icons.key />
@@ -764,67 +776,75 @@ export default function CrmUsuarios() {
       {passwordModal && (
         <div className="modal-overlay" onClick={closePasswordModal}>
           <div className="modal-content modal-small" onClick={(e) => e.stopPropagation()}>
-            <div className="modal-icon info">
-              <Icons.key />
-            </div>
-            <h3>Cambiar Contraseña</h3>
-            <p>Nueva contraseña para <strong>{passwordModal.userName}</strong></p>
+            <form autoComplete="off" onSubmit={(e) => { e.preventDefault(); handleResetPassword(); }}>
+              {/* Hidden trap inputs to absorb browser autocomplete - must be first */}
+              <input type="text" name="trap_user_field_xyz" autoComplete="username" style={{ position: 'absolute', left: '-9999px', opacity: 0, width: 0, height: 0 }} tabIndex={-1} aria-hidden="true" />
+              <input type="password" name="trap_pass_field_xyz" autoComplete="current-password" style={{ position: 'absolute', left: '-9999px', opacity: 0, width: 0, height: 0 }} tabIndex={-1} aria-hidden="true" />
 
-            {/* Hidden trap inputs to absorb browser autocomplete */}
-            <input type="text" name="fake-username" autoComplete="username" style={{ position: 'absolute', left: '-9999px', opacity: 0 }} tabIndex={-1} />
-            <input type="password" name="fake-password" autoComplete="current-password" style={{ position: 'absolute', left: '-9999px', opacity: 0 }} tabIndex={-1} />
+              <div className="modal-icon info">
+                <Icons.key />
+              </div>
+              <h3>Cambiar Contraseña</h3>
+              <p>Nueva contraseña para <strong>{passwordModal.userName}</strong></p>
 
-            <div className="password-input-wrapper">
-              <input
-                type={showPassword ? 'text' : 'password'}
-                className="modal-input"
-                placeholder="Nueva contraseña (mín. 8 caracteres)"
-                value={newPassword}
-                onChange={(e) => setNewPassword(e.target.value)}
-                onKeyDown={(e) => e.stopPropagation()}
-                minLength={8}
-                autoFocus
-                autoComplete="new-password"
-              />
-              <button
-                type="button"
-                className="password-toggle-btn"
-                onClick={() => setShowPassword(!showPassword)}
-                title={showPassword ? 'Ocultar contraseña' : 'Mostrar contraseña'}
-              >
-                {showPassword ? <Icons.eyeOff /> : <Icons.eye />}
-              </button>
-            </div>
+              <div className="password-input-wrapper">
+                <input
+                  type={showPassword ? 'text' : 'password'}
+                  className="modal-input"
+                  name="new_secret_value_1"
+                  placeholder="Nueva contraseña (mín. 8 caracteres)"
+                  value={newPassword}
+                  onChange={(e) => setNewPassword(e.target.value)}
+                  onKeyDown={(e) => e.stopPropagation()}
+                  minLength={8}
+                  autoFocus
+                  autoComplete="off"
+                  data-lpignore="true"
+                  data-form-type="other"
+                />
+                <button
+                  type="button"
+                  className="password-toggle-btn"
+                  onClick={() => setShowPassword(!showPassword)}
+                  title={showPassword ? 'Ocultar contraseña' : 'Mostrar contraseña'}
+                >
+                  {showPassword ? <Icons.eyeOff /> : <Icons.eye />}
+                </button>
+              </div>
 
-            <div className="password-input-wrapper">
-              <input
-                type={showPassword ? 'text' : 'password'}
-                className="modal-input"
-                placeholder="Confirmar contraseña"
-                value={confirmPassword}
-                onChange={(e) => setConfirmPassword(e.target.value)}
-                onKeyDown={(e) => e.stopPropagation()}
-                minLength={8}
-                autoComplete="new-password"
-              />
-            </div>
+              <div className="password-input-wrapper">
+                <input
+                  type={showPassword ? 'text' : 'password'}
+                  className="modal-input"
+                  name="new_secret_value_2"
+                  placeholder="Confirmar contraseña"
+                  value={confirmPassword}
+                  onChange={(e) => setConfirmPassword(e.target.value)}
+                  onKeyDown={(e) => e.stopPropagation()}
+                  minLength={8}
+                  autoComplete="off"
+                  data-lpignore="true"
+                  data-form-type="other"
+                />
+              </div>
 
-            {newPassword && confirmPassword && newPassword !== confirmPassword && (
-              <p className="password-error">Las contraseñas no coinciden</p>
-            )}
+              {newPassword && confirmPassword && newPassword !== confirmPassword && (
+                <p className="password-error">Las contraseñas no coinciden</p>
+              )}
 
-            <div className="modal-actions">
-              <button className="btn-cancel" onClick={closePasswordModal}>
-                Cancelar
-              </button>
-              <button
-                className="btn-primary"
-                onClick={handleResetPassword}
-                disabled={savingPassword || newPassword.length < 8 || newPassword !== confirmPassword}
-              >
-                {savingPassword ? <Icons.loader className="spinner" /> : 'Guardar'}
-              </button>
-            </div>
+              <div className="modal-actions">
+                <button type="button" className="btn-cancel" onClick={closePasswordModal}>
+                  Cancelar
+                </button>
+                <button
+                  type="submit"
+                  className="btn-primary"
+                  disabled={savingPassword || newPassword.length < 8 || newPassword !== confirmPassword}
+                >
+                  {savingPassword ? <Icons.loader className="spinner" /> : 'Guardar'}
+                </button>
+              </div>
+            </form>
           </div>
         </div>
       )}
