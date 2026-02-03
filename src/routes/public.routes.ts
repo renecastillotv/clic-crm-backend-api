@@ -3,6 +3,8 @@
  *
  * Endpoints para acceder a información pública de tenants
  * para landing pages personalizadas.
+ *
+ * @version 1.0.0
  */
 
 import express, { Request, Response, NextFunction } from 'express';
