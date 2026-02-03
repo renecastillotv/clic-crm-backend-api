@@ -77,7 +77,7 @@ import {
   X,
   FilmReel,
   Mailbox,
-  Medal,
+  Gauge,
   Plugs,
   Handshake,
 } from '@phosphor-icons/react';
@@ -167,7 +167,7 @@ const Icons = {
   sitioWeb: <GlobeSimple size={18} weight="duotone" />,
   amenidades: <Star size={18} weight="duotone" />,
   extensiones: <PuzzlePiece size={18} weight="duotone" />,
-  productividad: <Medal size={18} weight="duotone" />,
+  productividad: <Gauge size={18} weight="duotone" />,
   userProfile: <UserCircle size={18} weight="duotone" />,
   logout: <SignOut size={18} weight="duotone" />,
   marketing: <Megaphone size={20} weight="duotone" />,
