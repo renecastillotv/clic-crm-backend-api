@@ -182,7 +182,7 @@ export default function ModalAplicarPago({
         background: 'white',
         borderRadius: '16px',
         width: '100%',
-        maxWidth: '600px',
+        maxWidth: 'min(600px, 95vw)',
         maxHeight: '90vh',
         overflow: 'auto',
         boxShadow: '0 20px 25px -5px rgba(0, 0, 0, 0.1), 0 10px 10px -5px rgba(0, 0, 0, 0.04)'
@@ -269,12 +269,13 @@ export default function ModalAplicarPago({
             }}>
               Tipo de pago:
             </label>
-            <div style={{ display: 'flex', gap: '12px' }}>
+            <div style={{ display: 'flex', gap: '12px', flexWrap: 'wrap' }}>
               <button
                 onClick={() => handleTipoPagoChange('parcial')}
                 disabled={loading}
                 style={{
-                  flex: 1,
+                  flex: '1 1 120px',
+                  minWidth: '120px',
                   padding: '14px 20px',
                   borderRadius: '10px',
                   border: `2px solid ${tipoPago === 'parcial' ? '#667eea' : '#e2e8f0'}`,
@@ -299,7 +300,8 @@ export default function ModalAplicarPago({
                 onClick={() => handleTipoPagoChange('total')}
                 disabled={loading}
                 style={{
-                  flex: 1,
+                  flex: '1 1 120px',
+                  minWidth: '120px',
                   padding: '14px 20px',
                   borderRadius: '10px',
                   border: `2px solid ${tipoPago === 'total' ? '#10b981' : '#e2e8f0'}`,
@@ -382,7 +384,7 @@ export default function ModalAplicarPago({
             
             {/* Botones rápidos de porcentaje (solo si es parcial) */}
             {tipoPago === 'parcial' && (
-              <div style={{ display: 'flex', gap: '8px', marginTop: '12px' }}>
+              <div style={{ display: 'flex', gap: '8px', marginTop: '12px', flexWrap: 'wrap' }}>
                 <button
                   type="button"
                   onClick={() => handlePorcentajeClick(25)}

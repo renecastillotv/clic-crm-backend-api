@@ -293,7 +293,7 @@ export default function DocumentoModal({ isOpen, onClose, onSubmit, tiposDisponi
           background: white;
           border-radius: 20px;
           width: 100%;
-          max-width: 500px;
+          max-width: min(500px, 90vw);
           display: flex;
           flex-direction: column;
           box-shadow: 0 20px 60px rgba(0, 0, 0, 0.3);

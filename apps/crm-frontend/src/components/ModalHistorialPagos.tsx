@@ -53,7 +53,7 @@ export default function ModalHistorialPagos({
 
   return (
     <div className="modal-overlay" onClick={onClose}>
-      <div className="modal-content" style={{ maxWidth: '800px', maxHeight: '90vh' }} onClick={(e) => e.stopPropagation()}>
+      <div className="modal-content" style={{ maxWidth: 'min(800px, 95vw)', maxHeight: '90vh' }} onClick={(e) => e.stopPropagation()}>
         <div className="modal-header">
           <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
             <div style={{

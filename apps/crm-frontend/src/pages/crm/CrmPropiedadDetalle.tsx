@@ -1282,6 +1282,43 @@ const styles = `
     font-weight: 500;
   }
 
+  /* Responsive badges and etiquetas */
+  @media (max-width: 768px) {
+    .badges-row {
+      gap: 6px;
+    }
+    .badge {
+      padding: 4px 8px;
+      font-size: 0.75rem;
+      gap: 2px;
+    }
+    .badge svg {
+      width: 10px;
+      height: 10px;
+    }
+    .etiquetas-row {
+      gap: 4px;
+    }
+    .etiqueta {
+      padding: 3px 8px;
+      font-size: 0.7rem;
+    }
+  }
+
+  @media (max-width: 480px) {
+    .badges-row {
+      gap: 4px;
+    }
+    .badge {
+      padding: 3px 6px;
+      font-size: 0.7rem;
+    }
+    .etiqueta {
+      padding: 2px 6px;
+      font-size: 0.65rem;
+    }
+  }
+
   .codigo-publico {
     font-size: 1.8rem;
     font-weight: 800;

@@ -928,3 +928,149 @@
 .crm-primary-glow {
   box-shadow: 0 0 0 3px rgba(0, 87, 255, 0.2);
 }
+
+/* ============================================================================
+   RESPONSIVE FIXES - Adaptación para sidebar colapsable
+   ============================================================================ */
+
+/* 1.1 Buttons - Allow text wrapping on small screens */
+@media (max-width: 640px) {
+  .crm-btn {
+    white-space: normal;
+    text-align: center;
+  }
+  .crm-btn-sm {
+    padding: 6px 10px;
+    font-size: 0.8rem;
+  }
+}
+
+/* 1.2 Status Cards - Responsive grid */
+@media (max-width: 768px) {
+  .crm-status-card {
+    min-width: calc(50% - 6px);
+    flex: 0 0 calc(50% - 6px);
+  }
+}
+@media (max-width: 480px) {
+  .crm-status-card {
+    min-width: 100%;
+    flex: 0 0 100%;
+  }
+}
+
+/* 1.3 Badges - Responsive sizing */
+@media (max-width: 640px) {
+  .crm-badge {
+    padding: 3px 6px;
+    font-size: 0.7rem;
+    gap: 2px;
+  }
+  .crm-badge svg {
+    width: 10px;
+    height: 10px;
+  }
+}
+
+/* 1.4 Select - Full width on mobile */
+@media (max-width: 640px) {
+  .crm-select {
+    min-width: auto;
+    width: 100%;
+  }
+}
+
+/* 1.5 Toolbar - Stack on mobile */
+@media (max-width: 640px) {
+  .crm-toolbar {
+    flex-direction: column;
+    align-items: stretch;
+    gap: 8px;
+  }
+  .crm-toolbar > * {
+    width: 100%;
+  }
+}
+
+/* 1.6 Tables - Better mobile handling */
+@media (max-width: 768px) {
+  .crm-table {
+    min-width: 500px;
+  }
+  .crm-table th,
+  .crm-table td {
+    padding: 8px 10px;
+    font-size: 0.85rem;
+  }
+}
+@media (max-width: 480px) {
+  .crm-table {
+    min-width: 400px;
+  }
+}
+
+/* 1.7 Content Relation Grid - Para botones de relacionar contenido */
+.content-relation-grid {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 16px;
+}
+@media (max-width: 1024px) {
+  .content-relation-grid {
+    grid-template-columns: repeat(2, 1fr);
+  }
+}
+@media (max-width: 640px) {
+  .content-relation-grid {
+    grid-template-columns: 1fr;
+    gap: 12px;
+  }
+}
+
+/* 1.8 Content Relation Buttons */
+.content-relation-btn {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  padding: 20px;
+  border-radius: 12px;
+  border: 2px dashed var(--premium-border, #E2E8F0);
+  background: var(--premium-surface, #F8FAFC);
+  cursor: pointer;
+  transition: all 0.2s ease;
+  text-align: center;
+}
+.content-relation-btn:hover {
+  border-color: var(--premium-primary, #0057FF);
+  background: var(--premium-primary-lighter, rgba(0, 87, 255, 0.04));
+}
+.content-relation-btn .emoji {
+  font-size: 2rem;
+  margin-bottom: 8px;
+}
+.content-relation-btn .title {
+  font-size: 1rem;
+  font-weight: 600;
+  color: var(--premium-text-strong, #1E293B);
+}
+.content-relation-btn .subtitle {
+  font-size: 0.85rem;
+  color: var(--premium-text-muted, #64748B);
+  margin-top: 4px;
+}
+@media (max-width: 640px) {
+  .content-relation-btn {
+    padding: 12px;
+  }
+  .content-relation-btn .emoji {
+    font-size: 1.5rem;
+    margin-bottom: 4px;
+  }
+  .content-relation-btn .title {
+    font-size: 0.9rem;
+  }
+  .content-relation-btn .subtitle {
+    font-size: 0.8rem;
+  }
+}

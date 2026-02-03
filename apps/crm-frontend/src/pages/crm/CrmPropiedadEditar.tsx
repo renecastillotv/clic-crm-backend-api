@@ -3463,131 +3463,51 @@ export default function CrmPropiedadEditar() {
                 <p className="form-hint" style={{ marginBottom: '20px' }}>
                   Relaciona esta propiedad con FAQs, Videos, Artículos y Testimonios para mejorar la experiencia del usuario
                 </p>
-                <div className="form-grid" style={{ gridTemplateColumns: 'repeat(4, 1fr)', gap: '16px' }}>
+                <div className="content-relation-grid">
                   <button
                     type="button"
-                    className="btn-secondary"
+                    className="content-relation-btn"
                     onClick={() => setShowFaqsModal(true)}
-                    style={{ 
-                      padding: '20px', 
-                      display: 'flex', 
-                      flexDirection: 'column', 
-                      alignItems: 'center', 
-                      gap: '12px',
-                      border: '2px solid #e2e8f0',
-                      borderRadius: '12px',
-                      background: '#f8fafc',
-                      transition: 'all 0.2s',
-                      cursor: 'pointer'
-                    }}
-                    onMouseEnter={(e) => {
-                      e.currentTarget.style.borderColor = '#6366f1';
-                      e.currentTarget.style.background = '#f0f4ff';
-                    }}
-                    onMouseLeave={(e) => {
-                      e.currentTarget.style.borderColor = '#e2e8f0';
-                      e.currentTarget.style.background = '#f8fafc';
-                    }}
                   >
-                    <span style={{ fontSize: '2rem' }}>❓</span>
-                    <span style={{ fontWeight: 600, fontSize: '1rem', color: '#1e293b' }}>Relacionar con FAQs</span>
-                    <span style={{ fontSize: '0.875rem', color: '#64748b', textAlign: 'center' }}>
+                    <span className="emoji">❓</span>
+                    <span className="title">Relacionar con FAQs</span>
+                    <span className="subtitle">
                       Buscar o crear preguntas frecuentes relacionadas
                     </span>
                   </button>
 
                   <button
                     type="button"
-                    className="btn-secondary"
+                    className="content-relation-btn"
                     onClick={() => setShowVideosModal(true)}
-                    style={{ 
-                      padding: '20px', 
-                      display: 'flex', 
-                      flexDirection: 'column', 
-                      alignItems: 'center', 
-                      gap: '12px',
-                      border: '2px solid #e2e8f0',
-                      borderRadius: '12px',
-                      background: '#f8fafc',
-                      transition: 'all 0.2s',
-                      cursor: 'pointer'
-                    }}
-                    onMouseEnter={(e) => {
-                      e.currentTarget.style.borderColor = '#6366f1';
-                      e.currentTarget.style.background = '#f0f4ff';
-                    }}
-                    onMouseLeave={(e) => {
-                      e.currentTarget.style.borderColor = '#e2e8f0';
-                      e.currentTarget.style.background = '#f8fafc';
-                    }}
                   >
-                    <span style={{ fontSize: '2rem' }}>🎥</span>
-                    <span style={{ fontWeight: 600, fontSize: '1rem', color: '#1e293b' }}>Relacionar con Videos</span>
-                    <span style={{ fontSize: '0.875rem', color: '#64748b', textAlign: 'center' }}>
+                    <span className="emoji">🎥</span>
+                    <span className="title">Relacionar con Videos</span>
+                    <span className="subtitle">
                       Buscar o crear videos relacionados
                     </span>
                   </button>
 
                   <button
                     type="button"
-                    className="btn-secondary"
+                    className="content-relation-btn"
                     onClick={() => setShowArticulosModal(true)}
-                    style={{
-                      padding: '20px',
-                      display: 'flex',
-                      flexDirection: 'column',
-                      alignItems: 'center',
-                      gap: '12px',
-                      border: '2px solid #e2e8f0',
-                      borderRadius: '12px',
-                      background: '#f8fafc',
-                      transition: 'all 0.2s',
-                      cursor: 'pointer'
-                    }}
-                    onMouseEnter={(e) => {
-                      e.currentTarget.style.borderColor = '#6366f1';
-                      e.currentTarget.style.background = '#f0f4ff';
-                    }}
-                    onMouseLeave={(e) => {
-                      e.currentTarget.style.borderColor = '#e2e8f0';
-                      e.currentTarget.style.background = '#f8fafc';
-                    }}
                   >
-                    <span style={{ fontSize: '2rem' }}>📄</span>
-                    <span style={{ fontWeight: 600, fontSize: '1rem', color: '#1e293b' }}>Relacionar con Artículos</span>
-                    <span style={{ fontSize: '0.875rem', color: '#64748b', textAlign: 'center' }}>
+                    <span className="emoji">📄</span>
+                    <span className="title">Relacionar con Artículos</span>
+                    <span className="subtitle">
                       Buscar o crear artículos relacionados
                     </span>
                   </button>
 
                   <button
                     type="button"
-                    className="btn-secondary"
+                    className="content-relation-btn"
                     onClick={() => setShowTestimoniosModal(true)}
-                    style={{
-                      padding: '20px',
-                      display: 'flex',
-                      flexDirection: 'column',
-                      alignItems: 'center',
-                      gap: '12px',
-                      border: '2px solid #e2e8f0',
-                      borderRadius: '12px',
-                      background: '#f8fafc',
-                      transition: 'all 0.2s',
-                      cursor: 'pointer'
-                    }}
-                    onMouseEnter={(e) => {
-                      e.currentTarget.style.borderColor = '#6366f1';
-                      e.currentTarget.style.background = '#f0f4ff';
-                    }}
-                    onMouseLeave={(e) => {
-                      e.currentTarget.style.borderColor = '#e2e8f0';
-                      e.currentTarget.style.background = '#f8fafc';
-                    }}
                   >
-                    <span style={{ fontSize: '2rem' }}>💬</span>
-                    <span style={{ fontWeight: 600, fontSize: '1rem', color: '#1e293b' }}>Relacionar con Testimonios</span>
-                    <span style={{ fontSize: '0.875rem', color: '#64748b', textAlign: 'center' }}>
+                    <span className="emoji">💬</span>
+                    <span className="title">Relacionar con Testimonios</span>
+                    <span className="subtitle">
                       Buscar o crear testimonios relacionados
                     </span>
                   </button>

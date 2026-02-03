@@ -352,7 +352,7 @@ export default function ActividadModal({
           background: white;
           border-radius: 20px;
           width: 100%;
-          max-width: 720px;
+          max-width: min(720px, 95vw);
           max-height: 90vh;
           overflow: hidden;
           box-shadow: 0 25px 50px rgba(0, 0, 0, 0.25);
@@ -601,6 +601,21 @@ export default function ActividadModal({
           .actividad-btn-danger {
             flex: 1;
             justify-content: center;
+          }
+        }
+
+        @media (max-width: 480px) {
+          .actividad-tipo-grid {
+            grid-template-columns: repeat(2, 1fr);
+            gap: 8px;
+          }
+
+          .actividad-modal-header {
+            padding: 16px;
+          }
+
+          .actividad-modal-body {
+            padding: 16px;
           }
         }
       `}</style>

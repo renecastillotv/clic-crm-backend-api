@@ -17,7 +17,7 @@
   border-radius: var(--border-radius-lg);
   box-shadow: var(--shadow-xl);
   width: 100%;
-  max-width: 48rem; /* 768px */
+  max-width: min(48rem, 95vw); /* 768px max, responsive */
   max-height: 90vh;
   overflow: hidden;
   display: flex;

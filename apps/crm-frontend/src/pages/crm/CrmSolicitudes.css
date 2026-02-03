@@ -679,7 +679,7 @@
   background: white;
   border-radius: 16px;
   padding: 24px;
-  max-width: 400px;
+  max-width: min(400px, 90vw);
   width: 90%;
   z-index: 9001;
 }
@@ -762,7 +762,7 @@
 
 /* Close Modal - Solicitudes */
 .modal-close-solicitud {
-  max-width: 400px;
+  max-width: min(400px, 90vw);
   width: 95%;
   background: white !important;
   box-shadow: 0 20px 60px rgba(0,0,0,0.2);
