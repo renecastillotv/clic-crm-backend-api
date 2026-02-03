@@ -17,6 +17,7 @@ import importRouter from './routes/import.js';
 import oauthRouter from './routes/oauth.routes.js';
 import cronRouter from './routes/cron.routes.js';
 import metaWebhooksRouter from './routes/meta-webhooks.routes.js';
+import publicRouter from './routes/public.routes.js';
 
 // Cargar variables de entorno
 dotenv.config();
@@ -236,6 +237,9 @@ app.get('/api/schema/:tableName', (req, res) => {
   
   res.json(table);
 });
+
+// Rutas públicas (sin autenticación - para landing pages de tenants)
+app.use('/api/public', publicRouter);
 
 // Rutas de autenticación
 app.use('/api/auth', authRouter);
