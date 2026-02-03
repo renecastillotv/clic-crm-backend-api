@@ -86,6 +86,7 @@ export async function getRegistrationRequests(
   filters?: {
     estado?: string;
     tipo_solicitud?: string;
+    busqueda?: string;
     limit?: number;
     offset?: number;
   }
@@ -103,6 +104,18 @@ export async function getRegistrationRequests(
   if (filters?.tipo_solicitud) {
     conditions.push(`tipo_solicitud = $${paramIndex}`);
     params.push(filters.tipo_solicitud);
+    paramIndex++;
+  }
+
+  // Search by name or motivacion
+  if (filters?.busqueda) {
+    const searchTerm = `%${filters.busqueda}%`;
+    conditions.push(`(
+      nombre ILIKE $${paramIndex} OR
+      apellido ILIKE $${paramIndex} OR
+      COALESCE(datos_formulario->>'motivacion', '') ILIKE $${paramIndex}
+    )`);
+    params.push(searchTerm);
     paramIndex++;
   }
 

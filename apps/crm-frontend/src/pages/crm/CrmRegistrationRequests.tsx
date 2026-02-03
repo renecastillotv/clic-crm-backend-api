@@ -7,7 +7,7 @@
 import { useState, useEffect } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { useAuth } from '@clerk/clerk-react';
-import { Eye, Check, X, Trash2, User, Mail, Phone, Calendar, FileText, Filter, UserPlus, ArrowLeft } from 'lucide-react';
+import { Eye, Check, X, Trash2, User, Mail, Phone, Calendar, FileText, Filter, UserPlus, ArrowLeft, Search, ChevronLeft, ChevronRight } from 'lucide-react';
 import { usePageHeader } from '../../layouts/CrmLayout';
 import { getRolesTenant, createUsuarioTenant, RolTenant } from '../../services/api';
 import { useAuth as useAuthContext } from '../../contexts/AuthContext';
@@ -69,9 +69,17 @@ export default function CrmRegistrationRequests() {
   const [error, setError] = useState<string | null>(null);
   const [roles, setRoles] = useState<RolTenant[]>([]);
 
-  // Filtros
-  const [filterEstado, setFilterEstado] = useState<string>('');
+  // Filtros y búsqueda
+  const [filterEstado, setFilterEstado] = useState<string>('pendiente');
   const [filterTipo, setFilterTipo] = useState<string>('');
+  const [searchQuery, setSearchQuery] = useState<string>('');
+  const [debouncedSearch, setDebouncedSearch] = useState<string>('');
+
+  // Paginación
+  const PAGE_SIZE = 24;
+  const [currentPage, setCurrentPage] = useState(1);
+  const [totalItems, setTotalItems] = useState(0);
+  const totalPages = Math.ceil(totalItems / PAGE_SIZE);
 
   // Modal de detalle
   const [selectedRequest, setSelectedRequest] = useState<RegistrationRequest | null>(null);
@@ -108,6 +116,15 @@ export default function CrmRegistrationRequests() {
     });
   }, [setPageHeader, tenantSlug, navigate]);
 
+  // Debounce de búsqueda
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      setDebouncedSearch(searchQuery);
+      setCurrentPage(1); // Reset page when search changes
+    }, 300);
+    return () => clearTimeout(timer);
+  }, [searchQuery]);
+
   // Cargar roles
   useEffect(() => {
     const fetchRoles = async () => {
@@ -133,6 +150,9 @@ export default function CrmRegistrationRequests() {
       const params = new URLSearchParams();
       if (filterEstado) params.append('estado', filterEstado);
       if (filterTipo) params.append('tipo_solicitud', filterTipo);
+      if (debouncedSearch) params.append('busqueda', debouncedSearch);
+      params.append('limit', PAGE_SIZE.toString());
+      params.append('offset', ((currentPage - 1) * PAGE_SIZE).toString());
 
       const response = await fetch(
         `${apiUrl}/tenants/${tenantSlug}/registration-requests?${params}`,
@@ -147,6 +167,7 @@ export default function CrmRegistrationRequests() {
 
       const data = await response.json();
       setRequests(data.requests);
+      setTotalItems(data.total);
     } catch (err: any) {
       setError(err.message);
     } finally {
@@ -179,8 +200,11 @@ export default function CrmRegistrationRequests() {
 
   useEffect(() => {
     fetchRequests();
+  }, [tenantSlug, filterEstado, filterTipo, debouncedSearch, currentPage]);
+
+  useEffect(() => {
     fetchStats();
-  }, [tenantSlug, filterEstado, filterTipo]);
+  }, [tenantSlug]);
 
   const handleApprove = async () => {
     if (!actionModal) return;
@@ -373,35 +397,35 @@ export default function CrmRegistrationRequests() {
         <div className="stats-cards">
           <div
             className={`stat-card ${filterEstado === '' ? 'active' : ''}`}
-            onClick={() => setFilterEstado('')}
+            onClick={() => { setFilterEstado(''); setCurrentPage(1); }}
           >
             <div className="stat-value">{stats.total}</div>
             <div className="stat-label">Total</div>
           </div>
           <div
             className={`stat-card pending ${filterEstado === 'pendiente' ? 'active' : ''}`}
-            onClick={() => setFilterEstado('pendiente')}
+            onClick={() => { setFilterEstado('pendiente'); setCurrentPage(1); }}
           >
             <div className="stat-value">{stats.counts.pendiente || 0}</div>
             <div className="stat-label">Pendientes</div>
           </div>
           <div
             className={`stat-card viewed ${filterEstado === 'visto' ? 'active' : ''}`}
-            onClick={() => setFilterEstado('visto')}
+            onClick={() => { setFilterEstado('visto'); setCurrentPage(1); }}
           >
             <div className="stat-value">{stats.counts.visto || 0}</div>
             <div className="stat-label">Vistos</div>
           </div>
           <div
             className={`stat-card approved ${filterEstado === 'aprobado' ? 'active' : ''}`}
-            onClick={() => setFilterEstado('aprobado')}
+            onClick={() => { setFilterEstado('aprobado'); setCurrentPage(1); }}
           >
             <div className="stat-value">{stats.counts.aprobado || 0}</div>
             <div className="stat-label">Aprobados</div>
           </div>
           <div
             className={`stat-card rejected ${filterEstado === 'rechazado' ? 'active' : ''}`}
-            onClick={() => setFilterEstado('rechazado')}
+            onClick={() => { setFilterEstado('rechazado'); setCurrentPage(1); }}
           >
             <div className="stat-value">{stats.counts.rechazado || 0}</div>
             <div className="stat-label">Rechazados</div>
@@ -411,11 +435,20 @@ export default function CrmRegistrationRequests() {
 
       {/* Filters */}
       <div className="filters-bar">
+        <div className="search-box">
+          <Search size={16} />
+          <input
+            type="text"
+            placeholder="Buscar por nombre o intención..."
+            value={searchQuery}
+            onChange={(e) => setSearchQuery(e.target.value)}
+          />
+        </div>
         <div className="filter-group">
           <Filter size={16} />
           <select
             value={filterTipo}
-            onChange={(e) => setFilterTipo(e.target.value)}
+            onChange={(e) => { setFilterTipo(e.target.value); setCurrentPage(1); }}
           >
             <option value="">Todos los tipos</option>
             <option value="usuario">Usuario</option>
@@ -424,12 +457,14 @@ export default function CrmRegistrationRequests() {
             <option value="propietario">Propietario</option>
           </select>
         </div>
-        {(filterEstado || filterTipo) && (
+        {(filterEstado !== 'pendiente' || filterTipo || searchQuery) && (
           <button
             className="clear-filters"
             onClick={() => {
-              setFilterEstado('');
+              setFilterEstado('pendiente');
               setFilterTipo('');
+              setSearchQuery('');
+              setCurrentPage(1);
             }}
           >
             Limpiar filtros
@@ -447,6 +482,7 @@ export default function CrmRegistrationRequests() {
           <p>No se encontraron solicitudes con los filtros seleccionados.</p>
         </div>
       ) : (
+        <>
         <div className="requests-list">
           {requests.map((request) => (
             <div key={request.id} className="request-card">
@@ -538,6 +574,32 @@ export default function CrmRegistrationRequests() {
             </div>
           ))}
         </div>
+
+        {/* Pagination */}
+        {totalPages > 1 && (
+          <div className="pagination">
+            <button
+              className="btn-pagination"
+              onClick={() => setCurrentPage((p) => Math.max(1, p - 1))}
+              disabled={currentPage === 1}
+            >
+              <ChevronLeft size={16} />
+              Anterior
+            </button>
+            <span className="pagination-info">
+              Página {currentPage} de {totalPages} ({totalItems} solicitudes)
+            </span>
+            <button
+              className="btn-pagination"
+              onClick={() => setCurrentPage((p) => Math.min(totalPages, p + 1))}
+              disabled={currentPage === totalPages}
+            >
+              Siguiente
+              <ChevronRight size={16} />
+            </button>
+          </div>
+        )}
+        </>
       )}
 
       {/* Detail Modal */}
