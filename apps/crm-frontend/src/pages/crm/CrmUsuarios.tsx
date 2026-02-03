@@ -157,6 +157,28 @@ export default function CrmUsuarios() {
   const [togglingStatus, setTogglingStatus] = useState<string | null>(null);
   const [togglingVisibility, setTogglingVisibility] = useState<string | null>(null);
   const [successMessage, setSuccessMessage] = useState<string | null>(null);
+  const [pendingRequestsCount, setPendingRequestsCount] = useState<number>(0);
+
+  // Cargar conteo de solicitudes pendientes
+  useEffect(() => {
+    const fetchPendingCount = async () => {
+      try {
+        const token = await getToken();
+        const apiUrl = import.meta.env.VITE_API_URL || 'http://localhost:3001/api';
+        const response = await fetch(
+          `${apiUrl}/tenants/${tenantSlug}/registration-requests/stats`,
+          { headers: { Authorization: `Bearer ${token}` } }
+        );
+        if (response.ok) {
+          const data = await response.json();
+          setPendingRequestsCount((data.counts?.pendiente || 0) + (data.counts?.visto || 0));
+        }
+      } catch (err) {
+        console.error('Error fetching pending requests count:', err);
+      }
+    };
+    if (tenantSlug) fetchPendingCount();
+  }, [tenantSlug, getToken]);
 
   // Configurar header de la página
   useEffect(() => {
@@ -165,13 +187,38 @@ export default function CrmUsuarios() {
       subtitle: 'Gestiona los usuarios y permisos de tu tenant',
       actions: (
         <>
-          <button 
-            className="btn-secondary" 
+          <button
+            className="btn-secondary"
             onClick={() => navigate(`/crm/${tenantSlug}/roles`)}
             style={{ marginRight: '12px' }}
           >
             <Icons.shield />
             Roles
+          </button>
+          <button
+            className="btn-secondary"
+            onClick={() => navigate(`/crm/${tenantSlug}/registration-requests`)}
+            style={{ marginRight: '12px', position: 'relative' }}
+          >
+            <Icons.user />
+            Solicitudes
+            {pendingRequestsCount > 0 && (
+              <span style={{
+                position: 'absolute',
+                top: '-6px',
+                right: '-6px',
+                background: '#EF4444',
+                color: 'white',
+                fontSize: '11px',
+                fontWeight: '600',
+                borderRadius: '9999px',
+                padding: '2px 6px',
+                minWidth: '18px',
+                textAlign: 'center',
+              }}>
+                {pendingRequestsCount}
+              </span>
+            )}
           </button>
           <button className="btn-primary" onClick={() => navigate(`/crm/${tenantSlug}/usuarios/nuevo`)}>
             <Icons.plus />
@@ -180,7 +227,7 @@ export default function CrmUsuarios() {
         </>
       ),
     });
-  }, [setPageHeader, tenantSlug, navigate]);
+  }, [setPageHeader, tenantSlug, navigate, pendingRequestsCount]);
 
   // Cargar datos
   const cargarDatos = useCallback(async () => {

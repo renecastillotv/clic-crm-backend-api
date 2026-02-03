@@ -5,10 +5,12 @@
  */
 
 import { useState, useEffect } from 'react';
-import { useParams } from 'react-router-dom';
+import { useParams, useNavigate } from 'react-router-dom';
 import { useAuth } from '@clerk/clerk-react';
-import { Eye, Check, X, Trash2, User, Mail, Phone, Calendar, FileText, Filter } from 'lucide-react';
+import { Eye, Check, X, Trash2, User, Mail, Phone, Calendar, FileText, Filter, UserPlus, ArrowLeft } from 'lucide-react';
 import { usePageHeader } from '../../contexts/PageHeaderContext';
+import { getRolesTenant, createUsuarioTenant, RolTenant } from '../../services/api';
+import { useAuth as useAuthContext } from '../../contexts/AuthContext';
 import Modal from '../../components/Modal';
 import './CrmRegistrationRequests.css';
 
@@ -58,11 +60,14 @@ export default function CrmRegistrationRequests() {
   const { tenantSlug } = useParams<{ tenantSlug: string }>();
   const { getToken } = useAuth();
   const { setPageHeader } = usePageHeader();
+  const { tenantActual } = useAuthContext();
+  const navigate = useNavigate();
 
   const [requests, setRequests] = useState<RegistrationRequest[]>([]);
   const [stats, setStats] = useState<Stats | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [roles, setRoles] = useState<RolTenant[]>([]);
 
   // Filtros
   const [filterEstado, setFilterEstado] = useState<string>('');
@@ -81,12 +86,42 @@ export default function CrmRegistrationRequests() {
   const [actionType, setActionType] = useState('crear_usuario');
   const [processing, setProcessing] = useState(false);
 
+  // Modal de crear usuario
+  const [createUserModal, setCreateUserModal] = useState<RegistrationRequest | null>(null);
+  const [newUserRole, setNewUserRole] = useState<string>('');
+  const [newUserPassword, setNewUserPassword] = useState('');
+  const [creatingUser, setCreatingUser] = useState(false);
+
   useEffect(() => {
     setPageHeader({
       title: 'Solicitudes de Registro',
       subtitle: 'Gestiona las solicitudes de acceso al sistema',
+      actions: (
+        <button
+          className="btn-secondary"
+          onClick={() => navigate(`/crm/${tenantSlug}/usuarios`)}
+        >
+          <ArrowLeft size={16} />
+          Volver a Usuarios
+        </button>
+      ),
     });
-  }, [setPageHeader]);
+  }, [setPageHeader, tenantSlug, navigate]);
+
+  // Cargar roles
+  useEffect(() => {
+    const fetchRoles = async () => {
+      if (!tenantActual?.id) return;
+      try {
+        const token = await getToken();
+        const rolesData = await getRolesTenant(tenantActual.id, token);
+        setRoles(rolesData || []);
+      } catch (err) {
+        console.error('Error fetching roles:', err);
+      }
+    };
+    fetchRoles();
+  }, [tenantActual?.id, getToken]);
 
   const fetchRequests = async () => {
     try {
@@ -150,6 +185,13 @@ export default function CrmRegistrationRequests() {
   const handleApprove = async () => {
     if (!actionModal) return;
 
+    // Si la acción es crear usuario, abrir modal de creación
+    if (actionType === 'crear_usuario') {
+      setCreateUserModal(actionModal.request);
+      setActionModal(null);
+      return;
+    }
+
     try {
       setProcessing(true);
       const token = await getToken();
@@ -180,6 +222,67 @@ export default function CrmRegistrationRequests() {
       alert(err.message);
     } finally {
       setProcessing(false);
+    }
+  };
+
+  const handleCreateUser = async () => {
+    if (!createUserModal || !tenantActual?.id) return;
+
+    if (!newUserPassword || newUserPassword.length < 8) {
+      alert('La contraseña debe tener al menos 8 caracteres');
+      return;
+    }
+
+    try {
+      setCreatingUser(true);
+      const token = await getToken();
+      const apiUrl = import.meta.env.VITE_API_URL || 'http://localhost:3001/api';
+
+      // Crear usuario
+      const newUser = await createUsuarioTenant(
+        tenantActual.id,
+        {
+          nombre: createUserModal.nombre,
+          apellido: createUserModal.apellido || '',
+          email: createUserModal.email,
+          telefono: createUserModal.telefono || '',
+          password: newUserPassword,
+          roleIds: newUserRole ? [newUserRole] : [],
+        },
+        token
+      );
+
+      // Aprobar la solicitud con el usuario creado
+      const response = await fetch(
+        `${apiUrl}/tenants/${tenantSlug}/registration-requests/${createUserModal.id}/approve`,
+        {
+          method: 'POST',
+          headers: {
+            Authorization: `Bearer ${token}`,
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({
+            accion_tomada: 'crear_usuario',
+            usuario_creado_id: newUser.id,
+            notas_admin: `Usuario creado: ${newUser.email}`,
+          }),
+        }
+      );
+
+      if (!response.ok) throw new Error('Error al actualizar solicitud');
+
+      setCreateUserModal(null);
+      setNewUserRole('');
+      setNewUserPassword('');
+      fetchRequests();
+      fetchStats();
+
+      alert(`Usuario ${newUser.email} creado exitosamente`);
+    } catch (err: any) {
+      console.error('Error creating user:', err);
+      alert(err.message || 'Error al crear usuario');
+    } finally {
+      setCreatingUser(false);
     }
   };
 
@@ -568,6 +671,91 @@ export default function CrmRegistrationRequests() {
                   : actionModal.type === 'approve'
                   ? 'Aprobar'
                   : 'Rechazar'}
+              </button>
+            </div>
+          </div>
+        </Modal>
+      )}
+
+      {/* Create User Modal */}
+      {createUserModal && (
+        <Modal
+          isOpen={!!createUserModal}
+          onClose={() => {
+            setCreateUserModal(null);
+            setNewUserRole('');
+            setNewUserPassword('');
+          }}
+          title="Crear Usuario"
+          size="medium"
+        >
+          <div className="create-user-modal-content">
+            <div className="user-info-summary">
+              <h4>Datos del solicitante</h4>
+              <div className="detail-grid">
+                <div className="detail-item">
+                  <label>Nombre</label>
+                  <span>{createUserModal.nombre} {createUserModal.apellido}</span>
+                </div>
+                <div className="detail-item">
+                  <label>Email</label>
+                  <span>{createUserModal.email}</span>
+                </div>
+                {createUserModal.telefono && (
+                  <div className="detail-item">
+                    <label>Teléfono</label>
+                    <span>{createUserModal.telefono}</span>
+                  </div>
+                )}
+              </div>
+            </div>
+
+            <div className="form-group">
+              <label>Rol del usuario</label>
+              <select
+                value={newUserRole}
+                onChange={(e) => setNewUserRole(e.target.value)}
+              >
+                <option value="">Sin rol específico</option>
+                {roles.map((role) => (
+                  <option key={role.id} value={role.id}>
+                    {role.nombre}
+                  </option>
+                ))}
+              </select>
+            </div>
+
+            <div className="form-group">
+              <label>Contraseña temporal *</label>
+              <input
+                type="text"
+                value={newUserPassword}
+                onChange={(e) => setNewUserPassword(e.target.value)}
+                placeholder="Mínimo 8 caracteres"
+                minLength={8}
+              />
+              <small>El usuario deberá cambiar esta contraseña al iniciar sesión.</small>
+            </div>
+
+            <div className="modal-actions">
+              <button
+                className="btn-secondary"
+                onClick={() => {
+                  setCreateUserModal(null);
+                  setNewUserRole('');
+                  setNewUserPassword('');
+                }}
+                disabled={creatingUser}
+              >
+                Cancelar
+              </button>
+              <button
+                className="btn-primary"
+                onClick={handleCreateUser}
+                disabled={creatingUser || !newUserPassword || newUserPassword.length < 8}
+              >
+                <UserPlus size={16} />
+                {creatingUser ? 'Creando...' : 'Crear Usuario'}
               </button>
             </div>
           </div>
