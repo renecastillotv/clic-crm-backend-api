@@ -769,32 +769,28 @@ export async function agregarUsuarioATenant(
   // Buscar o crear usuario por email
   let usuario = await getUsuarioByEmail(data.email);
 
-  if (!usuario) {
-    // Crear nuevo usuario CON Clerk ID (bidireccionalidad)
-    let clerkId: string | null = null;
-
+  // Función auxiliar para obtener o crear clerk_id
+  async function ensureClerkUser(email: string, nombre?: string, apellido?: string, password?: string): Promise<string> {
     try {
-      console.log(`🔄 Creando usuario en Clerk: ${data.email}`);
+      console.log(`🔄 Creando usuario en Clerk: ${email}`);
 
-      if (data.password && data.password.trim()) {
-        // Si se proporciona contraseña, crear usuario con contraseña (puede loguearse inmediatamente)
+      if (password && password.trim()) {
         const clerkUser = await createClerkUser({
-          email: data.email,
-          password: data.password,
-          firstName: data.nombre,
-          lastName: data.apellido,
+          email,
+          password,
+          firstName: nombre,
+          lastName: apellido,
         });
-        clerkId = clerkUser.id;
-        console.log(`✅ Usuario creado en Clerk CON contraseña: ${data.email} (ID: ${clerkId})`);
+        console.log(`✅ Usuario creado en Clerk CON contraseña: ${email} (ID: ${clerkUser.id})`);
+        return clerkUser.id;
       } else {
-        // Sin contraseña - recibirá email para configurar
         const clerkUser = await createClerkUserWithoutPassword({
-          email: data.email,
-          firstName: data.nombre,
-          lastName: data.apellido,
+          email,
+          firstName: nombre,
+          lastName: apellido,
         });
-        clerkId = clerkUser.id;
-        console.log(`✅ Usuario creado en Clerk SIN contraseña: ${data.email} (ID: ${clerkId})`);
+        console.log(`✅ Usuario creado en Clerk SIN contraseña: ${email} (ID: ${clerkUser.id})`);
+        return clerkUser.id;
       }
     } catch (clerkError: any) {
       const errorMessage = clerkError.message || '';
@@ -809,21 +805,24 @@ export async function agregarUsuarioATenant(
 
       if (isEmailTaken) {
         // Intentar encontrar el usuario existente en Clerk
-        console.log(`🔍 Buscando usuario existente en Clerk: ${data.email}`);
-        const existingClerkUser = await getClerkUserByEmail(data.email);
+        console.log(`🔍 Buscando usuario existente en Clerk: ${email}`);
+        const existingClerkUser = await getClerkUserByEmail(email);
 
         if (existingClerkUser) {
-          clerkId = existingClerkUser.id;
-          console.log(`✅ Usuario encontrado en Clerk: ${data.email} (ID: ${clerkId})`);
+          console.log(`✅ Usuario encontrado en Clerk: ${email} (ID: ${existingClerkUser.id})`);
+          return existingClerkUser.id;
         } else {
-          // El email existe en Clerk pero no podemos obtener el usuario
-          throw new Error(`El email ${data.email} ya está registrado en el sistema de autenticación. El usuario debe iniciar sesión con su cuenta existente.`);
+          throw new Error(`El email ${email} ya está registrado en el sistema de autenticación. El usuario debe iniciar sesión con su cuenta existente.`);
         }
       } else {
-        // Otro error de Clerk - notificar al usuario
         throw new Error(`Error al crear usuario: ${errorMessage}`);
       }
     }
+  }
+
+  if (!usuario) {
+    // Crear nuevo usuario CON Clerk ID (bidireccionalidad)
+    const clerkId = await ensureClerkUser(data.email, data.nombre, data.apellido, data.password);
 
     const insertSql = `
       INSERT INTO usuarios (
@@ -869,6 +868,42 @@ export async function agregarUsuarioATenant(
       data.tiposUsuario ? JSON.stringify(data.tiposUsuario) : '[]',
     ]);
     usuario = result.rows[0];
+  } else {
+    // El usuario ya existe en BD - verificar si tiene clerk_id
+    if (!usuario.clerkId) {
+      console.log(`⚠️ Usuario ${data.email} existe en BD pero sin clerk_id. Sincronizando con Clerk...`);
+
+      try {
+        const clerkId = await ensureClerkUser(
+          data.email,
+          data.nombre || usuario.nombre || undefined,
+          data.apellido || usuario.apellido || undefined,
+          data.password
+        );
+
+        // Actualizar el usuario en BD con el clerk_id
+        const updateClerkIdSql = `
+          UPDATE usuarios SET clerk_id = $1, updated_at = NOW()
+          WHERE id = $2
+          RETURNING
+            id, email, nombre, apellido,
+            clerk_id as "clerkId",
+            avatar_url as "avatarUrl",
+            telefono,
+            es_platform_admin as "esPlatformAdmin",
+            activo,
+            ultimo_acceso as "ultimoAcceso",
+            created_at as "createdAt",
+            updated_at as "updatedAt"
+        `;
+        const updateResult = await query(updateClerkIdSql, [clerkId, usuario.id]);
+        usuario = updateResult.rows[0];
+        console.log(`✅ Usuario ${data.email} sincronizado con Clerk (ID: ${clerkId})`);
+      } catch (syncError: any) {
+        console.error(`❌ Error sincronizando usuario con Clerk: ${syncError.message}`);
+        throw new Error(`El usuario existe pero no tiene cuenta de autenticación: ${syncError.message}`);
+      }
+    }
   }
 
   if (!usuario) {
