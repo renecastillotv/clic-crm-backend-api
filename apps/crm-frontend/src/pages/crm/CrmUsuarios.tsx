@@ -400,6 +400,7 @@ export default function CrmUsuarios() {
             placeholder="Buscar por nombre o email..."
             value={busqueda}
             onChange={(e) => setBusqueda(e.target.value)}
+            autoComplete="off"
           />
         </div>
 
@@ -776,6 +777,7 @@ export default function CrmUsuarios() {
                 onKeyDown={(e) => e.stopPropagation()}
                 minLength={8}
                 autoFocus
+                autoComplete="new-password"
               />
               <button
                 type="button"
@@ -796,6 +798,7 @@ export default function CrmUsuarios() {
                 onChange={(e) => setConfirmPassword(e.target.value)}
                 onKeyDown={(e) => e.stopPropagation()}
                 minLength={8}
+                autoComplete="new-password"
               />
             </div>
 
