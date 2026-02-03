@@ -1,8 +1,8 @@
 .modal-overlay {
   position: fixed;
-  /* Ajustar para el área de trabajo (considerando sidebar y header) */
-  top: var(--header-height, 64px);
-  left: var(--sidebar-width, 220px);
+  /* Cubrir toda la pantalla para bloquear interacción */
+  top: 0;
+  left: 0;
   right: 0;
   bottom: 0;
   background: rgba(15, 23, 42, 0.6);
@@ -13,28 +13,31 @@
   justify-content: center;
   z-index: var(--z-modal-backdrop, 500);
   padding: var(--space-6, 24px);
+  /* Compensar visualmente para centrar en el área de contenido */
+  padding-left: calc(var(--sidebar-width, 220px) + var(--space-6, 24px));
+  padding-top: calc(var(--header-height, 64px) + var(--space-6, 24px));
   animation: fadeIn 0.2s ease-out;
 }
 
 /* Para modales de pantalla completa (como login) sin sidebar/header */
 .modal-overlay.modal-fullscreen {
-  top: 0;
-  left: 0;
+  padding-left: var(--space-6, 24px);
+  padding-top: var(--space-6, 24px);
 }
 
-/* Responsive: tablet */
+/* Responsive: tablet - sidebar colapsado */
 @media (max-width: 1024px) {
   .modal-overlay {
-    left: var(--sidebar-collapsed, 72px);
+    padding-left: calc(var(--sidebar-collapsed, 72px) + var(--space-6, 24px));
   }
 }
 
 /* Responsive: mobile - modal slide desde abajo */
 @media (max-width: 768px) {
   .modal-overlay {
-    top: 0;
-    left: 0;
     padding: 0;
+    padding-top: 0;
+    padding-left: 0;
     align-items: flex-end;
   }
 }
