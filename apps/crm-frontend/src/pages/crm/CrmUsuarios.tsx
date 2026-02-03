@@ -396,11 +396,14 @@ export default function CrmUsuarios() {
         <div className="search-box">
           <span className="search-icon"><Icons.search /></span>
           <input
-            type="text"
+            type="search"
+            name="user-search-filter"
             placeholder="Buscar por nombre o email..."
             value={busqueda}
             onChange={(e) => setBusqueda(e.target.value)}
             autoComplete="off"
+            data-lpignore="true"
+            data-form-type="other"
           />
         </div>
 
@@ -766,6 +769,10 @@ export default function CrmUsuarios() {
             </div>
             <h3>Cambiar Contraseña</h3>
             <p>Nueva contraseña para <strong>{passwordModal.userName}</strong></p>
+
+            {/* Hidden trap inputs to absorb browser autocomplete */}
+            <input type="text" name="fake-username" autoComplete="username" style={{ position: 'absolute', left: '-9999px', opacity: 0 }} tabIndex={-1} />
+            <input type="password" name="fake-password" autoComplete="current-password" style={{ position: 'absolute', left: '-9999px', opacity: 0 }} tabIndex={-1} />
 
             <div className="password-input-wrapper">
               <input
