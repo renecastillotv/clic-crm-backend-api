@@ -92,9 +92,9 @@ export default function DenllaLandingPage() {
             <span className="denlla-logo-text">Denlla</span>
           </Link>
           <nav className="denlla-nav">
-            <a href="#features" className="denlla-nav-link">Características</a>
-            <a href="#pricing" className="denlla-nav-link">Precios</a>
-            <Link to="/login" className="denlla-nav-link">Iniciar Sesión</Link>
+            <Link to="/caracteristicas" className="denlla-nav-link">Caracteristicas</Link>
+            <Link to="/precios" className="denlla-nav-link">Precios</Link>
+            <Link to="/login" className="denlla-nav-link">Iniciar Sesion</Link>
             <Link to="/signup" className="denlla-btn-primary denlla-btn-sm">
               Comenzar Gratis
             </Link>
@@ -210,8 +210,8 @@ export default function DenllaLandingPage() {
             </p>
           </div>
           <div className="denlla-footer-links">
-            <a href="#features" className="denlla-footer-link">Características</a>
-            <a href="#pricing" className="denlla-footer-link">Precios</a>
+            <Link to="/caracteristicas" className="denlla-footer-link">Caracteristicas</Link>
+            <Link to="/precios" className="denlla-footer-link">Precios</Link>
             <a href="mailto:soporte@denlla.com" className="denlla-footer-link">Contacto</a>
           </div>
           <div className="denlla-footer-legal">

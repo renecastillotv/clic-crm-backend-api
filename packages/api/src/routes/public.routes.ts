@@ -109,6 +109,7 @@ router.get('/tenants/:slug', async (req: Request, res: Response, next: NextFunct
         linkedin_url: infoNegocio.linkedin_url || null,
         youtube_url: infoNegocio.youtube_url || null,
         tiktok_url: infoNegocio.tiktok_url || null,
+        color_primario: infoNegocio.color_primario || null,
       },
     });
   } catch (error) {

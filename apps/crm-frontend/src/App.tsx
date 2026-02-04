@@ -21,6 +21,8 @@ import CrmLayout from './layouts/CrmLayout';
 
 // Páginas públicas
 import DenllaLandingPage from './pages/DenllaLandingPage';
+import DenllaPricingPage from './pages/DenllaPricingPage';
+import DenllaFeaturesPage from './pages/DenllaFeaturesPage';
 import VerificarCertificado from './pages/VerificarCertificado';
 
 // Páginas de autenticación
@@ -274,6 +276,8 @@ function AppRoutes() {
     <Routes>
       {/* ========== RUTAS PÚBLICAS ========== */}
       <Route path="/" element={<DenllaLandingPage />} />
+      <Route path="/precios" element={<DenllaPricingPage />} />
+      <Route path="/caracteristicas" element={<DenllaFeaturesPage />} />
       <Route path="/verificar" element={<VerificarCertificado />} />
       <Route path="/verificar/:codigo" element={<VerificarCertificado />} />
 

@@ -1,10 +1,16 @@
+/* ================================
+   TENANT SIGNUP PAGE
+   Denlla B2B Enterprise Style
+   ================================ */
+
 .tenant-signup {
   min-height: 100vh;
-  background: linear-gradient(135deg, #0f172a 0%, #1e293b 50%, #334155 100%);
+  background: #0F1115;
   display: flex;
   align-items: center;
   justify-content: center;
   padding: 2rem;
+  font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
 }
 
 .tenant-signup-content {
@@ -25,31 +31,32 @@
 }
 
 .tenant-signup-name {
-  color: #ffffff;
-  font-size: 1.75rem;
-  font-weight: 700;
+  color: #FFFFFF;
+  font-size: 1.5rem;
+  font-weight: 600;
   margin: 0;
+  letter-spacing: -0.02em;
 }
 
 /* Card */
 .tenant-signup-card {
-  background: #1e293b;
-  border: 1px solid #334155;
-  border-radius: 16px;
+  background: #1A1D21;
+  border: 1px solid #2A2E34;
+  border-radius: 12px;
   padding: 2rem;
   box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.5);
 }
 
 .tenant-signup-card h2 {
-  color: #f1f5f9;
-  font-size: 1.5rem;
+  color: #FFFFFF;
+  font-size: 1.25rem;
   font-weight: 600;
   margin: 0 0 0.5rem 0;
   text-align: center;
 }
 
 .tenant-signup-subtitle {
-  color: #94a3b8;
+  color: rgba(255, 255, 255, 0.5);
   text-align: center;
   margin: 0 0 1.5rem 0;
   font-size: 0.9375rem;
@@ -57,9 +64,9 @@
 
 /* Error */
 .tenant-signup-error {
-  background: rgba(220, 38, 38, 0.1);
-  border: 1px solid rgba(220, 38, 38, 0.3);
-  color: #fca5a5;
+  background: rgba(239, 68, 68, 0.1);
+  border: 1px solid rgba(239, 68, 68, 0.3);
+  color: #FCA5A5;
   padding: 0.75rem 1rem;
   border-radius: 8px;
   font-size: 0.875rem;
@@ -86,33 +93,33 @@
 }
 
 .form-group label {
-  color: #cbd5e1;
+  color: rgba(255, 255, 255, 0.7);
   font-size: 0.875rem;
   font-weight: 500;
 }
 
 .form-group input,
 .form-group textarea {
-  background: #0f172a;
-  border: 1px solid #334155;
+  background: #121417;
+  border: 1px solid #3A3F45;
   border-radius: 8px;
   padding: 0.75rem 1rem;
-  color: #f1f5f9;
+  color: #FFFFFF;
   font-size: 0.9375rem;
   font-family: inherit;
-  transition: border-color 0.2s, box-shadow 0.2s;
+  transition: border-color 0.15s, box-shadow 0.15s;
 }
 
 .form-group input::placeholder,
 .form-group textarea::placeholder {
-  color: #64748b;
+  color: rgba(255, 255, 255, 0.3);
 }
 
 .form-group input:focus,
 .form-group textarea:focus {
   outline: none;
-  border-color: #3b82f6;
-  box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.2);
+  border-color: var(--tenant-accent, #2563EB);
+  box-shadow: 0 0 0 3px color-mix(in srgb, var(--tenant-accent, #2563EB) 20%, transparent);
 }
 
 .form-group input:disabled,
@@ -134,20 +141,20 @@
   padding: 0.75rem 1.5rem;
   border-radius: 8px;
   font-size: 0.9375rem;
-  font-weight: 600;
+  font-weight: 500;
   text-decoration: none;
   cursor: pointer;
   border: none;
-  transition: all 0.2s ease;
+  transition: all 0.15s ease;
 }
 
 .tenant-signup-btn-primary {
-  background: #3b82f6;
-  color: #ffffff;
+  background: var(--tenant-accent, #2563EB);
+  color: #FFFFFF;
 }
 
 .tenant-signup-btn-primary:hover:not(:disabled) {
-  background: #2563eb;
+  filter: brightness(0.9);
 }
 
 .tenant-signup-btn-primary:disabled {
@@ -165,17 +172,17 @@
   text-align: center;
   margin-top: 1.5rem;
   padding-top: 1.5rem;
-  border-top: 1px solid #334155;
+  border-top: 1px solid #2A2E34;
 }
 
 .tenant-signup-footer p {
-  color: #64748b;
+  color: rgba(255, 255, 255, 0.4);
   font-size: 0.875rem;
   margin: 0;
 }
 
 .tenant-signup-footer a {
-  color: #3b82f6;
+  color: var(--tenant-accent, #2563EB);
   text-decoration: none;
   font-weight: 500;
 }
@@ -191,13 +198,13 @@
 }
 
 .tenant-signup-back a {
-  color: #64748b;
+  color: rgba(255, 255, 255, 0.4);
   text-decoration: none;
-  font-size: 0.875rem;
+  font-size: 0.8125rem;
 }
 
 .tenant-signup-back a:hover {
-  color: #94a3b8;
+  color: rgba(255, 255, 255, 0.6);
 }
 
 /* Success state */
@@ -205,25 +212,25 @@
   width: 64px;
   height: 64px;
   background: rgba(34, 197, 94, 0.1);
-  border: 2px solid #22c55e;
+  border: 2px solid #22C55E;
   border-radius: 50%;
   display: flex;
   align-items: center;
   justify-content: center;
   font-size: 2rem;
-  color: #22c55e;
+  color: #22C55E;
   margin: 0 auto 1.5rem;
 }
 
 .success-message {
-  color: #f1f5f9;
+  color: #FFFFFF;
   text-align: center;
   margin: 0 0 0.75rem 0;
   font-size: 1rem;
 }
 
 .success-detail {
-  color: #94a3b8;
+  color: rgba(255, 255, 255, 0.5);
   text-align: center;
   margin: 0 0 1.5rem 0;
   font-size: 0.9375rem;
@@ -240,8 +247,8 @@
 .loading-spinner {
   width: 48px;
   height: 48px;
-  border: 3px solid rgba(255, 255, 255, 0.1);
-  border-top-color: #ffffff;
+  border: 3px solid #2A2E34;
+  border-top-color: var(--tenant-accent, #2563EB);
   border-radius: 50%;
   animation: spin 1s linear infinite;
 }

@@ -1,6 +1,6 @@
 /**
  * TenantSignupPage - Formulario de solicitud de acceso al tenant
- * No es registro directo, sino una solicitud que el admin aprueba
+ * Estilo Denlla B2B Enterprise con soporte para colores del tenant
  */
 
 import { useEffect, useState } from 'react';
@@ -19,6 +19,7 @@ interface TenantPublicInfo {
     slogan?: string;
     logo_url?: string;
     isotipo_url?: string;
+    color_primario?: string;
   } | null;
 }
 
@@ -85,23 +86,21 @@ export default function TenantSignupPage() {
     e.preventDefault();
     setError(null);
 
-    // Validación básica
     if (!formData.nombre.trim() || !formData.apellido.trim() || !formData.email.trim()) {
       setError('Por favor completa los campos requeridos');
       return;
     }
 
-    // Validar email
     const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
     if (!emailRegex.test(formData.email)) {
-      setError('Por favor ingresa un email válido');
+      setError('Por favor ingresa un email valido');
       return;
     }
 
     try {
       setSubmitting(true);
       const apiUrl = import.meta.env.VITE_API_URL || 'http://localhost:3001/api';
-      const response = await fetch(`${apiUrl}/public/tenants/${tenantSlug}/join-request`, {
+      const response = await fetch(`${apiUrl}/public/tenants/${tenantSlug}/registro`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -123,9 +122,19 @@ export default function TenantSignupPage() {
     }
   };
 
+  const displayName = tenantInfo?.infoNegocio?.nombre || tenantInfo?.tenant.nombre || 'Empresa';
+  const logoUrl = tenantInfo?.infoNegocio?.logo_url || tenantInfo?.infoNegocio?.isotipo_url;
+  const accentColor = tenantInfo?.infoNegocio?.color_primario || '#2563EB';
+
+  // Dynamic styles for tenant customization
+  const customStyles = {
+    '--tenant-accent': accentColor,
+    '--tenant-accent-hover': accentColor,
+  } as React.CSSProperties;
+
   if (loading) {
     return (
-      <div className="tenant-signup">
+      <div className="tenant-signup" style={customStyles}>
         <div className="tenant-signup-content">
           <div className="tenant-signup-loading">
             <div className="loading-spinner"></div>
@@ -135,13 +144,10 @@ export default function TenantSignupPage() {
     );
   }
 
-  const displayName = tenantInfo?.infoNegocio?.nombre || tenantInfo?.tenant.nombre || 'Empresa';
-  const logoUrl = tenantInfo?.infoNegocio?.logo_url || tenantInfo?.infoNegocio?.isotipo_url;
-
-  // Pantalla de éxito
+  // Pantalla de exito
   if (submitted) {
     return (
-      <div className="tenant-signup">
+      <div className="tenant-signup" style={customStyles}>
         <div className="tenant-signup-content">
           <div className="tenant-signup-card">
             <div className="success-icon">✓</div>
@@ -150,7 +156,7 @@ export default function TenantSignupPage() {
               Tu solicitud para unirte a <strong>{displayName}</strong> ha sido enviada exitosamente.
             </p>
             <p className="success-detail">
-              El administrador revisará tu solicitud y te contactará pronto.
+              El administrador revisara tu solicitud y te contactara pronto.
             </p>
             <Link to={`/${tenantSlug}`} className="tenant-signup-btn tenant-signup-btn-primary">
               Volver al inicio
@@ -162,7 +168,7 @@ export default function TenantSignupPage() {
   }
 
   return (
-    <div className="tenant-signup">
+    <div className="tenant-signup" style={customStyles}>
       <div className="tenant-signup-content">
         {/* Header con logo */}
         <div className="tenant-signup-header">
@@ -217,7 +223,7 @@ export default function TenantSignupPage() {
             </div>
 
             <div className="form-group">
-              <label htmlFor="email">Correo electrónico *</label>
+              <label htmlFor="email">Correo electronico *</label>
               <input
                 type="email"
                 id="email"
@@ -231,7 +237,7 @@ export default function TenantSignupPage() {
             </div>
 
             <div className="form-group">
-              <label htmlFor="telefono">Teléfono</label>
+              <label htmlFor="telefono">Telefono</label>
               <input
                 type="tel"
                 id="telefono"
@@ -250,7 +256,7 @@ export default function TenantSignupPage() {
                 name="motivacion"
                 value={formData.motivacion}
                 onChange={handleChange}
-                placeholder="¿Por qué te gustaría unirte?"
+                placeholder="¿Por que te gustaria unirte?"
                 rows={3}
                 disabled={submitting}
               />
@@ -268,7 +274,7 @@ export default function TenantSignupPage() {
           <div className="tenant-signup-footer">
             <p>
               ¿Ya tienes cuenta?{' '}
-              <Link to={`/${tenantSlug}/login`}>Iniciar sesión</Link>
+              <Link to={`/${tenantSlug}/login`}>Iniciar sesion</Link>
             </p>
           </div>
         </div>
