@@ -18,6 +18,43 @@ import {
 const router = express.Router();
 
 /**
+ * GET /api/public/stats
+ *
+ * Obtiene estadísticas públicas de la plataforma para la landing page.
+ * No requiere autenticación.
+ */
+router.get('/stats', async (req: Request, res: Response, next: NextFunction) => {
+  try {
+    // Contar tenants activos
+    const tenantsResult = await query(
+      `SELECT COUNT(*) FROM tenants WHERE activo = true`
+    );
+    const totalTenants = parseInt(tenantsResult.rows[0].count, 10);
+
+    // Contar usuarios activos
+    const usersResult = await query(
+      `SELECT COUNT(*) FROM usuarios WHERE activo = true`
+    );
+    const totalUsers = parseInt(usersResult.rows[0].count, 10);
+
+    // Contar propiedades
+    const propertiesResult = await query(
+      `SELECT COUNT(*) FROM propiedades WHERE activo = true`
+    );
+    const totalProperties = parseInt(propertiesResult.rows[0].count, 10);
+
+    res.json({
+      tenants: totalTenants,
+      users: totalUsers,
+      properties: totalProperties,
+    });
+  } catch (error) {
+    console.error('❌ Error en GET /api/public/stats:', error);
+    next(error);
+  }
+});
+
+/**
  * GET /api/public/tenants/:slug
  *
  * Obtiene información pública de un tenant para mostrar en landing page.
