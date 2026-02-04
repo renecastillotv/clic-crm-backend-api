@@ -87,8 +87,16 @@ export default function TenantLoginPage() {
 
   const displayName = tenantInfo?.infoNegocio?.nombre || tenantInfo?.tenant.nombre || 'Empresa';
   const logoUrl = tenantInfo?.infoNegocio?.logo_url || tenantInfo?.infoNegocio?.isotipo_url;
-  const accentColor = tenantInfo?.infoNegocio?.color_primario || '#2563EB';
-  const accentColorHover = accentColor === '#2563EB' ? '#1D4ED8' : accentColor;
+
+  // Premium tenant color overrides
+  const PREMIUM_TENANT_COLORS: Record<string, { accent: string; hover: string }> = {
+    'clic': { accent: '#f04e00', hover: '#d94500' },
+    'ubikala': { accent: '#5C6B3C', hover: '#4A5730' },
+  };
+
+  const premiumColors = tenantSlug ? PREMIUM_TENANT_COLORS[tenantSlug] : null;
+  const accentColor = premiumColors?.accent || tenantInfo?.infoNegocio?.color_primario || '#2563EB';
+  const accentColorHover = premiumColors?.hover || (accentColor === '#2563EB' ? '#1D4ED8' : accentColor);
 
   return (
     <div
