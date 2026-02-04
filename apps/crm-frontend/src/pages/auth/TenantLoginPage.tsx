@@ -1,5 +1,6 @@
 /**
  * TenantLoginPage - Página de inicio de sesión con branding del tenant
+ * Estilo Denlla B2B Enterprise con soporte para personalización
  */
 
 import { useEffect, useState } from 'react';
@@ -18,6 +19,7 @@ interface TenantPublicInfo {
     slogan?: string;
     logo_url?: string;
     isotipo_url?: string;
+    color_primario?: string;
   } | null;
 }
 
@@ -64,15 +66,16 @@ export default function TenantLoginPage() {
           display: 'flex',
           alignItems: 'center',
           justifyContent: 'center',
-          background: 'linear-gradient(135deg, #0f172a 0%, #1e293b 50%, #334155 100%)',
+          background: '#0F1115',
+          fontFamily: "'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif",
         }}
       >
         <div
           style={{
             width: 48,
             height: 48,
-            border: '3px solid rgba(255, 255, 255, 0.1)',
-            borderTopColor: '#ffffff',
+            border: '3px solid #2A2E34',
+            borderTopColor: '#2563EB',
             borderRadius: '50%',
             animation: 'spin 1s linear infinite',
           }}
@@ -84,6 +87,8 @@ export default function TenantLoginPage() {
 
   const displayName = tenantInfo?.infoNegocio?.nombre || tenantInfo?.tenant.nombre || 'Empresa';
   const logoUrl = tenantInfo?.infoNegocio?.logo_url || tenantInfo?.infoNegocio?.isotipo_url;
+  const accentColor = tenantInfo?.infoNegocio?.color_primario || '#2563EB';
+  const accentColorHover = accentColor === '#2563EB' ? '#1D4ED8' : accentColor;
 
   return (
     <div
@@ -92,13 +97,14 @@ export default function TenantLoginPage() {
         display: 'flex',
         alignItems: 'center',
         justifyContent: 'center',
-        background: 'linear-gradient(135deg, #0f172a 0%, #1e293b 50%, #334155 100%)',
+        background: '#0F1115',
         padding: '20px',
+        fontFamily: "'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif",
       }}
     >
       <div style={{ textAlign: 'center' }}>
         {/* Logo o nombre del tenant */}
-        <div style={{ marginBottom: '30px' }}>
+        <div style={{ marginBottom: '32px' }}>
           {logoUrl ? (
             <img
               src={logoUrl}
@@ -113,17 +119,18 @@ export default function TenantLoginPage() {
           ) : (
             <h1
               style={{
-                color: '#fff',
-                fontSize: '2rem',
-                fontWeight: 'bold',
+                color: '#FFFFFF',
+                fontSize: '1.75rem',
+                fontWeight: 600,
                 margin: 0,
+                letterSpacing: '-0.02em',
               }}
             >
               {displayName}
             </h1>
           )}
           {tenantInfo?.infoNegocio?.slogan && (
-            <p style={{ color: '#94a3b8', marginTop: '10px', fontSize: '1rem' }}>
+            <p style={{ color: 'rgba(255, 255, 255, 0.5)', marginTop: '8px', fontSize: '0.9375rem' }}>
               {tenantInfo.infoNegocio.slogan}
             </p>
           )}
@@ -137,47 +144,74 @@ export default function TenantLoginPage() {
                 margin: '0 auto',
               },
               card: {
-                backgroundColor: '#1e293b',
-                border: '1px solid #334155',
+                backgroundColor: '#1A1D21',
+                border: '1px solid #2A2E34',
                 borderRadius: '12px',
                 boxShadow: '0 25px 50px -12px rgba(0, 0, 0, 0.5)',
               },
               headerTitle: {
-                color: '#f1f5f9',
+                color: '#FFFFFF',
+                fontWeight: 600,
               },
               headerSubtitle: {
-                color: '#94a3b8',
+                color: 'rgba(255, 255, 255, 0.5)',
               },
               formFieldLabel: {
-                color: '#cbd5e1',
+                color: 'rgba(255, 255, 255, 0.7)',
               },
               formFieldInput: {
-                backgroundColor: '#0f172a',
-                borderColor: '#334155',
-                color: '#f1f5f9',
+                backgroundColor: '#121417',
+                borderColor: '#3A3F45',
+                color: '#FFFFFF',
+                '&:focus': {
+                  borderColor: accentColor,
+                  boxShadow: `0 0 0 3px ${accentColor}33`,
+                },
               },
               formButtonPrimary: {
-                backgroundColor: '#3b82f6',
+                backgroundColor: accentColor,
                 '&:hover': {
-                  backgroundColor: '#2563eb',
+                  backgroundColor: accentColorHover,
                 },
               },
               footerActionLink: {
-                color: '#3b82f6',
+                color: accentColor,
+                '&:hover': {
+                  color: accentColorHover,
+                },
               },
               dividerLine: {
-                backgroundColor: '#334155',
+                backgroundColor: '#2A2E34',
               },
               dividerText: {
-                color: '#64748b',
+                color: 'rgba(255, 255, 255, 0.4)',
               },
               socialButtonsBlockButton: {
-                backgroundColor: '#1e293b',
-                borderColor: '#334155',
-                color: '#f1f5f9',
+                backgroundColor: '#121417',
+                borderColor: '#3A3F45',
+                color: '#FFFFFF',
                 '&:hover': {
-                  backgroundColor: '#334155',
+                  backgroundColor: '#2A2E34',
+                  borderColor: '#4A5057',
                 },
+              },
+              identityPreviewEditButton: {
+                color: accentColor,
+              },
+              formFieldInputShowPasswordButton: {
+                color: 'rgba(255, 255, 255, 0.5)',
+              },
+              otpCodeFieldInput: {
+                backgroundColor: '#121417',
+                borderColor: '#3A3F45',
+                color: '#FFFFFF',
+              },
+              alert: {
+                backgroundColor: 'rgba(239, 68, 68, 0.1)',
+                borderColor: '#EF4444',
+              },
+              alertText: {
+                color: '#FCA5A5',
               },
             },
           }}
@@ -189,13 +223,13 @@ export default function TenantLoginPage() {
 
         {/* Link para solicitar acceso */}
         <div style={{ marginTop: '24px' }}>
-          <p style={{ color: '#64748b', fontSize: '0.875rem', marginBottom: '8px' }}>
+          <p style={{ color: 'rgba(255, 255, 255, 0.4)', fontSize: '0.875rem', marginBottom: '8px' }}>
             ¿No tienes cuenta en {displayName}?
           </p>
           <Link
             to={`/${tenantSlug}/registro`}
             style={{
-              color: '#3b82f6',
+              color: accentColor,
               textDecoration: 'none',
               fontSize: '0.875rem',
               fontWeight: 500,
@@ -210,7 +244,7 @@ export default function TenantLoginPage() {
           <Link
             to={`/${tenantSlug}`}
             style={{
-              color: '#64748b',
+              color: 'rgba(255, 255, 255, 0.4)',
               textDecoration: 'none',
               fontSize: '0.8125rem',
             }}

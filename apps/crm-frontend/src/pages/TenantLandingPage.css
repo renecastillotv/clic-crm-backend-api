@@ -1,10 +1,16 @@
+/* ================================
+   TENANT LANDING PAGE
+   Denlla B2B Enterprise Style
+   ================================ */
+
 .tenant-landing {
   min-height: 100vh;
-  background: linear-gradient(135deg, #0f172a 0%, #1e293b 50%, #334155 100%);
+  background: #0F1115;
   display: flex;
   align-items: center;
   justify-content: center;
   padding: 2rem;
+  font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
 }
 
 .tenant-landing-content {
@@ -29,18 +35,18 @@
 
 /* Nombre y slogan */
 .tenant-name {
-  font-size: 2.5rem;
-  font-weight: 700;
-  color: #ffffff;
+  font-size: 2rem;
+  font-weight: 600;
+  color: #FFFFFF;
   margin: 0 0 0.75rem 0;
   letter-spacing: -0.02em;
 }
 
 .tenant-slogan {
-  font-size: 1.125rem;
-  color: rgba(255, 255, 255, 0.7);
+  font-size: 1rem;
+  color: rgba(255, 255, 255, 0.5);
   margin: 0 0 2.5rem 0;
-  line-height: 1.5;
+  line-height: 1.6;
 }
 
 /* Botones */
@@ -55,57 +61,55 @@
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  padding: 1rem 2rem;
-  border-radius: 12px;
-  font-size: 1rem;
-  font-weight: 600;
+  padding: 0.875rem 1.75rem;
+  border-radius: 8px;
+  font-size: 0.9375rem;
+  font-weight: 500;
   text-decoration: none;
-  transition: all 0.2s ease;
+  transition: all 0.15s ease;
   cursor: pointer;
   border: none;
 }
 
 .tenant-btn-primary {
-  background: #ffffff;
-  color: #0f172a;
+  background: var(--tenant-primary, #2563EB);
+  color: #FFFFFF;
 }
 
 .tenant-btn-primary:hover {
-  background: #f1f5f9;
-  transform: translateY(-2px);
-  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.25);
+  background: var(--tenant-primary-hover, #1D4ED8);
+  filter: brightness(0.9);
 }
 
 .tenant-btn-secondary {
   background: transparent;
-  color: #ffffff;
-  border: 2px solid rgba(255, 255, 255, 0.3);
+  color: rgba(255, 255, 255, 0.9);
+  border: 1px solid rgba(255, 255, 255, 0.2);
 }
 
 .tenant-btn-secondary:hover {
-  background: rgba(255, 255, 255, 0.1);
-  border-color: rgba(255, 255, 255, 0.5);
-  transform: translateY(-2px);
+  background: rgba(255, 255, 255, 0.05);
+  border-color: rgba(255, 255, 255, 0.3);
 }
 
 /* Contacto */
 .tenant-contact {
   display: flex;
   flex-wrap: wrap;
-  gap: 1rem;
+  gap: 1.5rem;
   justify-content: center;
   margin-bottom: 1.5rem;
 }
 
 .tenant-contact-item {
-  color: rgba(255, 255, 255, 0.6);
+  color: rgba(255, 255, 255, 0.5);
   font-size: 0.875rem;
   text-decoration: none;
-  transition: color 0.2s ease;
+  transition: color 0.15s ease;
 }
 
 .tenant-contact-item:hover {
-  color: #ffffff;
+  color: #FFFFFF;
 }
 
 /* Redes sociales */
@@ -122,15 +126,14 @@
   width: 44px;
   height: 44px;
   border-radius: 50%;
-  background: rgba(255, 255, 255, 0.1);
-  color: rgba(255, 255, 255, 0.7);
-  transition: all 0.2s ease;
+  background: rgba(255, 255, 255, 0.06);
+  color: rgba(255, 255, 255, 0.5);
+  transition: all 0.15s ease;
 }
 
 .tenant-social-link:hover {
-  background: rgba(255, 255, 255, 0.2);
-  color: #ffffff;
-  transform: translateY(-2px);
+  background: rgba(255, 255, 255, 0.1);
+  color: #FFFFFF;
 }
 
 /* Loading */
@@ -144,8 +147,8 @@
 .loading-spinner {
   width: 48px;
   height: 48px;
-  border: 3px solid rgba(255, 255, 255, 0.1);
-  border-top-color: #ffffff;
+  border: 3px solid #2A2E34;
+  border-top-color: var(--tenant-primary, #2563EB);
   border-radius: 50%;
   animation: spin 1s linear infinite;
 }
@@ -158,23 +161,26 @@
 
 /* Error states */
 .tenant-landing-error {
-  background: linear-gradient(135deg, #1e293b 0%, #0f172a 100%);
+  background: #0F1115;
 }
 
 .tenant-error-icon {
-  font-size: 4rem;
+  font-size: 3rem;
   margin-bottom: 1.5rem;
+  opacity: 0.6;
 }
 
 .tenant-landing-error h1 {
-  font-size: 2rem;
-  color: #ffffff;
+  font-size: 1.5rem;
+  font-weight: 600;
+  color: #FFFFFF;
   margin: 0 0 0.75rem 0;
 }
 
 .tenant-landing-error p {
-  color: rgba(255, 255, 255, 0.6);
+  color: rgba(255, 255, 255, 0.5);
   margin: 0 0 2rem 0;
+  font-size: 0.9375rem;
 }
 
 /* Responsive */
@@ -189,16 +195,16 @@
   }
 
   .tenant-name {
-    font-size: 2rem;
+    font-size: 1.75rem;
   }
 
   .tenant-slogan {
-    font-size: 1rem;
+    font-size: 0.9375rem;
   }
 
   .tenant-btn {
-    padding: 0.875rem 1.5rem;
-    font-size: 0.9375rem;
+    padding: 0.75rem 1.5rem;
+    font-size: 0.875rem;
   }
 }
 
@@ -210,6 +216,6 @@
   }
 
   .tenant-btn {
-    min-width: 180px;
+    min-width: 160px;
   }
 }

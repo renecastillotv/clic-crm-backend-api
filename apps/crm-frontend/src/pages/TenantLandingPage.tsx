@@ -23,6 +23,7 @@ interface TenantPublicInfo {
     email_principal?: string;
     facebook_url?: string;
     instagram_url?: string;
+    color_primario?: string;
   } | null;
 }
 
@@ -118,9 +119,16 @@ export default function TenantLandingPage() {
   const { tenant, infoNegocio } = tenantInfo;
   const displayName = infoNegocio?.nombre || tenant.nombre;
   const logoUrl = infoNegocio?.logo_url || infoNegocio?.isotipo_url;
+  const primaryColor = infoNegocio?.color_primario || '#2563EB';
+
+  // Dynamic styles for tenant customization
+  const customStyles = primaryColor !== '#2563EB' ? {
+    '--tenant-primary': primaryColor,
+    '--tenant-primary-hover': primaryColor,
+  } as React.CSSProperties : {};
 
   return (
-    <div className="tenant-landing">
+    <div className="tenant-landing" style={customStyles}>
       <div className="tenant-landing-content">
         {logoUrl && (
           <div className="tenant-logo-container">

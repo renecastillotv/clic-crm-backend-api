@@ -1,8 +1,10 @@
 /**
  * SignupPage - Página de registro con Clerk
+ * Estilo Denlla B2B Enterprise
  */
 
 import { SignUp } from '@clerk/clerk-react';
+import { Link } from 'react-router-dom';
 
 export default function SignupPage() {
   return (
@@ -12,24 +14,28 @@ export default function SignupPage() {
         display: 'flex',
         alignItems: 'center',
         justifyContent: 'center',
-        background: 'linear-gradient(135deg, #1a1a2e 0%, #16213e 100%)',
+        background: '#0F1115',
         padding: '20px',
+        fontFamily: "'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif",
       }}
     >
       <div style={{ textAlign: 'center' }}>
         {/* Logo */}
-        <div style={{ marginBottom: '30px' }}>
-          <h1
-            style={{
-              color: '#fff',
-              fontSize: '2.5rem',
-              fontWeight: 'bold',
-              margin: 0,
-            }}
-          >
-            🏠 CRM Inmobiliario
-          </h1>
-          <p style={{ color: '#94a3b8', marginTop: '10px' }}>
+        <div style={{ marginBottom: '32px' }}>
+          <Link to="/" style={{ textDecoration: 'none' }}>
+            <h1
+              style={{
+                color: '#FFFFFF',
+                fontSize: '1.75rem',
+                fontWeight: 600,
+                margin: 0,
+                letterSpacing: '-0.02em',
+              }}
+            >
+              Denlla
+            </h1>
+          </Link>
+          <p style={{ color: 'rgba(255, 255, 255, 0.5)', marginTop: '8px', fontSize: '0.9375rem' }}>
             Crea tu cuenta para empezar
           </p>
         </div>
@@ -42,47 +48,74 @@ export default function SignupPage() {
                 margin: '0 auto',
               },
               card: {
-                backgroundColor: '#1e293b',
-                border: '1px solid #334155',
+                backgroundColor: '#1A1D21',
+                border: '1px solid #2A2E34',
                 borderRadius: '12px',
                 boxShadow: '0 25px 50px -12px rgba(0, 0, 0, 0.5)',
               },
               headerTitle: {
-                color: '#f1f5f9',
+                color: '#FFFFFF',
+                fontWeight: 600,
               },
               headerSubtitle: {
-                color: '#94a3b8',
+                color: 'rgba(255, 255, 255, 0.5)',
               },
               formFieldLabel: {
-                color: '#cbd5e1',
+                color: 'rgba(255, 255, 255, 0.7)',
               },
               formFieldInput: {
-                backgroundColor: '#0f172a',
-                borderColor: '#334155',
-                color: '#f1f5f9',
+                backgroundColor: '#121417',
+                borderColor: '#3A3F45',
+                color: '#FFFFFF',
+                '&:focus': {
+                  borderColor: '#2563EB',
+                  boxShadow: '0 0 0 3px rgba(37, 99, 235, 0.2)',
+                },
               },
               formButtonPrimary: {
-                backgroundColor: '#3b82f6',
+                backgroundColor: '#2563EB',
                 '&:hover': {
-                  backgroundColor: '#2563eb',
+                  backgroundColor: '#1D4ED8',
                 },
               },
               footerActionLink: {
-                color: '#3b82f6',
+                color: '#2563EB',
+                '&:hover': {
+                  color: '#1D4ED8',
+                },
               },
               dividerLine: {
-                backgroundColor: '#334155',
+                backgroundColor: '#2A2E34',
               },
               dividerText: {
-                color: '#64748b',
+                color: 'rgba(255, 255, 255, 0.4)',
               },
               socialButtonsBlockButton: {
-                backgroundColor: '#1e293b',
-                borderColor: '#334155',
-                color: '#f1f5f9',
+                backgroundColor: '#121417',
+                borderColor: '#3A3F45',
+                color: '#FFFFFF',
                 '&:hover': {
-                  backgroundColor: '#334155',
+                  backgroundColor: '#2A2E34',
+                  borderColor: '#4A5057',
                 },
+              },
+              identityPreviewEditButton: {
+                color: '#2563EB',
+              },
+              formFieldInputShowPasswordButton: {
+                color: 'rgba(255, 255, 255, 0.5)',
+              },
+              otpCodeFieldInput: {
+                backgroundColor: '#121417',
+                borderColor: '#3A3F45',
+                color: '#FFFFFF',
+              },
+              alert: {
+                backgroundColor: 'rgba(239, 68, 68, 0.1)',
+                borderColor: '#EF4444',
+              },
+              alertText: {
+                color: '#FCA5A5',
               },
             },
           }}

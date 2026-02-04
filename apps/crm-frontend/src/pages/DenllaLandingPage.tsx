@@ -5,6 +5,7 @@
  * Inspiración: Airbnb, Stripe, Linear
  */
 
+import { useState, useEffect } from 'react';
 import { Link } from 'react-router-dom';
 import {
   Building2,
@@ -17,6 +18,12 @@ import {
   Check,
 } from 'lucide-react';
 import './DenllaLandingPage.css';
+
+interface PlatformStats {
+  tenants: number;
+  users: number;
+  properties: number;
+}
 
 const FEATURES = [
   {
@@ -59,6 +66,23 @@ const BENEFITS = [
 ];
 
 export default function DenllaLandingPage() {
+  const [stats, setStats] = useState<PlatformStats>({ tenants: 50, users: 200, properties: 500 });
+
+  useEffect(() => {
+    const fetchStats = async () => {
+      try {
+        const response = await fetch('/api/public/stats');
+        if (response.ok) {
+          const data = await response.json();
+          setStats(data);
+        }
+      } catch (error) {
+        console.error('Error fetching platform stats:', error);
+      }
+    };
+    fetchStats();
+  }, []);
+
   return (
     <div className="denlla-landing">
       {/* Header */}
@@ -132,9 +156,22 @@ export default function DenllaLandingPage() {
       {/* Social Proof */}
       <section className="denlla-proof">
         <div className="denlla-proof-content">
-          <p className="denlla-proof-stat">+50</p>
+          <div className="denlla-proof-stats">
+            <div className="denlla-proof-stat-item">
+              <p className="denlla-proof-stat">+{stats.tenants}</p>
+              <p className="denlla-proof-label">inmobiliarias</p>
+            </div>
+            <div className="denlla-proof-stat-item">
+              <p className="denlla-proof-stat">+{stats.users}</p>
+              <p className="denlla-proof-label">usuarios activos</p>
+            </div>
+            <div className="denlla-proof-stat-item">
+              <p className="denlla-proof-stat">+{stats.properties}</p>
+              <p className="denlla-proof-label">propiedades</p>
+            </div>
+          </div>
           <p className="denlla-proof-text">
-            inmobiliarias en Latinoamérica confían en Denlla
+            Inmobiliarias en Latinoamérica confían en Denlla
             <br />
             para gestionar sus operaciones diarias.
           </p>
