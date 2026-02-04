@@ -60,6 +60,10 @@ export async function requireAuth(
         'http://localhost:5173',
         'https://clic-crm-frontend.vercel.app',
         'https://crm.clicinmobiliaria.com',
+        'https://denlla.com',
+        'https://www.denlla.com',
+        'https://ubikala.com',
+        'https://www.ubikala.com',
       ],
     });
     console.log('🔐 Token válido para usuario:', payload.sub);
