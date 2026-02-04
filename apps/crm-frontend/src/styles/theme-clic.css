@@ -1,24 +1,49 @@
 /* ================================
-   DESIGN SYSTEM PREMIUM
-   Notion + Linear + Stripe Style
+   DENLLA DESIGN SYSTEM
+   B2B Infrastructure Style
 
-   IMPORTANTE: Solo variables CSS y estilos específicos
-   NO usamos selectores globales agresivos
+   Plataforma de administración inmobiliaria
+   Estilo: Sobrio, técnico, enterprise
    ================================ */
 
 /* Import Inter font */
 @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap');
 
 :root {
+  /* ===== DENLLA COLOR PALETTE ===== */
+
+  /* Grafito Técnico - Principal */
+  --denlla-graphite-900: #0F1115;
+  --denlla-graphite-800: #121417;
+  --denlla-graphite-700: #1A1D21;
+
+  /* Gris Arquitectónico - Secundario */
+  --denlla-gray-600: #2A2E34;
+  --denlla-gray-500: #3A3F45;
+  --denlla-gray-400: #4A5057;
+  --denlla-gray-300: #6B7280;
+  --denlla-gray-200: #9CA3AF;
+
+  /* Gris Mineral - Neutro Claro */
+  --denlla-mineral-100: #F4F6F8;
+  --denlla-mineral-200: #E6E9ED;
+  --denlla-mineral-300: #DADFE5;
+
+  /* Azul Técnico - Acento */
+  --denlla-accent: #2563EB;
+  --denlla-accent-hover: #1D4ED8;
+  --denlla-accent-light: rgba(37, 99, 235, 0.12);
+  --denlla-accent-lighter: rgba(37, 99, 235, 0.06);
+
   /* ===== TYPOGRAPHY ===== */
   --font-primary: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
 
-  /* ===== COLORS ===== */
-  --premium-primary: #0057FF;
-  --premium-primary-dark: #0041CC;
-  --premium-primary-light: rgba(0, 87, 255, 0.12);
-  --premium-primary-lighter: rgba(0, 87, 255, 0.06);
-  --premium-primary-gradient: linear-gradient(135deg, #0057FF 0%, #6236FF 100%);
+  /* ===== PREMIUM MAPPINGS (usando Denlla) ===== */
+  --premium-primary: var(--denlla-accent);
+  --premium-primary-dark: var(--denlla-accent-hover);
+  --premium-primary-light: var(--denlla-accent-light);
+  --premium-primary-lighter: var(--denlla-accent-lighter);
+  --premium-primary-gradient: linear-gradient(135deg, var(--denlla-accent) 0%, #4F46E5 100%);
 
   /* Status Colors */
   --color-success: #10B981;
@@ -30,33 +55,33 @@
   --color-info: #3B82F6;
   --color-info-light: rgba(59, 130, 246, 0.12);
 
-  /* Backgrounds */
-  --premium-sidebar-bg: #E8EBEF;
+  /* Backgrounds - Denlla Palette */
+  --premium-sidebar-bg: var(--denlla-mineral-200);
   --premium-sidebar-hover: rgba(0, 0, 0, 0.05);
   --premium-card-bg: #FFFFFF;
-  --premium-surface: #F8F9FA;
-  --premium-surface-hover: #F1F5F9;
-  --premium-overlay: rgba(15, 23, 42, 0.6);
-  --premium-overlay-light: rgba(15, 23, 42, 0.4);
+  --premium-surface: var(--denlla-mineral-100);
+  --premium-surface-hover: var(--denlla-mineral-200);
+  --premium-overlay: rgba(15, 17, 21, 0.7);
+  --premium-overlay-light: rgba(15, 17, 21, 0.5);
 
-  /* Text */
-  --premium-text-main: #111827;
-  --premium-text-strong: #0F172A;
-  --premium-text-muted: #64748B;
-  --premium-text-soft: #94A3B8;
-  --premium-sidebar-text: #334155;
-  --premium-sidebar-text-active: #0057FF;
+  /* Text - Denlla Palette */
+  --premium-text-main: var(--denlla-graphite-900);
+  --premium-text-strong: var(--denlla-graphite-800);
+  --premium-text-muted: var(--denlla-gray-300);
+  --premium-text-soft: var(--denlla-gray-200);
+  --premium-sidebar-text: var(--denlla-gray-500);
+  --premium-sidebar-text-active: var(--denlla-accent);
 
-  /* Borders */
-  --premium-card-border: #E2E8F0;
-  --premium-border-light: #F1F5F9;
-  --premium-border-medium: #CBD5E1;
-  --premium-sidebar-border: #D1D5DB;
+  /* Borders - Denlla Palette */
+  --premium-card-border: var(--denlla-mineral-300);
+  --premium-border-light: var(--denlla-mineral-100);
+  --premium-border-medium: var(--denlla-mineral-300);
+  --premium-sidebar-border: var(--denlla-mineral-300);
 
-  /* Icons */
-  --premium-icon-default: #94A3B8;
-  --premium-icon-active: #0057FF;
-  --premium-icon-sidebar: #64748B;
+  /* Icons - Denlla Palette */
+  --premium-icon-default: var(--denlla-gray-200);
+  --premium-icon-active: var(--denlla-accent);
+  --premium-icon-sidebar: var(--denlla-gray-300);
 
   /* ===== Z-INDEX HIERARCHY (Sistema Unificado) ===== */
   --z-base: 0;
@@ -71,24 +96,24 @@
   --z-toast: 900;
   --z-max: 9999;
 
-  /* ===== SHADOWS/ELEVATION ===== */
-  --premium-shadow-color: rgba(15, 23, 42, 0.08);
-  --premium-elevation-1: 0 1px 2px rgba(15, 23, 42, 0.06);
-  --premium-elevation-2: 0 4px 10px rgba(15, 23, 42, 0.08);
-  --premium-elevation-3: 0 4px 14px rgba(0, 0, 0, 0.08);
-  --premium-elevation-card: 0 4px 14px rgba(0, 0, 0, 0.08);
-  --premium-elevation-header: 0 2px 8px rgba(0, 0, 0, 0.04);
-  --premium-elevation-button: 0 4px 10px rgba(0, 87, 255, 0.25);
-  --premium-elevation-input: 0 2px 6px rgba(0, 0, 0, 0.04);
+  /* ===== SHADOWS/ELEVATION - Denlla Style ===== */
+  --premium-shadow-color: rgba(15, 17, 21, 0.08);
+  --premium-elevation-1: 0 1px 2px rgba(15, 17, 21, 0.05);
+  --premium-elevation-2: 0 4px 10px rgba(15, 17, 21, 0.06);
+  --premium-elevation-3: 0 4px 14px rgba(15, 17, 21, 0.08);
+  --premium-elevation-card: 0 2px 8px rgba(15, 17, 21, 0.06);
+  --premium-elevation-header: 0 1px 4px rgba(15, 17, 21, 0.04);
+  --premium-elevation-button: 0 2px 8px rgba(37, 99, 235, 0.2);
+  --premium-elevation-input: 0 1px 4px rgba(15, 17, 21, 0.04);
   --premium-elevation-sidebar: inset -1px 0 0 rgba(0, 0, 0, 0.05);
-  /* Nuevas sombras con más contraste */
-  --shadow-sm: 0 1px 2px rgba(0, 0, 0, 0.05);
-  --shadow-md: 0 4px 12px rgba(0, 0, 0, 0.1);
-  --shadow-lg: 0 8px 24px rgba(0, 0, 0, 0.12);
-  --shadow-xl: 0 16px 48px rgba(0, 0, 0, 0.16);
-  --shadow-primary: 0 4px 14px rgba(0, 87, 255, 0.35);
-  --shadow-success: 0 4px 14px rgba(16, 185, 129, 0.35);
-  --shadow-danger: 0 4px 14px rgba(239, 68, 68, 0.35);
+  /* Sombras sutiles - estilo enterprise */
+  --shadow-sm: 0 1px 2px rgba(15, 17, 21, 0.04);
+  --shadow-md: 0 2px 8px rgba(15, 17, 21, 0.06);
+  --shadow-lg: 0 4px 16px rgba(15, 17, 21, 0.08);
+  --shadow-xl: 0 8px 32px rgba(15, 17, 21, 0.1);
+  --shadow-primary: 0 2px 8px rgba(37, 99, 235, 0.25);
+  --shadow-success: 0 2px 8px rgba(16, 185, 129, 0.25);
+  --shadow-danger: 0 2px 8px rgba(239, 68, 68, 0.25);
 
   /* ===== RADIUS ===== */
   --premium-radius-xs: 4px;

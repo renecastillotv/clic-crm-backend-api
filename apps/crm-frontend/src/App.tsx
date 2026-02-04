@@ -2,7 +2,7 @@
  * App.tsx - Rutas principales del CRM
  *
  * Estructura de rutas:
- * - / → Página SaaS pública
+ * - / → Landing Denlla (plataforma)
  * - /login, /signup → Autenticación con Clerk
  * - /admin/* → Panel de administración de la plataforma (solo platform admins)
  * - /crm/:tenantSlug/* → CRM de cada tenant
@@ -20,7 +20,7 @@ import AdminLayout from './layouts/AdminLayout';
 import CrmLayout from './layouts/CrmLayout';
 
 // Páginas públicas
-import SaasPage from './pages/SaasPage';
+import DenllaLandingPage from './pages/DenllaLandingPage';
 import VerificarCertificado from './pages/VerificarCertificado';
 
 // Páginas de autenticación
@@ -273,7 +273,7 @@ function AppRoutes() {
   return (
     <Routes>
       {/* ========== RUTAS PÚBLICAS ========== */}
-      <Route path="/" element={<SaasPage />} />
+      <Route path="/" element={<DenllaLandingPage />} />
       <Route path="/verificar" element={<VerificarCertificado />} />
       <Route path="/verificar/:codigo" element={<VerificarCertificado />} />
 
