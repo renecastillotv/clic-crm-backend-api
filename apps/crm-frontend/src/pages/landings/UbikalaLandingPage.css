@@ -1,0 +1,665 @@
+/* ================================
+   UBIKALA LANDING PAGE
+   Earthy Palette: Verde oliva, Arena, Terracota, Marfil, Gris calido
+   ================================ */
+
+/* Color Palette */
+:root {
+  --ubikala-olive: #5C6B3C;
+  --ubikala-olive-dark: #4A5730;
+  --ubikala-olive-light: #7A8B5A;
+  --ubikala-sand: #D4C4A8;
+  --ubikala-sand-light: #E8DFD0;
+  --ubikala-sand-dark: #B5A68A;
+  --ubikala-terracotta: #C96D3D;
+  --ubikala-terracotta-dark: #A85A30;
+  --ubikala-ivory: #FAF7F0;
+  --ubikala-ivory-pure: #FFFEF9;
+  --ubikala-warm-gray: #6B6660;
+  --ubikala-warm-gray-light: #8B8680;
+  --ubikala-warm-gray-dark: #4A4642;
+}
+
+.ubikala-landing {
+  min-height: 100vh;
+  background: var(--ubikala-ivory);
+  font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+  color: var(--ubikala-warm-gray-dark);
+}
+
+/* ================================
+   HEADER
+   ================================ */
+.ubikala-header {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  z-index: 100;
+  background: rgba(250, 247, 240, 0.95);
+  backdrop-filter: blur(12px);
+  border-bottom: 1px solid var(--ubikala-sand);
+}
+
+.ubikala-header-content {
+  max-width: 1200px;
+  margin: 0 auto;
+  padding: 1rem 2rem;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.ubikala-logo {
+  text-decoration: none;
+}
+
+.ubikala-logo-text {
+  font-size: 1.5rem;
+  font-weight: 700;
+  color: var(--ubikala-olive);
+  letter-spacing: -0.03em;
+}
+
+.ubikala-nav {
+  display: flex;
+  align-items: center;
+  gap: 2rem;
+}
+
+.ubikala-nav-link {
+  color: var(--ubikala-warm-gray);
+  text-decoration: none;
+  font-size: 0.9375rem;
+  font-weight: 500;
+  transition: color 0.15s;
+}
+
+.ubikala-nav-link:hover {
+  color: var(--ubikala-olive);
+}
+
+/* ================================
+   BUTTONS
+   ================================ */
+.ubikala-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.5rem;
+  padding: 0.625rem 1.25rem;
+  border-radius: 8px;
+  font-size: 0.9375rem;
+  font-weight: 500;
+  text-decoration: none;
+  cursor: pointer;
+  border: none;
+  transition: all 0.2s ease;
+}
+
+.ubikala-btn-primary {
+  background: var(--ubikala-olive);
+  color: #FFFFFF;
+}
+
+.ubikala-btn-primary:hover {
+  background: var(--ubikala-olive-dark);
+}
+
+.ubikala-btn-secondary {
+  background: var(--ubikala-sand);
+  color: var(--ubikala-warm-gray-dark);
+}
+
+.ubikala-btn-secondary:hover {
+  background: var(--ubikala-sand-dark);
+}
+
+.ubikala-btn-accent {
+  background: var(--ubikala-terracotta);
+  color: #FFFFFF;
+}
+
+.ubikala-btn-accent:hover {
+  background: var(--ubikala-terracotta-dark);
+}
+
+.ubikala-btn-outline {
+  background: transparent;
+  color: var(--ubikala-olive);
+  border: 1.5px solid var(--ubikala-olive);
+}
+
+.ubikala-btn-outline:hover {
+  background: var(--ubikala-olive);
+  color: #FFFFFF;
+}
+
+.ubikala-btn-ghost {
+  background: transparent;
+  color: var(--ubikala-ivory-pure);
+  border: 1.5px solid rgba(255, 255, 255, 0.3);
+}
+
+.ubikala-btn-ghost:hover {
+  background: rgba(255, 255, 255, 0.1);
+  border-color: rgba(255, 255, 255, 0.5);
+}
+
+.ubikala-btn-lg {
+  padding: 0.875rem 1.75rem;
+  font-size: 1rem;
+}
+
+/* ================================
+   HERO
+   ================================ */
+.ubikala-hero {
+  padding: 10rem 2rem 6rem;
+  background: linear-gradient(180deg, var(--ubikala-ivory) 0%, var(--ubikala-sand-light) 100%);
+}
+
+.ubikala-hero-content {
+  max-width: 800px;
+  margin: 0 auto;
+  text-align: center;
+}
+
+.ubikala-hero-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.5rem;
+  padding: 0.5rem 1rem;
+  background: var(--ubikala-sand);
+  color: var(--ubikala-warm-gray-dark);
+  border-radius: 100px;
+  font-size: 0.8125rem;
+  font-weight: 500;
+  margin-bottom: 1.5rem;
+}
+
+.ubikala-hero-title {
+  font-size: 3.5rem;
+  font-weight: 700;
+  line-height: 1.1;
+  margin: 0 0 1.5rem 0;
+  color: var(--ubikala-warm-gray-dark);
+  letter-spacing: -0.03em;
+}
+
+.ubikala-text-accent {
+  color: var(--ubikala-olive);
+}
+
+.ubikala-hero-subtitle {
+  font-size: 1.25rem;
+  color: var(--ubikala-warm-gray);
+  line-height: 1.6;
+  margin: 0 0 2rem 0;
+}
+
+.ubikala-hero-actions {
+  display: flex;
+  gap: 1rem;
+  justify-content: center;
+  flex-wrap: wrap;
+  margin-bottom: 2rem;
+}
+
+.ubikala-hero-trust {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.5rem;
+  color: var(--ubikala-warm-gray-light);
+  font-size: 0.875rem;
+}
+
+.ubikala-hero-trust svg {
+  color: var(--ubikala-terracotta);
+}
+
+/* ================================
+   STATS
+   ================================ */
+.ubikala-stats {
+  padding: 3rem 2rem;
+  background: var(--ubikala-olive);
+}
+
+.ubikala-stats-grid {
+  max-width: 1000px;
+  margin: 0 auto;
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 2rem;
+}
+
+.ubikala-stat {
+  text-align: center;
+}
+
+.ubikala-stat-value {
+  font-size: 2.5rem;
+  font-weight: 700;
+  color: #FFFFFF;
+  letter-spacing: -0.02em;
+}
+
+.ubikala-stat-label {
+  font-size: 0.875rem;
+  color: rgba(255, 255, 255, 0.7);
+  margin-top: 0.25rem;
+}
+
+/* ================================
+   USER TYPES
+   ================================ */
+.ubikala-users {
+  padding: 6rem 2rem;
+  background: var(--ubikala-ivory-pure);
+}
+
+.ubikala-users-content {
+  max-width: 1200px;
+  margin: 0 auto;
+}
+
+.ubikala-section-header {
+  text-align: center;
+  margin-bottom: 4rem;
+}
+
+.ubikala-section-title {
+  font-size: 2.5rem;
+  font-weight: 700;
+  color: var(--ubikala-warm-gray-dark);
+  margin: 0 0 1rem 0;
+  letter-spacing: -0.02em;
+}
+
+.ubikala-section-subtitle {
+  font-size: 1.125rem;
+  color: var(--ubikala-warm-gray);
+  margin: 0;
+}
+
+.ubikala-users-grid {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 2rem;
+}
+
+.ubikala-user-card {
+  background: #FFFFFF;
+  border: 1px solid var(--ubikala-sand);
+  border-radius: 16px;
+  padding: 2rem;
+  text-align: center;
+  transition: all 0.3s ease;
+}
+
+.ubikala-user-card:hover {
+  border-color: var(--ubikala-olive-light);
+  box-shadow: 0 20px 40px -15px rgba(92, 107, 60, 0.15);
+  transform: translateY(-4px);
+}
+
+.ubikala-user-icon {
+  width: 64px;
+  height: 64px;
+  background: var(--ubikala-sand-light);
+  border-radius: 16px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  margin: 0 auto 1.5rem;
+  color: var(--ubikala-olive);
+}
+
+.ubikala-user-title {
+  font-size: 1.25rem;
+  font-weight: 600;
+  color: var(--ubikala-warm-gray-dark);
+  margin: 0 0 0.75rem 0;
+}
+
+.ubikala-user-description {
+  font-size: 0.9375rem;
+  color: var(--ubikala-warm-gray);
+  line-height: 1.5;
+  margin: 0 0 1.5rem 0;
+}
+
+.ubikala-user-features {
+  list-style: none;
+  padding: 0;
+  margin: 0 0 1.5rem 0;
+  text-align: left;
+}
+
+.ubikala-user-features li {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  font-size: 0.875rem;
+  color: var(--ubikala-warm-gray);
+  padding: 0.5rem 0;
+  border-bottom: 1px solid var(--ubikala-sand-light);
+}
+
+.ubikala-user-features li:last-child {
+  border-bottom: none;
+}
+
+.ubikala-user-features svg {
+  color: var(--ubikala-olive);
+  flex-shrink: 0;
+}
+
+/* ================================
+   FEATURES
+   ================================ */
+.ubikala-features {
+  padding: 6rem 2rem;
+  background: var(--ubikala-sand-light);
+}
+
+.ubikala-features-content {
+  max-width: 1200px;
+  margin: 0 auto;
+}
+
+.ubikala-features-grid {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 2rem;
+}
+
+.ubikala-feature-card {
+  background: #FFFFFF;
+  border-radius: 12px;
+  padding: 1.5rem;
+  border: 1px solid var(--ubikala-sand);
+  transition: all 0.2s ease;
+}
+
+.ubikala-feature-card:hover {
+  border-color: var(--ubikala-terracotta);
+}
+
+.ubikala-feature-icon {
+  width: 48px;
+  height: 48px;
+  background: linear-gradient(135deg, var(--ubikala-terracotta) 0%, var(--ubikala-terracotta-dark) 100%);
+  border-radius: 12px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: #FFFFFF;
+  margin-bottom: 1rem;
+}
+
+.ubikala-feature-title {
+  font-size: 1.0625rem;
+  font-weight: 600;
+  color: var(--ubikala-warm-gray-dark);
+  margin: 0 0 0.5rem 0;
+}
+
+.ubikala-feature-description {
+  font-size: 0.875rem;
+  color: var(--ubikala-warm-gray);
+  line-height: 1.5;
+  margin: 0;
+}
+
+/* ================================
+   TESTIMONIALS
+   ================================ */
+.ubikala-testimonials {
+  padding: 6rem 2rem;
+  background: var(--ubikala-ivory-pure);
+}
+
+.ubikala-testimonials-content {
+  max-width: 1200px;
+  margin: 0 auto;
+}
+
+.ubikala-testimonials-grid {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 2rem;
+}
+
+.ubikala-testimonial-card {
+  background: #FFFFFF;
+  border: 1px solid var(--ubikala-sand);
+  border-radius: 16px;
+  padding: 2rem;
+}
+
+.ubikala-testimonial-quote {
+  font-size: 1rem;
+  color: var(--ubikala-warm-gray-dark);
+  line-height: 1.6;
+  margin: 0 0 1.5rem 0;
+  font-style: italic;
+}
+
+.ubikala-testimonial-author {
+  display: flex;
+  align-items: center;
+  gap: 1rem;
+}
+
+.ubikala-testimonial-avatar {
+  width: 48px;
+  height: 48px;
+  background: var(--ubikala-olive-light);
+  color: #FFFFFF;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-weight: 600;
+  font-size: 1.125rem;
+}
+
+.ubikala-testimonial-name {
+  font-size: 0.9375rem;
+  font-weight: 600;
+  color: var(--ubikala-warm-gray-dark);
+}
+
+.ubikala-testimonial-role {
+  font-size: 0.8125rem;
+  color: var(--ubikala-warm-gray-light);
+}
+
+/* ================================
+   CTA
+   ================================ */
+.ubikala-cta {
+  padding: 6rem 2rem;
+  background: var(--ubikala-warm-gray-dark);
+}
+
+.ubikala-cta-content {
+  max-width: 700px;
+  margin: 0 auto;
+  text-align: center;
+}
+
+.ubikala-cta-title {
+  font-size: 2.5rem;
+  font-weight: 700;
+  color: #FFFFFF;
+  margin: 0 0 1rem 0;
+  letter-spacing: -0.02em;
+}
+
+.ubikala-cta-subtitle {
+  font-size: 1.125rem;
+  color: rgba(255, 255, 255, 0.7);
+  margin: 0 0 2rem 0;
+}
+
+.ubikala-cta-actions {
+  display: flex;
+  gap: 1rem;
+  justify-content: center;
+  flex-wrap: wrap;
+}
+
+/* ================================
+   FOOTER
+   ================================ */
+.ubikala-footer {
+  padding: 3rem 2rem;
+  background: var(--ubikala-warm-gray-dark);
+  border-top: 1px solid rgba(255, 255, 255, 0.1);
+}
+
+.ubikala-footer-content {
+  max-width: 1200px;
+  margin: 0 auto;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: 2rem;
+}
+
+.ubikala-footer-brand .ubikala-logo-text {
+  color: #FFFFFF;
+}
+
+.ubikala-footer-tagline {
+  color: rgba(255, 255, 255, 0.5);
+  font-size: 0.875rem;
+  margin: 0.5rem 0 0 0;
+}
+
+.ubikala-footer-links {
+  display: flex;
+  gap: 2rem;
+}
+
+.ubikala-footer-link {
+  color: rgba(255, 255, 255, 0.6);
+  text-decoration: none;
+  font-size: 0.875rem;
+  transition: color 0.15s;
+}
+
+.ubikala-footer-link:hover {
+  color: #FFFFFF;
+}
+
+.ubikala-footer-legal {
+  width: 100%;
+  text-align: center;
+  padding-top: 2rem;
+  border-top: 1px solid rgba(255, 255, 255, 0.1);
+}
+
+.ubikala-footer-legal p {
+  color: rgba(255, 255, 255, 0.4);
+  font-size: 0.8125rem;
+  margin: 0;
+}
+
+/* ================================
+   RESPONSIVE
+   ================================ */
+@media (max-width: 1024px) {
+  .ubikala-users-grid,
+  .ubikala-features-grid,
+  .ubikala-testimonials-grid {
+    grid-template-columns: repeat(2, 1fr);
+  }
+
+  .ubikala-stats-grid {
+    grid-template-columns: repeat(2, 1fr);
+  }
+}
+
+@media (max-width: 768px) {
+  .ubikala-nav {
+    display: none;
+  }
+
+  .ubikala-hero {
+    padding: 8rem 1.5rem 4rem;
+  }
+
+  .ubikala-hero-title {
+    font-size: 2.5rem;
+  }
+
+  .ubikala-hero-subtitle {
+    font-size: 1.0625rem;
+  }
+
+  .ubikala-hero-subtitle br {
+    display: none;
+  }
+
+  .ubikala-stats-grid {
+    grid-template-columns: repeat(2, 1fr);
+    gap: 1.5rem;
+  }
+
+  .ubikala-stat-value {
+    font-size: 2rem;
+  }
+
+  .ubikala-users,
+  .ubikala-features,
+  .ubikala-testimonials,
+  .ubikala-cta {
+    padding: 4rem 1.5rem;
+  }
+
+  .ubikala-section-title {
+    font-size: 2rem;
+  }
+
+  .ubikala-users-grid,
+  .ubikala-features-grid,
+  .ubikala-testimonials-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .ubikala-cta-title {
+    font-size: 2rem;
+  }
+
+  .ubikala-footer-content {
+    flex-direction: column;
+    text-align: center;
+  }
+
+  .ubikala-footer-links {
+    justify-content: center;
+  }
+}
+
+@media (max-width: 480px) {
+  .ubikala-hero-title {
+    font-size: 2rem;
+  }
+
+  .ubikala-hero-actions {
+    flex-direction: column;
+  }
+
+  .ubikala-btn-lg {
+    width: 100%;
+  }
+
+  .ubikala-cta-actions {
+    flex-direction: column;
+  }
+}

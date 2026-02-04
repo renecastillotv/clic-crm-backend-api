@@ -34,6 +34,10 @@ import TenantSignupPage from './pages/auth/TenantSignupPage';
 // Landing de Tenant
 import TenantLandingPage from './pages/TenantLandingPage';
 
+// Premium Tenant Landing Pages
+import ClicLandingPage from './pages/landings/ClicLandingPage';
+import UbikalaLandingPage from './pages/landings/UbikalaLandingPage';
+
 // Páginas Admin
 import AdminDashboard from './pages/admin/AdminDashboard';
 import AdminTenants from './pages/admin/AdminTenants';
@@ -491,6 +495,11 @@ function AppRoutes() {
       <Route path="/tenants/*" element={<Navigate to="/dashboard" replace />} />
       <Route path="/platform/*" element={<Navigate to="/admin" replace />} />
       <Route path="/saas" element={<Navigate to="/" replace />} />
+
+      {/* ========== PREMIUM TENANT LANDING PAGES ========== */}
+      {/* Landing pages personalizadas para tenants con dominios propios */}
+      <Route path="/clic" element={<ClicLandingPage />} />
+      <Route path="/ubikala" element={<UbikalaLandingPage />} />
 
       {/* ========== LANDING PAGES POR TENANT ========== */}
       {/* Estas rutas deben ir DESPUÉS de las rutas específicas pero ANTES del 404 */}
