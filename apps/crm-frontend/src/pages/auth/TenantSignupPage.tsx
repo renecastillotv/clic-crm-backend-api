@@ -1,10 +1,15 @@
 /**
  * TenantSignupPage - Formulario de solicitud de acceso al tenant
  * Estilo Denlla B2B Enterprise con soporte para colores del tenant
+ *
+ * Supports both URL-based routing (/:tenantSlug/registro) and
+ * host-based routing (custom domains like crm.clicinmobiliaria.com/registro)
  */
 
 import { useEffect, useState } from 'react';
-import { useParams, useNavigate, Link } from 'react-router-dom';
+import { useNavigate, Link } from 'react-router-dom';
+import { useTenantSlug } from '../../components/HostBasedRoutes';
+import { getTenantFromHost } from '../../utils/tenantFromHost';
 import './TenantSignupPage.css';
 
 interface TenantPublicInfo {
@@ -32,8 +37,10 @@ interface FormData {
 }
 
 export default function TenantSignupPage() {
-  const { tenantSlug } = useParams<{ tenantSlug: string }>();
+  // Get tenantSlug from URL params, context, or host detection
+  const tenantSlug = useTenantSlug();
   const navigate = useNavigate();
+  const isCustomDomain = getTenantFromHost().isCustomDomain;
   const [tenantInfo, setTenantInfo] = useState<TenantPublicInfo | null>(null);
   const [loading, setLoading] = useState(true);
   const [submitting, setSubmitting] = useState(false);
@@ -167,7 +174,7 @@ export default function TenantSignupPage() {
             <p className="success-detail">
               El administrador revisara tu solicitud y te contactara pronto.
             </p>
-            <Link to={`/${tenantSlug}`} className="tenant-signup-btn tenant-signup-btn-primary">
+            <Link to={isCustomDomain ? '/' : `/${tenantSlug}`} className="tenant-signup-btn tenant-signup-btn-primary">
               Volver al inicio
             </Link>
           </div>
@@ -283,14 +290,14 @@ export default function TenantSignupPage() {
           <div className="tenant-signup-footer">
             <p>
               ¿Ya tienes cuenta?{' '}
-              <Link to={`/${tenantSlug}/login`}>Iniciar sesion</Link>
+              <Link to={isCustomDomain ? '/login' : `/${tenantSlug}/login`}>Iniciar sesion</Link>
             </p>
           </div>
         </div>
 
         {/* Link volver */}
         <div className="tenant-signup-back">
-          <Link to={`/${tenantSlug}`}>← Volver a {displayName}</Link>
+          <Link to={isCustomDomain ? '/' : `/${tenantSlug}`}>← Volver a {displayName}</Link>
         </div>
       </div>
     </div>

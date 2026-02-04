@@ -3,6 +3,8 @@
  *
  * Enfoque: René Castillo como figura central, YouTube presence,
  * puerta de entrada para asesores e independientes
+ *
+ * Supports both path-based routing (/clic) and custom domain (crm.clicinmobiliaria.com)
  */
 
 import { Link } from 'react-router-dom';
@@ -20,7 +22,12 @@ import {
   Tv,
   Trophy,
 } from 'lucide-react';
+import { getTenantFromHost } from '../../utils/tenantFromHost';
 import './ClicLandingPage.css';
+
+// Host-aware paths - use root paths on custom domains
+const tenantConfig = getTenantFromHost();
+const basePath = tenantConfig.isCustomDomain ? '' : '/clic';
 
 // Assets from info_negocio
 const CLIC_ASSETS = {
@@ -81,7 +88,7 @@ export default function ClicLandingPage() {
       {/* Header */}
       <header className="clic-header">
         <div className="clic-header-content">
-          <Link to="/clic" className="clic-logo">
+          <Link to={basePath || '/'} className="clic-logo">
             <img
               src={CLIC_ASSETS.logoBlanco}
               alt="CLIC Inmobiliaria"
@@ -91,8 +98,8 @@ export default function ClicLandingPage() {
           <nav className="clic-nav">
             <a href="#beneficios" className="clic-nav-link">Beneficios</a>
             <a href="#testimonios" className="clic-nav-link">Testimonios</a>
-            <Link to="/clic/login" className="clic-nav-link">Iniciar Sesión</Link>
-            <Link to="/clic/registro" className="clic-btn-primary clic-btn-sm">
+            <Link to={`${basePath}/login`} className="clic-nav-link">Iniciar Sesión</Link>
+            <Link to={`${basePath}/registro`} className="clic-btn-primary clic-btn-sm">
               Unirme al equipo
             </Link>
           </nav>
@@ -117,11 +124,11 @@ export default function ClicLandingPage() {
               CLIC Inmobiliaria es la plataforma que impulsa tu carrera como asesor inmobiliario.
             </p>
             <div className="clic-hero-actions">
-              <Link to="/clic/registro" className="clic-btn-primary clic-btn-lg">
+              <Link to={`${basePath}/registro`} className="clic-btn-primary clic-btn-lg">
                 Quiero ser asesor CLIC
                 <ArrowRight size={18} />
               </Link>
-              <Link to="/clic/login" className="clic-btn-secondary clic-btn-lg">
+              <Link to={`${basePath}/login`} className="clic-btn-secondary clic-btn-lg">
                 Ya tengo cuenta
               </Link>
             </div>
@@ -280,11 +287,11 @@ export default function ClicLandingPage() {
             tecnología y capacitación para cerrar más ventas.
           </p>
           <div className="clic-cta-actions">
-            <Link to="/clic/registro" className="clic-btn-accent clic-btn-lg">
+            <Link to={`${basePath}/registro`} className="clic-btn-accent clic-btn-lg">
               Solicitar ser asesor
               <ArrowRight size={18} />
             </Link>
-            <Link to="/clic/login" className="clic-btn-outline clic-btn-lg">
+            <Link to={`${basePath}/login`} className="clic-btn-outline clic-btn-lg">
               Iniciar sesión
             </Link>
           </div>
@@ -318,8 +325,8 @@ export default function ClicLandingPage() {
           <div className="clic-footer-links">
             <div className="clic-footer-column">
               <h4>Acceso</h4>
-              <Link to="/clic/login">Iniciar sesión</Link>
-              <Link to="/clic/registro">Unirme al equipo</Link>
+              <Link to={`${basePath}/login`}>Iniciar sesión</Link>
+              <Link to={`${basePath}/registro`}>Unirme al equipo</Link>
             </div>
             <div className="clic-footer-column">
               <h4>Contacto</h4>

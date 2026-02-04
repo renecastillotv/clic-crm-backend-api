@@ -1,11 +1,16 @@
 /**
  * TenantLoginPage - Página de inicio de sesión con branding del tenant
  * Estilo Denlla B2B Enterprise con soporte para personalización
+ *
+ * Supports both URL-based routing (/:tenantSlug/login) and
+ * host-based routing (custom domains like crm.clicinmobiliaria.com/login)
  */
 
 import { useEffect, useState } from 'react';
 import { SignIn } from '@clerk/clerk-react';
-import { useParams, useNavigate, Link } from 'react-router-dom';
+import { useNavigate, Link } from 'react-router-dom';
+import { useTenantSlug } from '../../components/HostBasedRoutes';
+import { getTenantFromHost } from '../../utils/tenantFromHost';
 
 interface TenantPublicInfo {
   tenant: {
@@ -24,8 +29,10 @@ interface TenantPublicInfo {
 }
 
 export default function TenantLoginPage() {
-  const { tenantSlug } = useParams<{ tenantSlug: string }>();
+  // Get tenantSlug from URL params, context, or host detection
+  const tenantSlug = useTenantSlug();
   const navigate = useNavigate();
+  const isCustomDomain = getTenantFromHost().isCustomDomain;
   const [tenantInfo, setTenantInfo] = useState<TenantPublicInfo | null>(null);
   const [loading, setLoading] = useState(true);
 
@@ -224,8 +231,8 @@ export default function TenantLoginPage() {
             },
           }}
           routing="path"
-          path={`/${tenantSlug}/login`}
-          signUpUrl={`/${tenantSlug}/registro`}
+          path={isCustomDomain ? '/login' : `/${tenantSlug}/login`}
+          signUpUrl={isCustomDomain ? '/registro' : `/${tenantSlug}/registro`}
           afterSignInUrl={`/crm/${tenantSlug}`}
         />
 
@@ -235,7 +242,7 @@ export default function TenantLoginPage() {
             ¿No tienes cuenta en {displayName}?
           </p>
           <Link
-            to={`/${tenantSlug}/registro`}
+            to={isCustomDomain ? '/registro' : `/${tenantSlug}/registro`}
             style={{
               color: accentColor,
               textDecoration: 'none',
@@ -250,7 +257,7 @@ export default function TenantLoginPage() {
         {/* Link volver a landing */}
         <div style={{ marginTop: '16px' }}>
           <Link
-            to={`/${tenantSlug}`}
+            to={isCustomDomain ? '/' : `/${tenantSlug}`}
             style={{
               color: 'rgba(255, 255, 255, 0.4)',
               textDecoration: 'none',

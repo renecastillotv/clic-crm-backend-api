@@ -2,6 +2,8 @@
  * UbikalaLandingPage - Premium landing page for Ubikala
  * Portal inmobiliario para inmobiliarias, asesores y propietarios
  * Paleta: Verde oliva, Arena, Terracota, Marfil, Gris calido
+ *
+ * Supports both path-based routing (/ubikala) and custom domain (ubikala.com)
  */
 
 import { Link } from 'react-router-dom';
@@ -21,7 +23,12 @@ import {
   Camera,
   Share2,
 } from 'lucide-react';
+import { getTenantFromHost } from '../../utils/tenantFromHost';
 import './UbikalaLandingPage.css';
+
+// Host-aware paths - use root paths on custom domains
+const tenantConfig = getTenantFromHost();
+const basePath = tenantConfig.isCustomDomain ? '' : '/ubikala';
 
 const USER_TYPES = [
   {
@@ -108,14 +115,14 @@ export default function UbikalaLandingPage() {
       {/* Header */}
       <header className="ubikala-header">
         <div className="ubikala-header-content">
-          <Link to="/ubikala" className="ubikala-logo">
+          <Link to={basePath || '/'} className="ubikala-logo">
             <span className="ubikala-logo-text">Ubikala</span>
           </Link>
           <nav className="ubikala-nav">
             <a href="#usuarios" className="ubikala-nav-link">Para quien</a>
             <a href="#caracteristicas" className="ubikala-nav-link">Caracteristicas</a>
-            <Link to="/ubikala/login" className="ubikala-nav-link">Iniciar Sesion</Link>
-            <Link to="/ubikala/registro" className="ubikala-btn ubikala-btn-primary">
+            <Link to={`${basePath}/login`} className="ubikala-nav-link">Iniciar Sesion</Link>
+            <Link to={`${basePath}/registro`} className="ubikala-btn ubikala-btn-primary">
               Publicar gratis
             </Link>
           </nav>
@@ -140,7 +147,7 @@ export default function UbikalaLandingPage() {
             publican y encuentran las mejores oportunidades del mercado.
           </p>
           <div className="ubikala-hero-actions">
-            <Link to="/ubikala/registro" className="ubikala-btn ubikala-btn-primary ubikala-btn-lg">
+            <Link to={`${basePath}/registro`} className="ubikala-btn ubikala-btn-primary ubikala-btn-lg">
               Publicar mi propiedad
               <ArrowRight size={18} />
             </Link>
@@ -192,7 +199,7 @@ export default function UbikalaLandingPage() {
                     </li>
                   ))}
                 </ul>
-                <Link to="/ubikala/registro" className="ubikala-btn ubikala-btn-outline">
+                <Link to={`${basePath}/registro`} className="ubikala-btn ubikala-btn-outline">
                   Comenzar ahora
                 </Link>
               </div>
@@ -257,11 +264,11 @@ export default function UbikalaLandingPage() {
             Crea tu cuenta gratis y comienza a mostrar tus propiedades al mundo.
           </p>
           <div className="ubikala-cta-actions">
-            <Link to="/ubikala/registro" className="ubikala-btn ubikala-btn-accent ubikala-btn-lg">
+            <Link to={`${basePath}/registro`} className="ubikala-btn ubikala-btn-accent ubikala-btn-lg">
               Crear cuenta gratis
               <ArrowRight size={18} />
             </Link>
-            <Link to="/ubikala/login" className="ubikala-btn ubikala-btn-ghost ubikala-btn-lg">
+            <Link to={`${basePath}/login`} className="ubikala-btn ubikala-btn-ghost ubikala-btn-lg">
               Ya tengo cuenta
             </Link>
           </div>

@@ -1,14 +1,22 @@
 /**
  * App.tsx - Rutas principales del CRM
  *
- * Estructura de rutas:
- * - / → Landing Denlla (plataforma)
- * - /login, /signup → Autenticación con Clerk
- * - /admin/* → Panel de administración de la plataforma (solo platform admins)
- * - /crm/:tenantSlug/* → CRM de cada tenant
- * - /:tenantSlug → Landing personalizada del tenant
- * - /:tenantSlug/login → Login con branding del tenant
- * - /:tenantSlug/registro → Solicitud de acceso al tenant
+ * Host-Based Routing:
+ * Routes are determined by the hostname for white-label support:
+ *
+ * On custom tenant domains (crm.clicinmobiliaria.com, ubikala.com):
+ *   - / → Tenant's premium landing page
+ *   - /login → Tenant login with branding
+ *   - /registro → Tenant signup with branding
+ *   - /crm/:tenantSlug/* → CRM (slug auto-detected from host)
+ *
+ * On platform domain (denlla.com, vercel app):
+ *   - / → Denlla platform landing
+ *   - /login → Platform login
+ *   - /admin/* → Platform admin panel
+ *   - /:tenantSlug → Tenant landing via path
+ *   - /:tenantSlug/login → Tenant login via path
+ *   - /crm/:tenantSlug/* → CRM for specific tenant
  */
 
 import { BrowserRouter as Router, Routes, Route, Navigate } from 'react-router-dom';
@@ -34,9 +42,20 @@ import TenantSignupPage from './pages/auth/TenantSignupPage';
 // Landing de Tenant
 import TenantLandingPage from './pages/TenantLandingPage';
 
-// Premium Tenant Landing Pages
+// Premium Tenant Landing Pages (used by HostBasedRoutes)
 import ClicLandingPage from './pages/landings/ClicLandingPage';
 import UbikalaLandingPage from './pages/landings/UbikalaLandingPage';
+
+// Host-based routing for custom domains
+import {
+  HostBasedLanding,
+  HostBasedLogin,
+  HostBasedSignup,
+  ClicLogin,
+  ClicSignup,
+  UbikalaLogin,
+  UbikalaSignup,
+} from './components/HostBasedRoutes';
 
 // Páginas Admin
 import AdminDashboard from './pages/admin/AdminDashboard';
@@ -278,16 +297,19 @@ function PostLoginRedirect() {
 function AppRoutes() {
   return (
     <Routes>
-      {/* ========== RUTAS PÚBLICAS ========== */}
-      <Route path="/" element={<DenllaLandingPage />} />
+      {/* ========== RUTAS PÚBLICAS (HOST-AWARE) ========== */}
+      {/* Landing page - detects tenant from hostname */}
+      <Route path="/" element={<HostBasedLanding />} />
       <Route path="/precios" element={<DenllaPricingPage />} />
       <Route path="/caracteristicas" element={<DenllaFeaturesPage />} />
       <Route path="/verificar" element={<VerificarCertificado />} />
       <Route path="/verificar/:codigo" element={<VerificarCertificado />} />
 
-      {/* ========== AUTENTICACIÓN ========== */}
-      <Route path="/login/*" element={<LoginPage />} />
-      <Route path="/signup/*" element={<SignupPage />} />
+      {/* ========== AUTENTICACIÓN (HOST-AWARE) ========== */}
+      {/* Login - detects tenant from hostname for custom domains */}
+      <Route path="/login/*" element={<HostBasedLogin />} />
+      <Route path="/signup/*" element={<HostBasedSignup />} />
+      <Route path="/registro" element={<HostBasedSignup />} />
 
       {/* Post-login redirect */}
       <Route
@@ -496,13 +518,18 @@ function AppRoutes() {
       <Route path="/platform/*" element={<Navigate to="/admin" replace />} />
       <Route path="/saas" element={<Navigate to="/" replace />} />
 
-      {/* ========== PREMIUM TENANT LANDING PAGES ========== */}
-      {/* Landing pages personalizadas para tenants con dominios propios */}
+      {/* ========== PREMIUM TENANT LANDING PAGES (PATH-BASED FALLBACK) ========== */}
+      {/* These routes are for accessing tenant landings via path when on platform domain */}
+      {/* On custom domains, host detection handles routing at / */}
       <Route path="/clic" element={<ClicLandingPage />} />
+      <Route path="/clic/login/*" element={<ClicLogin />} />
+      <Route path="/clic/registro" element={<ClicSignup />} />
       <Route path="/ubikala" element={<UbikalaLandingPage />} />
+      <Route path="/ubikala/login/*" element={<UbikalaLogin />} />
+      <Route path="/ubikala/registro" element={<UbikalaSignup />} />
 
-      {/* ========== LANDING PAGES POR TENANT ========== */}
-      {/* Estas rutas deben ir DESPUÉS de las rutas específicas pero ANTES del 404 */}
+      {/* ========== LANDING PAGES POR TENANT (GENERIC) ========== */}
+      {/* For non-premium tenants accessed via path on platform domain */}
       <Route path="/:tenantSlug" element={<TenantLandingPage />} />
       <Route path="/:tenantSlug/login/*" element={<TenantLoginPage />} />
       <Route path="/:tenantSlug/registro" element={<TenantSignupPage />} />
