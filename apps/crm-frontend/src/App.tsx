@@ -42,20 +42,10 @@ import TenantSignupPage from './pages/auth/TenantSignupPage';
 // Landing de Tenant
 import TenantLandingPage from './pages/TenantLandingPage';
 
-// Premium Tenant Landing Pages (used by HostBasedRoutes)
-import ClicLandingPage from './pages/landings/ClicLandingPage';
-import UbikalaLandingPage from './pages/landings/UbikalaLandingPage';
-
 // Host-based routing for custom domains
-import {
-  HostBasedLanding,
-  HostBasedLogin,
-  HostBasedSignup,
-  ClicLogin,
-  ClicSignup,
-  UbikalaLogin,
-  UbikalaSignup,
-} from './components/HostBasedRoutes';
+// Note: Premium landing pages (ClicLandingPage, UbikalaLandingPage) are imported
+// directly in HostBasedRoutes.tsx and only shown on their custom domains
+import { HostBasedLanding, HostBasedLogin, HostBasedSignup } from './components/HostBasedRoutes';
 
 // Páginas Admin
 import AdminDashboard from './pages/admin/AdminDashboard';
@@ -518,18 +508,9 @@ function AppRoutes() {
       <Route path="/platform/*" element={<Navigate to="/admin" replace />} />
       <Route path="/saas" element={<Navigate to="/" replace />} />
 
-      {/* ========== PREMIUM TENANT LANDING PAGES (PATH-BASED FALLBACK) ========== */}
-      {/* These routes are for accessing tenant landings via path when on platform domain */}
-      {/* On custom domains, host detection handles routing at / */}
-      <Route path="/clic" element={<ClicLandingPage />} />
-      <Route path="/clic/login/*" element={<ClicLogin />} />
-      <Route path="/clic/registro" element={<ClicSignup />} />
-      <Route path="/ubikala" element={<UbikalaLandingPage />} />
-      <Route path="/ubikala/login/*" element={<UbikalaLogin />} />
-      <Route path="/ubikala/registro" element={<UbikalaSignup />} />
-
-      {/* ========== LANDING PAGES POR TENANT (GENERIC) ========== */}
-      {/* For non-premium tenants accessed via path on platform domain */}
+      {/* ========== LANDING PAGES POR TENANT ========== */}
+      {/* All tenants (including clic, ubikala) get the generic TenantLandingPage on platform domain */}
+      {/* Premium landing pages only show on their custom domains via HostBasedLanding */}
       <Route path="/:tenantSlug" element={<TenantLandingPage />} />
       <Route path="/:tenantSlug/login/*" element={<TenantLoginPage />} />
       <Route path="/:tenantSlug/registro" element={<TenantSignupPage />} />
