@@ -7,6 +7,7 @@ import bcrypt from 'bcrypt';
 import { createTemaDefault } from './componentesService.js';
 import { Feature } from './adminFeaturesService.js';
 import { initComponentesWebTenant } from './tenantInitService.js';
+import { createClerkUser } from '../middleware/clerkAuth.js';
 import type { PoolClient } from 'pg';
 
 // NOTA: Las rutas estándar ahora se definen globalmente en tipos_pagina.alias_rutas
@@ -560,15 +561,29 @@ export async function createTenantWithAdmin(data: CreateTenantWithAdminData) {
 
     const tenant = tenantResult.rows[0];
 
-    // 6. Hash de la contraseña del admin
+    // 6. Crear el usuario en Clerk primero
+    let clerkUser;
+    try {
+      clerkUser = await createClerkUser({
+        email: data.adminUser.email,
+        password: data.adminUser.password,
+        firstName: data.adminUser.nombre,
+        lastName: data.adminUser.apellido,
+      });
+      console.log(`✅ Usuario admin creado en Clerk: ${clerkUser.id}`);
+    } catch (error: any) {
+      throw new Error(`Error al crear usuario admin en Clerk: ${error.message}`);
+    }
+
+    // 7. Hash de la contraseña del admin para nuestra BD
     const passwordHash = await bcrypt.hash(data.adminUser.password, 10);
 
-    // 7. Crear el usuario admin
+    // 8. Crear el usuario admin en nuestra BD con clerk_id
     const userInsertSql = `
       INSERT INTO usuarios (
-        email, password_hash, nombre, apellido, es_platform_admin, activo
+        email, password_hash, nombre, apellido, clerk_id, es_platform_admin, activo
       )
-      VALUES ($1, $2, $3, $4, false, true)
+      VALUES ($1, $2, $3, $4, $5, false, true)
       RETURNING id, email, nombre, apellido
     `;
 
@@ -577,11 +592,12 @@ export async function createTenantWithAdmin(data: CreateTenantWithAdminData) {
       passwordHash,
       data.adminUser.nombre,
       data.adminUser.apellido,
+      clerkUser.id, // Guardamos el clerk_id
     ]);
 
     const adminUser = userResult.rows[0];
 
-    // 8. Obtener el rol "tenant_owner"
+    // 9. Obtener el rol "tenant_owner"
     const roleResult = await client.query(
       `SELECT id FROM roles WHERE codigo = 'tenant_owner' AND tipo = 'tenant' LIMIT 1`
     );
@@ -592,21 +608,21 @@ export async function createTenantWithAdmin(data: CreateTenantWithAdminData) {
 
     const tenantOwnerRoleId = roleResult.rows[0].id;
 
-    // 9. Asociar usuario con tenant como owner (sin rol_id, eso va en usuarios_roles)
+    // 10. Asociar usuario con tenant como owner (sin rol_id, eso va en usuarios_roles)
     await client.query(
       `INSERT INTO usuarios_tenants (usuario_id, tenant_id, es_owner, activo)
        VALUES ($1, $2, true, true)`,
       [adminUser.id, tenant.id]
     );
 
-    // 10. Asignar rol al usuario en la tabla usuarios_roles
+    // 11. Asignar rol al usuario en la tabla usuarios_roles
     await client.query(
       `INSERT INTO usuarios_roles (usuario_id, tenant_id, rol_id, activo, asignado_en)
        VALUES ($1, $2, $3, true, NOW())`,
       [adminUser.id, tenant.id, tenantOwnerRoleId]
     );
 
-    // 11. Crear tema por defecto
+    // 12. Crear tema por defecto
     const temaColores = JSON.stringify({
       primary: '#667eea',
       secondary: '#764ba2',
@@ -626,10 +642,10 @@ export async function createTenantWithAdmin(data: CreateTenantWithAdminData) {
       [tenant.id, `Tema ${data.nombre}`, temaColores]
     );
 
-    // 12. Las rutas estándar ya no se insertan por tenant
+    // 13. Las rutas estándar ya no se insertan por tenant
     // Se obtienen de tipos_pagina.alias_rutas (fuente global)
 
-    // 13. Insertar páginas base para el tenant (legacy)
+    // 14. Insertar páginas base para el tenant (legacy)
     await insertPaginasBaseTenant(tenant.id, client);
 
     // 14. Inicializar componentes_web desde plantillas_pagina
