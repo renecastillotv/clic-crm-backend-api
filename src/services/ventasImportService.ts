@@ -14,43 +14,22 @@ import { calcularYCrearComisiones } from './comisionesService.js';
 // ============================================================================
 
 interface CSVVentaRow {
-  'No. de Cierre': string;
-  'Negocio': string;
-  'Contacto principal': string;
-  'Contacto - Telefono': string;
-  'Contacto - Correo electronico': string;
-  'Cierre hecho por': string;
-  'Inmueble Externo': string;
-  'Es un proyecto?': string;
-  'Operación': string;
-  'Propiedad - Número de Unidad': string;
-  'Propiedad - Código': string;
-  'Propiedad - Nombre': string;
-  'Propiedad - Nombre privado': string;
-  'Propiedad - Categoría': string;
-  'Propiedad - Ciudad': string;
-  'Propiedad - Sector': string;
-  'Estatus': string;
-  'Moneda': string;
-  'Valor de Cierre': string;
-  'Impuestos Aplicados?': string;
-  'Porcentaje Comision': string;
-  'Estatus completado': string;
-  'Fecha Ganado': string;
-  'Notas': string;
-  'Fecha creado': string;
-  'Referidor': string;
-  'Referidor (USD)': string;
   [key: string]: string;
 }
 
 export interface ImportVentasResult {
   total: number;
   importadas: number;
+  omitidas_duplicadas: number;
   errores: { fila: number; numero_cierre: string; error: string }[];
   warnings: { fila: number; numero_cierre: string; warning: string }[];
   contactos_creados: number;
   contactos_existentes: number;
+  propiedades_vinculadas: number;
+  propiedades_externas: number;
+  usuarios_resueltos: number;
+  usuarios_no_resueltos: string[];
+  comisiones_creadas: number;
 }
 
 export interface ImportVentasPreview {
@@ -65,64 +44,114 @@ export interface ImportVentasPreview {
 }
 
 // ============================================================================
-// CSV PARSER
+// CSV PARSER (multiline-safe)
 // ============================================================================
 
-function parseCSVLine(line: string): string[] {
-  const result: string[] = [];
+/**
+ * Parsea un CSV completo respetando campos entrecomillados con saltos de línea.
+ * Primero divide en filas lógicas (respetando comillas) y luego parsea cada fila.
+ */
+function parseVentasCSV(content: string): CSVVentaRow[] {
+  const rows: CSVVentaRow[] = [];
+
+  // Split into logical rows respecting quoted fields with newlines
+  const logicalLines = splitCSVIntoLogicalLines(content);
+  if (logicalLines.length < 2) return [];
+
+  const headers = parseCSVFields(logicalLines[0]);
+
+  for (let i = 1; i < logicalLines.length; i++) {
+    const line = logicalLines[i];
+    if (!line.trim()) continue;
+
+    const values = parseCSVFields(line);
+    const row: CSVVentaRow = {};
+
+    headers.forEach((header, idx) => {
+      row[header.trim()] = (values[idx] || '').trim();
+    });
+
+    rows.push(row);
+  }
+
+  return rows;
+}
+
+/**
+ * Divide el contenido CSV en líneas lógicas, respetando comillas.
+ * Un campo entrecomillado puede contener saltos de línea internos.
+ */
+function splitCSVIntoLogicalLines(content: string): string[] {
+  const lines: string[] = [];
   let current = '';
   let inQuotes = false;
 
-  for (let i = 0; i < line.length; i++) {
-    const char = line[i];
-    const nextChar = line[i + 1];
+  for (let i = 0; i < content.length; i++) {
+    const char = content[i];
 
-    if (char === '"' && !inQuotes) {
-      inQuotes = true;
-    } else if (char === '"' && inQuotes) {
-      if (nextChar === '"') {
-        current += '"';
-        i++;
+    if (char === '"') {
+      if (inQuotes && content[i + 1] === '"') {
+        current += '""';
+        i++; // skip escaped quote
       } else {
-        inQuotes = false;
+        inQuotes = !inQuotes;
+        current += char;
       }
-    } else if (char === ',' && !inQuotes) {
-      result.push(current.trim());
+    } else if ((char === '\n' || char === '\r') && !inQuotes) {
+      // End of logical line
+      if (char === '\r' && content[i + 1] === '\n') {
+        i++; // skip \r\n
+      }
+      if (current.trim()) {
+        lines.push(current);
+      }
       current = '';
     } else {
       current += char;
     }
   }
 
-  result.push(current.trim());
+  if (current.trim()) {
+    lines.push(current);
+  }
+
+  return lines;
+}
+
+/**
+ * Parsea los campos de una línea CSV, respetando comillas.
+ */
+function parseCSVFields(line: string): string[] {
+  const result: string[] = [];
+  let current = '';
+  let inQuotes = false;
+
+  for (let i = 0; i < line.length; i++) {
+    const char = line[i];
+
+    if (char === '"' && !inQuotes) {
+      inQuotes = true;
+    } else if (char === '"' && inQuotes) {
+      if (line[i + 1] === '"') {
+        current += '"';
+        i++;
+      } else {
+        inQuotes = false;
+      }
+    } else if (char === ',' && !inQuotes) {
+      result.push(current);
+      current = '';
+    } else {
+      current += char;
+    }
+  }
+
+  result.push(current);
   return result;
 }
 
-function parseVentasCSV(content: string): CSVVentaRow[] {
-  const lines = content.split('\n');
-  if (lines.length < 2) return [];
-
-  const headers = parseCSVLine(lines[0]);
-  const rows: CSVVentaRow[] = [];
-
-  for (let i = 1; i < lines.length; i++) {
-    const line = lines[i].trim();
-    if (!line) continue;
-
-    const values = parseCSVLine(line);
-    const row: any = {};
-
-    headers.forEach((header, idx) => {
-      row[header] = values[idx] || '';
-    });
-
-    rows.push(row as CSVVentaRow);
-  }
-
-  return rows;
-}
-
 function parseBool(val: string): boolean {
+  if (!val) return false;
   return val.toLowerCase() === 'true';
 }
 
@@ -166,12 +195,17 @@ async function findContactoByPhoneOrEmail(
   return { id: '', found: false };
 }
 
+/**
+ * Busca usuario por nombre: primero en usuarios_tenants, luego en perfiles_asesor.
+ * En perfiles_asesor buscamos por slug o por nombre+apellido del usuario vinculado.
+ */
 async function findUsuarioByName(
   tenantId: string,
   nombre: string
 ): Promise<string | null> {
   if (!nombre) return null;
 
+  // 1. Buscar en usuarios_tenants por nombre+apellido
   const result = await query(
     `SELECT u.id FROM usuarios u
      INNER JOIN usuarios_tenants ut ON u.id = ut.usuario_id
@@ -181,22 +215,68 @@ async function findUsuarioByName(
      LIMIT 1`,
     [tenantId, `%${nombre}%`]
   );
+  if (result.rows.length > 0) return result.rows[0].id;
 
-  return result.rows.length > 0 ? result.rows[0].id : null;
+  // 2. Buscar por solo nombre (sin apellido)
+  const result2 = await query(
+    `SELECT u.id FROM usuarios u
+     INNER JOIN usuarios_tenants ut ON u.id = ut.usuario_id
+     WHERE ut.tenant_id = $1
+       AND u.nombre ILIKE $2
+       AND ut.activo = true
+     LIMIT 1`,
+    [tenantId, `%${nombre}%`]
+  );
+  if (result2.rows.length > 0) return result2.rows[0].id;
+
+  // 3. Buscar en perfiles_asesor por slug o por nombre del usuario vinculado
+  const result3 = await query(
+    `SELECT pa.usuario_id FROM perfiles_asesor pa
+     INNER JOIN usuarios u ON pa.usuario_id = u.id
+     WHERE pa.tenant_id = $1
+       AND pa.activo = true
+       AND (
+         pa.slug ILIKE $2
+         OR CONCAT(u.nombre, ' ', u.apellido) ILIKE $2
+         OR u.nombre ILIKE $2
+       )
+     LIMIT 1`,
+    [tenantId, `%${nombre}%`]
+  );
+  if (result3.rows.length > 0) return result3.rows[0].usuario_id;
+
+  return null;
 }
 
+/**
+ * Busca propiedad por código numérico.
+ * El CSV usa 'Propiedad - Código' con valores como '1748'.
+ * Busca por codigo exacto (string) y también como número.
+ */
 async function findPropiedadByCodigo(
   tenantId: string,
   codigo: string
 ): Promise<string | null> {
   if (!codigo) return null;
 
+  // Buscar por codigo exacto
   const result = await query(
-    `SELECT id FROM propiedades WHERE tenant_id = $1 AND codigo = $2 AND activo = true LIMIT 1`,
+    `SELECT id FROM propiedades WHERE tenant_id = $1 AND codigo = $2 LIMIT 1`,
     [tenantId, codigo]
   );
+  if (result.rows.length > 0) return result.rows[0].id;
 
-  return result.rows.length > 0 ? result.rows[0].id : null;
+  // Buscar por codigo numérico (sin ceros a la izquierda, etc.)
+  const num = parseInt(codigo);
+  if (!isNaN(num) && num.toString() !== codigo) {
+    const result2 = await query(
+      `SELECT id FROM propiedades WHERE tenant_id = $1 AND codigo = $2 LIMIT 1`,
+      [tenantId, num.toString()]
+    );
+    if (result2.rows.length > 0) return result2.rows[0].id;
+  }
+
+  return null;
 }
 
 async function findEstadoVentaByNombre(
@@ -205,12 +285,21 @@ async function findEstadoVentaByNombre(
 ): Promise<string | null> {
   if (!nombre) return null;
 
+  // Buscar exacto primero
   const result = await query(
     `SELECT id FROM estados_venta WHERE tenant_id = $1 AND nombre ILIKE $2 AND activo = true LIMIT 1`,
     [tenantId, nombre]
   );
+  if (result.rows.length > 0) return result.rows[0].id;
 
-  return result.rows.length > 0 ? result.rows[0].id : null;
+  // Buscar parcial
+  const result2 = await query(
+    `SELECT id FROM estados_venta WHERE tenant_id = $1 AND nombre ILIKE $2 AND activo = true LIMIT 1`,
+    [tenantId, `%${nombre}%`]
+  );
+  if (result2.rows.length > 0) return result2.rows[0].id;
+
+  return null;
 }
 
 // ============================================================================
@@ -307,10 +396,16 @@ export async function importarVentas(
   const result: ImportVentasResult = {
     total: rows.length,
     importadas: 0,
+    omitidas_duplicadas: 0,
     errores: [],
     warnings: [],
     contactos_creados: 0,
     contactos_existentes: 0,
+    propiedades_vinculadas: 0,
+    propiedades_externas: 0,
+    usuarios_resueltos: 0,
+    usuarios_no_resueltos: [],
+    comisiones_creadas: 0,
   };
 
   // Caches para evitar lookups repetidos
@@ -318,10 +413,11 @@ export async function importarVentas(
   const usuarioCache = new Map<string, string | null>();
   const propiedadCache = new Map<string, string | null>();
   const estadoCache = new Map<string, string | null>();
+  const usuariosNoResueltos = new Set<string>();
 
   for (let i = 0; i < rows.length; i++) {
     const row = rows[i];
-    const numeroCierre = row['No. de Cierre'];
+    const numeroCierre = row['No. de Cierre'] || '';
     const fila = i + 2; // +2 because 1-indexed + header row
 
     try {
@@ -339,7 +435,7 @@ export async function importarVentas(
           [tenantId, numVenta]
         );
         if (existingCheck.rows.length > 0) {
-          result.warnings.push({ fila, numero_cierre: numeroCierre, warning: 'Venta ya existe (numero_venta duplicado), omitida' });
+          result.omitidas_duplicadas++;
           continue;
         }
       }
@@ -361,7 +457,6 @@ export async function importarVentas(
             contactoCache.set(contactoKey, found.id);
             result.contactos_existentes++;
           } else if (contactoNombre) {
-            // Create contact
             const newContacto = await createContacto(tenantId, {
               nombre: contactoNombre,
               telefono: telefono || undefined,
@@ -376,7 +471,7 @@ export async function importarVentas(
         }
       }
 
-      // 2. Resolve usuario cerrador
+      // 2. Resolve usuario cerrador (usuarios_tenants + perfiles_asesor)
       const cerrador = row['Cierre hecho por'];
       let usuarioCerradorId: string | null = null;
       if (cerrador) {
@@ -385,13 +480,15 @@ export async function importarVentas(
         } else {
           usuarioCerradorId = await findUsuarioByName(tenantId, cerrador);
           usuarioCache.set(cerrador, usuarioCerradorId);
-          if (!usuarioCerradorId) {
-            result.warnings.push({ fila, numero_cierre: numeroCierre, warning: `Usuario "${cerrador}" no encontrado` });
+          if (usuarioCerradorId) {
+            result.usuarios_resueltos++;
+          } else {
+            usuariosNoResueltos.add(cerrador);
           }
         }
       }
 
-      // 3. Resolve propiedad
+      // 3. Resolve propiedad by código
       const esExterna = parseBool(row['Inmueble Externo']);
       let propiedadId: string | null = null;
       const codigoPropiedad = row['Propiedad - Código'];
@@ -403,6 +500,13 @@ export async function importarVentas(
           propiedadId = await findPropiedadByCodigo(tenantId, codigoPropiedad);
           propiedadCache.set(codigoPropiedad, propiedadId);
         }
+        if (propiedadId) {
+          result.propiedades_vinculadas++;
+        } else {
+          result.propiedades_externas++;
+        }
+      } else {
+        result.propiedades_externas++;
       }
 
       // 4. Resolve estado venta
@@ -431,6 +535,9 @@ export async function importarVentas(
       const notas = row['Notas'] || null;
       const referidorNombre = row['Referidor'] || null;
 
+      // Determinar si guardar propiedad info como externa
+      const guardarComoExterna = esExterna || !propiedadId;
+
       const sql = `
         INSERT INTO ventas (
           tenant_id, numero_venta, nombre_negocio, contacto_id,
@@ -450,31 +557,31 @@ export async function importarVentas(
       `;
 
       const params = [
-        tenantId,                                          // $1
-        isNaN(numVenta) ? null : numVenta,                 // $2
-        row['Negocio'] || `Venta #${numeroCierre}`,        // $3
-        contactoId,                                        // $4
-        usuarioCerradorId,                                 // $5
-        propiedadId,                                       // $6
-        esExterna,                                         // $7
-        esExterna ? (row['Propiedad - Nombre'] || null) : null,          // $8
-        esExterna ? (row['Propiedad - Nombre privado'] || null) : null,  // $9
-        row['Propiedad - Ciudad'] || null,                 // $10
-        row['Propiedad - Sector'] || null,                 // $11
-        row['Propiedad - Categoría'] || null,              // $12
-        row['Propiedad - Número de Unidad'] || null,       // $13
-        estadoVentaId,                                     // $14
-        valorCierre,                                       // $15
-        moneda,                                            // $16
-        porcentajeComision,                                // $17
-        montoComision,                                     // $18
-        aplicaImpuestos,                                   // $19
-        completada,                                        // $20
-        fechaCierre,                                       // $21
-        notas,                                             // $22
-        referidorNombre,                                   // $23
-        '{}',                                              // $24 datos_extra
-        fechaCreado || new Date().toISOString(),            // $25
+        tenantId,                                                           // $1
+        isNaN(numVenta) ? null : numVenta,                                  // $2
+        row['Negocio'] || `Venta #${numeroCierre}`,                         // $3
+        contactoId,                                                         // $4
+        usuarioCerradorId,                                                  // $5
+        propiedadId,                                                        // $6
+        guardarComoExterna,                                                 // $7
+        guardarComoExterna ? (row['Propiedad - Nombre'] || null) : null,    // $8
+        guardarComoExterna ? (row['Propiedad - Nombre privado'] || null) : null, // $9
+        row['Propiedad - Ciudad'] || null,                                  // $10
+        row['Propiedad - Sector'] || null,                                  // $11
+        row['Propiedad - Categoría'] || null,                               // $12
+        row['Propiedad - Número de Unidad'] || null,                        // $13
+        estadoVentaId,                                                      // $14
+        valorCierre,                                                        // $15
+        moneda,                                                             // $16
+        porcentajeComision,                                                 // $17
+        montoComision,                                                      // $18
+        aplicaImpuestos,                                                    // $19
+        completada,                                                         // $20
+        fechaCierre,                                                        // $21
+        notas,                                                              // $22
+        referidorNombre,                                                    // $23
+        '{}',                                                               // $24 datos_extra
+        fechaCreado || new Date().toISOString(),                             // $25
       ];
 
       const insertResult = await query(sql, params);
@@ -501,6 +608,7 @@ export async function importarVentas(
               vendedor_externo_nombre: null,
             }
           );
+          result.comisiones_creadas++;
         } catch (comisionError) {
           result.warnings.push({
             fila,
@@ -520,5 +628,6 @@ export async function importarVentas(
     }
   }
 
+  result.usuarios_no_resueltos = Array.from(usuariosNoResueltos);
   return result;
 }
