@@ -139,44 +139,50 @@ export async function getUsuarioConRoles(usuarioId: string): Promise<UsuarioConR
 
   const usuario = usuarioResult.rows[0];
 
-  // Obtener tenants del usuario
-  const tenantsSql = `
+  // Obtener tenants del usuario con sus roles en una sola consulta (evita N+1)
+  const tenantsWithRolesSql = `
     SELECT
-      t.id,
-      t.nombre,
-      t.slug,
-      ut.es_owner as "esOwner"
+      t.id as tenant_id,
+      t.nombre as tenant_nombre,
+      t.slug as tenant_slug,
+      ut.es_owner as "esOwner",
+      r.id as rol_id,
+      r.codigo as rol_codigo,
+      r.nombre as rol_nombre,
+      r.color as rol_color
     FROM usuarios_tenants ut
     JOIN tenants t ON ut.tenant_id = t.id
+    LEFT JOIN usuarios_roles ur ON ur.usuario_id = ut.usuario_id AND ur.tenant_id = t.id AND ur.activo = true
+    LEFT JOIN roles r ON ur.rol_id = r.id
     WHERE ut.usuario_id = $1 AND ut.activo = true AND t.activo = true
+    ORDER BY t.nombre
   `;
 
-  const tenantsResult = await query(tenantsSql, [usuarioId]);
+  const tenantsRolesResult = await query(tenantsWithRolesSql, [usuarioId]);
 
-  // Obtener roles por cada tenant
-  const tenants = await Promise.all(
-    tenantsResult.rows.map(async (tenant: any) => {
-      const rolesSql = `
-        SELECT
-          r.id,
-          r.codigo,
-          r.nombre,
-          r.color
-        FROM usuarios_roles ur
-        JOIN roles r ON ur.rol_id = r.id
-        WHERE ur.usuario_id = $1
-          AND ur.tenant_id = $2
-          AND ur.activo = true
-      `;
+  // Agrupar por tenant
+  const tenantsMap = new Map<string, any>();
+  for (const row of tenantsRolesResult.rows) {
+    if (!tenantsMap.has(row.tenant_id)) {
+      tenantsMap.set(row.tenant_id, {
+        id: row.tenant_id,
+        nombre: row.tenant_nombre,
+        slug: row.tenant_slug,
+        esOwner: row.esOwner,
+        roles: [],
+      });
+    }
+    if (row.rol_id) {
+      tenantsMap.get(row.tenant_id).roles.push({
+        id: row.rol_id,
+        codigo: row.rol_codigo,
+        nombre: row.rol_nombre,
+        color: row.rol_color,
+      });
+    }
+  }
 
-      const rolesResult = await query(rolesSql, [usuarioId, tenant.id]);
-
-      return {
-        ...tenant,
-        roles: rolesResult.rows,
-      };
-    })
-  );
+  const tenants = Array.from(tenantsMap.values());
 
   // Obtener roles de plataforma (sin tenant)
   const platformRolesSql = `
@@ -839,14 +845,16 @@ export async function agregarUsuarioATenant(
       }
     } catch (clerkError: any) {
       const errorMessage = clerkError.message || '';
-      console.error(`⚠️ Error creando usuario en Clerk: ${errorMessage}`);
+      const errorCodes = (clerkError as any).clerkErrorCodes || '';
+      console.error(`⚠️ Error creando usuario en Clerk: ${errorMessage} (codes: ${errorCodes})`);
 
       // Verificar si el error es porque el email ya existe en Clerk
-      const isEmailTaken = errorMessage.toLowerCase().includes('email') &&
-        (errorMessage.toLowerCase().includes('taken') ||
-         errorMessage.toLowerCase().includes('already') ||
-         errorMessage.toLowerCase().includes('existe') ||
-         errorMessage.toLowerCase().includes('unique'));
+      // Clerk usa el código 'form_identifier_exists' para emails duplicados
+      const isEmailTaken = errorCodes.includes('form_identifier_exists') ||
+        errorMessage.toLowerCase().includes('taken') ||
+        errorMessage.toLowerCase().includes('already') ||
+        errorMessage.toLowerCase().includes('existe') ||
+        errorMessage.toLowerCase().includes('unique');
 
       if (isEmailTaken) {
         // Intentar encontrar el usuario existente en Clerk
