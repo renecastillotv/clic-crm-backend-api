@@ -529,4 +529,244 @@ router.get('/history', async (req, res) => {
   }
 });
 
+// ============================================================================
+// CSV IMPORT ENDPOINTS (Agent Assignment)
+// ============================================================================
+
+import {
+  analyzeCSVAgents,
+  assignAgentsToProperties,
+  getPropertiesWithoutAgent,
+  getAgentAssignmentStats,
+  getTenantUsers,
+} from '../services/csvImportService.js';
+
+/**
+ * GET /api/import/csv/users
+ * Obtiene los usuarios del tenant para mapeo de agentes
+ */
+router.get('/csv/users', async (req, res) => {
+  try {
+    const tenantId = req.query.tenant_id as string;
+
+    if (!tenantId) {
+      return res.status(400).json({
+        success: false,
+        error: 'tenant_id is required',
+      });
+    }
+
+    const users = await getTenantUsers(tenantId);
+
+    return res.json({
+      success: true,
+      data: users,
+    });
+
+  } catch (error: any) {
+    console.error('Error getting tenant users:', error);
+    return res.status(500).json({
+      success: false,
+      error: error.message,
+    });
+  }
+});
+
+/**
+ * POST /api/import/csv/analyze-agents
+ * Analiza un CSV y mapea agentes a usuarios
+ */
+router.post('/csv/analyze-agents', async (req, res) => {
+  try {
+    const { tenant_id, csv_content } = req.body;
+
+    if (!tenant_id || !csv_content) {
+      return res.status(400).json({
+        success: false,
+        error: 'tenant_id and csv_content are required',
+      });
+    }
+
+    const analysis = await analyzeCSVAgents(csv_content, tenant_id);
+
+    return res.json({
+      success: true,
+      data: analysis,
+    });
+
+  } catch (error: any) {
+    console.error('Error analyzing CSV agents:', error);
+    return res.status(500).json({
+      success: false,
+      error: error.message,
+    });
+  }
+});
+
+/**
+ * POST /api/import/csv/assign-agents
+ * Asigna agentes a propiedades basándose en el análisis previo
+ */
+router.post('/csv/assign-agents', async (req, res) => {
+  try {
+    const { tenant_id, property_agent_map, agent_mappings } = req.body;
+
+    if (!tenant_id || !property_agent_map || !agent_mappings) {
+      return res.status(400).json({
+        success: false,
+        error: 'tenant_id, property_agent_map, and agent_mappings are required',
+      });
+    }
+
+    const result = await assignAgentsToProperties(
+      tenant_id,
+      property_agent_map,
+      agent_mappings
+    );
+
+    return res.json({
+      success: true,
+      data: result,
+    });
+
+  } catch (error: any) {
+    console.error('Error assigning agents:', error);
+    return res.status(500).json({
+      success: false,
+      error: error.message,
+    });
+  }
+});
+
+/**
+ * GET /api/import/csv/unassigned
+ * Obtiene propiedades sin agente asignado
+ */
+router.get('/csv/unassigned', async (req, res) => {
+  try {
+    const tenantId = req.query.tenant_id as string;
+
+    if (!tenantId) {
+      return res.status(400).json({
+        success: false,
+        error: 'tenant_id is required',
+      });
+    }
+
+    const properties = await getPropertiesWithoutAgent(tenantId);
+
+    return res.json({
+      success: true,
+      data: properties,
+    });
+
+  } catch (error: any) {
+    console.error('Error getting unassigned properties:', error);
+    return res.status(500).json({
+      success: false,
+      error: error.message,
+    });
+  }
+});
+
+/**
+ * GET /api/import/csv/stats
+ * Obtiene estadísticas de asignación de agentes
+ */
+router.get('/csv/stats', async (req, res) => {
+  try {
+    const tenantId = req.query.tenant_id as string;
+
+    if (!tenantId) {
+      return res.status(400).json({
+        success: false,
+        error: 'tenant_id is required',
+      });
+    }
+
+    const stats = await getAgentAssignmentStats(tenantId);
+
+    return res.json({
+      success: true,
+      data: stats,
+    });
+
+  } catch (error: any) {
+    console.error('Error getting agent stats:', error);
+    return res.status(500).json({
+      success: false,
+      error: error.message,
+    });
+  }
+});
+
+// ============================================================================
+// VENTAS CSV IMPORT
+// ============================================================================
+
+import {
+  previewImportVentas,
+  importarVentas,
+} from '../services/ventasImportService.js';
+
+/**
+ * POST /api/import/ventas/preview
+ * Analiza un CSV de ventas sin insertar nada
+ */
+router.post('/ventas/preview', async (req, res) => {
+  try {
+    const { tenant_id, csv_content } = req.body;
+
+    if (!tenant_id || !csv_content) {
+      return res.status(400).json({
+        success: false,
+        error: 'tenant_id and csv_content are required',
+      });
+    }
+
+    const preview = await previewImportVentas(tenant_id, csv_content);
+
+    return res.json({
+      success: true,
+      data: preview,
+    });
+  } catch (error: any) {
+    console.error('Error previewing ventas import:', error);
+    return res.status(500).json({
+      success: false,
+      error: error.message,
+    });
+  }
+});
+
+/**
+ * POST /api/import/ventas
+ * Importa ventas desde un CSV
+ */
+router.post('/ventas', async (req, res) => {
+  try {
+    const { tenant_id, csv_content } = req.body;
+
+    if (!tenant_id || !csv_content) {
+      return res.status(400).json({
+        success: false,
+        error: 'tenant_id and csv_content are required',
+      });
+    }
+
+    const result = await importarVentas(tenant_id, csv_content);
+
+    return res.json({
+      success: true,
+      data: result,
+    });
+  } catch (error: any) {
+    console.error('Error importing ventas:', error);
+    return res.status(500).json({
+      success: false,
+      error: error.message,
+    });
+  }
+});
+
 export default router;
