@@ -6,8 +6,6 @@
 
 import express from 'express';
 import multer from 'multer';
-import path from 'path';
-import fs from 'fs';
 import { requireAuth, optionalAuth, createClerkUser, deleteClerkUser, updateClerkUser, clerkClient } from '../middleware/clerkAuth.js';
 import {
   getUsuarioByEmail,
@@ -21,25 +19,9 @@ import {
   getPerfilAsesor,
 } from '../services/usuariosService.js';
 
-// Configurar multer para subida de avatares
-const avatarStorage = multer.diskStorage({
-  destination: (req, file, cb) => {
-    const uploadDir = path.join(process.cwd(), 'uploads', 'avatars');
-    // Crear directorio si no existe
-    if (!fs.existsSync(uploadDir)) {
-      fs.mkdirSync(uploadDir, { recursive: true });
-    }
-    cb(null, uploadDir);
-  },
-  filename: (req, file, cb) => {
-    const uniqueSuffix = Date.now() + '-' + Math.round(Math.random() * 1E9);
-    const ext = path.extname(file.originalname);
-    cb(null, `avatar-${uniqueSuffix}${ext}`);
-  },
-});
-
+// Configurar multer para subida de avatares (memoryStorage para serverless)
 const uploadAvatar = multer({
-  storage: avatarStorage,
+  storage: multer.memoryStorage(),
   limits: { fileSize: 5 * 1024 * 1024 }, // 5MB
   fileFilter: (req, file, cb) => {
     const allowedTypes = ['image/jpeg', 'image/png', 'image/gif', 'image/webp'];
@@ -349,30 +331,27 @@ router.put('/profile', requireAuth, uploadAvatar.single('avatar'), async (req, r
     if (cargo !== undefined) updateData.cargo = cargo;
     if (departamento !== undefined) updateData.departamento = departamento;
 
-    // Si hay avatar subido, procesar
+    // Si hay avatar subido, procesar (memoryStorage - buffer en memoria)
     let avatarUrl = usuario.avatarUrl;
-    if (req.file) {
-      // Generar URL del avatar
-      const baseUrl = process.env.API_BASE_URL || `http://localhost:${process.env.PORT || 3001}`;
-      avatarUrl = `${baseUrl}/uploads/avatars/${req.file.filename}`;
-      updateData.avatarUrl = avatarUrl;
-
-      // Subir imagen a Clerk
+    if (req.file && req.file.buffer) {
       try {
-        // Leer el archivo como buffer (async para no bloquear)
-        const imageBuffer = await fs.promises.readFile(req.file.path);
-        const base64Image = imageBuffer.toString('base64');
+        const base64Image = req.file.buffer.toString('base64');
         const mimeType = req.file.mimetype;
         const dataUrl = `data:${mimeType};base64,${base64Image}`;
 
-        // Actualizar imagen de perfil en Clerk
+        // Subir imagen a Clerk
         await clerkClient.users.updateUserProfileImage(clerkUserId, {
-          file: dataUrl as any, // Clerk SDK acepta data URLs como string
+          file: dataUrl as any,
         });
-        console.log(`✅ Avatar actualizado en Clerk`);
+
+        // Obtener URL actualizada del usuario en Clerk
+        const updatedClerkUser = await clerkClient.users.getUser(clerkUserId);
+        avatarUrl = updatedClerkUser.imageUrl;
+        updateData.avatarUrl = avatarUrl;
+        console.log(`✅ Avatar actualizado en Clerk: ${avatarUrl}`);
       } catch (clerkError: any) {
         console.error('⚠️ Error al actualizar avatar en Clerk:', clerkError.message);
-        // No fallar la operación, el avatar local se actualizó
+        // Mantener el avatar anterior si falla
       }
     }
 
