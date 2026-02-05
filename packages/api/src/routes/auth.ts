@@ -112,6 +112,7 @@ router.post('/sync', requireAuth, async (req, res) => {
  * - tenantId: Si se proporciona, incluye el perfil de asesor para ese tenant
  */
 router.get('/me', requireAuth, async (req, res) => {
+  const startTime = Date.now();
   try {
     const clerkUserId = req.auth?.userId;
     const { tenantId } = req.query;
@@ -130,11 +131,20 @@ router.get('/me', requireAuth, async (req, res) => {
       return res.status(404).json({
         error: 'Usuario no encontrado',
         message: 'El usuario no existe en el sistema. Debe sincronizarse primero.',
+        clerkUserId,
       });
     }
 
     // Obtener usuario completo con roles
     const usuarioCompleto = await getUsuarioConRoles(usuario.id);
+
+    if (!usuarioCompleto) {
+      console.error(`⚠️ getUsuarioConRoles devolvió null para usuario ${usuario.id}`);
+      return res.status(500).json({
+        error: 'Error al obtener datos del usuario',
+        message: 'No se pudieron cargar los datos completos del usuario',
+      });
+    }
 
     // Si se proporciona tenantId, incluir perfil de asesor
     if (tenantId && typeof tenantId === 'string') {
@@ -144,9 +154,15 @@ router.get('/me', requireAuth, async (req, res) => {
       }
     }
 
+    const duration = Date.now() - startTime;
+    if (duration > 1000) {
+      console.warn(`⚠️ /auth/me tardó ${duration}ms para usuario ${usuario.email}`);
+    }
+
     res.json(usuarioCompleto);
   } catch (error: any) {
-    console.error('❌ Error en /auth/me:', error);
+    const duration = Date.now() - startTime;
+    console.error(`❌ Error en /auth/me (${duration}ms):`, error.message, error.stack);
     res.status(500).json({
       error: 'Error al obtener usuario',
       message: error.message,
@@ -343,8 +359,8 @@ router.put('/profile', requireAuth, uploadAvatar.single('avatar'), async (req, r
 
       // Subir imagen a Clerk
       try {
-        // Leer el archivo como buffer
-        const imageBuffer = fs.readFileSync(req.file.path);
+        // Leer el archivo como buffer (async para no bloquear)
+        const imageBuffer = await fs.promises.readFile(req.file.path);
         const base64Image = imageBuffer.toString('base64');
         const mimeType = req.file.mimetype;
         const dataUrl = `data:${mimeType};base64,${base64Image}`;

@@ -1260,11 +1260,13 @@ const styles = `
   }
 
   .badge-destacada {
+    position: static !important;
     background: rgba(245, 158, 11, 0.12);
     color: #d97706;
   }
 
   .badge-exclusiva {
+    position: static !important;
     background: rgba(98, 54, 255, 0.12);
     color: #6236FF;
   }

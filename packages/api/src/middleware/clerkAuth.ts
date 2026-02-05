@@ -191,7 +191,10 @@ export async function createClerkUser(data: {
     const clerkErrors = error.errors || error.clerkError?.errors;
     if (clerkErrors && Array.isArray(clerkErrors)) {
       const messages = clerkErrors.map((e: any) => e.longMessage || e.message).join('; ');
-      throw new Error(messages);
+      const codes = clerkErrors.map((e: any) => e.code).join('; ');
+      const err = new Error(messages);
+      (err as any).clerkErrorCodes = codes;
+      throw err;
     }
     throw new Error(error.message || 'Error desconocido al crear usuario en Clerk');
   }
@@ -215,7 +218,16 @@ export async function createClerkUserWithoutPassword(data: {
     });
   } catch (error: any) {
     console.error('Error al crear usuario en Clerk (sin contraseña):', error);
-    throw new Error(`Error al crear usuario: ${error.message}`);
+    // Extraer detalles de error de Clerk (igual que createClerkUser)
+    const clerkErrors = error.errors || error.clerkError?.errors;
+    if (clerkErrors && Array.isArray(clerkErrors)) {
+      const messages = clerkErrors.map((e: any) => e.longMessage || e.message).join('; ');
+      const codes = clerkErrors.map((e: any) => e.code).join('; ');
+      const err = new Error(messages);
+      (err as any).clerkErrorCodes = codes;
+      throw err;
+    }
+    throw new Error(error.message || 'Error desconocido al crear usuario en Clerk');
   }
 }
 

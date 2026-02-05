@@ -862,32 +862,81 @@ function extractAgentName(agent: any): string | null {
 }
 
 /**
- * Busca o crea un usuario por nombre (para asignar como agente)
+ * Resultado de búsqueda de agente con todos los IDs necesarios
  */
-async function findOrCreateAgent(tenantId: string, agentInput: any): Promise<string | null> {
+interface AgentLookupResult {
+  usuario_id: string;
+  perfil_asesor_id: string | null;
+}
+
+/**
+ * Busca un usuario por email o nombre y retorna usuario_id + perfil_asesor_id
+ */
+async function findAgentWithProfile(tenantId: string, agentInput: any): Promise<AgentLookupResult | null> {
+  if (!agentInput) return null;
+
+  // Extraer email del agente (más preciso que el nombre)
+  const agentEmail = typeof agentInput === 'object' ? agentInput.email?.toLowerCase() : null;
   const agentName = extractAgentName(agentInput);
-  if (!agentName) return null;
 
-  // Buscar usuario existente por nombre (usando la tabla de relación usuarios_tenants)
-  const searchSql = `
-    SELECT u.id
-    FROM usuarios u
-    INNER JOIN usuarios_tenants ut ON u.id = ut.usuario_id
-    WHERE ut.tenant_id = $1
-      AND ut.activo = true
-      AND u.activo = true
-      AND (u.nombre ILIKE $2 OR CONCAT(u.nombre, ' ', u.apellido) ILIKE $2)
-    LIMIT 1
-  `;
+  if (!agentEmail && !agentName) return null;
 
-  const result = await query(searchSql, [tenantId, `%${agentName}%`]);
+  // Primero buscar por email (más preciso)
+  if (agentEmail) {
+    const emailSearchSql = `
+      SELECT
+        u.id as usuario_id,
+        pa.id as perfil_asesor_id
+      FROM usuarios u
+      INNER JOIN usuarios_tenants ut ON u.id = ut.usuario_id
+      LEFT JOIN perfiles_asesor pa ON u.id = pa.usuario_id AND pa.tenant_id = $1
+      WHERE ut.tenant_id = $1
+        AND ut.activo = true
+        AND u.activo = true
+        AND LOWER(u.email) = $2
+      LIMIT 1
+    `;
 
-  if (result.rows.length > 0) {
-    return result.rows[0].id;
+    const emailResult = await query(emailSearchSql, [tenantId, agentEmail]);
+
+    if (emailResult.rows.length > 0) {
+      console.log(`  ✅ Agent found by email: ${agentEmail}`);
+      return {
+        usuario_id: emailResult.rows[0].usuario_id,
+        perfil_asesor_id: emailResult.rows[0].perfil_asesor_id,
+      };
+    }
   }
 
-  // No crear usuario automáticamente, solo retornar null
-  console.log(`⚠️ Agent not found: ${agentName}`);
+  // Si no se encontró por email, buscar por nombre
+  if (agentName) {
+    const nameSearchSql = `
+      SELECT
+        u.id as usuario_id,
+        pa.id as perfil_asesor_id
+      FROM usuarios u
+      INNER JOIN usuarios_tenants ut ON u.id = ut.usuario_id
+      LEFT JOIN perfiles_asesor pa ON u.id = pa.usuario_id AND pa.tenant_id = $1
+      WHERE ut.tenant_id = $1
+        AND ut.activo = true
+        AND u.activo = true
+        AND (u.nombre ILIKE $2 OR CONCAT(u.nombre, ' ', u.apellido) ILIKE $2)
+      LIMIT 1
+    `;
+
+    const nameResult = await query(nameSearchSql, [tenantId, `%${agentName}%`]);
+
+    if (nameResult.rows.length > 0) {
+      console.log(`  ✅ Agent found by name: ${agentName}`);
+      return {
+        usuario_id: nameResult.rows[0].usuario_id,
+        perfil_asesor_id: nameResult.rows[0].perfil_asesor_id,
+      };
+    }
+  }
+
+  // No encontrado
+  console.log(`  ⚠️ Agent not found: ${agentEmail || agentName}`);
   return null;
 }
 
@@ -930,11 +979,15 @@ async function importSingleProperty(
     // Transformar datos
     const propertyData = transformProperty(fullProperty, tenantId);
 
-    // Buscar agente si existe
+    // Buscar agente y asignar los 3 campos: agente_id, captador_id, perfil_asesor_id
     if (fullProperty.agents && fullProperty.agents.length > 0) {
-      const agentId = await findOrCreateAgent(tenantId, fullProperty.agents[0]);
-      if (agentId) {
-        propertyData.agente_id = agentId;
+      const agentResult = await findAgentWithProfile(tenantId, fullProperty.agents[0]);
+      if (agentResult) {
+        propertyData.agente_id = agentResult.usuario_id;
+        propertyData.captador_id = agentResult.usuario_id;
+        if (agentResult.perfil_asesor_id) {
+          propertyData.perfil_asesor_id = agentResult.perfil_asesor_id;
+        }
       }
     }
 
@@ -1070,11 +1123,15 @@ async function processPropertyBatch(
 
         const propertyData = transformProperty(fullProperty, tenantId);
 
-        // Buscar agente
+        // Buscar agente y asignar los 3 campos: agente_id, captador_id, perfil_asesor_id
         if (fullProperty.agents && fullProperty.agents.length > 0) {
-          const agentId = await findOrCreateAgent(tenantId, fullProperty.agents[0]);
-          if (agentId) {
-            propertyData.agente_id = agentId;
+          const agentResult = await findAgentWithProfile(tenantId, fullProperty.agents[0]);
+          if (agentResult) {
+            propertyData.agente_id = agentResult.usuario_id;
+            propertyData.captador_id = agentResult.usuario_id;
+            if (agentResult.perfil_asesor_id) {
+              propertyData.perfil_asesor_id = agentResult.perfil_asesor_id;
+            }
           }
         }
 
