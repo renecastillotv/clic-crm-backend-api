@@ -55,6 +55,14 @@ import {
   getTagTipos
 } from '../services/adminTagsGlobalService.js';
 import {
+  getPortalesCatalogo,
+  getPortalCatalogoById,
+  createPortalCatalogo,
+  updatePortalCatalogo,
+  deletePortalCatalogo,
+  togglePortalCatalogoStatus,
+} from '../services/adminPortalesCatalogoService.js';
+import {
   getAllModulos,
   getModulosByRol,
   getRolModulosMatrix,
@@ -1832,6 +1840,76 @@ router.post('/tags-global/:id/toggle', async (req, res) => {
       error: 'Error al cambiar estado',
       message: error.message
     });
+  }
+});
+
+// ==================== PORTALES CATÁLOGO ====================
+
+router.get('/portales-catalogo', async (req, res) => {
+  try {
+    const { activo, search } = req.query;
+    const filters: any = {};
+    if (activo !== undefined) filters.activo = activo === 'true';
+    if (search) filters.search = String(search);
+    const portales = await getPortalesCatalogo(filters);
+    res.json({ portales });
+  } catch (error: any) {
+    console.error('Error en GET /admin/portales-catalogo:', error);
+    res.status(500).json({ error: 'Error al obtener portales', message: error.message });
+  }
+});
+
+router.get('/portales-catalogo/:id', async (req, res) => {
+  try {
+    const portal = await getPortalCatalogoById(req.params.id);
+    if (!portal) return res.status(404).json({ error: 'Portal no encontrado' });
+    res.json({ portal });
+  } catch (error: any) {
+    console.error('Error en GET /admin/portales-catalogo/:id:', error);
+    res.status(500).json({ error: 'Error al obtener portal', message: error.message });
+  }
+});
+
+router.post('/portales-catalogo', async (req, res) => {
+  try {
+    const portal = await createPortalCatalogo(req.body);
+    res.status(201).json({ portal });
+  } catch (error: any) {
+    console.error('Error en POST /admin/portales-catalogo:', error);
+    res.status(400).json({ error: 'Error al crear portal', message: error.message });
+  }
+});
+
+router.put('/portales-catalogo/:id', async (req, res) => {
+  try {
+    const portal = await updatePortalCatalogo(req.params.id, req.body);
+    res.json({ portal });
+  } catch (error: any) {
+    console.error('Error en PUT /admin/portales-catalogo/:id:', error);
+    res.status(400).json({ error: 'Error al actualizar portal', message: error.message });
+  }
+});
+
+router.delete('/portales-catalogo/:id', async (req, res) => {
+  try {
+    const deleted = await deletePortalCatalogo(req.params.id);
+    if (!deleted) return res.status(404).json({ error: 'Portal no encontrado' });
+    res.json({ success: true, message: 'Portal eliminado' });
+  } catch (error: any) {
+    console.error('Error en DELETE /admin/portales-catalogo/:id:', error);
+    res.status(400).json({ error: 'Error al eliminar portal', message: error.message });
+  }
+});
+
+router.post('/portales-catalogo/:id/toggle', async (req, res) => {
+  try {
+    const { activo } = req.body;
+    if (activo === undefined) return res.status(400).json({ error: 'El campo "activo" es requerido' });
+    const portal = await togglePortalCatalogoStatus(req.params.id, activo);
+    res.json({ portal });
+  } catch (error: any) {
+    console.error('Error en POST /admin/portales-catalogo/:id/toggle:', error);
+    res.status(400).json({ error: 'Error al cambiar estado', message: error.message });
   }
 });
 

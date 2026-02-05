@@ -475,4 +475,19 @@ router.get('/todos', async (req, res) => {
   }
 });
 
+// ============================================================
+// PORTALES
+// ============================================================
+
+router.get('/portales', async (req, res) => {
+  try {
+    const { getPortalesCatalogoActivos } = await import('../services/adminPortalesCatalogoService.js');
+    const portales = await getPortalesCatalogoActivos();
+    res.json(portales);
+  } catch (error: any) {
+    console.error('Error al obtener portales:', error);
+    res.status(500).json({ error: error.message || 'Error al obtener portales' });
+  }
+});
+
 export default router;
