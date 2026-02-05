@@ -6,6 +6,7 @@
 
 import express from 'express';
 import multer from 'multer';
+import sharp from 'sharp';
 import { requireAuth, optionalAuth, createClerkUser, deleteClerkUser, updateClerkUser, clerkClient } from '../middleware/clerkAuth.js';
 import {
   getUsuarioByEmail,
@@ -335,13 +336,18 @@ router.put('/profile', requireAuth, uploadAvatar.single('avatar'), async (req, r
     let avatarUrl = usuario.avatarUrl;
     if (req.file && req.file.buffer) {
       try {
-        // Crear Blob desde el buffer para la API de Clerk
-        const blob = new Blob([req.file.buffer], { type: req.file.mimetype });
+        // Procesar imagen: fondo blanco (elimina transparencia) + convertir a JPEG
+        const processedBuffer = await sharp(req.file.buffer)
+          .flatten({ background: '#ffffff' })
+          .jpeg({ quality: 90 })
+          .resize(500, 500, { fit: 'cover', position: 'center' })
+          .toBuffer();
+
+        // Crear File desde el buffer procesado (mejor compat. serverless)
+        const file = new File([processedBuffer], 'avatar.jpg', { type: 'image/jpeg' });
 
         // Subir imagen a Clerk
-        await clerkClient.users.updateUserProfileImage(clerkUserId, {
-          file: blob,
-        });
+        await clerkClient.users.updateUserProfileImage(clerkUserId, { file });
 
         // Obtener URL actualizada del usuario en Clerk
         const updatedClerkUser = await clerkClient.users.getUser(clerkUserId);
@@ -350,7 +356,7 @@ router.put('/profile', requireAuth, uploadAvatar.single('avatar'), async (req, r
         console.log(`✅ Avatar actualizado en Clerk: ${avatarUrl}`);
       } catch (clerkError: any) {
         console.error('⚠️ Error al actualizar avatar en Clerk:', clerkError.message);
-        // Mantener el avatar anterior si falla
+        console.error('  Detalle:', JSON.stringify(clerkError.errors || clerkError.clerkError || clerkError.status || 'unknown'));
       }
     }
 
