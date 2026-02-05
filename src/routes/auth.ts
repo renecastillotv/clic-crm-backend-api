@@ -335,13 +335,12 @@ router.put('/profile', requireAuth, uploadAvatar.single('avatar'), async (req, r
     let avatarUrl = usuario.avatarUrl;
     if (req.file && req.file.buffer) {
       try {
-        const base64Image = req.file.buffer.toString('base64');
-        const mimeType = req.file.mimetype;
-        const dataUrl = `data:${mimeType};base64,${base64Image}`;
+        // Crear Blob desde el buffer para la API de Clerk
+        const blob = new Blob([req.file.buffer], { type: req.file.mimetype });
 
         // Subir imagen a Clerk
         await clerkClient.users.updateUserProfileImage(clerkUserId, {
-          file: dataUrl as any,
+          file: blob,
         });
 
         // Obtener URL actualizada del usuario en Clerk
